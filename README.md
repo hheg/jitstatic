@@ -1,0 +1,48 @@
+jitstatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET.
+
+You can push an pull from it as if it were an ordinary git repo. Accessing the repo and the data enpoint can be configured to be on separate user/password combinations.
+
+Uses dropwizards simple configuration.
+Example configuration
+
+```
+server:
+  type: simple
+  maxThreads: 1024
+  idleThreadTimeout: 1 h
+  connector:
+    type: http
+    port: 0
+  requestLog:
+    appenders:
+      - type: console
+logging:
+  level: INFO
+  appenders:
+    - type: console
+storage:
+    baseDirectory: /tmp/acceptance
+    localFilePath: /test/storage
+    user: suser
+    secret: ssecret
+hosted:
+    basePath: file:/tmp/remote
+    servletName: selfhosted
+    hostedEndpoint: git
+    userName: huser
+    secret: hseCr3t
+
+```
+storage is the key-value endpoint and hosted is the git endpoint. You can configure a remote repo too.
+
+The repository should contain a file `storage.localFilePath` which contains the data. The data must be in json and in the format of:
+```
+{"urlkey":{"key":"value"}}
+```
+`urlkey` will be the accesspoint for getting the map {"key":"value"}, and the `"value"` could be any object.
+
+To reach the `urlkey` data the adress could look like this: 
+```
+http://localhost:8080/storage/urlkey
+```
+Right now the application only allowes basic authentication so be sure you secure it with HTTPS.

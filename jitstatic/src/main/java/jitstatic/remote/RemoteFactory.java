@@ -1,0 +1,75 @@
+package jitstatic.remote;
+
+/*-
+ * #%L
+ * jitstatic
+ * %%
+ * Copyright (C) 2017 HHegardt
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
+import java.net.URI;
+
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.dropwizard.setup.Environment;
+import jitstatic.remote.RemoteRepostioryManager;
+import jitstatic.source.Source;
+
+public class RemoteFactory {
+
+	@NotNull
+	@JsonProperty
+	private URI remoteRepo;
+
+	@JsonProperty
+	private String userName;
+
+	@JsonProperty
+	private String remotePassword = "";
+
+	public URI getRemoteRepo() {
+		return remoteRepo;
+	}
+
+	public void setRemoteRepo(URI remoteRepo) {
+		this.remoteRepo = remoteRepo;
+	}
+
+	public String getUserName() {
+		return userName;
+	}
+
+	public void setUserName(String userName) {
+		this.userName = userName;
+	}
+
+	public String getRemotePassword() {
+		return remotePassword;
+	}
+
+	public void setRemotePassword(String remotePassword) {
+		this.remotePassword = remotePassword;
+	}
+
+	public Source build(Environment env) {
+		if (!getRemoteRepo().isAbsolute())
+			throw new IllegalArgumentException(String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
+		return new RemoteRepostioryManager(getRemoteRepo(), getUserName(), getRemotePassword());
+	}
+
+}

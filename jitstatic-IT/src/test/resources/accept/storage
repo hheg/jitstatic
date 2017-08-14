@@ -1,0 +1,7 @@
+{
+	"key":{ "key" : "value"},
+	"map":{ "map" : {
+		"key" : "value"
+	}},
+	"array": {"array":["value1","value2"]}
+}
