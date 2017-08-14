@@ -8,7 +8,7 @@
 	<modules>
 		<module>jitstatic</module>
 		<module>storage</module>
-		<module>remote</module>
+		<module>source</module>
 		<module>jitstatic-IT</module>
 	</modules>
 	<properties>
