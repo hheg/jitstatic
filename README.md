@@ -7,6 +7,7 @@ Example configuration
 
 ```
 server:
+  applicationContextPath: /app/
   type: simple
   maxThreads: 1024
   connector:
@@ -41,6 +42,12 @@ The repository should contain a file `storage.localFilePath` which contains the 
 
 To reach the `urlkey` data the adress could look like this: 
 ```
-http://localhost:8080/storage/urlkey
+http://localhost:8080/app/storage/urlkey
 ```
-Right now the application only allowes basic authentication so be sure you secure it with HTTPS.
+To clone the repo you just type
+```
+git clone http://huser:hsecr3t@localhost:8080/app/jitstatic/jitstatic.git
+```
+The database is contained in the file `test/storage`
+
+Right now the application only allowes basic authentication so be sure you secure it with HTTPS by using standard Dropwizard HTTPS configuration.

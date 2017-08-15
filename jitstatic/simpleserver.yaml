@@ -1,4 +1,5 @@
 server:
+  applicationContextPath: /app
   type: simple
   maxThreads: 1024
   connector:
