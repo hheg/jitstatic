@@ -9,16 +9,6 @@
 	<artifactId>jitstatic</artifactId>
 	<dependencies>
 		<dependency>
-			<groupId>org.simple</groupId>
-			<artifactId>source</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>org.simple</groupId>
-			<artifactId>storage</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-		</dependency>
-		<dependency>
 			<groupId>io.dropwizard</groupId>
 			<artifactId>dropwizard-core</artifactId>
 		</dependency>
@@ -27,13 +17,14 @@
 			<artifactId>dropwizard-auth</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-annotations</artifactId>
+			<groupId>io.dropwizard</groupId>
+			<artifactId>dropwizard-lifecycle</artifactId>
+			<version>1.1.2</version>
 		</dependency>
 		<dependency>
-			<groupId>org.glassfish.jersey.core</groupId>
-			<artifactId>jersey-server</artifactId>
-			<version>2.25.1</version>
+			<groupId>io.dropwizard</groupId>
+			<artifactId>dropwizard-jetty</artifactId>
+			<version>1.1.2</version>
 		</dependency>
 		<dependency>
 			<groupId>io.dropwizard</groupId>
@@ -41,9 +32,13 @@
 			<version>1.1.2</version>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.jetty</groupId>
-			<artifactId>jetty-server</artifactId>
-			<version>9.4.2.v20170220</version>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-annotations</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<version>4.5.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.jgit</groupId>
@@ -54,9 +49,14 @@
 			<artifactId>org.eclipse.jgit.http.server</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>io.dropwizard</groupId>
-			<artifactId>dropwizard-metrics</artifactId>
-			<version>1.1.2</version>
+			<groupId>org.glassfish.jersey.core</groupId>
+			<artifactId>jersey-server</artifactId>
+			<version>2.25.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-server</artifactId>
+			<version>9.4.2.v20170220</version>
 		</dependency>
 		<dependency>
 			<groupId>io.dropwizard.metrics</groupId>
@@ -74,9 +74,19 @@
 			<version>5.3.4.Final</version>
 		</dependency>
 		<dependency>
-			<groupId>io.dropwizard</groupId>
-			<artifactId>dropwizard-lifecycle</artifactId>
-			<version>1.1.2</version>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-security</artifactId>
+			<version>9.4.2.v20170220</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-util</artifactId>
+			<version>9.4.2.v20170220</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.validation</groupId>
+			<artifactId>validation-api</artifactId>
+			<version>1.1.0.Final</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.annotation</groupId>
@@ -94,24 +104,14 @@
 			<version>2.0.1</version>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.jetty</groupId>
-			<artifactId>jetty-security</artifactId>
-			<version>9.4.2.v20170220</version>
+			<groupId>org.simple</groupId>
+			<artifactId>source</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.jetty</groupId>
-			<artifactId>jetty-util</artifactId>
-			<version>9.4.2.v20170220</version>
-		</dependency>
-		<dependency>
-			<groupId>io.dropwizard</groupId>
-			<artifactId>dropwizard-jetty</artifactId>
-			<version>1.1.2</version>
-		</dependency>
-		<dependency>
-			<groupId>javax.validation</groupId>
-			<artifactId>validation-api</artifactId>
-			<version>1.1.0.Final</version>
+			<groupId>org.simple</groupId>
+			<artifactId>storage</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.glassfish.jersey.test-framework.providers</groupId>

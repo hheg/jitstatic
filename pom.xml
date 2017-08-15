@@ -20,7 +20,7 @@
 		<jersey.version>2.25.1</jersey.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.build.fileEncoding>UTF-8</project.build.fileEncoding>
-		<maven.verison>3.0</maven.verison>
+		<maven.version>3.0</maven.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -132,7 +132,7 @@
 				<configuration>
 					<licenseName>apache_v2</licenseName>
 					<inceptionYear>2017</inceptionYear>
-					<organizationName>HHegardt</organizationName>
+					<organizationName>H.Hegardt</organizationName>
 					<projectName>jitstatic</projectName>					
 				</configuration>
 				<executions>
