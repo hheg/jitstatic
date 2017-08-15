@@ -101,10 +101,11 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 			}
 			return git.getRepository();
 		} else {
+			Repository repository = new FileRepositoryBuilder().findGitDir(workingRepo.toFile()).readEnvironment().setMustExist(true)
+			.build();
 			if (!Files.exists(localStorage))
-				throw new FileNotFoundException(localStorage.toString());
-			return new FileRepositoryBuilder().findGitDir(workingRepo.toFile()).readEnvironment().setMustExist(true)
-					.build();
+				throw new FileNotFoundException(localStorage.toString()+". Cannot boot without this storage file. Please create it in order to boot.");
+			return repository;
 		}
 	}
 

@@ -14,7 +14,7 @@ logging:
     - type: console
 storage:
     baseDirectory: /tmp/acceptance
-    localFilePath: /test/storage
+    localFilePath: test/storage
     user: suser
     secret: ssecret
 hosted:

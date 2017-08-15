@@ -1,10 +1,9 @@
 server:
   type: simple
   maxThreads: 1024
-  idleThreadTimeout: 1 h
   connector:
     type: http
-    port: 0
+    port: 8080
   requestLog:
     appenders:
       - type: console
@@ -13,10 +12,14 @@ logging:
   appenders:
     - type: console
 storage:
-    baseDirectory: /tmp/acceptance
+    baseDirectory: /tmp/jitstatic/storage
     localFilePath: test/storage
     user: suser
     secret: ssecret
-remote:
-    remoteRepo: file://tmp/remote
+hosted:
+    basePath: file:/tmp/jitstatic/remote
+    servletName: jitstatic
+    hostedEndpoint: jitstatic.git
+    userName: huser
+    secret: hseCr3t
     
