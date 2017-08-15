@@ -9,10 +9,9 @@ Example configuration
 server:
   type: simple
   maxThreads: 1024
-  idleThreadTimeout: 1 h
   connector:
     type: http
-    port: 0
+    port: 8080
   requestLog:
     appenders:
       - type: console
@@ -21,17 +20,16 @@ logging:
   appenders:
     - type: console
 storage:
-    baseDirectory: /tmp/acceptance
-    localFilePath: /test/storage
+    baseDirectory: /tmp/jitstatic/storage
+    localFilePath: test/storage
     user: suser
     secret: ssecret
 hosted:
-    basePath: file:/tmp/remote
-    servletName: selfhosted
-    hostedEndpoint: git
+    basePath: file:/tmp/jitstatic/remote
+    servletName: jitstatic
+    hostedEndpoint: jitstatic.git
     userName: huser
     secret: hseCr3t
-
 ```
 storage is the key-value endpoint and hosted is the git endpoint. You can configure a remote repo too.
 
