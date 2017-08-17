@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/hheg/jitstatic.svg?branch=master)](https://travis-ci.org/hheg/jitstatic)
+[![Coverage Status](https://coveralls.io/repos/github/hheg/jitstatic/badge.svg?branch=master)](https://coveralls.io/github/hheg/jitstatic?branch=master)
+
 jitstatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET.
 
 You can push an pull from it as if it were an ordinary git repo. Accessing the repo and the data enpoint can be configured to be on separate user/password combinations.
