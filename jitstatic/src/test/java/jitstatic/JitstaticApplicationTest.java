@@ -164,7 +164,7 @@ public class JitstaticApplicationTest {
 		verify(lifecycle, times(2)).manage(ArgumentMatchers.<AutoCloseableLifeCycleManager<Storage>>any());
 	}
 	@Test
-	public void testAddingAstorageListener() throws Exception {
+	public void testAddingAStorageListener() throws Exception {
 		config.setHostedFactory(hostedFactory);
 		when(hostedFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
