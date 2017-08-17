@@ -104,7 +104,7 @@ public class GitStorage implements Storage {
 	public void checkHealth() {
 		try {
 			//refresh();
-			final Path storage = checkStorage();
+			checkStorage();
 			//readStorage(storage);			
 		} catch (Exception e) {
 			throw new RuntimeException(e);

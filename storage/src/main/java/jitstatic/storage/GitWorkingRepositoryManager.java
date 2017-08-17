@@ -20,7 +20,6 @@ package jitstatic.storage;
  * #L%
  */
 
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,7 +85,11 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 			final Git git = clone.call();
 			if (!Files.exists(localStorage)) {
 				logger.debug("Storage {} doesn't exist, creating", localStorage);
-				Files.createDirectories(localStorage.getParent());
+				Path parent = localStorage.getParent();
+				if (parent != null) {
+					Files.createDirectories(parent);
+				}
+
 				try (InputStream emptyJson = getClass().getResourceAsStream("/empty.json");) {
 					Files.copy(emptyJson, localStorage);
 				}
@@ -101,10 +104,11 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 			}
 			return git.getRepository();
 		} else {
-			Repository repository = new FileRepositoryBuilder().findGitDir(workingRepo.toFile()).readEnvironment().setMustExist(true)
-			.build();
+			Repository repository = new FileRepositoryBuilder().findGitDir(workingRepo.toFile()).readEnvironment()
+					.setMustExist(true).build();
 			if (!Files.exists(localStorage))
-				throw new FileNotFoundException(localStorage.toString()+". Cannot boot without this storage file. Please create it in order to boot.");
+				throw new FileNotFoundException(localStorage.toString()
+						+ ". Cannot boot without this storage file. Please create it in order to boot.");
 			return repository;
 		}
 	}
@@ -128,8 +132,13 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 	}
 
 	public Path resolvePath(String fileStorage) {
-		Path resolved = workingRepository.getDirectory().toPath().getParent().resolve(fileStorage);
-		return (Files.exists(resolved) ? resolved : null);
+		Path parent = workingRepository.getDirectory().toPath().getParent();
+		if (parent != null) {
+			Path resolved = parent.resolve(fileStorage);
+			if (Files.exists(resolved))
+				return resolved;
+		}
+		return null;
 	}
 
 }
