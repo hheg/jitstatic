@@ -25,6 +25,12 @@
 	<prerequisites>
 		<maven>3.0.1</maven>
 	</prerequisites>
+	 <licenses>
+        <license>
+          <name>Apache Software License - Version 2.0</name>
+          <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+	</licenses>
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
