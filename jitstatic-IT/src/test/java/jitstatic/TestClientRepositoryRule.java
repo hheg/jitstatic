@@ -33,7 +33,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.api.RemoteAddCommand;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.rules.ExternalResource;
@@ -66,7 +65,7 @@ public class TestClientRepositoryRule extends ExternalResource {
 			cloneCommand.setCredentialsProvider(upcp);
 		}
 
-		try (Git git = cloneCommand.call(); Repository r = git.getRepository()) {
+		try (Git git = cloneCommand.call()) {
 			for (String file : filesToCommit) {
 				final Path filePath = base.resolve(file);
 				Files.createDirectories(filePath.getParent());

@@ -63,5 +63,18 @@ public class GitRecievePackListenerTest {
 		grpl.requestDestroyed(servletRequstEvent);
 		verify(sourceEventListener,times(0)).onEvent();	
 	}
+	
+	@Test
+	public void testShouldNotSignalOnWebMethodOtherThanPost() {
+		String url = "http://localhost:8080/application/git/git-receive-pack";
+		when(servletRequstEvent.getServletRequest()).thenReturn(httpServletRequest);
+		when(httpServletRequest.getMethod()).thenReturn("GET");
+		when(httpServletRequest.getRequestURL()).thenReturn(new StringBuffer(url));
+		
+		GitRecievePackListener grpl = new GitRecievePackListener();
+		grpl.addListener(sourceEventListener);
+		grpl.requestDestroyed(servletRequstEvent);
+		verify(sourceEventListener,times(0)).onEvent();
+	}
 
 }

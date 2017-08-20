@@ -94,7 +94,7 @@ public class StorageFactory {
 				remote.getContact());
 		try {
 			GitStorage gitStorage = new GitStorage(getLocalFilePath(), gwrm);
-			gitStorage.load();
+			gitStorage.load();// TODO remove this
 			return gitStorage;
 		} catch (IllegalArgumentException | LoaderException e) {
 			StorageUtils.closeSilently(gwrm);

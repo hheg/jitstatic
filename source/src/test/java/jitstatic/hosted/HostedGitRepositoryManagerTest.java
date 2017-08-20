@@ -19,12 +19,14 @@ package jitstatic.hosted;
  * limitations under the License.
  * #L%
  */
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
@@ -40,10 +42,9 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
-import jitstatic.hosted.HostedGitRepositoryManager;
-
 public class HostedGitRepositoryManagerTest {
 
+	private static final String ENDPOINT = "endpoint";
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 	@Rule
@@ -59,7 +60,7 @@ public class HostedGitRepositoryManagerTest {
 
 	@Test
 	public void testCreatedBareDirectory() {
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint");) {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT);) {
 			assertTrue(Files.exists(tempDir.resolve(HostedGitRepositoryManager.BARE).resolve("HEAD")));
 		}
 	}
@@ -68,7 +69,7 @@ public class HostedGitRepositoryManagerTest {
 	public void testForDirectory() {
 		ex.expect(IllegalArgumentException.class);
 		ex.expectMessage(String.format("Path %s is not a directory", tempFile));
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempFile, "endpoint");) {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempFile, ENDPOINT);) {
 		}
 	}
 
@@ -79,7 +80,7 @@ public class HostedGitRepositoryManagerTest {
 		Set<PosixFilePermission> perms = PosixFilePermissions.fromString("r-xr-x---");
 		Files.setPosixFilePermissions(tempDir, perms);
 
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint");) {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT);) {
 		}
 	}
 
@@ -101,8 +102,8 @@ public class HostedGitRepositoryManagerTest {
 	@Test
 	public void testGetRepositoryResolver() throws RepositoryNotFoundException, ServiceMayNotContinueException,
 			ServiceNotAuthorizedException, ServiceNotEnabledException {
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint");) {
-			Repository open = grm.getRepositoryResolver().open(null, "endpoint");
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT);) {
+			Repository open = grm.getRepositoryResolver().open(null, ENDPOINT);
 			assertNotNull(open);
 		}
 	}
@@ -111,8 +112,20 @@ public class HostedGitRepositoryManagerTest {
 	public void testNotFoundRepositoryResolver() throws RepositoryNotFoundException, ServiceMayNotContinueException,
 			ServiceNotAuthorizedException, ServiceNotEnabledException {
 		ex.expect(RepositoryNotFoundException.class);
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint");) {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT);) {
 			grm.getRepositoryResolver().open(null, "something");
+		}
+	}
+
+	@Test
+	public void testMountingOnExistingGitRepository() {
+		Path bareRepo;
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT)) {
+			bareRepo = Paths.get(grm.getContact().repositoryURI());
+		}
+
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT)) {
+			assertEquals(bareRepo, Paths.get(grm.getContact().repositoryURI()));
 		}
 	}
 

@@ -49,7 +49,7 @@ public class TestRepositoryRule extends ExternalResource {
 
 		try (Git bareGit = Git.init().setBare(true).setDirectory(bareBase.toFile()).call();
 				Git git = Git.cloneRepository().setURI(bareBase.toUri().toString()).setDirectory(workBase.toFile())
-						.call()) {
+						.call();) {
 			for (String file : filesToCommit) {
 				final Path filePath = workBase.resolve(file);
 				Files.createDirectories(filePath.getParent());
