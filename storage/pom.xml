@@ -4,14 +4,14 @@
 	<parent>
 		<groupId>org.simple</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
+		<version>0.0.1</version>
 	</parent>
 	<artifactId>storage</artifactId>
 	<dependencies>
 		<dependency>
 			<groupId>org.simple</groupId>
 			<artifactId>source</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
