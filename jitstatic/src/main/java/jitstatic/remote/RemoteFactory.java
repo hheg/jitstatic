@@ -27,7 +27,7 @@ import javax.validation.constraints.NotNull;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
-import jitstatic.remote.RemoteRepostioryManager;
+import jitstatic.remote.RemoteManager;
 import jitstatic.source.Source;
 
 public class RemoteFactory {
@@ -68,8 +68,9 @@ public class RemoteFactory {
 
 	public Source build(Environment env) {
 		if (!getRemoteRepo().isAbsolute())
-			throw new IllegalArgumentException(String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
-		return new RemoteRepostioryManager(getRemoteRepo(), getUserName(), getRemotePassword());
+			throw new IllegalArgumentException(
+					String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
+		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword());
 	}
 
 }

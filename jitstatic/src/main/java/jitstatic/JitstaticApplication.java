@@ -1,5 +1,10 @@
 package jitstatic;
 
+
+
+import org.slf4j.LoggerFactory;
+
+
 /*-
  * #%L
  * jitstatic
@@ -32,6 +37,8 @@ import jitstatic.storage.LoaderException;
 import jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
+	
+	private final org.slf4j.Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
 
 	public static void main(final String[] args) throws Exception {
 		new JitstaticApplication().run(args);
@@ -52,12 +59,14 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
 			if (hostedFactory != null) {
 				source = hostedFactory.build(env);
+				if(config.getRemoteFactory() != null) {
+					log.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
+				}
 			} else {
 				source = config.getRemoteFactory().build(env);
 			}
 
-			final Storage s = storage = config.getStorageFactory().build(source, env);
-			// TODO fix this more robust. This should't fail at this moment.
+			final Storage s = storage = config.getStorageFactory().build(source, env);			
 			source.addListener(new SourceEventListener() {				
 				@Override
 				public void onEvent() {
@@ -68,7 +77,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 				}
 			});
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
-			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(source));
+			env.lifecycle().manage(new ManagedObject<>(source));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
 			env.jersey().register(new MapResource(storage));
 		} catch (Exception e) {

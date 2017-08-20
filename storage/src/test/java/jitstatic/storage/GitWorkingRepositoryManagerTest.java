@@ -152,6 +152,12 @@ public class GitWorkingRepositoryManagerTest {
 		try(GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(newPath, STORAGE, remoteRepo)){
 			assertTrue(Files.exists(newstorage));
 		}
-		
+	}
+	@Test
+	public void testRemoteContactInfoIsNull() {
+		ex.expect(NullPointerException.class);
+		ex.expectMessage("remoteContactInfo cannot be null");
+		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, null);) {			
+		}
 	}
 }

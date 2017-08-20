@@ -132,7 +132,7 @@ public class HostedFactory {
 		
 		final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
 		servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());
-		servlet.setInitParameter(EXPOSE_ALL, Boolean.toString(isExposeAll())); // TODO this shouldn't be changeable ?
+		servlet.setInitParameter(EXPOSE_ALL, Boolean.toString(isExposeAll()));
 		servlet.setInitParameter(SERVLET_NAME, getServletName());
 		servlet.addMapping(baseServletPath);
 

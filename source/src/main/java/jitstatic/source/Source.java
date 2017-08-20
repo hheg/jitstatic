@@ -26,6 +26,7 @@ public interface Source extends AutoCloseable {
 	public void close();
 	public void addListener(SourceEventListener listener);
 	public Contact getContact();
+	public void start();
 	public interface Contact {
 		public URI repositoryURI();
 		public String getUserName();

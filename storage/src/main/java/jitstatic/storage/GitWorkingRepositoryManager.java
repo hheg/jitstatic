@@ -58,7 +58,8 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 			throw new IllegalArgumentException(String.format("Path %s is not writeable", baseDirectory));
 
 		try {
-			this.workingRepository = setUpWorkingRepository(baseDirectory, remoteContactInfo,
+			this.workingRepository = setUpWorkingRepository(baseDirectory,
+					Objects.requireNonNull(remoteContactInfo, "remoteContactInfo cannot be null"),
 					Objects.requireNonNull(localStorageFilePath));
 		} catch (IllegalStateException | GitAPIException | IOException e) {
 			throw new RuntimeException(e);

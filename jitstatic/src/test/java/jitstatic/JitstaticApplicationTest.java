@@ -34,7 +34,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -117,8 +116,7 @@ public class JitstaticApplicationTest {
 		config.setHostedFactory(hostedFactory);
 		when(hostedFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
-		// TODO Fix so this is more accurate
-		verify(lifecycle, times(2)).manage(ArgumentMatchers.<AutoCloseableLifeCycleManager<Source>>any());
+		verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
 	}
 
 	@Test
@@ -126,8 +124,7 @@ public class JitstaticApplicationTest {
 		config.setHostedFactory(hostedFactory);
 		when(hostedFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
-		// TODO Fix so this is more accurate
-		verify(lifecycle, times(2)).manage(ArgumentMatchers.<AutoCloseableLifeCycleManager<Storage>>any());
+		verify(lifecycle, times(1)).manage(isA(AutoCloseableLifeCycleManager.class));
 	}
 
 	@Test
@@ -151,8 +148,7 @@ public class JitstaticApplicationTest {
 		config.setRemoteFactory(remoteFactory);
 		when(remoteFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
-		// TODO Fix so this is more accurate
-		verify(lifecycle, times(2)).manage(ArgumentMatchers.<AutoCloseableLifeCycleManager<Source>>any());
+		verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
 	}
 
 	@Test
@@ -160,15 +156,14 @@ public class JitstaticApplicationTest {
 		config.setRemoteFactory(remoteFactory);
 		when(remoteFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
-		// TODO Fix so this is more accurate
-		verify(lifecycle, times(2)).manage(ArgumentMatchers.<AutoCloseableLifeCycleManager<Storage>>any());
+		verify(lifecycle, times(1)).manage(isA(AutoCloseableLifeCycleManager.class));
 	}
 	@Test
 	public void testAddingAStorageListener() throws Exception {
 		config.setHostedFactory(hostedFactory);
 		when(hostedFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
-		verify(source).addListener(any(SourceEventListener.class));
+		verify(source).addListener(isA(SourceEventListener.class));
 	}
 
 	@Test

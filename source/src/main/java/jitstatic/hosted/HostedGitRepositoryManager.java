@@ -63,7 +63,7 @@ class HostedGitRepositoryManager implements Source {
 
 		try {
 			this.bareRepository = setUpBareRepository(workingDirectory);
-		} catch (IllegalStateException | GitAPIException | IOException e) {
+		} catch (final IllegalStateException | GitAPIException | IOException e) {
 			throw new RuntimeException(e);
 		}
 		this.listener = new GitRecievePackListener();
@@ -131,5 +131,10 @@ class HostedGitRepositoryManager implements Source {
 				return null;
 			}
 		};
+	}
+
+	@Override
+	public void start() {
+		// noop		
 	}
 }
