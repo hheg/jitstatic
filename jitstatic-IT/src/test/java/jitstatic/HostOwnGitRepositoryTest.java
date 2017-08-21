@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -101,12 +102,12 @@ public class HostOwnGitRepositoryTest {
 	private String storageAdress;
 
 	@BeforeClass
-	public static void setupClass() {
+	public static void setupClass() throws UnsupportedEncodingException {
 		provider = new UsernamePasswordCredentialsProvider(drop.getConfiguration().getHostedFactory().getUserName(),
 				drop.getConfiguration().getHostedFactory().getSecret());
 		StorageFactory storage = drop.getConfiguration().getStorageFactory();
 		basic = "Basic "
-				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes());
+				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
 		hcc.setConnectionRequestTimeout(Duration.minutes(1));
 		hcc.setConnectionTimeout(Duration.minutes(1));
 		hcc.setTimeout(Duration.minutes(1));

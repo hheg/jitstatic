@@ -27,6 +27,7 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -111,7 +112,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 	private final ObjectMapper mapper = new ObjectMapper();
 
 	@BeforeClass
-	public static void setup() {
+	public static void setup() throws UnsupportedEncodingException {
 		remoteAdress = String.format("http://localhost:%d/application", remote.getLocalPort());
 		localAdress = String.format("http://localhost:%d/application", local.getLocalPort());
 
@@ -217,8 +218,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 		};
 	}
 
-	private static String buildBasicAuth(final String user, final String password) {
-		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes());
+	private static String buildBasicAuth(final String user, final String password) throws UnsupportedEncodingException {
+		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes("UTF-8"));
 	}
 
 	private static Supplier<String> getRepo() {
