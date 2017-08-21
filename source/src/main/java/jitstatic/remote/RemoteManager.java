@@ -37,14 +37,18 @@ class RemoteManager implements Source {
 	private final RemoteRepositoryManager remoteRepoManager;
 
 	private volatile ScheduledFuture<?> job;
+	private final long duration;
+	private final TimeUnit unit;
 
-	public RemoteManager(final URI remoteRepoManager, final String userName, final String password) {
-		this(new RemoteRepositoryManager(remoteRepoManager, userName, password), new ScheduledThreadPoolExecutor(1));
+	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, long duration, TimeUnit unit) {
+		this(new RemoteRepositoryManager(remoteRepoManager, userName, password), new ScheduledThreadPoolExecutor(1), duration, unit);
 	}
 
-	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledThreadPoolExecutor scheduler) {
+	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledThreadPoolExecutor scheduler, long duration, TimeUnit unit) {
 		this.remoteRepoManager = Objects.requireNonNull(remoteRepoManager);
 		this.poller = Objects.requireNonNull(scheduler);
+		this.unit = Objects.requireNonNull(unit);
+		this.duration = (duration <= 0 ? _5 : duration);		
 	}
 
 	@Override
@@ -67,7 +71,7 @@ class RemoteManager implements Source {
 
 	@Override
 	public void start() {
-		this.job = this.poller.scheduleWithFixedDelay(this.remoteRepoManager.checkRemote(), 0, _5, TimeUnit.SECONDS);
+		this.job = this.poller.scheduleWithFixedDelay(this.remoteRepoManager.checkRemote(), 0, duration, unit);
 	}
 
 	@Override

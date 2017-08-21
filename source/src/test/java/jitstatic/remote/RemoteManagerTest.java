@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.isA;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -45,18 +46,19 @@ public class RemoteManagerTest {
 	@Test
 	public void testRemoteRepositoryManagerPolling() throws URISyntaxException {
 		SourceEventListener mock = mock(SourceEventListener.class);
-		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1));) {
+		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS);) {
 			when(rmr.checkRemote()).thenReturn(() -> mock.onEvent());
 			rrm.start();
-			verify(mock, timeout(100).times(1)).onEvent(); // TODO make this more deterministic...
-			verify(mock, timeout(5 * 1200).times(2)).onEvent();
+			// TODO make this more deterministic...
+			verify(mock, timeout(100).times(1)).onEvent(); 
+			verify(mock, timeout(1 * 1200).times(2)).onEvent();
 		}
 	}
 	@Test
 	public void testRemoteHealthCheck() {
 		ex.expect(RuntimeException.class);
 		ex.expectCause(isA(IllegalArgumentException.class));
-		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1));) {
+		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS);) {
 			when(rmr.getFault()).thenReturn(new IllegalArgumentException("Illegal"));
 			rrm.checkHealth();
 		}

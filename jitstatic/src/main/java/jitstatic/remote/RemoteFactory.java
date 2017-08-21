@@ -20,7 +20,6 @@ package jitstatic.remote;
  * #L%
  */
 
-
 import java.net.URI;
 
 import javax.validation.constraints.NotNull;
@@ -28,6 +27,7 @@ import javax.validation.constraints.NotNull;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
+import io.dropwizard.util.Duration;
 import jitstatic.remote.RemoteManager;
 import jitstatic.source.Source;
 
@@ -42,6 +42,9 @@ public class RemoteFactory {
 
 	@JsonProperty
 	private String remotePassword = "";
+
+	@JsonProperty
+	private Duration pollingPeriod = Duration.seconds(5);
 
 	public URI getRemoteRepo() {
 		return remoteRepo;
@@ -71,7 +74,16 @@ public class RemoteFactory {
 		if (!getRemoteRepo().isAbsolute())
 			throw new IllegalArgumentException(
 					String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
-		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword());
+		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword(), getPollingPeriod().getQuantity(),
+				getPollingPeriod().getUnit());
+	}
+
+	public Duration getPollingPeriod() {
+		return pollingPeriod;
+	}
+
+	public void setPollingPeriod(Duration pollingPeriod) {
+		this.pollingPeriod = pollingPeriod;
 	}
 
 }

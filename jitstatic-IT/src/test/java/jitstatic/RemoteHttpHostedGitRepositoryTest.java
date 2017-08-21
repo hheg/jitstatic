@@ -97,7 +97,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 					ConfigOverride.config("remote.userName",
 							() -> remote.getConfiguration().getHostedFactory().getUserName()),
 					ConfigOverride.config("remote.remotePassword",
-							() -> remote.getConfiguration().getHostedFactory().getSecret()))));
+							() -> remote.getConfiguration().getHostedFactory().getSecret()),
+					ConfigOverride.config("remote.pollingPeriod", "1 second"))));
 
 	private static String remoteAdress;
 	private static String localAdress;
@@ -153,8 +154,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test7 client");
 		try {
 			Builder clientTarget = client.target(String.format("%s/storage/urlkey", localAdress)).request()
-			.header(HttpHeader.AUTHORIZATION.asString(), localBasic);
-			
+					.header(HttpHeader.AUTHORIZATION.asString(), localBasic);
+
 			Map<String, Object> response = clientTarget.get(type);
 			assertEquals("value", response.get("key"));
 			originalValue = (String) response.get("key");
@@ -163,19 +164,19 @@ public class RemoteHttpHostedGitRepositoryTest {
 			Path storage = newFolder.resolve(ACCEPT_STORAGE2);
 			try (Git git = Git.cloneRepository().setDirectory(newFolder.toFile()).setURI(getRepo().get())
 					.setCredentialsProvider(provider).call();) {
-				
+
 				Map<String, Map<String, Object>> data = readSource(storage);
 				Map<String, Object> map = data.get("urlkey");
 				map.put("key", newValue);
 				writeSource(data, storage);
-				
+
 				git.add().addFilepattern(ACCEPT_STORAGE2).call();
 				RevCommit commit = git.commit().setMessage("Evolve").call();
 				Iterable<PushResult> result = git.push().setCredentialsProvider(provider).call();
 				RemoteRefUpdate remoteUpdate = result.iterator().next().getRemoteUpdate("refs/heads/master");
 				assertEquals(Status.OK, remoteUpdate.getStatus());
 
-				sleep(10 * 1000);
+				sleep(1500);
 
 				response = clientTarget.get(type);
 				assertEquals(newValue, response.get("key"));
@@ -185,7 +186,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				remoteUpdate = result.iterator().next().getRemoteUpdate("refs/heads/master");
 				assertEquals(Status.OK, remoteUpdate.getStatus());
 
-				sleep(10 * 1000);
+				sleep(1500);
 
 				response = clientTarget.get(type);
 				assertEquals(originalValue, response.get("key"));
