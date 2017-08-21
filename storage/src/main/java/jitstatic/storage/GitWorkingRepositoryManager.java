@@ -4,7 +4,7 @@ package jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 HHegardt
+ * Copyright (C) 2017 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ package jitstatic.storage;
  * #L%
  */
 
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -90,11 +92,8 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 				if (parent != null) {
 					Files.createDirectories(parent);
 				}
-
-				try (InputStream emptyJson = getClass().getResourceAsStream("/empty.json");) {
-					Files.copy(emptyJson, localStorage);
-				}
-
+				Files.write(localStorage, "{}".getBytes("UTF-8"));
+				
 				git.add().addFilepattern(localFilePath).call();
 				git.commit().setMessage("Initializing commit").call();
 				PushCommand push = git.push().setRemote(Constants.DEFAULT_REMOTE_NAME);

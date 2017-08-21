@@ -1,11 +1,10 @@
 package jitstatic;
 
-import static org.hamcrest.core.Is.isA;
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 HHegardt
+ * Copyright (C) 2017 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +19,8 @@ import static org.hamcrest.core.Is.isA;
  * limitations under the License.
  * #L%
  */
+
+import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;

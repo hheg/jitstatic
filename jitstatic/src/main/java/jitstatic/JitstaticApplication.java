@@ -1,16 +1,10 @@
 package jitstatic;
 
-
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 HHegardt
+ * Copyright (C) 2017 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +19,13 @@ import org.slf4j.LoggerFactory;
  * limitations under the License.
  * #L%
  */
+
+
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 
 
 import io.dropwizard.Application;
