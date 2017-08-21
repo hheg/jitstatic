@@ -37,6 +37,7 @@ import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
 import io.dropwizard.auth.AuthDynamicFeature;
@@ -55,6 +56,9 @@ public class StorageFactoryTest {
 	private JerseyEnvironment jersey = mock(JerseyEnvironment.class);
 	private Source source = mock(Source.class);
 
+	@Rule
+	public final ExpectedException ex = ExpectedException.none();
+	
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -92,6 +96,17 @@ public class StorageFactoryTest {
 		verify(jersey).register(isA(AuthDynamicFeature.class));
 		verify(jersey).register(RolesAllowedDynamicFeature.class);
 		verify(jersey).register(isA(AuthValueFactoryProvider.Binder.class));
+	}
+	
+	@Test
+	public void testEmptyStoragePath() {
+		when(env.jersey()).thenReturn(jersey);
+		when(source.getContact()).thenReturn(remoteRepo);
+		ex.expect(IllegalArgumentException.class);
+		ex.expectMessage("Storage file name's empty");
+		sf.setLocalFilePath("");
+		try (Storage storage = sf.build(source, env);) {
+		}
 	}
 	
 	private static final class RemoteContact implements Contact {

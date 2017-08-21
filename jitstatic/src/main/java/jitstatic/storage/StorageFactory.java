@@ -39,11 +39,6 @@ import io.dropwizard.setup.Environment;
 import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 import jitstatic.source.Source;
-import jitstatic.storage.GitStorage;
-import jitstatic.storage.GitWorkingRepositoryManager;
-import jitstatic.storage.LoaderException;
-import jitstatic.storage.StorageUtils;
-import jitstatic.storage.Storage;
 
 public class StorageFactory {
 
@@ -83,7 +78,7 @@ public class StorageFactory {
 		this.localFilePath = localFilePath;
 	}
 
-	public Storage build(final Source remote, Environment env) throws LoaderException {
+	public Storage build(final Source remote, Environment env) {
 		final Path baseDirectoryPath = Paths.get(getBaseDirectory());
 		env.jersey()
 				.register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
@@ -93,11 +88,9 @@ public class StorageFactory {
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
 		final GitWorkingRepositoryManager gwrm = new GitWorkingRepositoryManager(baseDirectoryPath, getLocalFilePath(),
 				remote.getContact());
-		try {
-			GitStorage gitStorage = new GitStorage(getLocalFilePath(), gwrm);
-			gitStorage.load();// TODO remove this
-			return gitStorage;
-		} catch (IllegalArgumentException | LoaderException e) {
+		try {			
+			return new GitStorage(getLocalFilePath(), gwrm);
+		} catch (IllegalArgumentException e) {
 			StorageUtils.closeSilently(gwrm);
 			throw e;
 		}

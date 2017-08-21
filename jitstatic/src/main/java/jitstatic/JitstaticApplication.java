@@ -25,9 +25,6 @@ package jitstatic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-
-
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
