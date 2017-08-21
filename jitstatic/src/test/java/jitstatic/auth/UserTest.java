@@ -20,6 +20,7 @@ package jitstatic.auth;
  * #L%
  */
 
+
 import static org.junit.Assert.*;
 
 import org.junit.Test;

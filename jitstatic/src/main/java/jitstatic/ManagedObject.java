@@ -20,6 +20,7 @@ package jitstatic;
  * #L%
  */
 
+
 import io.dropwizard.lifecycle.Managed;
 import jitstatic.source.Source;
 
