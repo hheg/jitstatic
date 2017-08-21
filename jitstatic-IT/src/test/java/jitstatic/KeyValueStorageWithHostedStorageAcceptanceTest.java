@@ -24,6 +24,7 @@ package jitstatic;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -78,10 +79,10 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
 
 	@BeforeClass
-	public static void setup() {
+	public static void setup() throws UnsupportedEncodingException {
 		adress = String.format("http://localhost:%d/application", drop.getLocalPort());
 		StorageFactory storage = drop.getConfiguration().getStorageFactory();
-		basic = "Basic " + Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes());
+		basic = "Basic " + Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
 		hcc.setConnectionRequestTimeout(Duration.minutes(1));
 		hcc.setConnectionTimeout(Duration.minutes(1));
 		hcc.setTimeout(Duration.minutes(1));

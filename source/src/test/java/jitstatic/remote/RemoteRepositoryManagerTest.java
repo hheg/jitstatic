@@ -53,12 +53,12 @@ import jitstatic.source.SourceEventListener;
 public class RemoteRepositoryManagerTest {
 
 	@ClassRule
-	public static TemporaryFolder folder = new TemporaryFolder();
+	public final static TemporaryFolder folder = new TemporaryFolder();
 
 	@Rule
-	public ExpectedException ex = ExpectedException.none();
+	public final ExpectedException ex = ExpectedException.none();
 
-	private SourceEventListener svl = mock(SourceEventListener.class);
+	private final SourceEventListener svl = mock(SourceEventListener.class);
 
 	private File newFolder;
 
@@ -105,7 +105,7 @@ public class RemoteRepositoryManagerTest {
 	public void testCheckSuccessfulRemotePoll() throws IllegalStateException, GitAPIException, IOException {
 		try (Git git = Git.init().setDirectory(newFolder).call()) {
 			Path fileData = Files.write(Paths.get(newFolder.getAbsolutePath(), UUID.randomUUID().toString()),
-					UUID.randomUUID().toString().getBytes());
+					UUID.randomUUID().toString().getBytes("UTF-8"));
 			git.add().addFilepattern(fileData.getFileName().toString()).call();
 			ObjectId id = git.commit().setMessage("First").call().getId();
 
@@ -131,7 +131,7 @@ public class RemoteRepositoryManagerTest {
 			RemoteRepositoryManager rrm = new RemoteRepositoryManager(newFolder.toURI(), null, null);
 			rrm.addListeners(svl);
 			Files.write(Paths.get(newFolder.getAbsolutePath(), UUID.randomUUID().toString()),
-					UUID.randomUUID().toString().getBytes());
+					UUID.randomUUID().toString().getBytes("UTF-8"));
 			git.commit().setMessage("Initial commit").call();
 			git.checkout().setName("other").setCreateBranch(true).call();
 			git.branchDelete().setBranchNames("master").setForce(true).call();
@@ -146,13 +146,13 @@ public class RemoteRepositoryManagerTest {
 			RemoteRepositoryManager rrm = new RemoteRepositoryManager(newFolder.toURI(), null, null);
 			rrm.addListeners(svl);
 			Path fileData = Files.write(Paths.get(newFolder.getAbsolutePath(), UUID.randomUUID().toString()),
-					UUID.randomUUID().toString().getBytes());
+					UUID.randomUUID().toString().getBytes("UTF-8"));
 			git.add().addFilepattern(fileData.getFileName().toString()).call();
 			ObjectId id = git.commit().setMessage("First").call().getId();
 			rrm.checkRemote().run();
 			verify(svl).onEvent();
 			assertEquals(id.getName(), rrm.getLatestSHA());
-			Files.write(fileData, UUID.randomUUID().toString().getBytes());
+			Files.write(fileData, UUID.randomUUID().toString().getBytes("UTF-8"));
 			git.add().addFilepattern(fileData.getFileName().toString()).call();
 			id = git.commit().setMessage("Second").call().getId();
 			rrm.checkRemote().run();
