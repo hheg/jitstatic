@@ -96,7 +96,7 @@ public class RemoteRepositoryManagerTest {
 			rrm.addListeners(svl);
 			rrm.checkRemote().run();
 			verify(svl, never()).onEvent();
-			assertTrue(rrm.fault instanceof RepositoryIsMissingIntendedBranch);
+			assertTrue(rrm.getFault() instanceof RepositoryIsMissingIntendedBranch);
 		}
 	}
 
@@ -110,10 +110,10 @@ public class RemoteRepositoryManagerTest {
 
 			RemoteRepositoryManager rrm = new RemoteRepositoryManager(newFolder.toURI(), null, null);
 			rrm.addListeners(svl);
-			assertEquals(null, rrm.latestSHA);
+			assertEquals(null, rrm.getLatestSHA());
 			rrm.checkRemote().run();
 			verify(svl).onEvent();
-			assertEquals(id.getName(), rrm.latestSHA);
+			assertEquals(id.getName(), rrm.getLatestSHA());
 		}
 	}
 
@@ -121,7 +121,7 @@ public class RemoteRepositoryManagerTest {
 	public void testCheckFailedRemotePoll() {
 		RemoteRepositoryManager rrm = new RemoteRepositoryManager(newFolder.toURI(), null, null);
 		rrm.checkRemote().run();
-		assertNotNull(rrm.fault);
+		assertNotNull(rrm.getFault());
 	}
 
 	@Test
@@ -135,7 +135,7 @@ public class RemoteRepositoryManagerTest {
 			git.checkout().setName("other").setCreateBranch(true).call();
 			git.branchDelete().setBranchNames("master").setForce(true).call();
 			rrm.checkRemote().run();
-			assertEquals(RepositoryIsMissingIntendedBranch.class, rrm.fault.getClass());
+			assertEquals(RepositoryIsMissingIntendedBranch.class, rrm.getFault().getClass());
 		}
 	}
 
@@ -150,13 +150,13 @@ public class RemoteRepositoryManagerTest {
 			ObjectId id = git.commit().setMessage("First").call().getId();
 			rrm.checkRemote().run();
 			verify(svl).onEvent();
-			assertEquals(id.getName(), rrm.latestSHA);
+			assertEquals(id.getName(), rrm.getLatestSHA());
 			Files.write(fileData, UUID.randomUUID().toString().getBytes());
 			git.add().addFilepattern(fileData.getFileName().toString()).call();
 			id = git.commit().setMessage("Second").call().getId();
 			rrm.checkRemote().run();
 			verify(svl, times(2)).onEvent();
-			assertEquals(id.getName(), rrm.latestSHA);
+			assertEquals(id.getName(), rrm.getLatestSHA());
 		}
 	}
 

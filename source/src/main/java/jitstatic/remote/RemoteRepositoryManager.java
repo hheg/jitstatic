@@ -44,8 +44,10 @@ class RemoteRepositoryManager implements Contact {
 	private final String userName;
 	private final String password;
 
-	volatile String latestSHA = null;
-	volatile Exception fault = null;
+	private String latestSHA = null;
+	private Exception fault = null;
+
+	private static final Object LOCK = new Object();
 
 	public RemoteRepositoryManager(final URI remoteRepo, String userName, String password) {
 		this.remoteRepo = Objects.requireNonNull(remoteRepo, "Remote endpoint cannot be null");
@@ -72,19 +74,42 @@ class RemoteRepositoryManager implements Contact {
 				while (iterator.hasNext()) {
 					Ref next = iterator.next();
 					if (REFS_HEADS_MASTER.equals(next.getName())) {
-						latestSHA = next.getObjectId().getName();
-						listeners.forEach(SourceEventListener::onEvent);
-						triggered |= true;
+						String remoteSHA = next.getObjectId().getName();
+						if (!remoteSHA.equals(getLatestSHA())) {
+							listeners.forEach(SourceEventListener::onEvent);
+							setLatestSHA(remoteSHA);
+							triggered |= true;
+						}
 					}
 				}
 				if (!triggered) {
 					throw new RepositoryIsMissingIntendedBranch(
 							"Repository doesn't have a " + REFS_HEADS_MASTER + " branch");
 				}
+				setFault(null);
 			} catch (final Exception e) {
-				fault = e;
+				setFault(e);
 			}
 		};
+	}
+
+	public Exception getFault() {
+		synchronized (LOCK) {
+			return fault;
+		}
+	}
+
+	private void setFault(Exception fault) {
+		synchronized (LOCK) {
+			this.fault = fault;
+		}
+	}
+
+	void removeFault(Exception fault) {
+		synchronized (LOCK) {
+			if (fault == this.fault)
+				this.fault = null;
+		}
 	}
 
 	@Override
@@ -104,5 +129,13 @@ class RemoteRepositoryManager implements Contact {
 
 	public Contact getContact() {
 		return this;
+	}
+
+	String getLatestSHA() {
+		return latestSHA;
+	}
+
+	void setLatestSHA(String latestSHA) {
+		this.latestSHA = latestSHA;
 	}
 }

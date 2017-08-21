@@ -2,6 +2,7 @@ package jitstatic;
 
 
 
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
@@ -38,7 +39,7 @@ import jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 	
-	private final org.slf4j.Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
+	private final Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
 
 	public static void main(final String[] args) throws Exception {
 		new JitstaticApplication().run(args);

@@ -69,4 +69,13 @@ class RemoteManager implements Source {
 		this.job = this.poller.scheduleWithFixedDelay(this.remoteRepoManager.checkRemote(), 0, _5, TimeUnit.SECONDS);
 	}
 
+	@Override
+	public void checkHealth() {
+		Exception fault = remoteRepoManager.getFault();
+		if (fault != null) {
+			remoteRepoManager.removeFault(fault);
+			throw new RuntimeException(fault);
+		}
+	}
+
 }

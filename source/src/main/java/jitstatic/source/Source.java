@@ -32,4 +32,5 @@ public interface Source extends AutoCloseable {
 		public String getUserName();
 		public String getPassword();
 	}
+	public void checkHealth();
 }

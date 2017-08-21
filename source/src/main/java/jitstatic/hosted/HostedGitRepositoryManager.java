@@ -137,4 +137,9 @@ class HostedGitRepositoryManager implements Source {
 	public void start() {
 		// noop		
 	}
+
+	@Override
+	public void checkHealth() {
+		// noop for now		
+	}
 }

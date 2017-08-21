@@ -4,6 +4,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.isA;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -39,7 +40,7 @@ public class RemoteManagerTest {
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 	private RemoteRepositoryManager rmr = mock(RemoteRepositoryManager.class);
-
+	
 	@Test
 	public void testRemoteRepositoryManagerPolling() throws URISyntaxException {
 		SourceEventListener mock = mock(SourceEventListener.class);
@@ -48,6 +49,15 @@ public class RemoteManagerTest {
 			rrm.start();
 			verify(mock, timeout(100).times(1)).onEvent(); // TODO make this more deterministic...
 			verify(mock, timeout(5 * 1200).times(2)).onEvent();
+		}
+	}
+	@Test
+	public void testRemoteHealthCheck() {
+		ex.expect(RuntimeException.class);
+		ex.expectCause(isA(IllegalArgumentException.class));
+		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1));) {
+			when(rmr.getFault()).thenReturn(new IllegalArgumentException("Illegal"));
+			rrm.checkHealth();
 		}
 	}
 }
