@@ -20,34 +20,35 @@ package jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+
 import org.junit.Test;
 
 import com.codahale.metrics.health.HealthCheck.Result;
 
-import jitstatic.StorageHealthChecker;
-import jitstatic.storage.Storage;
+import jitstatic.source.Source;
 
-public class StorageHealthCheckerTest {
-
-	private final Storage storage = mock(Storage.class);
+public class SourceHealthCheckerTest {
+	
+	private final Source source = mock(Source.class);
 
 	@Test
-	public void testCheck() throws Exception {
-		StorageHealthChecker shc = new StorageHealthChecker(storage);
-		assertEquals(Result.healthy().isHealthy(), shc.check().isHealthy());
+	public void testSourceHealthCheckerHealthy() throws Exception {		
+		SourceHealthChecker shc = new SourceHealthChecker(source);
+		assertTrue(shc.check().isHealthy());
 	}
 
 	@Test
-	public void testStorageHealthCheckerNotHealthy() throws Exception {
+	public void testSourceHealthCheckerNotHealthy() throws Exception {
 		RuntimeException runtimeException = new RuntimeException("error");
-		doThrow(runtimeException).when(storage).checkHealth();
-		StorageHealthChecker shc = new StorageHealthChecker(storage);
+		doThrow(runtimeException).when(source).checkHealth();
+		SourceHealthChecker shc = new SourceHealthChecker(source);
 		Result check = shc.check();
 		assertFalse(check.isHealthy());
 		assertEquals(runtimeException, check.getError());
 	}
-
 }

@@ -20,29 +20,20 @@ package jitstatic;
  * #L%
  */
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import com.codahale.metrics.health.HealthCheck;
+import org.junit.Test;
 
-import jitstatic.storage.Storage;
+public class AutoCloseableLifeCycleManagerTest {
 
-public class StorageHealthChecker extends HealthCheck {
+	AutoCloseable ac = mock(AutoCloseable.class);
 
-	public static final String NAME = "storagechecker";
-	
-	private final Storage storage;
-	
-	public StorageHealthChecker(Storage storage) {
-		this.storage = storage;
-	}
-
-	@Override
-	protected Result check() throws Exception {		
-		try {
-			storage.checkHealth();
-			return Result.healthy();
-		}catch(Exception e) {
-			return Result.unhealthy(e);
-		}
+	@Test
+	public void testAutoCloseableLifeCycleManager() throws Exception {
+		AutoCloseableLifeCycleManager<AutoCloseable> unit = new AutoCloseableLifeCycleManager<AutoCloseable>(ac);
+		unit.stop();
+		verify(ac).close();
 	}
 
 }
