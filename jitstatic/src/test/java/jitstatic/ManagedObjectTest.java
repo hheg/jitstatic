@@ -20,29 +20,25 @@ package jitstatic;
  * #L%
  */
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import com.codahale.metrics.health.HealthCheck;
+import org.junit.Test;
 
-import jitstatic.storage.Storage;
+import jitstatic.source.Source;
 
-public class StorageHealthChecker extends HealthCheck {
+public class ManagedObjectTest {
 
-	public static final String NAME = "storagechecker";
+	Source m = mock(Source.class);
+
+	@Test
+	public void testManagedObject() throws Exception {
+		ManagedObject<Source> mo = new ManagedObject<>(m);
+		mo.start();
+		verify(m).start();
+		mo.stop();
+		verify(m).close();
 	
-	private final Storage storage;
-	
-	public StorageHealthChecker(Storage storage) {
-		this.storage = storage;
-	}
-
-	@Override
-	protected Result check() throws Exception {		
-		try {
-			storage.checkHealth();
-			return Result.healthy();
-		}catch(Exception e) {
-			return Result.unhealthy(e);
-		}
 	}
 
 }

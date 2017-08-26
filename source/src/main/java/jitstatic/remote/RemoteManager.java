@@ -20,9 +20,9 @@ package jitstatic.remote;
  * #L%
  */
 
-
 import java.net.URI;
 import java.util.Objects;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -33,22 +33,25 @@ import jitstatic.source.SourceEventListener;
 class RemoteManager implements Source {
 
 	private static final int _5 = 5;
-	private final ScheduledThreadPoolExecutor poller;
+	private final ScheduledExecutorService poller;
 	private final RemoteRepositoryManager remoteRepoManager;
 
 	private volatile ScheduledFuture<?> job;
 	private final long duration;
 	private final TimeUnit unit;
 
-	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, long duration, TimeUnit unit) {
-		this(new RemoteRepositoryManager(remoteRepoManager, userName, password), new ScheduledThreadPoolExecutor(1), duration, unit);
+	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, final long duration,
+			final TimeUnit unit) {
+		this(new RemoteRepositoryManager(remoteRepoManager, userName, password), new ScheduledThreadPoolExecutor(1),
+				duration, unit);
 	}
 
-	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledThreadPoolExecutor scheduler, long duration, TimeUnit unit) {
+	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledExecutorService scheduler,
+			final long duration, final TimeUnit unit) {
 		this.remoteRepoManager = Objects.requireNonNull(remoteRepoManager);
 		this.poller = Objects.requireNonNull(scheduler);
 		this.unit = Objects.requireNonNull(unit);
-		this.duration = (duration <= 0 ? _5 : duration);		
+		this.duration = (duration <= 0 ? _5 : duration);
 	}
 
 	@Override
