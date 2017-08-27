@@ -25,7 +25,9 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.hamcrest.Matchers.*;
+
 import static org.junit.Assert.assertEquals;
 
 import java.net.URISyntaxException;
@@ -37,6 +39,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import jitstatic.source.SourceEventListener;
 
@@ -71,11 +74,22 @@ public class RemoteManagerTest {
 	@Test
 	public void testRemoteManagerSchedulerDefaults() {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
+		try (RemoteManager rrm = new RemoteManager(rmr, exec, 0, TimeUnit.SECONDS);) {
+			rrm.start();
+			ArgumentCaptor<Long> captor = ArgumentCaptor.forClass(Long.class);
+			verify(exec).scheduleWithFixedDelay(eq(null), eq(0L), captor.capture(), eq(TimeUnit.SECONDS));
+			assertEquals(Long.valueOf(5), captor.getValue());
+		}
+	}
+	
+	@Test
+	public void testRemoteManagerSchedulerSetPollingValue() {
+		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS);) {
 			rrm.start();
 			ArgumentCaptor<Long> captor = ArgumentCaptor.forClass(Long.class);
-			verify(exec).scheduleAtFixedRate(any(Runnable.class), any(Long.class), captor.capture(), any());
-			assertEquals(Long.valueOf(5), captor.getValue());
+			verify(exec).scheduleWithFixedDelay(eq(null), eq(0L), captor.capture(), eq(TimeUnit.SECONDS));
+			assertEquals(Long.valueOf(1), captor.getValue());
 		}
 	}
 
