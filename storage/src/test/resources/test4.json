@@ -18,7 +18,24 @@
  * #L%
  */
 
+
 {
-	"key1": { "key1" : "value1" },
-	"key4": { "key4" : "value4" }
+	"key1": {
+		"data": "value1",
+		"users": [
+			{
+				"user": "user",
+				"password": "1234"
+			}
+		]
+	},
+	"key4": {
+		"data": "value4",
+		"users": [
+			{
+				"user": "user",
+				"password": "1234"
+			}
+		]
+	}
 }

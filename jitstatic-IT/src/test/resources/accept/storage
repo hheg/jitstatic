@@ -1,7 +1,20 @@
 {
-	"key":{ "key" : "value"},
-	"map":{ "map" : {
-		"key" : "value"
-	}},
-	"array": {"array":["value1","value2"]}
+	"key1": {
+		"data": "value1",
+		"users": [
+			{
+				"user": "suser",
+				"password": "ssecret"
+			}
+		]
+	},
+	"key3": {
+		"data": "value3",
+		"users": [
+			{
+				"user": "suser",
+				"password": "ssecret"
+			}
+		]
+	}
 }

@@ -20,12 +20,8 @@ package jitstatic.storage;
  * #L%
  */
 
-
-
-import java.util.Map;
-
 public interface Storage extends AutoCloseable{
-	public Map<String,Object> get(String key);
+	public StorageData get(String key);
 	public void load() throws LoaderException;
 	public void close();
 	public void checkHealth();

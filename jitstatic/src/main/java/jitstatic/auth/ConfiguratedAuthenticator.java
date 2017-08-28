@@ -29,18 +29,12 @@ import io.dropwizard.auth.basic.BasicCredentials;
 
 public class ConfiguratedAuthenticator implements Authenticator<BasicCredentials, User> {
 
-	private final BasicCredentials storageCredentials;
-
-	public ConfiguratedAuthenticator(final String user, final String secret) {
-		this.storageCredentials = new BasicCredentials(user, secret);
+	public ConfiguratedAuthenticator() {
 	}
 
 	@Override
-	public Optional<User> authenticate(BasicCredentials credentials) throws AuthenticationException {
-		if (storageCredentials.equals(credentials)) {
-			return Optional.of(new User(this.storageCredentials.getUsername()));
-		}
-		return Optional.empty();
+	public Optional<User> authenticate(final BasicCredentials credentials) throws AuthenticationException {
+		return Optional.of(new User(credentials.getUsername(), credentials.getPassword()));
 	}
 
 }

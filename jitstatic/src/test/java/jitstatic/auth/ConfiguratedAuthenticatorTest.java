@@ -21,6 +21,7 @@ package jitstatic.auth;
  */
 
 
+
 import static org.junit.Assert.*;
 
 import java.util.Optional;
@@ -39,22 +40,16 @@ public class ConfiguratedAuthenticatorTest {
 
 	@Test
 	public void testAuthenticate() throws AuthenticationException {
-		ConfiguratedAuthenticator ca = new ConfiguratedAuthenticator(user, secret);
+		ConfiguratedAuthenticator ca = new ConfiguratedAuthenticator();
 		final String u = new String("user");
 		final String s = new String("secret");
 		assertTrue(user != u);
 		assertTrue(secret != s);
 		Optional<User> authenticate = ca.authenticate(new BasicCredentials(u, s));
 		assertTrue(authenticate.isPresent());
+		User user2 = authenticate.get();
+		assertEquals(user,user2.getName());
+		assertEquals(secret,user2.getPassword());
 	}
-	
-	@Test
-	public void testFailingAuthentication() throws AuthenticationException {
-		ConfiguratedAuthenticator ca = new ConfiguratedAuthenticator(user, secret);
-		Optional<User> authenticate = ca.authenticate(new BasicCredentials(user, "wrongpassword"));
-		assertFalse(authenticate.isPresent());
-	}
-	
-	
 
 }

@@ -23,23 +23,37 @@ package jitstatic.auth;
 
 import java.security.Principal;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public final class User implements Principal {
 
 	private final String user;
-	
-	public User(String user) {
+	private final String password;
+
+	@JsonCreator
+	public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
 		this.user = user;
+		this.password = password;
 	}
 
 	@Override
+	@JsonGetter("user")
 	public String getName() {
 		return this.user;
+	}
+
+	@JsonGetter("password")
+	public String getPassword() {
+		return password;
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
+		result = prime * result + ((password == null) ? 0 : password.hashCode());
 		result = prime * result + ((user == null) ? 0 : user.hashCode());
 		return result;
 	}
@@ -53,6 +67,11 @@ public final class User implements Principal {
 		if (getClass() != obj.getClass())
 			return false;
 		User other = (User) obj;
+		if (password == null) {
+			if (other.password != null)
+				return false;
+		} else if (!password.equals(other.password))
+			return false;
 		if (user == null) {
 			if (other.user != null)
 				return false;
@@ -65,6 +84,4 @@ public final class User implements Principal {
 	public String toString() {
 		return "User [user=" + user + "]";
 	}
-	
-
 }

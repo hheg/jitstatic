@@ -21,6 +21,7 @@ package jitstatic.auth;
  */
 
 
+
 import static org.junit.Assert.*;
 
 import org.junit.Test;
@@ -29,49 +30,49 @@ public class UserTest {
 
 	@Test
 	public void testSameUser() {
-		User u1 = new User(new String("user"));
-		User u2 = new User(new String("user"));
+		User u1 = new User(new String("user"), new String("1"));
+		User u2 = new User(new String("user"),new String("1"));
 		assertEquals(u1,u2);
 		assertEquals(u1.hashCode(),u2.hashCode());
 	}
 	
 	@Test
 	public void testSameUserObject() {
-		User u1 = new User(new String("user"));		
+		User u1 = new User(new String("user"),new String("1"));		
 		assertEquals(u1,u1);		
 	}
 	
 	@Test
 	public void testNotSameUser() {
-		User u1 = new User(new String("auser"));
-		User u2 = new User(new String("buser"));
+		User u1 = new User(new String("auser"),new String("1"));
+		User u2 = new User(new String("buser"),new String("1"));
 		assertNotEquals(u1,u2);
 	}
 
 	
 	@Test
 	public void testAgainstNull() {
-		User u1 = new User(new String("auser"));		
+		User u1 = new User(new String("auser"),null);		
 		assertNotEquals(u1,null);
 	}
 	
 	@Test
 	public void testAgainstUserNull() {
-		User u1 = new User(null);
-		User u2 = new User(null);
+		User u1 = new User(null,null);
+		User u2 = new User(null,null);
 		assertTrue(u1.equals(u2));
 	}
 	
 	@Test
 	public void testNullAgainstUser() {
-		User u1 = new User(null);
-		User u2 = new User("other");
+		User u1 = new User(null,null);
+		User u2 = new User("other",null);
 		assertFalse(u1.equals(u2));
 	}
 	
 	@Test
 	public void testAgainstAnotherObject() {
-		User u1 = new User(new String("auser"));		
+		User u1 = new User(new String("auser"),null);		
 		assertNotEquals(u1,new Object());
 	}
 }

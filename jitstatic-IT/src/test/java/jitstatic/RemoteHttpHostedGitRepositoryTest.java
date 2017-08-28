@@ -20,6 +20,7 @@ package jitstatic;
  * #L%
  */
 
+
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -37,7 +38,6 @@ import java.util.function.Supplier;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation.Builder;
-import javax.ws.rs.core.GenericType;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
@@ -59,14 +59,18 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
+import jitstatic.hosted.HostedFactory;
+import jitstatic.storage.StorageData;
 import jitstatic.storage.StorageFactory;
 
 public class RemoteHttpHostedGitRepositoryTest {
@@ -75,9 +79,16 @@ public class RemoteHttpHostedGitRepositoryTest {
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
 	private static final DropwizardAppRule<JitstaticConfiguration> remote;
 	private static final DropwizardAppRule<JitstaticConfiguration> local;
-	private static final GenericType<Map<String, Object>> type = new GenericType<Map<String, Object>>() {
-	};
+	private static final ObjectMapper mapper = new ObjectMapper();
 
+	private static String remoteAdress;
+	private static String localAdress;
+
+	private static String remoteBasic;
+	private static String localBasic;
+	private static UsernamePasswordCredentialsProvider provider;
+	private static JsonNode expectedResponse;
+	
 	@ClassRule
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class,
@@ -100,47 +111,38 @@ public class RemoteHttpHostedGitRepositoryTest {
 							() -> remote.getConfiguration().getHostedFactory().getSecret()),
 					ConfigOverride.config("remote.pollingPeriod", "1 second"))));
 
-	private static String remoteAdress;
-	private static String localAdress;
-
-	private static String remoteBasic;
-	private static String localBasic;
-	private static UsernamePasswordCredentialsProvider provider;
-
 	@Rule
 	public final ExpectedException ex = ExpectedException.none();
 
-	private final ObjectMapper mapper = new ObjectMapper();
-
 	@BeforeClass
-	public static void setup() throws UnsupportedEncodingException {
+	public static void setup() throws JsonProcessingException, IOException {
 		remoteAdress = String.format("http://localhost:%d/application", remote.getLocalPort());
-		localAdress = String.format("http://localhost:%d/application", local.getLocalPort());
+		remoteBasic = getBasicAuth(remote);
 
-		StorageFactory storage = remote.getConfiguration().getStorageFactory();
-		remoteBasic = buildBasicAuth(storage.getUser(), storage.getSecret());
-		storage = local.getConfiguration().getStorageFactory();
-		localBasic = buildBasicAuth(storage.getUser(), storage.getSecret());
-		provider = new UsernamePasswordCredentialsProvider(remote.getConfiguration().getHostedFactory().getUserName(),
-				remote.getConfiguration().getHostedFactory().getSecret());
+		HostedFactory hf = remote.getConfiguration().getHostedFactory();
+		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
+
+		localAdress = String.format("http://localhost:%d/application", local.getLocalPort());
+		localBasic = getBasicAuth(local);
 		assertTrue(local.getConfiguration().getHostedFactory() == null);
+		expectedResponse = mapper.readTree("\"value1\"");
 	}
 
 	@Test
 	public void testRemoteHostedGitRepository() {
 		Client client = new JerseyClientBuilder(remote.getEnvironment()).build("test5 client");
 		try {
-			Map<String, Object> response = client.target(String.format("%s/storage/urlkey", remoteAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), remoteBasic).get(type);
-			assertEquals("value", response.get("key"));
+			JsonNode response = client.target(String.format("%s/storage/key1", remoteAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), remoteBasic).get(JsonNode.class);
+			assertEquals(expectedResponse, response);
 		} finally {
 			client.close();
 		}
 		client = new JerseyClientBuilder(local.getEnvironment()).build("test6 client");
 		try {
-			Map<String, Object> response = client.target(String.format("%s/storage/urlkey", localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), localBasic).get(type);
-			assertEquals("value", response.get("key"));
+			JsonNode response = client.target(String.format("%s/storage/key1", localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), localBasic).get(JsonNode.class);
+			assertEquals(expectedResponse, response);
 		} finally {
 			client.close();
 		}
@@ -150,36 +152,37 @@ public class RemoteHttpHostedGitRepositoryTest {
 	public void testRemoteHostedGitUpdate()
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		final String newValue = UUID.randomUUID().toString();
-		String originalValue = null;
+		JsonNode originalValue = null;
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test7 client");
 		try {
-			Builder clientTarget = client.target(String.format("%s/storage/urlkey", localAdress)).request()
+			Builder clientTarget = client.target(String.format("%s/storage/key1", localAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), localBasic);
+			JsonNode response = clientTarget.get(JsonNode.class);
 
-			Map<String, Object> response = clientTarget.get(type);
-			assertEquals("value", response.get("key"));
-			originalValue = (String) response.get("key");
+			assertEquals(expectedResponse, response);
+			originalValue = response;
 
 			Path newFolder = tmpFolder.newFolder().toPath();
 			Path storage = newFolder.resolve(ACCEPT_STORAGE2);
 			try (Git git = Git.cloneRepository().setDirectory(newFolder.toFile()).setURI(getRepo().get())
 					.setCredentialsProvider(provider).call();) {
 
-				Map<String, Map<String, Object>> data = readSource(storage);
-				Map<String, Object> map = data.get("urlkey");
-				map.put("key", newValue);
+				Map<String, StorageData> data = readSource(storage);
+				StorageData sd = data.get("key1");
+				data.put("key1", new StorageData(sd.getUsers(), mapper.readTree("\"" + newValue + "\"")));
 				writeSource(data, storage);
 
 				git.add().addFilepattern(ACCEPT_STORAGE2).call();
 				RevCommit commit = git.commit().setMessage("Evolve").call();
 				Iterable<PushResult> result = git.push().setCredentialsProvider(provider).call();
+
 				RemoteRefUpdate remoteUpdate = result.iterator().next().getRemoteUpdate("refs/heads/master");
 				assertEquals(Status.OK, remoteUpdate.getStatus());
 
 				sleep(1500);
 
-				response = clientTarget.get(type);
-				assertEquals(newValue, response.get("key"));
+				response = clientTarget.get(JsonNode.class);
+				assertEquals(mapper.readTree("\"" + newValue + "\""), response);
 
 				git.revert().include(commit).call();
 				result = git.push().setCredentialsProvider(provider).call();
@@ -188,8 +191,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				sleep(1500);
 
-				response = clientTarget.get(type);
-				assertEquals(originalValue, response.get("key"));
+				response = clientTarget.get(JsonNode.class);
+				assertEquals(originalValue, response);
 
 			}
 		} finally {
@@ -229,15 +232,23 @@ public class RemoteHttpHostedGitRepositoryTest {
 				remote.getConfiguration().getHostedFactory().getHostedEndpoint());
 	}
 
-	private Map<String, Map<String, Object>> readSource(final Path storage) throws IOException {
+	private static String getBasicAuth(DropwizardAppRule<JitstaticConfiguration> app)
+			throws UnsupportedEncodingException {
+		StorageFactory storage = app.getConfiguration().getStorageFactory();
+		String user = storage.getUser();
+		String secret = storage.getSecret();
+		return buildBasicAuth(user, secret);
+	}
+
+	private Map<String, StorageData> readSource(final Path storage) throws IOException {
 		assertTrue(Files.exists(storage));
 		try (InputStream bc = Files.newInputStream(storage);) {
-			return mapper.readValue(bc, new TypeReference<Map<String, Map<String, Object>>>() {
+			return mapper.readValue(bc, new TypeReference<Map<String, StorageData>>() {
 			});
 		}
 	}
 
-	private void writeSource(final Map<String, Map<String, Object>> map, final Path storage)
+	private void writeSource(final Map<String, StorageData> map, final Path storage)
 			throws JsonGenerationException, JsonMappingException, IOException {
 		assertTrue(Files.exists(storage));
 		mapper.writeValue(storage.toFile(), map);

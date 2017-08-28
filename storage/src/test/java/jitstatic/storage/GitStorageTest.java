@@ -20,20 +20,19 @@ package jitstatic.storage;
  * #L%
  */
 
-
-
+import static org.hamcrest.Matchers.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import static org.hamcrest.Matchers.isA;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.junit.After;
@@ -43,12 +42,15 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
-import jitstatic.storage.GitStorage;
-import jitstatic.storage.GitWorkingRepositoryManager;
-import jitstatic.storage.LoaderException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jitstatic.auth.User;
 
 public class GitStorageTest {
 	private static final String STORAGE = "storage";
+	private static final ObjectMapper mapper = new ObjectMapper();
 
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
@@ -57,7 +59,7 @@ public class GitStorageTest {
 
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
-	
+
 	private Path tempFile;
 
 	@Before
@@ -109,37 +111,46 @@ public class GitStorageTest {
 
 	@Test
 	public void testLoadCache() throws IOException, LoaderException {
-		final Map<String,Object> map = new HashMap<>();
-		map.put("key1", "value1");
+		Set<User> users = new HashSet<>();
+		users.add(new User("user", "1234"));
 		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
 		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
 			StorageTestUtils.copy("/test1.json", tempFile);
 			gs.load();
-			assertEquals(map, gs.get("key"));
+			StorageData storage = new StorageData(users, readData("\"value1\""));
+			assertEquals(storage, gs.get("key"));
 			StorageTestUtils.copy("/test2.json", tempFile);
 			gs.load();
-			map.clear();
-			map.put("key2","value2");
-			assertEquals(map, gs.get("key"));
+			storage = new StorageData(users, readData("\"value2\""));
+			assertEquals(storage, gs.get("key"));
 		}
 	}
-	
+
+	private JsonNode readData(String content) throws JsonProcessingException, IOException {
+		return mapper.readTree(content);
+	}
+
 	@Test
 	public void testLoadNewCache() throws IOException, LoaderException {
 		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
 		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
 			StorageTestUtils.copy("/test3.json", tempFile);
 			gs.load();
-			assertEquals("value1", gs.get("key1").get("key1"));
-			assertEquals("value3",gs.get("key3").get("key3"));
+			StorageData key1Data = gs.get("key1");
+			StorageData key3Data = gs.get("key3");
+			assertNotNull(key1Data);
+			assertNotNull(key3Data);
 			StorageTestUtils.copy("/test4.json", tempFile);
 			gs.load();
-			assertEquals("value1",gs.get("key1").get("key1"));
-			assertEquals("value4", gs.get("key4").get("key4"));
-			assertEquals(null,gs.get("key3"));
+			key1Data = gs.get("key1");
+			StorageData key4Data = gs.get("key4");
+			key3Data = gs.get("key3");
+			assertNotNull(key1Data);
+			assertNotNull(key4Data);
+			assertNull(key3Data);
 		}
 	}
-	
+
 	@Test
 	public void testCheckHealth() {
 		ex.expectCause(isA(LoaderException.class));

@@ -20,11 +20,9 @@ package jitstatic.api;
  * #L%
  */
 
+import java.util.Optional;
+import java.util.Set;
 
-
-import java.util.Map;
-
-import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -34,8 +32,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
 import com.codahale.metrics.annotation.Metered;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import io.dropwizard.auth.Auth;
+import jitstatic.auth.User;
 import jitstatic.storage.Storage;
+import jitstatic.storage.StorageData;
 
 @Path("storage")
 public class MapResource {
@@ -48,13 +50,22 @@ public class MapResource {
 	@Path("/{key}")
 	@Metered
 	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	@RolesAllowed(value = { "keystorage" })
-	public Map<String, Object> get(final @PathParam("key") String key) {
-		final Map<String, Object> o = storage.get(key);
+	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	public JsonNode get(final @PathParam("key") String key, @Auth Optional<User> user) {
+		final StorageData o = storage.get(key);
 		if (o == null) {
-			throw new WebApplicationException("Key not found",Status.NOT_FOUND);
+			throw new WebApplicationException(Status.NOT_FOUND);
 		}
-		return o;
+		Set<User> allowedUsers = o.getUsers();
+		if (allowedUsers.isEmpty()) {
+			return o.getData();
+		}
+		if (!user.isPresent()) {
+			throw new WebApplicationException(Status.UNAUTHORIZED);
+		}
+		if (!allowedUsers.contains(user.get())) {
+			throw new WebApplicationException(Status.UNAUTHORIZED);
+		}
+		return o.getData();
 	}
 }

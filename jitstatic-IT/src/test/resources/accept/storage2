@@ -1,1 +1,20 @@
-{"urlkey":{"key":"value"}}
+{
+	"key1": {
+		"data": "value1",
+		"users": [
+			{
+				"user": "suser",
+				"password": "ssecret"
+			}
+		]
+	},
+	"key4": {
+		"data": "value4",
+		"users": [
+			{
+				"user": "suser",
+				"password": "ssecret"
+			}
+		]
+	}
+}

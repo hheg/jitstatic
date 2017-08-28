@@ -26,11 +26,9 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
-import java.util.Map;
 import java.util.function.Supplier;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
@@ -43,24 +41,26 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
 import io.dropwizard.client.JerseyClientBuilder;
+import io.dropwizard.setup.Environment;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
-import jitstatic.JitstaticApplication;
-import jitstatic.JitstaticConfiguration;
 import jitstatic.storage.StorageFactory;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
-	private static final DropwizardAppRule<JitstaticConfiguration> drop;
+	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
+	private static final DropwizardAppRule<JitstaticConfiguration> DW;
 	private static final TestRepositoryRule testRepo;
-	private static final GenericType<Map<String, Object>> type = new GenericType<Map<String, Object>>() {
-	};
+	private static String adress;
+	private static String basic;
 
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
@@ -68,21 +68,18 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	@ClassRule
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((testRepo = new TestRepositoryRule(getFolder(), "accept/storage")))
-			.around((drop = new DropwizardAppRule<>(JitstaticApplication.class,
+			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
 					ConfigOverride.config("storage.baseDirectory", getFolder()),
 					ConfigOverride.config("storage.localFilePath", "accept/storage"),
 					ConfigOverride.config("remote.remoteRepo", () -> "file://" + testRepo.getBase.get()))));
 
-	private static String adress;
-	private static String basic;
-	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
-
 	@BeforeClass
 	public static void setup() throws UnsupportedEncodingException {
-		adress = String.format("http://localhost:%d/application", drop.getLocalPort());
-		StorageFactory storage = drop.getConfiguration().getStorageFactory();
-		basic = "Basic " + Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
+		adress = String.format("http://localhost:%d/application", DW.getLocalPort());
+		StorageFactory storage = DW.getConfiguration().getStorageFactory();
+		basic = "Basic "
+				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
 		hcc.setConnectionRequestTimeout(Duration.minutes(1));
 		hcc.setConnectionTimeout(Duration.minutes(1));
 		hcc.setTimeout(Duration.minutes(1));
@@ -93,14 +90,14 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 		Client client = buildClient("test client");
 		try {
 			Response response = client.target(String.format("%s/storage/nokey", adress)).request().get();
-			assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+			assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 		} finally {
 			client.close();
 		}
 	}
 
 	@Test
-	public void testGetNotFoundKey() {
+	public void testGetNotFoundKeyWithAuth() {
 		Client client = buildClient("test3 client");
 		try {
 			Response response = client.target(String.format("%s/storage/nokey", adress)).request()
@@ -115,9 +112,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	public void testGetAKeyValue() {
 		Client client = buildClient("test4 client");
 		try {
-			Map<String, Object> response = client.target(String.format("%s/storage/key", adress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(type);
-			assertEquals("value", response.get("key"));
+			JsonNode response = client.target(String.format("%s/storage/key1", adress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals("value1", response.asText());
 		} finally {
 			client.close();
 		}
@@ -127,7 +124,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	public void testGetAKeyValueWithoutAuth() {
 		Client client = buildClient("test2 client");
 		try {
-			Response response = client.target(String.format("%s/storage/key", adress)).request().get();
+			Response response = client.target(String.format("%s/storage/key1", adress)).request().get();
 			assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
 		} finally {
 			client.close();
@@ -143,12 +140,11 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 			}
 		};
 	}
-	
+
 	private Client buildClient(final String name) {
-		HttpClientBuilder httpClientBuilder = new HttpClientBuilder(drop.getEnvironment());
-		httpClientBuilder.using(hcc);
-		JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(drop.getEnvironment());
-		jerseyClientBuilder.setApacheHttpClientBuilder(httpClientBuilder);
+		Environment env = DW.getEnvironment();
+		JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(env);
+		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(hcc));
 		return jerseyClientBuilder.build(name);
 	}
 }

@@ -20,6 +20,7 @@ package jitstatic.remote;
  * #L%
  */
 
+
 import java.net.URI;
 
 import javax.validation.constraints.NotNull;

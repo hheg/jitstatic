@@ -21,6 +21,7 @@ package jitstatic.source;
  */
 
 
+
 import java.net.URI;
 
 public interface Source extends AutoCloseable {
