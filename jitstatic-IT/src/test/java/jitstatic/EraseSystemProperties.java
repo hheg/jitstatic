@@ -21,6 +21,7 @@ package jitstatic;
  */
 
 
+
 import org.junit.rules.ExternalResource;
 
 public class EraseSystemProperties extends ExternalResource {

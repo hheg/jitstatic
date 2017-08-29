@@ -20,6 +20,7 @@ package jitstatic;
  * #L%
  */
 
+
 import com.codahale.metrics.health.HealthCheck;
 
 import jitstatic.source.Source;

@@ -31,28 +31,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.core.GenericType;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
@@ -60,6 +54,7 @@ import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.client.HttpClientBuilder;
@@ -70,20 +65,20 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
-import jitstatic.JitstaticApplication;
-import jitstatic.JitstaticConfiguration;
+import jitstatic.auth.User;
+import jitstatic.hosted.HostedFactory;
+import jitstatic.storage.StorageData;
 import jitstatic.storage.StorageFactory;
 
 public class HostOwnGitRepositoryTest {
 
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
-	private static final DropwizardAppRule<JitstaticConfiguration> drop;
-	private static final GenericType<Map<String, Object>> type = new GenericType<Map<String, Object>>() {
-	};
+	private static final DropwizardAppRule<JitstaticConfiguration> DW;
+	private static final ObjectMapper mapper = new ObjectMapper();
 
 	@ClassRule
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
-			.around((drop = new DropwizardAppRule<>(JitstaticApplication.class,
+			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
 					ConfigOverride.config("storage.baseDirectory", getFolder()),
 					ConfigOverride.config("storage.localFilePath", "accept/storage"),
@@ -92,81 +87,51 @@ public class HostOwnGitRepositoryTest {
 	private static UsernamePasswordCredentialsProvider provider;
 	private static String basic;
 	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
-
-	@Rule
-	public ExpectedException ex = ExpectedException.none();
-
-	private final ObjectMapper mapper = new ObjectMapper();
-
-	private String gitAdress;
-	private String storageAdress;
+	private static String gitAdress;
+	private static String storageAdress;
 
 	@BeforeClass
 	public static void setupClass() throws UnsupportedEncodingException {
-		provider = new UsernamePasswordCredentialsProvider(drop.getConfiguration().getHostedFactory().getUserName(),
-				drop.getConfiguration().getHostedFactory().getSecret());
-		StorageFactory storage = drop.getConfiguration().getStorageFactory();
-		basic = "Basic "
-				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
+		final HostedFactory hf = DW.getConfiguration().getHostedFactory();
+		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
+		basic = getBasicAuth();
 		hcc.setConnectionRequestTimeout(Duration.minutes(1));
 		hcc.setConnectionTimeout(Duration.minutes(1));
 		hcc.setTimeout(Duration.minutes(1));
-	}
-
-	@Before
-	public void setup() {
-		gitAdress = String.format("http://localhost:%d/application/%s/%s", drop.getLocalPort(),
-				drop.getConfiguration().getHostedFactory().getServletName(),
-				drop.getConfiguration().getHostedFactory().getHostedEndpoint());
-		storageAdress = String.format("http://localhost:%d/application", drop.getLocalPort());
 		mapper.enable(Feature.ALLOW_COMMENTS);
+		int localPort = DW.getLocalPort();
+		gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(),
+				hf.getHostedEndpoint());
+		storageAdress = String.format("http://localhost:%d/application", localPort);
 	}
 
 	@Test
-	public void testCloneOwnHostedRepository()
-			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+	public void testCloneOwnHostedRepository() throws Exception {
 		try (Git git = Git.cloneRepository().setDirectory(tmpFolder.newFolder()).setCredentialsProvider(provider)
 				.setURI(gitAdress).call()) {
-			String localFilePath = drop.getConfiguration().getStorageFactory().getLocalFilePath();
-			Path path = Paths.get(git.getRepository().getDirectory().getParentFile().getAbsolutePath(), localFilePath);
+			String localFilePath = getLocalFilePath();
+			Path path = Paths.get(getRepopath(git), localFilePath);
 			assertTrue(Files.exists(path));
 		}
 	}
 
 	@Test
-	public void testPushToOwnHostedRepository()
-			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+	public void testPushToOwnHostedRepositoryAndFetchResultFromKeyValuestorage() throws Exception {
+		StorageData data = null;
 		try (Git git = Git.cloneRepository().setDirectory(tmpFolder.newFolder()).setURI(gitAdress)
 				.setCredentialsProvider(provider).call()) {
-			String localFilePath = drop.getConfiguration().getStorageFactory().getLocalFilePath();
-			Path path = Paths.get(git.getRepository().getDirectory().getParentFile().getAbsolutePath(), localFilePath);
+			String localFilePath = getLocalFilePath();
+			Path path = Paths.get(getRepopath(git), localFilePath);
 
-			Map<String, Map<String, Object>> sourceMap = readSource(path);
-			Map<String, Object> value = new HashMap<>();
-			sourceMap.put("key", value);
-			writeSource(sourceMap, path);
+			Map<String, StorageData> sourceMap = readSource(path);
 
-			git.add().addFilepattern(localFilePath).call();
-			git.commit().setMessage("Test commit").call();
-			Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-			PushResult pr = call.iterator().next();
-			RemoteRefUpdate remoteUpdate = pr.getRemoteUpdate("refs/heads/master");
-			assertEquals(Status.OK, remoteUpdate.getStatus());
-		}
-	}
+			Set<User> users = new HashSet<>();
+			StorageFactory storage = DW.getConfiguration().getStorageFactory();
+			users.add(new User(storage.getUser(), storage.getSecret()));
 
-	@Test
-	public void testPushToOwnHostedRepositoryAndFetchResultFromKeyValuestorage()
-			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		try (Git git = Git.cloneRepository().setDirectory(tmpFolder.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = drop.getConfiguration().getStorageFactory().getLocalFilePath();
-			Path path = Paths.get(git.getRepository().getDirectory().getParentFile().getAbsolutePath(), localFilePath);
+			data = new StorageData(users, mapper.readTree("\"value\""));
+			sourceMap.put("key1", data);
 
-			Map<String, Map<String, Object>> sourceMap = readSource(path);
-			Map<String, Object> value = new HashMap<>();
-			value.put("key", "value");
-			sourceMap.put("urlkey", value);
 			writeSource(sourceMap, path);
 
 			git.add().addFilepattern(localFilePath).call();
@@ -179,9 +144,9 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			Map<String, Object> response = client.target(String.format("%s/storage/urlkey", storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(type);
-			assertEquals("value", response.get("key"));
+			JsonNode response = client.target(String.format("%s/storage/key1", storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals(data.getData(), response);
 		} finally {
 			client.close();
 		}
@@ -198,27 +163,39 @@ public class HostOwnGitRepositoryTest {
 		};
 	}
 
-	private Map<String, Map<String, Object>> readSource(final Path storage) throws IOException {
+	private static String getBasicAuth() throws UnsupportedEncodingException {
+		StorageFactory storage = DW.getConfiguration().getStorageFactory();
+		return "Basic "
+				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
+	}
+
+	private Map<String, StorageData> readSource(final Path storage) throws IOException {
 		assertTrue(Files.exists(storage));
 		try (InputStream bc = Files.newInputStream(storage);) {
-			return mapper.readValue(bc, new TypeReference<Map<String, Map<String, Object>>>() {
+			return mapper.readValue(bc, new TypeReference<Map<String, StorageData>>() {
 			});
 		}
 	}
 
-	private void writeSource(final Map<String, Map<String, Object>> map, final Path storage)
+	private void writeSource(final Map<String, StorageData> map, final Path storage)
 			throws JsonGenerationException, JsonMappingException, IOException {
 		assertTrue(Files.exists(storage));
 		mapper.writeValue(storage.toFile(), map);
 	}
 
 	private Client buildClient(final String name) {
-		Environment environment = drop.getEnvironment();
-		HttpClientBuilder httpClientBuilder = new HttpClientBuilder(environment);
-		httpClientBuilder.using(hcc);
+		Environment environment = DW.getEnvironment();
 		JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(environment);
-		jerseyClientBuilder.setApacheHttpClientBuilder(httpClientBuilder);
+		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(environment).using(hcc));
 		return jerseyClientBuilder.build(name);
+	}
+
+	private String getRepopath(Git git) {
+		return git.getRepository().getDirectory().getParentFile().getAbsolutePath();
+	}
+
+	private String getLocalFilePath() {
+		return DW.getConfiguration().getStorageFactory().getLocalFilePath();
 	}
 
 }

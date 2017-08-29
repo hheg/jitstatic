@@ -22,6 +22,7 @@ package jitstatic;
 
 
 
+
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 

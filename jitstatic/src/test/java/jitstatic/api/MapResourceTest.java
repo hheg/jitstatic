@@ -21,19 +21,20 @@ package jitstatic.api;
  */
 
 
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response.Status;
 
@@ -45,23 +46,27 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit.ResourceTestRule;
-import jitstatic.api.MapResource;
 import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 import jitstatic.storage.Storage;
+import jitstatic.storage.StorageData;
 
 public class MapResourceTest {
 	private static final String user = "user";
 	private static final String secret = "secret";
-	private static final String basicAuthCred = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes());
+	private static final String basicAuthCred = "Basic "
+			+ Base64.getEncoder().encodeToString((user + ":" + secret).getBytes());
 	private static final Storage storage = mock(Storage.class);
-	private static final Map<String, Map<String, Object>> data = new HashMap<>();
-	private static final GenericType<Map<String, Object>> genericType = new GenericType<Map<String, Object>>() {
-	};
+	private static final Map<String, StorageData> data = new HashMap<>();
+	private static final ObjectMapper mapper = new ObjectMapper();
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
@@ -69,30 +74,38 @@ public class MapResourceTest {
 	public static final ResourceTestRule resources = ResourceTestRule.builder()
 			.setTestContainerFactory(new GrizzlyWebTestContainerFactory())
 			.addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-					.setAuthenticator(new ConfiguratedAuthenticator(user, secret)).setRealm("jitstatic")
-					.buildAuthFilter()))
+					.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()))
 			.addProvider(RolesAllowedDynamicFeature.class)
-			.addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new MapResource(storage)).build();
+			.addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new MapResource(storage))
+			.build();
 
 	@BeforeClass
-	public static void setupClass() {
-		Map<String, Object> dogData = new HashMap<>();
-		dogData.put("food", Arrays.asList(new String[] { "bone", "meat" }));
-		Map<String, Object> dogToys = new HashMap<>();
-		dogToys.put("ball", "frizbee");
-		dogData.put("toys", dogToys);
+	public static void setupClass() throws JsonProcessingException, IOException {
+		JsonNode node = mapper.readTree("{\"food\" : [\"bone\",\"meat\"]}");
+		Set<User> users = new HashSet<>(Arrays.asList(new User(user, secret)));
+		StorageData dogData = new StorageData(users, node);
 		data.put("dog", dogData);
+		JsonNode horse = mapper.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
+		StorageData horseData = new StorageData(new HashSet<>(), horse);
+		data.put("horse", horseData);
 	}
 
 	@Test
 	public void testGettingKeyFromResource() {
-		Map<String, Object> expected = data.get("dog");
+		StorageData expected = data.get("dog");
 		when(storage.get("dog")).thenReturn(expected);
-		Map<String, Object> response = resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred)
-				.get(genericType);
+		JsonNode response = resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred)
+				.get(JsonNode.class);
+		assertEquals(expected.getData(), response);
+	}
 
-		assertEquals(expected, response);
-
+	@Test
+	public void testGettingKeyFromResourceWithNoAuthentication() {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.UNAUTHORIZED.toString());
+		StorageData expected = data.get("dog");
+		when(storage.get("dog")).thenReturn(expected);
+		resources.target("/storage/dog").request().get(JsonNode.class);
 	}
 
 	@Test
@@ -100,7 +113,26 @@ public class MapResourceTest {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
 		when(storage.get(any())).thenReturn(null);
+		resources.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred)
+				.get(StorageData.class);
+	}
 
-		resources.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred).get(genericType);
+	@Test
+	public void testNoAuthorizationOnPermittedResource() {
+		StorageData expected = data.get("horse");
+		when(storage.get("horse")).thenReturn(expected);
+		JsonNode response = resources.target("/storage/horse").request().get(JsonNode.class);
+		assertEquals(expected.getData(), response);
+	}
+
+	@Test
+	public void testKeyIsFoundButWrongUser() {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.UNAUTHORIZED.toString());
+		StorageData expected = data.get("dog");
+		when(storage.get("dog")).thenReturn(expected);
+		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + secret).getBytes());
+		resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
+
 	}
 }

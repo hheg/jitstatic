@@ -20,66 +20,70 @@ package jitstatic.storage;
  * #L%
  */
 
-
 import static org.hamcrest.CoreMatchers.isA;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Set;
+import java.util.UUID;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jitstatic.source.Source.Contact;
 import jitstatic.storage.GitWorkingRepositoryManager;
 
+@RunWith(Parameterized.class)
 public class GitWorkingRepositoryManagerTest {
 	private static final String STORAGE = "storage";
 
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
-	
-	@Rule
-	public final TemporaryFolder tempFolder = new TemporaryFolder();
-	
+
+	@ClassRule
+	public static final TemporaryFolder tempFolder = new TemporaryFolder();
+
+	@Parameters
+    public static Collection<Contact> data() {
+        return Arrays.asList(new LocalRemoteContact(),new RemoteRemoteContact("user", "pass"));
+    }
+	private final Contact remoteRepo;
 	private Path tempFile;
 	private Path tempDir;
-	private Contact remoteRepo;
+	
+	public GitWorkingRepositoryManagerTest(Contact c) {
+		remoteRepo = c;
+	}	
 
 	@Before
 	public void setup() throws Exception {
 		tempFile = tempFolder.newFile().toPath();
 		tempDir = tempFolder.newFolder().toPath();
-		try(Git git = Git.init().setDirectory(tempDir.resolve("bare").toFile()).setBare(true).call();) {
+		try (Git git = Git.init().setDirectory(tempDir.resolve("bare").toFile()).setBare(true).call();) {
 			URI uri = git.getRepository().getDirectory().toURI();
-			remoteRepo = new Contact() {
-				
-				@Override
-				public URI repositoryURI() {
-					return uri;
-				}
-				
-				@Override
-				public String getUserName() {
-					return null;
-				}
-				
-				@Override
-				public String getPassword() {
-					return null;
-				}
-			};;
+			SetURI u = (SetURI) remoteRepo;
+			u.setURI(uri);
 		}
 	}
 
@@ -119,6 +123,7 @@ public class GitWorkingRepositoryManagerTest {
 			assertTrue(Files.exists(storage));
 		}
 	}
+
 	@Test
 	public void testReEntrantInstansiationButStorageIsRemoved() throws IOException {
 		final Path storage = tempDir.resolve(GitWorkingRepositoryManager.WORKING).resolve(STORAGE);
@@ -126,7 +131,7 @@ public class GitWorkingRepositoryManagerTest {
 		ex.expect(RuntimeException.class);
 		ex.expectCause(isA(FileNotFoundException.class));
 		ex.expectMessage(storage.toString());
-		
+
 		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
 			assertTrue(Files.exists(storage));
 		}
@@ -134,31 +139,115 @@ public class GitWorkingRepositoryManagerTest {
 		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
 		}
 	}
-	
+
 	@Test
 	public void testResolveACorrectFile() {
 		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
 			assertNotNull(grm.resolvePath(STORAGE));
 		}
 	}
+
 	@Test
 	public void testClonseAnExistingRepo() throws IOException {
 		final Path storage = tempDir.resolve(GitWorkingRepositoryManager.WORKING).resolve(STORAGE);
-		
+
 		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
 			assertTrue(Files.exists(storage));
 		}
 		final Path newPath = tempFolder.newFolder().toPath();
 		final Path newstorage = newPath.resolve(GitWorkingRepositoryManager.WORKING).resolve(STORAGE);
-		try(GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(newPath, STORAGE, remoteRepo)){
+		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(newPath, STORAGE, remoteRepo)) {
 			assertTrue(Files.exists(newstorage));
 		}
 	}
+
 	@Test
 	public void testRemoteContactInfoIsNull() {
 		ex.expect(NullPointerException.class);
 		ex.expectMessage("remoteContactInfo cannot be null");
-		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, null);) {			
+		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, null);) {
 		}
+	}
+
+	@Test
+	public void testRefreshing() throws InvalidRemoteException, TransportException, GitAPIException,
+			UnsupportedEncodingException, IOException {
+		URI repositoryURI = remoteRepo.repositoryURI();
+		String s = UUID.randomUUID().toString();
+		Path p = Paths.get(repositoryURI).resolve(s);
+		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
+			grm.refresh();
+			assertFalse(Files.exists(p));
+		}
+		try (Git git = Git.cloneRepository().setURI(repositoryURI.toString()).setDirectory(tempFolder.newFolder())
+				.call()) {
+			Files.write(p, s.getBytes("UTF-8"));
+			git.add().addFilepattern(s).call();
+			git.commit().setMessage("Test commit").call();
+			git.push().call();
+		}
+		try (GitWorkingRepositoryManager grm = new GitWorkingRepositoryManager(tempDir, STORAGE, remoteRepo);) {
+			grm.refresh();
+			assertTrue(Files.exists(p));
+		}
+	}
+
+	private static class RemoteRemoteContact implements Contact, SetURI {
+
+		private String user;
+		private String password;
+		private URI uri;
+
+		public RemoteRemoteContact(final String user, final String password) {
+			this.user = user;
+			this.password = password;
+		}
+
+		public void setURI(URI uri) {
+			this.uri = uri;
+		}
+
+		@Override
+		public URI repositoryURI() {
+			return uri;
+		}
+
+		@Override
+		public String getUserName() {
+			return user;
+		}
+
+		@Override
+		public String getPassword() {
+			return password;
+		}
+	}
+
+	private static class LocalRemoteContact implements Contact, SetURI {
+
+		private URI uri;
+
+		public void setURI(URI uri) {
+			this.uri = uri;
+		}
+
+		@Override
+		public URI repositoryURI() {
+			return uri;
+		}
+
+		@Override
+		public String getUserName() {
+			return null;
+		}
+
+		@Override
+		public String getPassword() {
+			return null;
+		}
+	}
+
+	private interface SetURI {
+		public void setURI(URI uri);
 	}
 }

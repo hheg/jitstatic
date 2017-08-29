@@ -22,6 +22,7 @@ package jitstatic.storage;
 
 
 
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -55,11 +56,13 @@ public class StorageFactory {
 	@NotEmpty
 	@NotNull
 	@JsonProperty
+	@Deprecated
 	private String user;
 
 	@NotEmpty
 	@NotNull
 	@JsonProperty
+	@Deprecated
 	private String secret;
 
 	public String getBaseDirectory() {
@@ -82,7 +85,7 @@ public class StorageFactory {
 		final Path baseDirectoryPath = Paths.get(getBaseDirectory());
 		env.jersey()
 				.register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-						.setAuthenticator(new ConfiguratedAuthenticator(getUser(), getSecret())).setRealm("jitstatic")
+						.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic")
 						.buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
@@ -95,19 +98,20 @@ public class StorageFactory {
 			throw e;
 		}
 	}
-
+	@Deprecated
 	public String getUser() {
 		return user;
 	}
 
+	@Deprecated
 	public void setUser(String user) {
 		this.user = user;
 	}
-
+	@Deprecated
 	public String getSecret() {
 		return secret;
 	}
-
+	@Deprecated
 	public void setSecret(String secret) {
 		this.secret = secret;
 	}

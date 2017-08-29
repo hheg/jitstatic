@@ -21,6 +21,7 @@ package jitstatic.storage;
  */
 
 
+
 class StorageUtils {
 
 	public static void closeSilently(final AutoCloseable repo){

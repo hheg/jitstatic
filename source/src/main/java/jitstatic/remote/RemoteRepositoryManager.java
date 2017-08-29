@@ -21,6 +21,7 @@ package jitstatic.remote;
  */
 
 
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,12 +69,12 @@ class RemoteRepositoryManager implements Contact {
 					lsRemoteRepository
 							.setCredentialsProvider(new UsernamePasswordCredentialsProvider(userName, password));
 				}
-				Collection<Ref> refs = lsRemoteRepository.setHeads(true).setTags(true)
+				final Collection<Ref> refs = lsRemoteRepository.setHeads(true).setTags(true)
 						.setRemote(this.remoteRepo.toString()).call();
-				Iterator<Ref> iterator = refs.iterator();
+				final Iterator<Ref> iterator = refs.iterator();
 				boolean triggered = false;
 				while (iterator.hasNext()) {
-					Ref next = iterator.next();
+					final Ref next = iterator.next();
 					if (REFS_HEADS_MASTER.equals(next.getName())) {
 						String remoteSHA = next.getObjectId().getName();
 						if (!remoteSHA.equals(getLatestSHA())) {

@@ -20,15 +20,15 @@ package jitstatic.remote;
  * #L%
  */
 
+
+import static org.hamcrest.Matchers.isA;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
-import static org.hamcrest.Matchers.*;
-
-import static org.junit.Assert.assertEquals;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,7 +39,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import jitstatic.source.SourceEventListener;
 

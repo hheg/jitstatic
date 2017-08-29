@@ -21,7 +21,6 @@ package jitstatic.storage;
  */
 
 
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -31,6 +30,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
 import com.fasterxml.jackson.core.JsonParser.Feature;
@@ -38,8 +39,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class GitStorage implements Storage {
-
-	private final Map<String, Map<String,Object>> cache = new ConcurrentHashMap<>();
+	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
+	private final Map<String, StorageData> cache = new ConcurrentHashMap<>();
 	private final String fileStorage;
 	private final GitWorkingRepositoryManager gitRepositoryManager;
 	private final ObjectMapper mapper = new ObjectMapper();
@@ -55,61 +56,69 @@ public class GitStorage implements Storage {
 	}
 
 	@Override
-	public Map<String,Object> get(String key) {
+	public StorageData get(String key) {
 		return cache.get(key);
 	}
-	
+
 	private void refresh() throws LoaderException {
 		try {
 			gitRepositoryManager.refresh();
 		} catch (GitAPIException e) {
-			throw new LoaderException("Error while loading storage",e);
+			throw new LoaderException("Error while loading storage", e);
 		}
 	}
-	
+
 	private Path checkStorage() throws LoaderException {
 		Path storage = gitRepositoryManager.resolvePath(fileStorage);
-		if(storage == null) {
-			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.",fileStorage,(cache.isEmpty() ? "loading" : "reloading")));
+		if (storage == null) {
+			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.", fileStorage,
+					(cache.isEmpty() ? "loading" : "reloading")));
 		}
 		return storage;
 	}
-	
-	private Map<String, Map<String, Object>> readStorage(final Path storage) throws LoaderException {
+
+	private Map<String, StorageData> readStorage(final Path storage) throws LoaderException {
 		// TODO Change this to an event reader
-		try(InputStream bc = Files.newInputStream(storage);) {
-			return mapper.readValue(bc, new TypeReference<Map<String, Map<String,Object>>>(){});
+		try (InputStream bc = Files.newInputStream(storage);) {
+			return mapper.readValue(bc, new TypeReference<Map<String, StorageData>>() {
+			});
 		} catch (IOException e) {
-			throw new LoaderException("Error while parsing data",e);
-		}		
+			throw new LoaderException("Error while parsing data", e);
+		}
 	}
-	
+
 	@Override
 	public void load() throws LoaderException {
-		refresh();
-		final Path storage = checkStorage();
-		final Map<String, Map<String, Object>> map = readStorage(storage);
-		
-		Set<String> cacheKeySet = cache.keySet();
-		Set<String> readKeySet = map.keySet();
-		cacheKeySet.retainAll(readKeySet);
-		cache.putAll(map);
+		try {
+			refresh();
+
+			final Path storage = checkStorage();
+			final Map<String, StorageData> map = readStorage(storage);
+
+			Set<String> cacheKeySet = cache.keySet();
+			Set<String> readKeySet = map.keySet();
+			cacheKeySet.retainAll(readKeySet);
+			cache.putAll(map);
+		} catch (Exception e) {
+			LOG.warn("Error while loading store", e);
+			throw new LoaderException(e);
+		}
 	}
 
 	@Override
 	public void close() {
 		StorageUtils.closeSilently(gitRepositoryManager);
 	}
-	
+
 	@Override
 	public void checkHealth() {
 		try {
-			//refresh();
+			// refresh();
 			checkStorage();
-			//readStorage(storage);			
+			// readStorage(storage);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
-		}		
+		}
 	}
 
 }
