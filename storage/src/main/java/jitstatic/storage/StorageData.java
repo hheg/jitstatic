@@ -21,6 +21,7 @@ package jitstatic.storage;
  */
 
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -38,8 +39,8 @@ public class StorageData {
 
 	@JsonCreator
 	public StorageData(final @JsonDeserialize(as=LinkedHashSet.class) @JsonProperty("users") Set<User> users, final @JsonProperty("data") JsonNode data) {
-		this.users = users;
-		this.data = data;
+		this.users = Objects.requireNonNull(users);
+		this.data = Objects.requireNonNull(data);
 	}
 
 	public Set<User> getUsers() {
@@ -54,8 +55,8 @@ public class StorageData {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((data == null) ? 0 : data.hashCode());
-		result = prime * result + ((users == null) ? 0 : users.hashCode());
+		result = prime * result + data.hashCode();
+		result = prime * result + users.hashCode();
 		return result;
 	}
 
@@ -68,15 +69,9 @@ public class StorageData {
 		if (getClass() != obj.getClass())
 			return false;
 		StorageData other = (StorageData) obj;
-		if (data == null) {
-			if (other.data != null)
-				return false;
-		} else if (!data.equals(other.data))
+		if (!data.equals(other.data))
 			return false;
-		if (users == null) {
-			if (other.users != null)
-				return false;
-		} else if (!users.equals(other.users))
+		if (!users.equals(other.users))
 			return false;
 		return true;
 	}
