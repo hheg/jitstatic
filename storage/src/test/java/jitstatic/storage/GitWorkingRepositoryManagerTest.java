@@ -32,6 +32,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
 
@@ -40,26 +42,39 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import jitstatic.source.Source.Contact;
 import jitstatic.storage.GitWorkingRepositoryManager;
 
+@RunWith(Parameterized.class)
 public class GitWorkingRepositoryManagerTest {
 	private static final String STORAGE = "storage";
 
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
-	@Rule
-	public final TemporaryFolder tempFolder = new TemporaryFolder();
+	@ClassRule
+	public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
+	@Parameters
+    public static Collection<Contact> data() {
+        return Arrays.asList(new LocalRemoteContact(),new RemoteRemoteContact("user", "pass"));
+    }
+	private final Contact remoteRepo;
 	private Path tempFile;
 	private Path tempDir;
-	private Contact remoteRepo;
+	
+	public GitWorkingRepositoryManagerTest(Contact c) {
+		remoteRepo = c;
+	}	
 
 	@Before
 	public void setup() throws Exception {
@@ -67,24 +82,8 @@ public class GitWorkingRepositoryManagerTest {
 		tempDir = tempFolder.newFolder().toPath();
 		try (Git git = Git.init().setDirectory(tempDir.resolve("bare").toFile()).setBare(true).call();) {
 			URI uri = git.getRepository().getDirectory().toURI();
-			remoteRepo = new Contact() {
-
-				@Override
-				public URI repositoryURI() {
-					return uri;
-				}
-
-				@Override
-				public String getUserName() {
-					return "user";
-				}
-
-				@Override
-				public String getPassword() {
-					return "pass";
-				}
-			};
-			;
+			SetURI u = (SetURI) remoteRepo;
+			u.setURI(uri);
 		}
 	}
 
@@ -193,4 +192,62 @@ public class GitWorkingRepositoryManagerTest {
 		}
 	}
 
+	private static class RemoteRemoteContact implements Contact, SetURI {
+
+		private String user;
+		private String password;
+		private URI uri;
+
+		public RemoteRemoteContact(final String user, final String password) {
+			this.user = user;
+			this.password = password;
+		}
+
+		public void setURI(URI uri) {
+			this.uri = uri;
+		}
+
+		@Override
+		public URI repositoryURI() {
+			return uri;
+		}
+
+		@Override
+		public String getUserName() {
+			return user;
+		}
+
+		@Override
+		public String getPassword() {
+			return password;
+		}
+	}
+
+	private static class LocalRemoteContact implements Contact, SetURI {
+
+		private URI uri;
+
+		public void setURI(URI uri) {
+			this.uri = uri;
+		}
+
+		@Override
+		public URI repositoryURI() {
+			return uri;
+		}
+
+		@Override
+		public String getUserName() {
+			return null;
+		}
+
+		@Override
+		public String getPassword() {
+			return null;
+		}
+	}
+
+	private interface SetURI {
+		public void setURI(URI uri);
+	}
 }
