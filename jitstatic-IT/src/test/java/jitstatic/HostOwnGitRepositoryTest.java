@@ -77,9 +77,10 @@ public class HostOwnGitRepositoryTest {
 	private static final ObjectMapper mapper = new ObjectMapper();
 	private static final String USER = "suser";
 	private static final String PASSWORD = "ssecret";
-
+	private static final HttpClientConfiguration hcc = new HttpClientConfiguration();
+	
 	@ClassRule
-	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
+	public static final RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
 					ConfigOverride.config("storage.baseDirectory", getFolder()),
@@ -88,7 +89,7 @@ public class HostOwnGitRepositoryTest {
 
 	private static UsernamePasswordCredentialsProvider provider;
 	private static String basic;
-	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
+	
 	private static String gitAdress;
 	private static String storageAdress;
 	

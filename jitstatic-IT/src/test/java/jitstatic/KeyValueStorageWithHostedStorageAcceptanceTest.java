@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
@@ -55,26 +54,26 @@ import io.dropwizard.util.Duration;
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
 	private static final String ACCEPT_STORAGE = "accept/storage";
-	private static final String LOCALUSER = "suser";
-	private static final String LOCALPASS = "ssecret";
+	private static final String USER = "suser";
+	private static final String PASSWORD = "ssecret";
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
 	private static final HttpClientConfiguration hcc = new HttpClientConfiguration();
 	private static final DropwizardAppRule<JitstaticConfiguration> DW;
 	private static final TestRepositoryRule testRepo;
 	private static String adress;
 	private static String basic;
-	
-	@Rule
-	public ExpectedException ex = ExpectedException.none();
 
 	@ClassRule
-	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
+	public static final RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((testRepo = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
 					ConfigOverride.config("storage.baseDirectory", getFolder()),
 					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE),
 					ConfigOverride.config("remote.remoteRepo", () -> "file://" + testRepo.getBase.get()))));
+
+	@Rule
+	public ExpectedException ex = ExpectedException.none();
 
 	@BeforeClass
 	public static void setup() throws UnsupportedEncodingException {
@@ -83,11 +82,6 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 		hcc.setConnectionRequestTimeout(Duration.minutes(1));
 		hcc.setConnectionTimeout(Duration.minutes(1));
 		hcc.setTimeout(Duration.minutes(1));
-	}
-
-	private static String basicAuth() throws UnsupportedEncodingException {
-		return "Basic "
-				+ Base64.getEncoder().encodeToString((LOCALUSER + ":" + LOCALPASS).getBytes("UTF-8"));
 	}
 
 	@Test
@@ -152,4 +146,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(hcc));
 		return jerseyClientBuilder.build(name);
 	}
+
+	private static String basicAuth() throws UnsupportedEncodingException {
+		return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
+	}
+
 }
