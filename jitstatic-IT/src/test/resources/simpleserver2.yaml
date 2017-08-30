@@ -15,8 +15,6 @@ logging:
 storage:
     baseDirectory: /tmp/acceptance
     localFilePath: test/storage
-    user: suser
-    secret: ssecret
 remote:
     remoteRepo: file://tmp/remote
     

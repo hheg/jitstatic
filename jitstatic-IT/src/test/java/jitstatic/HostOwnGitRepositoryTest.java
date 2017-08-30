@@ -68,20 +68,22 @@ import io.dropwizard.util.Duration;
 import jitstatic.auth.User;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.storage.StorageData;
-import jitstatic.storage.StorageFactory;
 
 public class HostOwnGitRepositoryTest {
 
+	private static final String ACCEPT_STORAGE = "accept/storage";
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
 	private static final DropwizardAppRule<JitstaticConfiguration> DW;
 	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String USER = "suser";
+	private static final String PASSWORD = "ssecret";
 
 	@ClassRule
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
 					ConfigOverride.config("storage.baseDirectory", getFolder()),
-					ConfigOverride.config("storage.localFilePath", "accept/storage"),
+					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE),
 					ConfigOverride.config("hosted.basePath", getFolder()))));
 
 	private static UsernamePasswordCredentialsProvider provider;
@@ -89,20 +91,20 @@ public class HostOwnGitRepositoryTest {
 	private static HttpClientConfiguration hcc = new HttpClientConfiguration();
 	private static String gitAdress;
 	private static String storageAdress;
-
+	
 	@BeforeClass
 	public static void setupClass() throws UnsupportedEncodingException {
 		final HostedFactory hf = DW.getConfiguration().getHostedFactory();
 		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
 		basic = getBasicAuth();
-		hcc.setConnectionRequestTimeout(Duration.minutes(1));
-		hcc.setConnectionTimeout(Duration.minutes(1));
-		hcc.setTimeout(Duration.minutes(1));
 		mapper.enable(Feature.ALLOW_COMMENTS);
 		int localPort = DW.getLocalPort();
 		gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(),
 				hf.getHostedEndpoint());
 		storageAdress = String.format("http://localhost:%d/application", localPort);
+		hcc.setConnectionRequestTimeout(Duration.minutes(1));
+		hcc.setConnectionTimeout(Duration.minutes(1));
+		hcc.setTimeout(Duration.minutes(1));
 	}
 
 	@Test
@@ -126,8 +128,7 @@ public class HostOwnGitRepositoryTest {
 			Map<String, StorageData> sourceMap = readSource(path);
 
 			Set<User> users = new HashSet<>();
-			StorageFactory storage = DW.getConfiguration().getStorageFactory();
-			users.add(new User(storage.getUser(), storage.getSecret()));
+			users.add(new User(USER, PASSWORD));
 
 			data = new StorageData(users, mapper.readTree("\"value\""));
 			sourceMap.put("key1", data);
@@ -164,9 +165,8 @@ public class HostOwnGitRepositoryTest {
 	}
 
 	private static String getBasicAuth() throws UnsupportedEncodingException {
-		StorageFactory storage = DW.getConfiguration().getStorageFactory();
 		return "Basic "
-				+ Base64.getEncoder().encodeToString((storage.getUser() + ":" + storage.getSecret()).getBytes("UTF-8"));
+				+ Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
 	}
 
 	private Map<String, StorageData> readSource(final Path storage) throws IOException {

@@ -53,18 +53,6 @@ public class StorageFactory {
 	@JsonProperty
 	private String localFilePath;
 
-	@NotEmpty
-	@NotNull
-	@JsonProperty
-	@Deprecated
-	private String user;
-
-	@NotEmpty
-	@NotNull
-	@JsonProperty
-	@Deprecated
-	private String secret;
-
 	public String getBaseDirectory() {
 		return baseDirectory;
 	}
@@ -97,22 +85,5 @@ public class StorageFactory {
 			StorageUtils.closeSilently(gwrm);
 			throw e;
 		}
-	}
-	@Deprecated
-	public String getUser() {
-		return user;
-	}
-
-	@Deprecated
-	public void setUser(String user) {
-		this.user = user;
-	}
-	@Deprecated
-	public String getSecret() {
-		return secret;
-	}
-	@Deprecated
-	public void setSecret(String secret) {
-		this.secret = secret;
 	}
 }

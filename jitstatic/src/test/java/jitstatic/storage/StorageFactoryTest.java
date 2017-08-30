@@ -77,8 +77,6 @@ public class StorageFactoryTest {
 		tempDir = tempFolder.newFolder("base").toPath();
 		sf.setBaseDirectory(tempDir.toAbsolutePath().toString());
 		sf.setLocalFilePath("storage");
-		sf.setUser("user");
-		sf.setSecret("secret");
 		assertTrue(validator.validate(sf).isEmpty());
 		try (Git git = Git.init().setDirectory(tempDir.resolve("bare").toFile()).setBare(true).call();) {
 			URI uri = git.getRepository().getDirectory().toURI();

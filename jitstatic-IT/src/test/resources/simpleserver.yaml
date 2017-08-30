@@ -15,8 +15,6 @@ logging:
 storage:
     baseDirectory: /tmp/acceptance
     localFilePath: test/storage
-    user: suser
-    secret: ssecret
 hosted:
     basePath: file:/tmp/remote
     servletName: selfhosted

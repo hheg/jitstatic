@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -71,10 +70,11 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.storage.StorageData;
-import jitstatic.storage.StorageFactory;
 
 public class RemoteHttpHostedGitRepositoryTest {
 
+	private static final String PASSWORD = "ssecret";
+	private static final String USER = "suser";
 	private static final String ACCEPT_STORAGE2 = "accept/storage2";
 	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
 	private static final DropwizardAppRule<JitstaticConfiguration> remote;
@@ -84,11 +84,11 @@ public class RemoteHttpHostedGitRepositoryTest {
 	private static String remoteAdress;
 	private static String localAdress;
 
-	private static String remoteBasic;
-	private static String localBasic;
+	private static String basicAuth;
+
 	private static UsernamePasswordCredentialsProvider provider;
 	private static JsonNode expectedResponse;
-	
+
 	@ClassRule
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class,
@@ -116,14 +116,14 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 	@BeforeClass
 	public static void setup() throws JsonProcessingException, IOException {
+		basicAuth = buildBasicAuth(USER, PASSWORD);
+
 		remoteAdress = String.format("http://localhost:%d/application", remote.getLocalPort());
-		remoteBasic = getBasicAuth(remote);
 
 		HostedFactory hf = remote.getConfiguration().getHostedFactory();
 		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
 
 		localAdress = String.format("http://localhost:%d/application", local.getLocalPort());
-		localBasic = getBasicAuth(local);
 		assertTrue(local.getConfiguration().getHostedFactory() == null);
 		expectedResponse = mapper.readTree("\"value1\"");
 	}
@@ -133,7 +133,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		Client client = new JerseyClientBuilder(remote.getEnvironment()).build("test5 client");
 		try {
 			JsonNode response = client.target(String.format("%s/storage/key1", remoteAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), remoteBasic).get(JsonNode.class);
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
 			assertEquals(expectedResponse, response);
 		} finally {
 			client.close();
@@ -141,7 +141,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		client = new JerseyClientBuilder(local.getEnvironment()).build("test6 client");
 		try {
 			JsonNode response = client.target(String.format("%s/storage/key1", localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), localBasic).get(JsonNode.class);
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
 			assertEquals(expectedResponse, response);
 		} finally {
 			client.close();
@@ -156,7 +156,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test7 client");
 		try {
 			Builder clientTarget = client.target(String.format("%s/storage/key1", localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), localBasic);
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
 			JsonNode response = clientTarget.get(JsonNode.class);
 
 			assertEquals(expectedResponse, response);
@@ -230,14 +230,6 @@ public class RemoteHttpHostedGitRepositoryTest {
 		return () -> String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(),
 				remote.getConfiguration().getHostedFactory().getServletName(),
 				remote.getConfiguration().getHostedFactory().getHostedEndpoint());
-	}
-
-	private static String getBasicAuth(DropwizardAppRule<JitstaticConfiguration> app)
-			throws UnsupportedEncodingException {
-		StorageFactory storage = app.getConfiguration().getStorageFactory();
-		String user = storage.getUser();
-		String secret = storage.getSecret();
-		return buildBasicAuth(user, secret);
 	}
 
 	private Map<String, StorageData> readSource(final Path storage) throws IOException {
