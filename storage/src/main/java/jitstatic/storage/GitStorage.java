@@ -20,11 +20,11 @@ package jitstatic.storage;
  * #L%
  */
 
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -34,8 +34,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class GitStorage implements Storage {
@@ -43,16 +44,14 @@ public class GitStorage implements Storage {
 	private final Map<String, StorageData> cache = new ConcurrentHashMap<>();
 	private final String fileStorage;
 	private final GitWorkingRepositoryManager gitRepositoryManager;
-	private final ObjectMapper mapper = new ObjectMapper();
+	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 
 	public GitStorage(final String fileStorage, final GitWorkingRepositoryManager gitRepositoryManager) {
-
 		this.fileStorage = Objects.requireNonNull(fileStorage, "File storage is null");
 		if (fileStorage.trim().isEmpty()) {
 			throw new IllegalArgumentException("Storage file name's empty");
 		}
-		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");
-		mapper.getFactory().enable(Feature.ALLOW_COMMENTS);
+		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");		
 	}
 
 	@Override
@@ -77,28 +76,12 @@ public class GitStorage implements Storage {
 		return storage;
 	}
 
-	private Map<String, StorageData> readStorage(final Path storage) throws LoaderException {
-		// TODO Change this to an event reader
-		try (InputStream bc = Files.newInputStream(storage);) {
-			return mapper.readValue(bc, new TypeReference<Map<String, StorageData>>() {
-			});
-		} catch (IOException e) {
-			throw new LoaderException("Error while parsing data", e);
-		}
-	}
-
 	@Override
 	public void load() throws LoaderException {
 		try {
 			refresh();
-
 			final Path storage = checkStorage();
-			final Map<String, StorageData> map = readStorage(storage);
-
-			Set<String> cacheKeySet = cache.keySet();
-			Set<String> readKeySet = map.keySet();
-			cacheKeySet.retainAll(readKeySet);
-			cache.putAll(map);
+			readStorage(storage);
 		} catch (Exception e) {
 			LOG.warn("Error while loading store", e);
 			throw new LoaderException(e);
@@ -118,6 +101,28 @@ public class GitStorage implements Storage {
 			// readStorage(storage);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
+		}
+	}
+
+	private void readStorage(final Path storage) throws IOException {
+		final Set<String> keys = new HashSet<>();
+		JsonParser parser = null;
+		try (final InputStream bc = Files.newInputStream(storage);) {
+			parser = mapper.getFactory().createParser(bc);
+			parser.nextToken();
+			while (parser.nextToken() == JsonToken.FIELD_NAME) {
+				final String key = parser.getText();
+				parser.nextToken();							
+				final StorageData readValue = parser.readValueAs(StorageData.class);
+				keys.add(key);
+				cache.put(key, readValue);
+			}
+		}
+		final Set<String> cacheKeys = cache.keySet();
+		cacheKeys.retainAll(keys);
+		try {
+			parser.close();
+		} catch (IOException ignore) {
 		}
 	}
 

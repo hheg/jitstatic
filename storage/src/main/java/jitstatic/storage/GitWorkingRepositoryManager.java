@@ -74,7 +74,7 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 		final Path localStorage = workingRepo.resolve(localFilePath);
 		final URIish bareRepoURL = new URIish(remote.repositoryURI().toURL());
 		if (!Files.exists(workingRepo)) {
-			Files.createDirectories(workingRepo); // TODO Fix attributes
+			Files.createDirectories(workingRepo);
 			UsernamePasswordCredentialsProvider upcp = null;
 			if (remote.getUserName() != null) {
 				upcp = new UsernamePasswordCredentialsProvider(remote.getUserName(), remote.getPassword());
@@ -131,9 +131,9 @@ class GitWorkingRepositoryManager implements AutoCloseable {
 	}
 
 	public Path resolvePath(String fileStorage) {
-		Path parent = workingRepository.getDirectory().toPath().getParent();
+		final Path parent = workingRepository.getDirectory().toPath().getParent();
 		if (parent != null) {
-			Path resolved = parent.resolve(fileStorage);
+			final Path resolved = parent.resolve(fileStorage);
 			if (Files.exists(resolved))
 				return resolved;
 		}
