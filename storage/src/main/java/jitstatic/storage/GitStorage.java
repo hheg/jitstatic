@@ -75,7 +75,7 @@ public class GitStorage implements Storage {
 		if (storage == null) {
 			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.", fileStorage,
 					(cache.isEmpty() ? "loading" : "reloading")));
-		}
+		}		
 		return storage;
 	}
 
