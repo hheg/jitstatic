@@ -51,7 +51,7 @@ class RemoteRepositoryManager implements Contact {
 
 	private static final Object LOCK = new Object();
 
-	public RemoteRepositoryManager(final URI remoteRepo, String userName, String password) {
+	public RemoteRepositoryManager(final URI remoteRepo, final String userName, final String password) {
 		this.remoteRepo = Objects.requireNonNull(remoteRepo, "Remote endpoint cannot be null");
 		this.userName = userName;
 		this.password = password == null ? "" : password;
@@ -80,7 +80,8 @@ class RemoteRepositoryManager implements Contact {
 						if (!remoteSHA.equals(getLatestSHA())) {
 							listeners.forEach(SourceEventListener::onEvent);
 							setLatestSHA(remoteSHA);
-							triggered |= true;
+							triggered = true;
+							break;
 						}
 					}
 				}

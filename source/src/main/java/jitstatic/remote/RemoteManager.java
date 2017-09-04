@@ -36,10 +36,10 @@ class RemoteManager implements Source {
 	private static final int _5 = 5;
 	private final ScheduledExecutorService poller;
 	private final RemoteRepositoryManager remoteRepoManager;
-
-	private volatile ScheduledFuture<?> job;
 	private final long duration;
 	private final TimeUnit unit;
+	
+	private volatile ScheduledFuture<?> job;
 
 	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, final long duration,
 			final TimeUnit unit) {

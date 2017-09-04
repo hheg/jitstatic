@@ -43,7 +43,7 @@ public class GitStorage implements Storage {
 	private final Map<String, StorageData> cache = new ConcurrentHashMap<>();
 	private final String fileStorage;
 	private final GitWorkingRepositoryManager gitRepositoryManager;
-	private final ObjectMapper mapper = new ObjectMapper();
+	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 
 	public GitStorage(final String fileStorage, final GitWorkingRepositoryManager gitRepositoryManager) {
 
@@ -52,7 +52,6 @@ public class GitStorage implements Storage {
 			throw new IllegalArgumentException("Storage file name's empty");
 		}
 		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");
-		mapper.getFactory().enable(Feature.ALLOW_COMMENTS);
 	}
 
 	@Override
@@ -73,7 +72,7 @@ public class GitStorage implements Storage {
 		if (storage == null) {
 			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.", fileStorage,
 					(cache.isEmpty() ? "loading" : "reloading")));
-		}
+		}		
 		return storage;
 	}
 
