@@ -28,17 +28,21 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.LsRemoteCommand;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jitstatic.source.Source.Contact;
 import jitstatic.source.SourceEventListener;
 
 class RemoteRepositoryManager implements Contact {
 
+	private static final Logger log = LoggerFactory.getLogger(RemoteRepositoryManager.class);
 	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private final URI remoteRepo;
 	private final List<SourceEventListener> listeners = new ArrayList<>();
@@ -46,10 +50,10 @@ class RemoteRepositoryManager implements Contact {
 	private final String userName;
 	private final String password;
 
-	private String latestSHA = null;
-	private Exception fault = null;
-
-	private static final Object LOCK = new Object();
+	private volatile String latestSHA = null;
+	
+	private final AtomicReference<Exception> faultRef = new AtomicReference<>();
+	
 
 	public RemoteRepositoryManager(final URI remoteRepo, String userName, String password) {
 		this.remoteRepo = Objects.requireNonNull(remoteRepo, "Remote endpoint cannot be null");
@@ -96,21 +100,13 @@ class RemoteRepositoryManager implements Contact {
 	}
 
 	public Exception getFault() {
-		synchronized (LOCK) {
-			return fault;
-		}
+		return faultRef.getAndSet(null);		
 	}
 
-	private void setFault(Exception fault) {
-		synchronized (LOCK) {
-			this.fault = fault;
-		}
-	}
-
-	void removeFault(Exception fault) {
-		synchronized (LOCK) {
-			if (fault == this.fault)
-				this.fault = null;
+	private void setFault(final Exception fault) {
+		final Exception old = faultRef.getAndSet(fault);
+		if(old != null) {
+			log.warn("Unregistered exception",old);
 		}
 	}
 

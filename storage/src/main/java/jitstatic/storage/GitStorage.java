@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,12 +47,14 @@ public class GitStorage implements Storage {
 	private final GitWorkingRepositoryManager gitRepositoryManager;
 	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 
+	private final AtomicReference<Exception> fault = new AtomicReference<>();
+
 	public GitStorage(final String fileStorage, final GitWorkingRepositoryManager gitRepositoryManager) {
 		this.fileStorage = Objects.requireNonNull(fileStorage, "File storage is null");
 		if (fileStorage.trim().isEmpty()) {
 			throw new IllegalArgumentException("Storage file name's empty");
 		}
-		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");		
+		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");
 	}
 
 	@Override
@@ -67,8 +70,8 @@ public class GitStorage implements Storage {
 		}
 	}
 
-	private Path checkStorage() throws LoaderException {
-		Path storage = gitRepositoryManager.resolvePath(fileStorage);
+	private Path checkAndResolveStorage() throws LoaderException {
+		final Path storage = gitRepositoryManager.resolvePath(fileStorage);
 		if (storage == null) {
 			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.", fileStorage,
 					(cache.isEmpty() ? "loading" : "reloading")));
@@ -80,10 +83,19 @@ public class GitStorage implements Storage {
 	public void load() throws LoaderException {
 		try {
 			refresh();
-			final Path storage = checkStorage();
+			final Path storage = checkAndResolveStorage();
 			readStorage(storage);
+		} catch (LoaderException e) {
+			final Exception old = fault.getAndSet(e);
+			if (old != null) {
+				LOG.warn("Had an unrecorded error while loading store", e);
+			}
+			throw e;
 		} catch (Exception e) {
-			LOG.warn("Error while loading store", e);
+			final Exception old = fault.getAndSet(e);
+			if (old != null) {
+				LOG.warn("Had an unrecorded unexpected error while loading store", e);
+			}
 			throw new LoaderException(e);
 		}
 	}
@@ -94,11 +106,13 @@ public class GitStorage implements Storage {
 	}
 
 	@Override
-	public void checkHealth() {
+	public void checkHealth() throws Exception {
+		final Exception old = fault.getAndSet(null);
+		if (old != null) {
+			throw old;
+		}
 		try {
-			// refresh();
-			checkStorage();
-			// readStorage(storage);
+			checkAndResolveStorage();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -112,7 +126,7 @@ public class GitStorage implements Storage {
 			parser.nextToken();
 			while (parser.nextToken() == JsonToken.FIELD_NAME) {
 				final String key = parser.getText();
-				parser.nextToken();							
+				parser.nextToken();
 				final StorageData readValue = parser.readValueAs(StorageData.class);
 				keys.add(key);
 				cache.put(key, readValue);

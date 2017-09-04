@@ -20,10 +20,13 @@ package jitstatic.storage;
  * #L%
  */
 
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -152,9 +155,62 @@ public class GitStorageTest {
 	}
 
 	@Test
-	public void testCheckHealth() {
+	public void testCheckHealth() throws Exception {
 		ex.expectCause(isA(LoaderException.class));
 		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+			gs.checkHealth();
+		}
+	}
+
+	@Test
+	public void testCheckHealthWithFault() throws Exception {
+		RuntimeException cause = new RuntimeException("Fault reading something");
+		doThrow(new RuntimeException("Fault reading something")).when(repoManager).refresh();
+		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
+		
+		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+			try {
+				gs.load();
+			} catch (LoaderException e) {
+				assertTrue(e.getCause() instanceof RuntimeException);
+				assertEquals(cause.getMessage(), e.getCause().getMessage());
+			}
+			try {
+				gs.checkHealth();
+			} catch (Exception e) {				
+				assertTrue(e instanceof RuntimeException);
+				assertEquals(cause.getMessage(), e.getMessage());
+			}
+			StorageTestUtils.copy("/test3.json", tempFile);
+			gs.checkHealth();
+		}
+	}
+	
+	@Test
+	public void testCheckHealthWithOldFault() throws Exception {
+		RuntimeException cause = new RuntimeException("Fault reading something");
+		ex.expect(is(equalTo(cause)));
+		doThrow(cause).when(repoManager).refresh();
+		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);		
+		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+			try {
+				gs.load();
+			} catch (LoaderException e) {
+				assertTrue(e.getCause() instanceof RuntimeException);
+				assertEquals(cause.getMessage(), e.getCause().getMessage());
+			}
+			try {
+				gs.checkHealth();
+			} catch (Exception e) {			
+				assertTrue(e instanceof RuntimeException);
+				assertEquals(cause.getMessage(), e.getMessage());
+			}
+			try {
+				gs.load();
+			} catch (LoaderException e) {
+				RuntimeException re = (RuntimeException) e.getCause();				
+				assertEquals(cause.getMessage(), re.getMessage());
+			}
 			gs.checkHealth();
 		}
 	}

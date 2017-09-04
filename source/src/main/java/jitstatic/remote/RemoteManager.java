@@ -81,8 +81,7 @@ class RemoteManager implements Source {
 	@Override
 	public void checkHealth() {
 		Exception fault = remoteRepoManager.getFault();
-		if (fault != null) {
-			remoteRepoManager.removeFault(fault);
+		if (fault != null) {			
 			throw new RuntimeException(fault);
 		}
 	}
