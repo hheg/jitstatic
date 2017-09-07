@@ -20,8 +20,9 @@ package jitstatic.auth;
  * #L%
  */
 
-
 import java.security.Principal;
+import java.util.Objects;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
@@ -59,25 +60,13 @@ public final class User implements Principal {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		User other = (User) obj;
-		if (password == null) {
-			if (other.password != null)
-				return false;
-		} else if (!password.equals(other.password))
-			return false;
-		if (user == null) {
-			if (other.user != null)
-				return false;
-		} else if (!user.equals(other.user))
-			return false;
-		return true;
+	public boolean equals(final Object other) {
+		return Optional.ofNullable(other)
+				.filter(that -> that instanceof User)
+				.map(that -> (User) that)
+				.filter(that -> Objects.equals(this.user, that.user))
+				.filter(that -> Objects.equals(this.password, that.password))
+				.isPresent();
 	}
 
 	@Override

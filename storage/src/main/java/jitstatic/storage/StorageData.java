@@ -22,6 +22,7 @@ package jitstatic.storage;
 
 import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -61,18 +62,12 @@ public class StorageData {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		StorageData other = (StorageData) obj;
-		if (!data.equals(other.data))
-			return false;
-		if (!users.equals(other.users))
-			return false;
-		return true;
+	public boolean equals(final Object other) {
+		return Optional.ofNullable(other)
+				.filter(that -> that instanceof StorageData)
+				.map(that -> (StorageData) that)
+				.filter(that -> Objects.equals(this.data, that.data))
+				.filter(that -> Objects.equals(this.users, that.users))
+				.isPresent();
 	}
 }
