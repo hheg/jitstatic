@@ -30,8 +30,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jitstatic.auth.User;
 
+@SuppressFBWarnings(justification="Equals used here is not dodgy code",value = {"EQ_UNUSUAL"})
 public class StorageData {
 
 	private final Set<User> users;
