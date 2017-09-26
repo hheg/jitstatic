@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -62,8 +63,14 @@ import jitstatic.storage.StorageData;
 public class MapResourceTest {
 	private static final String user = "user";
 	private static final String secret = "secret";
-	private static final String basicAuthCred = "Basic "
-			+ Base64.getEncoder().encodeToString((user + ":" + secret).getBytes());
+	private static final String basicAuthCred;
+	static {
+		try {
+			basicAuthCred = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes("UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			throw new Error(e);
+		}
+	}
 	private static final Storage storage = mock(Storage.class);
 	private static final Map<String, StorageData> data = new HashMap<>();
 	private static final ObjectMapper mapper = new ObjectMapper();
@@ -126,12 +133,12 @@ public class MapResourceTest {
 	}
 
 	@Test
-	public void testKeyIsFoundButWrongUser() {
+	public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.UNAUTHORIZED.toString());
 		StorageData expected = data.get("dog");
 		when(storage.get("dog")).thenReturn(expected);
-		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + secret).getBytes());
+		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + secret).getBytes("UTF-8"));
 		resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
 
 	}

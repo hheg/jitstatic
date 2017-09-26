@@ -21,58 +21,59 @@ package jitstatic.auth;
  */
 
 
-
 import static org.junit.Assert.*;
 
 import org.junit.Test;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+@SuppressFBWarnings(value = { "DM_STRING_CTOR" }, justification = "Not testing for reference equality")
 public class UserTest {
 
 	@Test
 	public void testSameUser() {
 		User u1 = new User(new String("user"), new String("1"));
-		User u2 = new User(new String("user"),new String("1"));
-		assertEquals(u1,u2);
-		assertEquals(u1.hashCode(),u2.hashCode());
-	}
-	
-	@Test
-	public void testSameUserObject() {
-		User u1 = new User(new String("user"),new String("1"));		
-		assertEquals(u1,u1);		
-	}
-	
-	@Test
-	public void testNotSameUser() {
-		User u1 = new User(new String("auser"),new String("1"));
-		User u2 = new User(new String("buser"),new String("1"));
-		assertNotEquals(u1,u2);
+		User u2 = new User(new String("user"), new String("1"));
+		assertEquals(u1, u2);
+		assertEquals(u1.hashCode(), u2.hashCode());
 	}
 
-	
+	@Test
+	public void testSameUserObject() {
+		User u1 = new User(new String("user"), new String("1"));
+		assertEquals(u1, u1);
+	}
+
+	@Test
+	public void testNotSameUser() {
+		User u1 = new User(new String("auser"), new String("1"));
+		User u2 = new User(new String("buser"), new String("1"));
+		assertNotEquals(u1, u2);
+	}
+
 	@Test
 	public void testAgainstNull() {
-		User u1 = new User(new String("auser"),null);		
-		assertNotEquals(u1,null);
+		User u1 = new User(new String("auser"), null);
+		assertNotEquals(u1, null);
 	}
-	
+
 	@Test
 	public void testAgainstUserNull() {
-		User u1 = new User(null,null);
-		User u2 = new User(null,null);
+		User u1 = new User(null, null);
+		User u2 = new User(null, null);
 		assertTrue(u1.equals(u2));
 	}
-	
+
 	@Test
 	public void testNullAgainstUser() {
-		User u1 = new User(null,null);
-		User u2 = new User("other",null);
+		User u1 = new User(null, null);
+		User u2 = new User("other", null);
 		assertFalse(u1.equals(u2));
 	}
-	
+
 	@Test
 	public void testAgainstAnotherObject() {
-		User u1 = new User(new String("auser"),null);		
-		assertNotEquals(u1,new Object());
+		User u1 = new User(new String("auser"), null);
+		assertNotEquals(u1, new Object());
 	}
 }

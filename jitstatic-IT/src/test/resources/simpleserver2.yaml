@@ -12,9 +12,7 @@ logging:
   level: INFO
   appenders:
     - type: console
-storage:
-    baseDirectory: /tmp/acceptance
-    localFilePath: test/storage
 remote:
     remoteRepo: file://tmp/remote
-    
+    localFilePath: test/storage
+    basePath: /tmp/acceptance   

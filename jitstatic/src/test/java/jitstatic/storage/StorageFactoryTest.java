@@ -22,20 +22,14 @@ package jitstatic.storage;
 
 
 
+
 import static org.junit.Assert.assertNull;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Path;
-
-import javax.validation.Validation;
-import javax.validation.Validator;
-
-import static org.mockito.Mockito.*;
-import static org.junit.Assert.*;
-import org.eclipse.jgit.api.Git;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -46,10 +40,6 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import jitstatic.source.Source;
-import jitstatic.source.Source.Contact;
-import jitstatic.storage.LoaderException;
-import jitstatic.storage.Storage;
-import jitstatic.storage.StorageFactory;
 
 public class StorageFactoryTest {
 
@@ -63,31 +53,11 @@ public class StorageFactoryTest {
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-	@Before
-	public void setup() throws IOException {
-		tempDir = tempFolder.newFolder().toPath();
-	}
-	private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 	private StorageFactory sf = new StorageFactory();
-	private Path tempDir;
-	private Contact remoteRepo;
-
-	@Before
-	public void setUp() throws Exception {		
-		tempDir = tempFolder.newFolder("base").toPath();
-		sf.setBaseDirectory(tempDir.toAbsolutePath().toString());
-		sf.setLocalFilePath("storage");
-		assertTrue(validator.validate(sf).isEmpty());
-		try (Git git = Git.init().setDirectory(tempDir.resolve("bare").toFile()).setBare(true).call();) {
-			URI uri = git.getRepository().getDirectory().toURI();
-			remoteRepo = new RemoteContact(uri) ;
-		}
-	}
 
 	@Test
 	public void testBuild() throws LoaderException {
 		when(env.jersey()).thenReturn(jersey);
-		when(source.getContact()).thenReturn(remoteRepo);
 		try (Storage storage = sf.build(source, env);) {
 			storage.load();
 			assertNull(storage.get("key"));
@@ -100,35 +70,9 @@ public class StorageFactoryTest {
 	@Test
 	public void testEmptyStoragePath() {
 		when(env.jersey()).thenReturn(jersey);
-		when(source.getContact()).thenReturn(remoteRepo);
-		ex.expect(IllegalArgumentException.class);
-		ex.expectMessage("Storage file name's empty");
-		sf.setLocalFilePath("");
-		try (Storage storage = sf.build(source, env);) {
+		ex.expect(NullPointerException.class);
+		ex.expectMessage("Source cannot be null");
+		try (Storage storage = sf.build(null, env);) {
 		}
 	}
-	
-	private static final class RemoteContact implements Contact {
-		private final URI uri;
-
-		private RemoteContact(URI uri) {
-			this.uri = uri;
-		}
-
-		@Override
-		public URI repositoryURI() {
-			return uri;
-		}
-
-		@Override
-		public String getUserName() {					
-			return null;
-		}
-
-		@Override
-		public String getPassword() {
-			return null;
-		}
-	}
-
 }

@@ -20,6 +20,7 @@ package jitstatic.source;
  * #L%
  */
 
+import java.io.InputStream;
 
 
 import java.net.URI;
@@ -29,10 +30,12 @@ public interface Source extends AutoCloseable {
 	public void addListener(SourceEventListener listener);
 	public Contact getContact();
 	public void start();
+	@Deprecated
 	public interface Contact {
 		public URI repositoryURI();
 		public String getUserName();
 		public String getPassword();
 	}
 	public void checkHealth();
+	public InputStream getSourceStream();
 }

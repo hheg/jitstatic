@@ -21,7 +21,6 @@ package jitstatic;
  */
 
 
-
 import com.codahale.metrics.health.HealthCheck;
 
 import jitstatic.storage.Storage;

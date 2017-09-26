@@ -21,12 +21,13 @@ package jitstatic.hosted;
  */
 
 
-
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 
@@ -35,9 +36,14 @@ import javax.servlet.ServletRegistration.Dynamic;
 import javax.validation.Validation;
 import javax.validation.Validator;
 
+import org.eclipse.jetty.security.SecurityHandler;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.util.component.LifeCycle.Listener;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import io.dropwizard.jetty.MutableServletContextHandler;
@@ -48,23 +54,23 @@ import jitstatic.hosted.HostedGitRepositoryManager;
 import jitstatic.source.Source;
 
 public class HostedFactoryTest {
-	
+
 	private Environment env = mock(Environment.class);
 	private ServletEnvironment senv = mock(ServletEnvironment.class);
 	private Dynamic servlet = mock(Dynamic.class);
 	private MutableServletContextHandler handler = mock(MutableServletContextHandler.class);
-	
+
 	private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-	
+
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
-		
+
 	@Test
 	public void testAHostedRemoteFileBuild() throws IOException {
 		when(env.servlets()).thenReturn(senv);
 		when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
 		when(env.getApplicationContext()).thenReturn(handler);
-		
+
 		HostedFactory rf = new HostedFactory();
 		rf.setBasePath(tempFolder.newFolder().toPath().toAbsolutePath());
 		rf.setHostedEndpoint("endpoint");
@@ -72,9 +78,57 @@ public class HostedFactoryTest {
 		rf.setSecret("secret");
 		rf.setServletName("servletName");
 		assertTrue(validator.validate(rf).isEmpty());
-		
+
 		Source source = rf.build(env);
-		assertEquals(source.getContact().repositoryURI(), rf.getBasePath().resolve(HostedGitRepositoryManager.BARE).toUri());
-		
+		assertEquals(source.getContact().repositoryURI(),
+				rf.getBasePath().resolve(HostedGitRepositoryManager.BARE).toUri());
+
+	}
+
+	@Test
+	public void testWithFulldBranchName() throws IOException {
+		when(env.servlets()).thenReturn(senv);
+		when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
+		when(env.getApplicationContext()).thenReturn(handler);
+		HostedFactory hf = new HostedFactory();
+		hf.setBasePath(tempFolder.newFolder().toPath().toAbsolutePath());
+		hf.setHostedEndpoint("endpoint");
+		hf.setUserName("user");
+		hf.setSecret("secret");
+		hf.setServletName("servletName");
+		hf.setBranch("refs/heads/master");
+		Source source = hf.build(env);
+		assertNotNull(source);
+	}
+	
+	@Test
+	public void testHostedFactoryNotNullHandler() throws Exception {
+		ArgumentCaptor<SecurityHandler> ac = ArgumentCaptor.forClass(SecurityHandler.class);
+		when(env.servlets()).thenReturn(senv);
+		when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
+		when(env.getApplicationContext()).thenReturn(handler);
+		HostedFactory hf = new HostedFactory();
+		hf.setBasePath(tempFolder.newFolder().toPath().toAbsolutePath());
+		hf.setHostedEndpoint("endpoint");
+		hf.setUserName("user");
+		hf.setSecret("secret");
+		hf.setServletName("servletName");
+		hf.setBranch("refs/heads/master");
+		Source source = hf.build(env);
+		assertNotNull(source);
+		verify(senv).setSecurityHandler(ac.capture());
+		SecurityHandler sh = ac.getValue();
+		Handler h = sh.getHandler();
+		h.addLifeCycleListener(mock(Listener.class));
+		h.destroy();
+		h.getServer();
+		h.isFailed();
+		h.isRunning();
+		h.isStarted();
+		h.isStarting();
+		h.isStopped();
+		h.isStopping();
+		h.removeLifeCycleListener(mock(Listener.class));
+		h.setServer(mock(Server.class));
 	}
 }

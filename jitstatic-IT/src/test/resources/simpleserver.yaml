@@ -12,13 +12,10 @@ logging:
   level: INFO
   appenders:
     - type: console
-storage:
-    baseDirectory: /tmp/acceptance
-    localFilePath: test/storage
 hosted:
     basePath: file:/tmp/remote
     servletName: selfhosted
     hostedEndpoint: git
     userName: huser
     secret: hseCr3t
-    
+    localFilePath: accept/storage2    

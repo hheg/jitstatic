@@ -21,14 +21,13 @@ package jitstatic.hosted;
  */
 
 
-
 import java.util.Arrays;
 import java.util.Objects;
 
 import org.eclipse.jetty.security.AbstractLoginService;
 import org.eclipse.jetty.util.security.Password;
 
-public class SimpleLoginService extends AbstractLoginService {
+class SimpleLoginService extends AbstractLoginService {
 
 	private final String[] roles = new String[] { "gitrole" };
 	private UserPrincipal principal;

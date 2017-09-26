@@ -21,7 +21,6 @@ package jitstatic;
  */
 
 
-
 import io.dropwizard.lifecycle.Managed;
 
 public class AutoCloseableLifeCycleManager<T extends AutoCloseable> implements Managed {

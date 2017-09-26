@@ -1,4 +1,4 @@
-package jitstatic.hosted;
+package jitstatic.storage;
 
 /*-
  * #%L
@@ -20,16 +20,29 @@ package jitstatic.hosted;
  * #L%
  */
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 
+public abstract class StorageInfo {
 
-class Utils {
+	@JsonProperty
+	private String branch = "master";
+	
+	@JsonProperty
+	private String localFilePath = "store";
 
-	public static void closeSilently(final AutoCloseable repo){
-		if (repo != null) {
-			try {
-				repo.close();
-			} catch (final Exception ignore) {
-			}
-		}
+	public String getLocalFilePath() {
+		return localFilePath;
+	}
+
+	public void setLocalFilePath(String localFilePath) {
+		this.localFilePath = localFilePath;
+	}
+
+	public String getBranch() {
+		return branch;
+	}
+
+	public void setBranch(String branch) {
+		this.branch = branch;
 	}
 }

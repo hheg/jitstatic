@@ -20,6 +20,7 @@ package jitstatic.auth;
  * #L%
  */
 
+
 import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;

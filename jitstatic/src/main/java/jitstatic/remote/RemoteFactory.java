@@ -22,6 +22,7 @@ package jitstatic.remote;
 
 
 import java.net.URI;
+import java.nio.file.Path;
 
 import javax.validation.constraints.NotNull;
 
@@ -31,8 +32,9 @@ import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
 import jitstatic.remote.RemoteManager;
 import jitstatic.source.Source;
+import jitstatic.storage.StorageInfo;
 
-public class RemoteFactory {
+public class RemoteFactory extends StorageInfo {
 
 	@NotNull
 	@JsonProperty
@@ -46,6 +48,9 @@ public class RemoteFactory {
 
 	@JsonProperty
 	private Duration pollingPeriod = Duration.seconds(5);
+
+	@JsonProperty
+	private Path basePath;
 
 	public URI getRemoteRepo() {
 		return remoteRepo;
@@ -71,12 +76,12 @@ public class RemoteFactory {
 		this.remotePassword = remotePassword;
 	}
 
-	public Source build(Environment env) {
+	public Source build(final Environment env) {
 		if (!getRemoteRepo().isAbsolute())
 			throw new IllegalArgumentException(
 					String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
 		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword(), getPollingPeriod().getQuantity(),
-				getPollingPeriod().getUnit());
+				getPollingPeriod().getUnit(), "refs/heads/" + getBranch(), getLocalFilePath(), getBasePath());
 	}
 
 	public Duration getPollingPeriod() {
@@ -85,6 +90,14 @@ public class RemoteFactory {
 
 	public void setPollingPeriod(Duration pollingPeriod) {
 		this.pollingPeriod = pollingPeriod;
+	}
+
+	public Path getBasePath() {
+		return basePath;
+	}
+
+	public void setBasePath(Path basePath) {
+		this.basePath = basePath;
 	}
 
 }

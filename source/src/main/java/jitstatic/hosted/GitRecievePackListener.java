@@ -21,7 +21,6 @@ package jitstatic.hosted;
  */
 
 
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,7 +40,7 @@ public class GitRecievePackListener implements ServletRequestListener {
 
 	@Override
 	public void requestDestroyed(final ServletRequestEvent sre) {
-		HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
+		final HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
 		if ("POST".equals(req.getMethod())) {
 			String[] split = req.getRequestURL().toString().split("/");
 			if ("git-receive-pack".equals(split[split.length - 1])) {

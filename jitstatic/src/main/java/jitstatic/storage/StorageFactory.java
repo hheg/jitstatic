@@ -20,18 +20,7 @@ package jitstatic.storage;
  * #L%
  */
 
-
-
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
-import javax.validation.constraints.NotNull;
-
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
-import org.hibernate.validator.constraints.NotEmpty;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
@@ -43,47 +32,11 @@ import jitstatic.source.Source;
 
 public class StorageFactory {
 
-	@NotEmpty
-	@NotNull
-	@JsonProperty
-	private String baseDirectory;
-
-	@NotEmpty
-	@NotNull
-	@JsonProperty
-	private String localFilePath;
-
-	public String getBaseDirectory() {
-		return baseDirectory;
-	}
-
-	public void setBaseDirectory(String baseDirectory) {
-		this.baseDirectory = baseDirectory;
-	}
-
-	public String getLocalFilePath() {
-		return localFilePath;
-	}
-
-	public void setLocalFilePath(String localFilePath) {
-		this.localFilePath = localFilePath;
-	}
-
 	public Storage build(final Source remote, Environment env) {
-		final Path baseDirectoryPath = Paths.get(getBaseDirectory());
-		env.jersey()
-				.register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-						.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic")
-						.buildAuthFilter()));
+		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
+				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-		final GitWorkingRepositoryManager gwrm = new GitWorkingRepositoryManager(baseDirectoryPath, getLocalFilePath(),
-				remote.getContact());
-		try {			
-			return new GitStorage(getLocalFilePath(), gwrm);
-		} catch (IllegalArgumentException e) {
-			StorageUtils.closeSilently(gwrm);
-			throw e;
-		}
+		return new GitStorage(remote);
 	}
 }

@@ -20,6 +20,7 @@ package jitstatic.api;
  * #L%
  */
 
+
 import java.util.Optional;
 import java.util.Set;
 
@@ -56,7 +57,7 @@ public class MapResource {
 		if (o == null) {
 			throw new WebApplicationException(Status.NOT_FOUND);
 		}
-		Set<User> allowedUsers = o.getUsers();
+		final Set<User> allowedUsers = o.getUsers();
 		if (allowedUsers.isEmpty()) {
 			return o.getData();
 		}

@@ -21,7 +21,6 @@ package jitstatic.hosted;
  */
 
 
-
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -45,13 +44,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jitstatic.hosted.SimpleLoginService;
 
+@SuppressFBWarnings(value = { "NP_NULL_PARAM_DEREF_NONVIRTUAL","DM_STRING_CTOR" }, justification = "Testing explicitly for this")
 public class SimpleLoginServiceTest {
 
-	private final String user = "user";
-	private final String secret = "secret";
-	private final String realm = "realm";
+	private static final String user = "user";
+	private static final String secret = "secret";
+	private static final String realm = "realm";
 
 	private ServletRequest req = mock(ServletRequest.class);
 	private UserIdentity uid = mock(UserIdentity.class);
@@ -93,7 +94,7 @@ public class SimpleLoginServiceTest {
 		Subject subject = login.getSubject();
 		assertNotNull(subject);
 	}
-	
+
 	@Test
 	public void testNotLogin() {
 		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
@@ -107,13 +108,13 @@ public class SimpleLoginServiceTest {
 		when(uid.getUserPrincipal()).thenReturn(new AbstractLoginService.UserPrincipal(user, new Password(secret)));
 		assertTrue(sls.validate(uid));
 	}
+
 	@Test
 	@Ignore
 	public void testNotValid() {
 		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
 		assertFalse(sls.validate(uid));
 	}
-	
 
 	@Test
 	public void testLoadRoleInfo() {
@@ -122,7 +123,7 @@ public class SimpleLoginServiceTest {
 				new AbstractLoginService.UserPrincipal(new String(user), new Password(new String(secret))));
 		assertArrayEquals(new String[] { "gitrole" }, loadRoleInfo);
 	}
-	
+
 	@Test
 	public void testNotRoleInfoForUser() {
 		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
@@ -136,7 +137,7 @@ public class SimpleLoginServiceTest {
 		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
 		UserPrincipal loadUserInfo = sls.loadUserInfo(user);
 		assertTrue(loadUserInfo.authenticate(new Password(new String(secret))));
-		assertEquals(user,loadUserInfo.getName());
+		assertEquals(user, loadUserInfo.getName());
 	}
 
 }

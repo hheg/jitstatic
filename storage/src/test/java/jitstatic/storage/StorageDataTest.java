@@ -20,7 +20,10 @@ package jitstatic.storage;
  * #L%
  */
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -121,4 +124,5 @@ public class StorageDataTest {
 	private JsonNode readJson(String content) throws JsonProcessingException, IOException {
 		return mapper.readTree(content);
 	}
+	
 }

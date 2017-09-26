@@ -12,15 +12,10 @@ logging:
   level: INFO
   appenders:
     - type: console
-storage:
-    baseDirectory: /tmp/jitstatic/storage
-    localFilePath: test/storage
-    user: suser
-    secret: ssecret
 hosted:
     basePath: file:/tmp/jitstatic/remote
     servletName: jitstatic
     hostedEndpoint: jitstatic.git
     userName: huser
     secret: hseCr3t
-    
+    localFilePath: test/storage

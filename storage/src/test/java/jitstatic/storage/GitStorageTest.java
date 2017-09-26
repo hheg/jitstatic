@@ -20,9 +20,9 @@ package jitstatic.storage;
  * #L%
  */
 
+
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -32,12 +32,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.api.errors.NoHeadException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -50,18 +50,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.auth.User;
+import jitstatic.source.Source;
 
 public class GitStorageTest {
-	private static final String STORAGE = "storage";
+
 	private static final ObjectMapper mapper = new ObjectMapper();
 
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
-	private GitWorkingRepositoryManager repoManager = mock(GitWorkingRepositoryManager.class);
-
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
+
+	public Source source = mock(Source.class);
 
 	private Path tempFile;
 
@@ -76,39 +77,10 @@ public class GitStorageTest {
 	}
 
 	@Test()
-	public void testInitGitStorageWithNullFileStorageName() {
-		ex.expectMessage("File storage is null");
+	public void testInitGitStorageWithNullSource() {
+		ex.expectMessage("Source cannot be null");
 		ex.expect(NullPointerException.class);
-		try (GitStorage gs = new GitStorage(null, null);) {
-		}
-	}
-
-	@Test()
-	public void testInitGitStorageWithEmptyFileStorageName() {
-		ex.expectMessage("Storage file name's empty");
-		ex.expect(IllegalArgumentException.class);
-		try (GitStorage gs = new GitStorage("", null);) {
-		}
-	}
-
-	@Test()
-	public void testInitGitStorageWithNullRepositoryManager() {
-		ex.expectMessage("RepositoryManager is null");
-		ex.expect(NullPointerException.class);
-		try (GitStorage gs = new GitStorage("notnull", null);) {
-		}
-	}
-
-	@Test
-	public void testRefreshWithFailingRepository() throws LoaderException {
-		ex.expect(LoaderException.class);
-		ex.expectMessage("Error while loading storage");
-		try {
-			doThrow(new NoHeadException("")).when(repoManager).refresh();
-		} catch (Exception ignore) {
-		}
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
-			gs.load();
+		try (GitStorage gs = new GitStorage(null);) {
 		}
 	}
 
@@ -116,13 +88,14 @@ public class GitStorageTest {
 	public void testLoadCache() throws IOException, LoaderException {
 		Set<User> users = new HashSet<>();
 		users.add(new User("user", "1234"));
-		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
-			StorageTestUtils.copy("/test1.json", tempFile);
+		try (GitStorage gs = new GitStorage(source);
+				InputStream test1 = GitStorageTest.class.getResourceAsStream("/test1.json");
+				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json")) {
+			when(source.getSourceStream()).thenReturn(test1);
 			gs.load();
 			StorageData storage = new StorageData(users, readData("\"value1\""));
 			assertEquals(storage, gs.get("key"));
-			StorageTestUtils.copy("/test2.json", tempFile);
+			when(source.getSourceStream()).thenReturn(test2);
 			gs.load();
 			storage = new StorageData(users, readData("\"value2\""));
 			assertEquals(storage, gs.get("key"));
@@ -135,15 +108,19 @@ public class GitStorageTest {
 
 	@Test
 	public void testLoadNewCache() throws IOException, LoaderException {
-		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
-			StorageTestUtils.copy("/test3.json", tempFile);
+
+		try (GitStorage gs = new GitStorage(source);
+				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
+
+			when(source.getSourceStream()).thenReturn(test3);
 			gs.load();
 			StorageData key1Data = gs.get("key1");
 			StorageData key3Data = gs.get("key3");
 			assertNotNull(key1Data);
 			assertNotNull(key3Data);
-			StorageTestUtils.copy("/test4.json", tempFile);
+
+			when(source.getSourceStream()).thenReturn(test4);
 			gs.load();
 			key1Data = gs.get("key1");
 			StorageData key4Data = gs.get("key4");
@@ -156,8 +133,14 @@ public class GitStorageTest {
 
 	@Test
 	public void testCheckHealth() throws Exception {
-		ex.expectCause(isA(LoaderException.class));
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+		NullPointerException npe = new NullPointerException();
+		ex.expect(is(npe));
+		when(source.getSourceStream()).thenThrow(npe);
+		try (GitStorage gs = new GitStorage(source);) {
+			try {
+				gs.load();
+			} catch (Exception ignore) {
+			}
 			gs.checkHealth();
 		}
 	}
@@ -165,10 +148,9 @@ public class GitStorageTest {
 	@Test
 	public void testCheckHealthWithFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
-		doThrow(new RuntimeException("Fault reading something")).when(repoManager).refresh();
-		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);
-		
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+		doThrow(new RuntimeException("Fault reading something")).when(source).getSourceStream();
+
+		try (GitStorage gs = new GitStorage(source);) {
 			try {
 				gs.load();
 			} catch (LoaderException e) {
@@ -177,7 +159,7 @@ public class GitStorageTest {
 			}
 			try {
 				gs.checkHealth();
-			} catch (Exception e) {				
+			} catch (Exception e) {
 				assertTrue(e instanceof RuntimeException);
 				assertEquals(cause.getMessage(), e.getMessage());
 			}
@@ -185,14 +167,14 @@ public class GitStorageTest {
 			gs.checkHealth();
 		}
 	}
-	
+
 	@Test
 	public void testCheckHealthWithOldFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
 		ex.expect(is(equalTo(cause)));
-		doThrow(cause).when(repoManager).refresh();
-		when(repoManager.resolvePath(STORAGE)).thenReturn(tempFile);		
-		try (GitStorage gs = new GitStorage(STORAGE, repoManager);) {
+		doThrow(cause).when(source).getSourceStream();
+
+		try (GitStorage gs = new GitStorage(source);) {
 			try {
 				gs.load();
 			} catch (LoaderException e) {
@@ -201,17 +183,24 @@ public class GitStorageTest {
 			}
 			try {
 				gs.checkHealth();
-			} catch (Exception e) {			
+			} catch (Exception e) {
 				assertTrue(e instanceof RuntimeException);
 				assertEquals(cause.getMessage(), e.getMessage());
 			}
 			try {
 				gs.load();
 			} catch (LoaderException e) {
-				RuntimeException re = (RuntimeException) e.getCause();				
+				RuntimeException re = (RuntimeException) e.getCause();
 				assertEquals(cause.getMessage(), re.getMessage());
 			}
 			gs.checkHealth();
+		}
+	}
+	
+	@Test
+	public void testSourceCloseFailed() {
+		doThrow(new RuntimeException()).when(source).close();
+		try (GitStorage gs = new GitStorage(source);) {
 		}
 	}
 }

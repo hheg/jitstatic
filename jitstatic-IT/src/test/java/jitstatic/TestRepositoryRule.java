@@ -20,11 +20,13 @@ package jitstatic;
  * #L%
  */
 
+
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import org.eclipse.jgit.api.Git;
@@ -53,7 +55,7 @@ public class TestRepositoryRule extends ExternalResource {
 						.call();) {
 			for (String file : filesToCommit) {
 				final Path filePath = workBase.resolve(file);
-				Files.createDirectories(filePath.getParent());
+				Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
 				try (InputStream is = getClass().getResourceAsStream("/" + file)) {
 					Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
 				}

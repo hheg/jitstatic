@@ -21,8 +21,6 @@ package jitstatic;
  */
 
 
-
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
@@ -30,12 +28,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.net.URI;
+import org.hamcrest.Matchers;
+import org.hamcrest.core.IsInstanceOf;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -43,6 +45,7 @@ import org.mockito.MockitoAnnotations;
 import com.codahale.metrics.health.HealthCheck;
 import com.codahale.metrics.health.HealthCheckRegistry;
 
+import io.dropwizard.Configuration;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
@@ -50,7 +53,6 @@ import jitstatic.api.MapResource;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
-import jitstatic.source.Source.Contact;
 import jitstatic.source.SourceEventListener;
 import jitstatic.storage.LoaderException;
 import jitstatic.storage.Storage;
@@ -74,8 +76,6 @@ public class JitstaticApplicationTest {
 	@Mock
 	private Source source;
 	@Mock
-	private Contact contact;
-	@Mock
 	private Storage storage;
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
@@ -93,8 +93,6 @@ public class JitstaticApplicationTest {
 		when(environment.jersey()).thenReturn(jersey);
 		when(environment.healthChecks()).thenReturn(hcr);
 		when(storageFactory.build(any(), isA(Environment.class))).thenReturn(storage);
-		when(source.getContact()).thenReturn(contact);
-		when(contact.repositoryURI()).thenReturn(URI.create("file://tmp"));
 	}
 
 	@Test
@@ -132,6 +130,7 @@ public class JitstaticApplicationTest {
 	@Test
 	public void buildsAMapResourceWithRemote() throws Exception {
 		config.setRemoteFactory(remoteFactory);
+		config.setStorageFactory(storageFactory);
 		when(remoteFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
 		verify(jersey).register(isA(MapResource.class));
@@ -156,10 +155,12 @@ public class JitstaticApplicationTest {
 	@Test
 	public void testStorageLifeCycleManagerIsRegisterdWithRemote() throws Exception {
 		config.setRemoteFactory(remoteFactory);
+		config.setStorageFactory(storageFactory);
 		when(remoteFactory.build(any())).thenReturn(source);
 		app.run(config, environment);
 		verify(lifecycle, times(1)).manage(isA(AutoCloseableLifeCycleManager.class));
 	}
+
 	@Test
 	public void testAddingAStorageListener() throws Exception {
 		config.setHostedFactory(hostedFactory);
@@ -180,7 +181,48 @@ public class JitstaticApplicationTest {
 			verify(source).close();
 			verify(storage).close();
 			throw e;
-		}		
+		}
 	}
-
+	
+	@Test
+	public void testNoConfigSet() throws Exception {
+		ex.expect(IllegalStateException.class);
+		ex.expectMessage("Either hosted or remote must be chosen");
+		app.run(config, environment);
+	}
+	
+	@Test
+	public void testDealingWhenFailed() throws Exception {
+		RuntimeException r = new RuntimeException();
+		ex.expect(Matchers.sameInstance(r));
+		HostedFactory hf = mock(HostedFactory.class);
+		config.setHostedFactory(hf);
+		doThrow(r).when(hf).build(environment);
+		app.run(config,environment);
+	}
+	
+	@Test
+	public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
+		config.setStorageFactory(storageFactory);
+		config.setHostedFactory(hostedFactory);
+		config.setRemoteFactory(remoteFactory);
+		when(hostedFactory.build(environment)).thenReturn(source);
+		when(storageFactory.build(source, environment)).thenReturn(storage);
+		app.run(config, environment);
+	}
+	
+	@Test
+	public void testLoaderIsWorking() throws Exception {
+		config.setStorageFactory(storageFactory);
+		config.setHostedFactory(hostedFactory);
+		config.setRemoteFactory(remoteFactory);
+		when(hostedFactory.build(environment)).thenReturn(source);
+		when(storageFactory.build(source, environment)).thenReturn(storage);
+		ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+		app.run(config, environment);
+		verify(source).addListener(c.capture());
+		c.getValue().onEvent();
+		verify(storage).load();
+	}
+	
 }

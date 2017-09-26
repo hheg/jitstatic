@@ -21,18 +21,19 @@ package jitstatic.auth;
  */
 
 
-
 import static org.junit.Assert.*;
 
 import java.util.Optional;
 
 import org.junit.Test;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.basic.BasicCredentials;
 import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 
+@SuppressFBWarnings(value = { "DM_STRING_CTOR" }, justification = "Not testing for reference equality")
 public class ConfiguratedAuthenticatorTest {
 
 	private static final String user = "user";
@@ -48,8 +49,8 @@ public class ConfiguratedAuthenticatorTest {
 		Optional<User> authenticate = ca.authenticate(new BasicCredentials(u, s));
 		assertTrue(authenticate.isPresent());
 		User user2 = authenticate.get();
-		assertEquals(user,user2.getName());
-		assertEquals(secret,user2.getPassword());
+		assertEquals(user, user2.getName());
+		assertEquals(secret, user2.getPassword());
 	}
 
 }

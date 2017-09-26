@@ -21,6 +21,7 @@ package jitstatic;
  */
 
 
+
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;

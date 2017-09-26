@@ -20,6 +20,7 @@ package jitstatic;
  * #L%
  */
 
+
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
@@ -68,12 +69,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 			.around((testRepo = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
-					ConfigOverride.config("storage.baseDirectory", getFolder()),
-					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE),
+					ConfigOverride.config("remote.basePath", getFolder()),
+					ConfigOverride.config("remote.localFilePath", ACCEPT_STORAGE),
 					ConfigOverride.config("remote.remoteRepo", () -> "file://" + testRepo.getBase.get()))));
-
-	@Rule
-	public ExpectedException ex = ExpectedException.none();
 
 	@BeforeClass
 	public static void setup() throws UnsupportedEncodingException {

@@ -22,6 +22,7 @@ package jitstatic;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,13 +42,16 @@ import javax.ws.rs.client.Client;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
@@ -71,34 +76,33 @@ import jitstatic.storage.StorageData;
 
 public class HostOwnGitRepositoryTest {
 
-	private static final String ACCEPT_STORAGE = "accept/storage";
-	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
-	private static final DropwizardAppRule<JitstaticConfiguration> DW;
-	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private static final String USER = "suser";
 	private static final String PASSWORD = "ssecret";
+
+	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
 	private static final HttpClientConfiguration hcc = new HttpClientConfiguration();
-	
+	private static final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
+
+	private static final DropwizardAppRule<JitstaticConfiguration> DW;
+
 	@ClassRule
 	public static final RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
-					ConfigOverride.config("storage.baseDirectory", getFolder()),
-					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE),
 					ConfigOverride.config("hosted.basePath", getFolder()))));
 
 	private static UsernamePasswordCredentialsProvider provider;
 	private static String basic;
-	
+
 	private static String gitAdress;
 	private static String storageAdress;
-	
+
 	@BeforeClass
 	public static void setupClass() throws UnsupportedEncodingException {
 		final HostedFactory hf = DW.getConfiguration().getHostedFactory();
 		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
 		basic = getBasicAuth();
-		mapper.enable(Feature.ALLOW_COMMENTS);
 		int localPort = DW.getLocalPort();
 		gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(),
 				hf.getHostedEndpoint());
@@ -140,7 +144,7 @@ public class HostOwnGitRepositoryTest {
 			git.commit().setMessage("Test commit").call();
 			Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
 			PushResult pr = call.iterator().next();
-			RemoteRefUpdate remoteUpdate = pr.getRemoteUpdate("refs/heads/master");
+			RemoteRefUpdate remoteUpdate = pr.getRemoteUpdate(REFS_HEADS_MASTER);
 			assertEquals(Status.OK, remoteUpdate.getStatus());
 		}
 
@@ -152,7 +156,35 @@ public class HostOwnGitRepositoryTest {
 		} finally {
 			client.close();
 		}
+	}
 
+	@Test
+	public void testPushToOwnHostedRepositoryWithBrokenJSONStorage() throws Exception {		
+		String originalSHA = null;
+		try (Git git = Git.cloneRepository().setDirectory(tmpFolder.newFolder()).setURI(gitAdress)
+				.setCredentialsProvider(provider).call()) {
+			originalSHA = git.getRepository().resolve(Constants.MASTER).getName();
+			String localFilePath = getLocalFilePath();
+			Path path = Paths.get(getRepopath(git), localFilePath);
+
+			assertTrue(Files.exists(path));
+
+			Files.write(path, "{".getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+
+			git.add().addFilepattern(localFilePath).call();
+			git.commit().setMessage("Test commit").call();
+			Iterable<PushResult> push = git.push().setCredentialsProvider(provider).call();
+			PushResult pushResult = push.iterator().next();
+			RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(REFS_HEADS_MASTER);
+			assertEquals(Status.REJECTED_OTHER_REASON,remoteUpdate.getStatus());
+			assertTrue(remoteUpdate.getMessage().startsWith("Unexpected end-of-input: expected close marker for Object (start marker at "));
+			
+		}
+		try (Git git = Git.cloneRepository().setDirectory(tmpFolder.newFolder()).setURI(gitAdress)
+				.setCredentialsProvider(provider).call()) {
+			assertNotNull(readSource(Paths.get(getRepopath(git), getLocalFilePath())));
+			assertEquals(originalSHA, git.getRepository().resolve(Constants.MASTER).getName());
+		}		
 	}
 
 	private static Supplier<String> getFolder() {
@@ -166,8 +198,7 @@ public class HostOwnGitRepositoryTest {
 	}
 
 	private static String getBasicAuth() throws UnsupportedEncodingException {
-		return "Basic "
-				+ Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
+		return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
 	}
 
 	private Map<String, StorageData> readSource(final Path storage) throws IOException {
@@ -196,7 +227,7 @@ public class HostOwnGitRepositoryTest {
 	}
 
 	private String getLocalFilePath() {
-		return DW.getConfiguration().getStorageFactory().getLocalFilePath();
+		return DW.getConfiguration().getHostedFactory().getLocalFilePath();
 	}
 
 }

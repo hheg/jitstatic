@@ -22,9 +22,7 @@ package jitstatic;
 
 
 
-
 import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -35,9 +33,7 @@ import jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
 
-	@NotNull
-	@Valid
-	private StorageFactory storage;
+	private StorageFactory storage = new StorageFactory();
 
 	@Valid
 	private RemoteFactory remote;
@@ -45,12 +41,10 @@ public class JitstaticConfiguration extends Configuration {
 	@Valid
 	private HostedFactory hosted;
 
-	@JsonProperty("storage")
 	public StorageFactory getStorageFactory() {
 		return storage;
 	}
 
-	@JsonProperty("storage")
 	public void setStorageFactory(final StorageFactory storage) {
 		this.storage = storage;
 	}

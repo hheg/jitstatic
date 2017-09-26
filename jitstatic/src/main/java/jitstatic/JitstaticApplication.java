@@ -20,9 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
-
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +28,15 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import jitstatic.api.MapResource;
 import jitstatic.hosted.HostedFactory;
+import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
-import jitstatic.storage.LoaderException;
 import jitstatic.storage.Storage;
+import jitstatic.storage.StorageFactory;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
-	
-	private final Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
+
+	private static final Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
 
 	public static void main(final String[] args) throws Exception {
 		new JitstaticApplication().run(args);
@@ -55,32 +53,35 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		Source source = null;
 		Storage storage = null;
 		try {
+			final StorageFactory storageFactory = config.getStorageFactory();
 			final HostedFactory hostedFactory = config.getHostedFactory();
 
 			if (hostedFactory != null) {
 				source = hostedFactory.build(env);
-				if(config.getRemoteFactory() != null) {
+				if (config.getRemoteFactory() != null) {
 					log.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
 				}
 			} else {
-				source = config.getRemoteFactory().build(env);
+				final RemoteFactory remoteFactory = config.getRemoteFactory();
+				if (remoteFactory == null) {
+					throw new IllegalStateException("Either hosted or remote must be chosen");
+				}
+				source = remoteFactory.build(env);
 			}
 
-			final Storage s = storage = config.getStorageFactory().build(source, env);			
-			source.addListener(new SourceEventListener() {				
-				@Override
-				public void onEvent() {
-					try {
-						s.load();
-					} catch (LoaderException e) {
-					}					
+			final Storage s = storage = storageFactory.build(source, env);
+			source.addListener(() -> {
+				try {
+					s.load();
+				} catch (Exception e) {
+					LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
 				}
 			});
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
 			env.lifecycle().manage(new ManagedObject<>(source));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
 			env.jersey().register(new MapResource(storage));
-		} catch (Exception e) {
+		} catch (final Exception e) {
 			guard = e;
 			throw e;
 		} finally {

@@ -21,7 +21,6 @@ package jitstatic.remote;
  */
 
 
-
 public class RepositoryIsMissingIntendedBranch extends RuntimeException {
 	public RepositoryIsMissingIntendedBranch(String msg) {
 		super(msg);

@@ -21,22 +21,9 @@ package jitstatic.storage;
  */
 
 
-
 public class LoaderException extends Exception {
 
 	private static final long serialVersionUID = -1946465274123591609L;
-
-	public LoaderException() {
-		super();
-	}
-
-	public LoaderException(final String msg) {
-		super(msg);
-	}
-
-	public LoaderException(final String msg, Throwable t) {
-		super(msg, t);
-	}
 
 	public LoaderException(Throwable e) {
 		super(e);

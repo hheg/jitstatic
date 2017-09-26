@@ -17,19 +17,41 @@
  * limitations under the License.
  * #L%
  */
-
-
-
 {
-	"first": {
-		"firstelement": "single_value",
-		"secondelement": {
-			"key": "value"
-		}
-	},
-	"second": [
-		"1",
-		"2",
-		"3"
-	]
+ "key1": {
+  "data": {
+   "key1": {
+    "data": "value1",
+    "users": [
+     {
+      "user": "user1",
+      "password": "1234"
+     }
+    ]
+   },
+   "key3": {
+    "data": "value3",
+    "users": [
+     {
+      "user": "user1",
+      "password": "1234"
+     }
+    ]
+   }
+  },
+  "users": [
+   {
+    "user": "user1",
+    "password": "1234"
+   }
+  ]
+ },
+ "key3": {
+  "users": [
+   {
+    "user": "user1",
+    "password": "1234"
+   }
+  ]
+ }
 }

@@ -20,6 +20,7 @@ package jitstatic.storage;
  * #L%
  */
 
+
 public interface Storage extends AutoCloseable{
 	public StorageData get(String key);
 	public void load() throws LoaderException;

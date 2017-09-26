@@ -21,9 +21,9 @@ package jitstatic.hosted;
  */
 
 
-
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration.Dynamic;
@@ -39,14 +39,21 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PreReceiveHookChain;
+import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
-import jitstatic.hosted.HostedGitRepositoryManager;
 import jitstatic.source.Source;
+import jitstatic.storage.StorageInfo;
 
-public class HostedFactory {
+public class HostedFactory extends StorageInfo {
 	public static final String SERVLET_NAME = "servlet-name";
 	public static final String BASE_PATH = "base-path";
 	public static final String EXPOSE_ALL = "expose-all";
@@ -122,16 +129,32 @@ public class HostedFactory {
 		this.secret = secret;
 	}
 
-	public Source build(Environment env) {
+	public Source build(final Environment env) {
+		final String normalizedBranchName = normalizeBranchName(getBranch());
+		if (!Repository.isValidRefName(normalizedBranchName)) {
+			throw new IllegalArgumentException(getBranch() + " is not a valid reference name");
+		}
+
 		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(),
-				getHostedEndpoint());
+				getHostedEndpoint(), getLocalFilePath(), getBranch());
 
 		final String baseServletPath = "/" + getServletName() + "/*";
 		final GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
-		
+
+		gs.setReceivePackFactory(new DefaultReceivePackFactory() {
+			@Override
+			public ReceivePack create(HttpServletRequest req, Repository db)
+					throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+				final ReceivePack rp = super.create(req, db);
+				rp.setPreReceiveHook(PreReceiveHookChain.newChain(Arrays.asList(new LogoPoster(),
+						new JitStaticPreReceiveHook(getLocalFilePath(), normalizedBranchName))));
+				return rp;
+			}
+		});
+
 		env.servlets().addServletListeners(hostedGitRepositoryManager.getRequestListener());
-		
+
 		final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
 		servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());
 		servlet.setInitParameter(EXPOSE_ALL, Boolean.toString(isExposeAll()));
@@ -158,6 +181,13 @@ public class HostedFactory {
 		env.servlets().setSecurityHandler(sec);
 
 		return hostedGitRepositoryManager;
+	}
+
+	private String normalizeBranchName(String branch) {
+		if (!branch.startsWith(Constants.R_HEADS)) {
+			branch = Constants.R_HEADS + branch;
+		}
+		return Repository.normalizeBranchName(branch);
 	}
 
 	private static class DropWizardHandlerWrapper implements Handler {

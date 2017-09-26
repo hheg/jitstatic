@@ -20,10 +20,9 @@ package jitstatic.storage;
  * #L%
  */
 
+
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -33,28 +32,25 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.eclipse.jgit.api.errors.GitAPIException;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jitstatic.source.Source;
+
 public class GitStorage implements Storage {
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
 	private final Map<String, StorageData> cache = new ConcurrentHashMap<>();
-	private final String fileStorage;
-	private final GitWorkingRepositoryManager gitRepositoryManager;
 	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
+	
+	private final Source source;
 
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
-
-	public GitStorage(final String fileStorage, final GitWorkingRepositoryManager gitRepositoryManager) {
-		this.fileStorage = Objects.requireNonNull(fileStorage, "File storage is null");
-		if (fileStorage.trim().isEmpty()) {
-			throw new IllegalArgumentException("Storage file name's empty");
-		}
-		this.gitRepositoryManager = Objects.requireNonNull(gitRepositoryManager, "RepositoryManager is null");
+		
+	public GitStorage(final Source source) {
+		this.source = Objects.requireNonNull(source,"Source cannot be null");		
 	}
 
 	@Override
@@ -62,35 +58,10 @@ public class GitStorage implements Storage {
 		return cache.get(key);
 	}
 
-	private void refresh() throws LoaderException {
-		try {
-			gitRepositoryManager.refresh();
-		} catch (GitAPIException e) {
-			throw new LoaderException("Error while loading storage", e);
-		}
-	}
-
-	private Path checkAndResolveStorage() throws LoaderException {
-		final Path storage = gitRepositoryManager.resolvePath(fileStorage);
-		if (storage == null) {
-			throw new LoaderException(String.format("%s has been removed from repo. Not %s data.", fileStorage,
-					(cache.isEmpty() ? "loading" : "reloading")));
-		}		
-		return storage;
-	}
-
 	@Override
 	public void load() throws LoaderException {
-		try {
-			refresh();
-			final Path storage = checkAndResolveStorage();
-			readStorage(storage);
-		} catch (LoaderException e) {
-			final Exception old = fault.getAndSet(e);
-			if (old != null) {
-				LOG.warn("Had an unrecorded error while loading store", e);
-			}
-			throw e;
+		try (InputStream is = source.getSourceStream()){			
+			readStorage(is);
 		} catch (Exception e) {
 			final Exception old = fault.getAndSet(e);
 			if (old != null) {
@@ -102,7 +73,10 @@ public class GitStorage implements Storage {
 
 	@Override
 	public void close() {
-		StorageUtils.closeSilently(gitRepositoryManager);
+		try {
+			source.close();
+		} catch (final Exception ignore) {
+		}
 	}
 
 	@Override
@@ -111,18 +85,11 @@ public class GitStorage implements Storage {
 		if (old != null) {
 			throw old;
 		}
-		try {
-			checkAndResolveStorage();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
 	}
 
-	private void readStorage(final Path storage) throws IOException {
+	private void readStorage(final InputStream storageStream) throws IOException {
 		final Set<String> keys = new HashSet<>();
-		JsonParser parser = null;
-		try (final InputStream bc = Files.newInputStream(storage);) {
-			parser = mapper.getFactory().createParser(bc);
+		try (final JsonParser parser = mapper.getFactory().createParser(storageStream);) {
 			parser.nextToken();
 			while (parser.nextToken() == JsonToken.FIELD_NAME) {
 				final String key = parser.getText();
@@ -132,12 +99,8 @@ public class GitStorage implements Storage {
 				cache.put(key, readValue);
 			}
 		}
+
 		final Set<String> cacheKeys = cache.keySet();
 		cacheKeys.retainAll(keys);
-		try {
-			parser.close();
-		} catch (IOException ignore) {
-		}
 	}
-
 }

@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,16 +20,12 @@ package jitstatic.storage;
  * #L%
  */
 
+public class BranchNotFoundException extends RuntimeException {
 
+	private static final long serialVersionUID = 7123976182257257482L;
 
-class StorageUtils {
-
-	public static void closeSilently(final AutoCloseable repo){
-		if (repo != null) {
-			try {
-				repo.close();
-			} catch (final Exception ignore) {
-			}
-		}
+	public BranchNotFoundException(String branch) {
+		super(branch + " is not found in the repository");
 	}
+
 }

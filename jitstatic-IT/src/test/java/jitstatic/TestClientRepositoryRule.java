@@ -22,6 +22,7 @@ package jitstatic;
 
 
 
+
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,7 +71,7 @@ public class TestClientRepositoryRule extends ExternalResource {
 		try (Git git = cloneCommand.call()) {
 			for (String file : filesToCommit) {
 				final Path filePath = base.resolve(file);
-				Files.createDirectories(filePath.getParent());
+				Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
 				try (InputStream is = getClass().getResourceAsStream("/" + file)) {
 					Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
 				}

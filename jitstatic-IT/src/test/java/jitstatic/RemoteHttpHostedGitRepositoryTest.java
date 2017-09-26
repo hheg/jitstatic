@@ -20,6 +20,7 @@ package jitstatic;
  * #L%
  */
 
+
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -73,6 +74,7 @@ import jitstatic.storage.StorageData;
 
 public class RemoteHttpHostedGitRepositoryTest {
 
+	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private static final String PASSWORD = "ssecret";
 	private static final String USER = "suser";
 	private static final String ACCEPT_STORAGE2 = "accept/storage2";
@@ -93,17 +95,16 @@ public class RemoteHttpHostedGitRepositoryTest {
 	public static RuleChain chain = RuleChain.outerRule(tmpFolder)
 			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
-					ConfigOverride.config("storage.baseDirectory", getFolder()),
-					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE2),
+					ConfigOverride.config("hosted.localFilePath", ACCEPT_STORAGE2),				
 					ConfigOverride.config("hosted.basePath", getFolder()))))
-			.around(new EraseSystemProperties("hosted.basePath"))
+			.around(new EraseSystemProperties("hosted.basePath","hosted.localFilePath"))
 			.around(new TestClientRepositoryRule(getFolder(),
 					() -> remote.getConfiguration().getHostedFactory().getUserName(),
 					() -> remote.getConfiguration().getHostedFactory().getSecret(), getRepo(), ACCEPT_STORAGE2))
 			.around((local = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
-					ConfigOverride.config("storage.baseDirectory", getFolder()),
-					ConfigOverride.config("storage.localFilePath", ACCEPT_STORAGE2),
+					ConfigOverride.config("remote.basePath", getFolder()),
+					ConfigOverride.config("remote.localFilePath", ACCEPT_STORAGE2),
 					ConfigOverride.config("remote.remoteRepo", getRepo()),
 					ConfigOverride.config("remote.userName",
 							() -> remote.getConfiguration().getHostedFactory().getUserName()),
@@ -176,7 +177,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				RevCommit commit = git.commit().setMessage("Evolve").call();
 				Iterable<PushResult> result = git.push().setCredentialsProvider(provider).call();
 
-				RemoteRefUpdate remoteUpdate = result.iterator().next().getRemoteUpdate("refs/heads/master");
+				RemoteRefUpdate remoteUpdate = result.iterator().next().getRemoteUpdate(REFS_HEADS_MASTER);
 				assertEquals(Status.OK, remoteUpdate.getStatus());
 
 				sleep(1500);
@@ -186,7 +187,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				git.revert().include(commit).call();
 				result = git.push().setCredentialsProvider(provider).call();
-				remoteUpdate = result.iterator().next().getRemoteUpdate("refs/heads/master");
+				remoteUpdate = result.iterator().next().getRemoteUpdate(REFS_HEADS_MASTER);
 				assertEquals(Status.OK, remoteUpdate.getStatus());
 
 				sleep(1500);

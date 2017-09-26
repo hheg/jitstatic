@@ -20,8 +20,11 @@ package jitstatic.remote;
  * #L%
  */
 
+import java.io.InputStream;
+
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -38,13 +41,13 @@ class RemoteManager implements Source {
 	private final RemoteRepositoryManager remoteRepoManager;
 	private final long duration;
 	private final TimeUnit unit;
-	
+
 	private volatile ScheduledFuture<?> job;
 
 	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, final long duration,
-			final TimeUnit unit) {
-		this(new RemoteRepositoryManager(remoteRepoManager, userName, password), new ScheduledThreadPoolExecutor(1),
-				duration, unit);
+			final TimeUnit unit, final String branch, final String storageFile, Path baseDirectory) {
+		this(new RemoteRepositoryManager(remoteRepoManager, userName, password, branch, storageFile, baseDirectory),
+				new ScheduledThreadPoolExecutor(1), duration, unit);
 	}
 
 	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledExecutorService scheduler,
@@ -81,8 +84,17 @@ class RemoteManager implements Source {
 	@Override
 	public void checkHealth() {
 		Exception fault = remoteRepoManager.getFault();
-		if (fault != null) {			
+		if (fault != null) {
 			throw new RuntimeException(fault);
+		}
+	}
+
+	@Override
+	public InputStream getSourceStream() {
+		try {
+			return remoteRepoManager.getStorageInputStream();
+		} catch (final Exception e) {
+			throw new RuntimeException(e);
 		}
 	}
 
