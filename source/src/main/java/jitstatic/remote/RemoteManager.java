@@ -60,8 +60,9 @@ class RemoteManager implements Source {
 
 	@Override
 	public void close() {
-		if (job != null) {
-			job.cancel(false);
+		final ScheduledFuture<?> j = this.job;
+		if (j != null) {
+			j.cancel(false);
 		}
 		this.poller.shutdown();
 	}

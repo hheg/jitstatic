@@ -32,6 +32,9 @@ import com.fasterxml.jackson.core.JsonParser.Feature;
 
 class StorageJSONParser {
 
+	private static final int SECOND = 0xF0;
+	private static final int FIRST = 0xF;
+	private static final int MASK = 0xFF;
 	private static final JsonFactory mapper = new JsonFactory().enable(Feature.ALLOW_COMMENTS)
 			.enable(Feature.STRICT_DUPLICATE_DETECTION);
 
@@ -49,7 +52,7 @@ class StorageJSONParser {
 				while (parser.nextToken() == JsonToken.FIELD_NAME) {
 					m ^= checkStorageData(parser);
 				}
-				if ((m & 0xFF) != 0xFF) {
+				if ((m & MASK) != MASK) {
 					errorParsingStorageFormat(parser);
 				}
 			}
@@ -60,10 +63,10 @@ class StorageJSONParser {
 		switch (parser.getText()) {
 		case "users":
 			parseUsers(parser);
-			return 0xF0;
+			return FIRST;
 		case "data":
 			parseData(parser);
-			return 0xF;
+			return SECOND;
 		default:
 			errorParsingStorageFormat(parser);
 		}
@@ -87,7 +90,7 @@ class StorageJSONParser {
 				stack.push(nextToken);
 			} else if (nextToken == JsonToken.END_OBJECT || nextToken == JsonToken.END_ARRAY) {
 				final JsonToken pop = stack.pop();
-				if (JsonToken.END_ARRAY.equals(nextToken)) {
+				if (nextToken == JsonToken.END_ARRAY) {
 					if (pop != JsonToken.START_ARRAY) {
 						errorParsingJSONFormat(parser);
 					}
@@ -113,7 +116,7 @@ class StorageJSONParser {
 					errorParsingStorageFormat(parser);
 				m ^= checkUser(parser, field);
 			}
-			if ((m & 0xFF) != 0xFF) {
+			if ((m & MASK) != MASK) {
 				errorParsingStorageFormat(parser);
 			}
 		}
@@ -125,9 +128,9 @@ class StorageJSONParser {
 	private int checkUser(final JsonParser parser, final String field) throws IOException {
 		switch (field) {
 		case "user":
-			return 0xF;
+			return FIRST;
 		case "password":
-			return 0xF0;
+			return SECOND;
 		default:
 			errorParsingStorageFormat(parser);
 		}
