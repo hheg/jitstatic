@@ -28,7 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isA;
 
 import java.io.File;
 import java.io.IOException;
@@ -232,7 +232,7 @@ public class RemoteRepositoryManagerTest {
 	public void testFaultyRemote() throws IllegalStateException, GitAPIException, IOException {
 		setUpFaultyRepo();
 		ex.expect(RuntimeException.class);
-		ex.expectCause(is(JsonEOFException.class));
+		ex.expectCause(isA(JsonEOFException.class));
 		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, BRANCH,
 				STORAGE, workingDir);) {
 

@@ -20,12 +20,11 @@ package jitstatic.hosted;
  * #L%
  */
 
-
+import static org.hamcrest.Matchers.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.hamcrest.Matchers.is;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,7 +58,6 @@ import org.junit.rules.TemporaryFolder;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
-import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 
 import jitstatic.source.SourceEventListener;
@@ -212,7 +210,7 @@ public class HostedGitRepositoryManagerTest {
 	@Test
 	public void testPushingANonJSONFormattedStorageFile() throws Exception {
 		ex.expect(RuntimeException.class);
-		ex.expectCause(is(JsonEOFException.class));
+		ex.expectCause(isA(JsonEOFException.class));
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master)) {
 			File localGitDir = tempFolder.newFolder();
 			try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {

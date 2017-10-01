@@ -1,7 +1,5 @@
 package jitstatic.hosted;
 
-import java.io.File;
-
 /*-
  * #%L
  * jitstatic
@@ -146,7 +144,7 @@ class HostedGitRepositoryManager implements Source {
 			ObjectInserter oi = repository.newObjectInserter();
 			final ObjectId blob = oi.insert(Constants.OBJ_BLOB, Constants.encode("{}"));
 
-			final String[] path = store.split(File.separatorChar == '\\' ? "\\\\" : File.separator);
+			final String[] path = store.split("/");
 
 			FileMode mode = FileMode.REGULAR_FILE;
 			oi = repository.newObjectInserter();

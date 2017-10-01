@@ -23,7 +23,7 @@ package jitstatic.remote;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isA;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,7 +84,7 @@ public class RemoteFactoryTest {
 	@Test
 	public void testAHostedRemoteBuildWithNoRemoteRepo() throws URISyntaxException, IOException {
 		ex.expect(RuntimeException.class);
-		ex.expectCause(is(InvalidRemoteException.class));
+		ex.expectCause(isA(InvalidRemoteException.class));
 
 		rf.setRemotePassword("pwd");
 		rf.setUserName("user");
