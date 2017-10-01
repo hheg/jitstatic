@@ -72,14 +72,14 @@ class HostedGitRepositoryManager implements Source {
 			throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
 		}
 		this.endPointName = endPointName;
-		
+
 		if (!Files.isDirectory(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not a directory", workingDirectory));
 		}
 		if (!Files.isWritable(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not writeable", workingDirectory));
 		}
-		
+
 		store = store.trim();
 		if (store.isEmpty()) {
 			throw new IllegalArgumentException("Storage name cannot be empty");
@@ -146,7 +146,7 @@ class HostedGitRepositoryManager implements Source {
 			ObjectInserter oi = repository.newObjectInserter();
 			final ObjectId blob = oi.insert(Constants.OBJ_BLOB, Constants.encode("{}"));
 
-			final String[] path = store.split(File.separator);
+			final String[] path = store.split(File.separatorChar == '\\' ? "\\\\" : File.separator);
 
 			FileMode mode = FileMode.REGULAR_FILE;
 			oi = repository.newObjectInserter();
