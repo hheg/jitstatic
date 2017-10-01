@@ -119,7 +119,7 @@ public class HostedGitRepositoryManagerTest {
 	@Test
 	public void testCreatedBareDirectory() {
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master);) {
-			assertTrue(Files.exists(tempDir.resolve(HostedGitRepositoryManager.BARE).resolve("HEAD")));
+			assertTrue(Files.exists(Paths.get(grm.repositoryURI()).resolve("HEAD")));
 		}
 	}
 
@@ -176,13 +176,10 @@ public class HostedGitRepositoryManagerTest {
 
 	@Test
 	public void testMountingOnExistingGitRepository() {
-		Path bareRepo;
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master)) {
-			bareRepo = Paths.get(grm.getContact().repositoryURI());
 		}
 
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master)) {
-			assertEquals(bareRepo, Paths.get(grm.getContact().repositoryURI()));
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master)) {			
 		}
 	}
 
@@ -206,7 +203,7 @@ public class HostedGitRepositoryManagerTest {
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		File base = tempFolder.newFolder();
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master);
-				Git git = Git.cloneRepository().setDirectory(base).setURI(tempDir.toUri().toString()+"/bare")
+				Git git = Git.cloneRepository().setDirectory(base).setURI(tempDir.toUri().toString())
 						.call()) {
 			assertTrue(Files.exists(base.toPath().resolve(store)));
 		}
@@ -237,8 +234,7 @@ public class HostedGitRepositoryManagerTest {
 		try(HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, store, master);){
 			try(InputStream is = grm.getSourceStream()){
 				JsonParser parser = mapper.createParser(is);
-				JsonToken token;
-				while((token = parser.nextToken()) != null);
+				while(parser.nextToken() != null);
 			}
 		}
 	}

@@ -42,7 +42,7 @@ public class GitRecievePackListener implements ServletRequestListener {
 	public void requestDestroyed(final ServletRequestEvent sre) {
 		final HttpServletRequest req = (HttpServletRequest) sre.getServletRequest();
 		if ("POST".equals(req.getMethod())) {
-			String[] split = req.getRequestURL().toString().split("/");
+			final String[] split = req.getRequestURL().toString().split("/");
 			if ("git-receive-pack".equals(split[split.length - 1])) {
 				listeners.forEach(SourceEventListener::onEvent);
 			}

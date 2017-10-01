@@ -20,8 +20,7 @@ package jitstatic.remote;
  * #L%
  */
 
-
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.hamcrest.Matchers.is;
@@ -78,11 +77,8 @@ public class RemoteFactoryTest {
 		rf.setRemoteRepo(uri);
 		rf.setBasePath(folder.newFolder().toPath());
 		try (Source source = rf.build(env);) {
-			assertEquals(source.getContact().repositoryURI(), uri);
-			assertEquals(source.getContact().getUserName(), rf.getUserName());
-			assertEquals(source.getContact().getPassword(), rf.getRemotePassword());
+			assertNotNull(source);
 		}
-
 	}
 
 	@Test

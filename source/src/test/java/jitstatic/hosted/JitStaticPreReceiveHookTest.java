@@ -198,7 +198,4 @@ public class JitStaticPreReceiveHookTest {
 		js.onPreReceive(rp, commands);
 
 	}
-
-	// @Test
-	// public void testFailed() {}
 }

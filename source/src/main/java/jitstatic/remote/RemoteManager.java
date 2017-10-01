@@ -73,11 +73,6 @@ class RemoteManager implements Source {
 	}
 
 	@Override
-	public Contact getContact() {
-		return remoteRepoManager.getContact();
-	}
-
-	@Override
 	public void start() {
 		this.job = this.poller.scheduleWithFixedDelay(this.remoteRepoManager.checkRemote(), 0, duration, unit);
 	}

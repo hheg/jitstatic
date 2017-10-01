@@ -1,5 +1,7 @@
 package jitstatic.hosted;
 
+import java.io.File;
+
 /*-
  * #%L
  * jitstatic
@@ -43,7 +45,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
@@ -53,34 +54,38 @@ import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
 
 class HostedGitRepositoryManager implements Source {
-	@Deprecated
-	static final String BARE = "bare";
+
 	private final Repository bareRepository;
 	private final String endPointName;
 	private final GitRecievePackListener listener;
 	private final String branch;
 	private final String storageFile;
 
-	public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String store,
-			final String branch) {
+	public HostedGitRepositoryManager(final Path workingDirectory, String endPointName, String store, String branch) {
 		Objects.requireNonNull(workingDirectory);
 		Objects.requireNonNull(endPointName);
 		Objects.requireNonNull(store);
 		Objects.requireNonNull(branch);
 
+		endPointName = endPointName.trim();
 		if (endPointName.isEmpty()) {
 			throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
 		}
 		this.endPointName = endPointName;
+		
 		if (!Files.isDirectory(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not a directory", workingDirectory));
 		}
 		if (!Files.isWritable(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not writeable", workingDirectory));
 		}
+		
+		store = store.trim();
 		if (store.isEmpty()) {
 			throw new IllegalArgumentException("Storage name cannot be empty");
 		}
+
+		branch = branch.trim();
 		if (branch.isEmpty()) {
 			throw new IllegalArgumentException("Branch name cannot be empty");
 		}
@@ -111,23 +116,29 @@ class HostedGitRepositoryManager implements Source {
 		return Repository.normalizeBranchName(branch);
 	}
 
-	private Repository setUpBareRepository(final Path repo, final String store, final String branch)
+	private Repository setUpBareRepository(final Path repositoryBase, final String store, final String branch)
 			throws IOException, IllegalStateException, GitAPIException {
-		final Path bareRepo = repo.resolve(BARE); // TODO remove specific BARE directory
-		if (!Files.exists(bareRepo)) {
-			Files.createDirectories(bareRepo);
-			final Repository repository = Git.init().setDirectory(bareRepo.toFile()).setBare(true).call()
+		final Repository repo = getRepository(repositoryBase);
+		if (repo == null) {
+			Files.createDirectories(repositoryBase);
+			final Repository repository = Git.init().setDirectory(repositoryBase.toFile()).setBare(true).call()
 					.getRepository();
 			initializeRepo(repository, store, branch);
 			return repository;
 		} else {
-			final Repository repository = new FileRepositoryBuilder().setGitDir(bareRepo.toFile()).readEnvironment()
-					.findGitDir(bareRepo.toFile()).setMustExist(true).build();
-			try (final StorageChecker sc = new StorageChecker(repository)) {
+			try (final StorageChecker sc = new StorageChecker(repo)) {
 				sc.check(store, branch);
 			}
-			return repository;
+			return repo;
 		}
+	}
+
+	private Repository getRepository(final Path baseDirectory) {
+		try {
+			return Git.open(baseDirectory.toFile()).getRepository();
+		} catch (final IOException ignore) {
+		}
+		return null;
 	}
 
 	private void initializeRepo(final Repository repository, final String store, String branch) throws IOException {
@@ -135,7 +146,7 @@ class HostedGitRepositoryManager implements Source {
 			ObjectInserter oi = repository.newObjectInserter();
 			final ObjectId blob = oi.insert(Constants.OBJ_BLOB, Constants.encode("{}"));
 
-			final String[] path = store.trim().split("/");
+			final String[] path = store.split(File.separator);
 
 			FileMode mode = FileMode.REGULAR_FILE;
 			oi = repository.newObjectInserter();
@@ -202,27 +213,6 @@ class HostedGitRepositoryManager implements Source {
 	@Override
 	public void addListener(SourceEventListener listener) {
 		this.listener.addListener(listener);
-	}
-
-	@Override
-	public Contact getContact() {
-		return new Contact() {
-
-			@Override
-			public URI repositoryURI() {
-				return bareRepository.getDirectory().toURI();
-			}
-
-			@Override
-			public String getUserName() {
-				return null;
-			}
-
-			@Override
-			public String getPassword() {
-				return null;
-			}
-		};
 	}
 
 	@Override

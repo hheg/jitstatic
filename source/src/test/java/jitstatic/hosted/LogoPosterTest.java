@@ -28,8 +28,6 @@ import java.util.Arrays;
 
 import org.eclipse.jgit.transport.ReceivePack;
 import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 public class LogoPosterTest {
 
@@ -37,14 +35,10 @@ public class LogoPosterTest {
 	
 	@Test
 	public void testLogoPoster() {	
-		doAnswer(new Answer<Object>() {
-		           public Object answer(InvocationOnMock invocation) {
-		                   Object[] args = invocation.getArguments();
-		                   System.out.println(Arrays.toString(args));
-		                   return null;
-		              }
-
-				}).when(rp).sendMessage(any());;
+		doAnswer((i) -> {
+             System.out.println(Arrays.toString(i.getArguments()));
+             return null;	
+		}).when(rp).sendMessage(any());		
 		LogoPoster poster = new LogoPoster();
 		poster.onPreReceive(rp,null);
 	}

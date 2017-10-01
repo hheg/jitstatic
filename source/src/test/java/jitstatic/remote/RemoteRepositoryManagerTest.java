@@ -32,7 +32,6 @@ import static org.hamcrest.Matchers.is;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,7 +51,6 @@ import org.junit.rules.TemporaryFolder;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 
 import jitstatic.hosted.BranchNotFoundException;
-import jitstatic.source.Source.Contact;
 import jitstatic.source.SourceEventListener;
 
 public class RemoteRepositoryManagerTest {
@@ -251,19 +249,6 @@ public class RemoteRepositoryManagerTest {
 				STORAGE, workingDir)) {
 		}
 
-	}
-
-	@Test
-	public void testRemoteContact() throws URISyntaxException, IllegalStateException, GitAPIException, IOException {
-		final String user = "user";
-		final String password = "password";
-		setUpRepo();
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), user, password, BRANCH,
-				STORAGE, workingDir);) {
-			Contact contact = rrm.getContact();
-			assertEquals(user, contact.getUserName());
-			assertEquals(password, contact.getPassword());
-		}
 	}
 
 	@Test

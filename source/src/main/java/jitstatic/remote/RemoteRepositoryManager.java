@@ -62,10 +62,9 @@ import org.slf4j.LoggerFactory;
 import jitstatic.hosted.BranchNotFoundException;
 import jitstatic.hosted.StorageChecker;
 import jitstatic.hosted.StorageExtractor;
-import jitstatic.source.Source.Contact;
 import jitstatic.source.SourceEventListener;
 
-class RemoteRepositoryManager implements Contact, AutoCloseable {
+class RemoteRepositoryManager implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(RemoteRepositoryManager.class);
 	private final URI remoteRepo;
@@ -218,23 +217,8 @@ class RemoteRepositoryManager implements Contact, AutoCloseable {
 		}
 	}
 
-	@Override
 	public URI repositoryURI() {
 		return remoteRepo;
-	}
-
-	@Override
-	public String getUserName() {
-		return userName;
-	}
-
-	@Override
-	public String getPassword() {
-		return password;
-	}
-
-	public Contact getContact() {
-		return this;
 	}
 
 	String getLatestSHA() {
