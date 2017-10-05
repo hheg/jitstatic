@@ -32,7 +32,7 @@ import jitstatic.source.Source;
 
 public class StorageFactory {
 
-	public Storage build(final Source remote, Environment env) {
+	public Storage build(final Source remote, final Environment env) {
 		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);

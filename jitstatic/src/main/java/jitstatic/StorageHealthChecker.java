@@ -1,5 +1,7 @@
 package jitstatic;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -32,7 +34,7 @@ public class StorageHealthChecker extends HealthCheck {
 	private final Storage storage;
 	
 	public StorageHealthChecker(Storage storage) {
-		this.storage = storage;
+		this.storage = Objects.requireNonNull(storage);
 	}
 
 	@Override

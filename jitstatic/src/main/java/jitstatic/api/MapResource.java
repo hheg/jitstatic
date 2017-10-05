@@ -1,5 +1,7 @@
 package jitstatic.api;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -45,7 +47,7 @@ public class MapResource {
 	private final Storage storage;
 
 	public MapResource(final Storage storage) {
-		this.storage = storage;
+		this.storage = Objects.requireNonNull(storage);
 	}
 
 	@Path("/{key}")

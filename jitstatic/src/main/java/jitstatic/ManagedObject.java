@@ -1,5 +1,7 @@
 package jitstatic;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -29,7 +31,7 @@ public class ManagedObject<T extends AutoCloseable & Source>  implements Managed
 	private final T object;
 	
 	public ManagedObject(T object) {
-		this.object = object;
+		this.object = Objects.requireNonNull(object);
 	}
 	
 	

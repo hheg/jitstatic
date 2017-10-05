@@ -32,7 +32,7 @@ public class RepositoryIsMissingIntendedBranch extends RuntimeException {
 	 * @see java.lang.Throwable#fillInStackTrace()
 	 */
 	@Override
-	public synchronized Throwable fillInStackTrace() {
+	public Throwable fillInStackTrace() {
 		return this;
 	}
 }

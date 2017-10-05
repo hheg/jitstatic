@@ -20,9 +20,6 @@ package jitstatic.source;
  * #L%
  */
 
-
-
-
 import java.util.EventListener;
 
 public interface SourceEventListener extends EventListener {

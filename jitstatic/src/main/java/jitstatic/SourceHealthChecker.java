@@ -1,5 +1,7 @@
 package jitstatic;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -30,7 +32,7 @@ public class SourceHealthChecker extends HealthCheck {
 	private final Source source;
 
 	public SourceHealthChecker(Source source) {
-		this.source = source;
+		this.source = Objects.requireNonNull(source);
 	}
 
 	@Override

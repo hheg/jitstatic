@@ -23,8 +23,9 @@ package jitstatic.hosted;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,9 +55,6 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -99,14 +97,11 @@ public class JitStaticPreReceiveHookTest {
 		workingGit.commit().setMessage("Initial commit").call();
 		workingGit.push().call();
 
-		protocol = new TestProtocol<Object>(null, new ReceivePackFactory<Object>() {
-			@Override
-			public ReceivePack create(Object req, Repository db)
-					throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-				final ReceivePack receivePack = new ReceivePack(db);
-				receivePack.setPreReceiveHook(new JitStaticPreReceiveHook(store, master));
-				return receivePack;
-			}
+		protocol = new TestProtocol<Object>(null, (req, db) -> {
+			final ReceivePack receivePack = new ReceivePack(db);
+			receivePack.setPreReceiveHook(new JitStaticPreReceiveHook(store, master));
+			return receivePack;
+
 		});
 		uri = protocol.register(o, bareGit.getRepository());
 	}

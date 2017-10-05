@@ -43,10 +43,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
@@ -195,16 +192,12 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	public RepositoryResolver<HttpServletRequest> getRepositoryResolver() {
-		return new RepositoryResolver<HttpServletRequest>() {
-			@Override
-			public Repository open(final HttpServletRequest req, final String name) throws RepositoryNotFoundException,
-					ServiceNotAuthorizedException, ServiceNotEnabledException, ServiceMayNotContinueException {
-				if (!endPointName.equals(name)) {
-					throw new RepositoryNotFoundException(name);
-				}
-				bareRepository.incrementOpen();
-				return bareRepository;
+		return (request, name) -> {
+			if (!endPointName.equals(name)) {
+				throw new RepositoryNotFoundException(name);
 			}
+			bareRepository.incrementOpen();
+			return bareRepository;
 		};
 	}
 
