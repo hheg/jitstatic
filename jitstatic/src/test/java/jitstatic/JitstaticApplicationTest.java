@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
@@ -51,7 +50,6 @@ import jitstatic.hosted.HostedFactory;
 import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
-import jitstatic.storage.LoaderException;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageFactory;
 
@@ -81,7 +79,7 @@ public class JitstaticApplicationTest {
 	private JitstaticConfiguration config;
 
 	@Before
-	public void setup() throws LoaderException {
+	public void setup() {
 		MockitoAnnotations.initMocks(this);
 		config = new JitstaticConfiguration();
 		config.setStorageFactory(storageFactory);
@@ -89,7 +87,7 @@ public class JitstaticApplicationTest {
 		when(environment.lifecycle()).thenReturn(lifecycle);
 		when(environment.jersey()).thenReturn(jersey);
 		when(environment.healthChecks()).thenReturn(hcr);
-		when(storageFactory.build(any(), isA(Environment.class))).thenReturn(storage);
+		when(storageFactory.build(any(), isA(Environment.class), any())).thenReturn(storage);
 	}
 
 	@Test
@@ -204,7 +202,7 @@ public class JitstaticApplicationTest {
 		config.setHostedFactory(hostedFactory);
 		config.setRemoteFactory(remoteFactory);
 		when(hostedFactory.build(environment)).thenReturn(source);
-		when(storageFactory.build(source, environment)).thenReturn(storage);
+		when(storageFactory.build(source, environment, null)).thenReturn(storage);
 		app.run(config, environment);
 	}
 	
@@ -214,12 +212,12 @@ public class JitstaticApplicationTest {
 		config.setHostedFactory(hostedFactory);
 		config.setRemoteFactory(remoteFactory);
 		when(hostedFactory.build(environment)).thenReturn(source);
-		when(storageFactory.build(source, environment)).thenReturn(storage);
+		when(storageFactory.build(source, environment, null)).thenReturn(storage);
 		ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
 		app.run(config, environment);
 		verify(source).addListener(c.capture());
-		c.getValue().onEvent();
-		verify(storage).load();
+		c.getValue().onEvent(null);
+		verify(storage).reload(any());
 	}
 	
 }

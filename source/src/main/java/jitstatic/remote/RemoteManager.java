@@ -1,5 +1,7 @@
 package jitstatic.remote;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -21,8 +23,6 @@ package jitstatic.remote;
  */
 
 import java.io.InputStream;
-
-
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -31,6 +31,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jgit.lib.Constants;
+
+import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
 
@@ -43,19 +46,21 @@ class RemoteManager implements Source {
 	private final TimeUnit unit;
 
 	private volatile ScheduledFuture<?> job;
+	private final String defaultRef;
 
 	public RemoteManager(final URI remoteRepoManager, final String userName, final String password, final long duration,
-			final TimeUnit unit, final String branch, final String storageFile, Path baseDirectory) {
-		this(new RemoteRepositoryManager(remoteRepoManager, userName, password, branch, storageFile, baseDirectory),
-				new ScheduledThreadPoolExecutor(1), duration, unit);
+			final TimeUnit unit, Path baseDirectory, final String defaultRef) throws CorruptedSourceException, IOException {
+		this(new RemoteRepositoryManager(remoteRepoManager, userName, password, baseDirectory, defaultRef),
+				new ScheduledThreadPoolExecutor(1), duration, unit, defaultRef);
 	}
 
 	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledExecutorService scheduler,
-			final long duration, final TimeUnit unit) {
+			final long duration, final TimeUnit unit, final String defaultRef) {
 		this.remoteRepoManager = Objects.requireNonNull(remoteRepoManager);
 		this.poller = Objects.requireNonNull(scheduler);
 		this.unit = Objects.requireNonNull(unit);
 		this.duration = (duration <= 0 ? _5 : duration);
+		this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
 	}
 
 	@Override
@@ -79,16 +84,19 @@ class RemoteManager implements Source {
 
 	@Override
 	public void checkHealth() {
-		Exception fault = remoteRepoManager.getFault();
+		final Exception fault = remoteRepoManager.getFault();
 		if (fault != null) {
 			throw new RuntimeException(fault);
 		}
 	}
 
 	@Override
-	public InputStream getSourceStream() {
+	public InputStream getSourceStream(final String key, String ref) {
 		try {
-			return remoteRepoManager.getStorageInputStream();
+			if (ref == null) {
+				ref = defaultRef;
+			}
+			return remoteRepoManager.getStorageInputStream(key, ref);
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}

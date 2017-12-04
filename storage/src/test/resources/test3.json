@@ -18,25 +18,12 @@
  * #L%
  */
 
-
-
 {
-	"key1": {
-		"data": "value1",
-		"users": [
-			{
-				"user": "user",
-				"password": "1234"
-			}
-		]
-	},
-	"key3": {
-		"data": "value3",
-		"users": [
-			{
-				"user": "user",
-				"password": "1234"
-			}
-		]
-	}
+	"data": "value1",
+	"users": [
+		{
+			"user": "user",
+			"password": "1234"
+		}
+	]
 }

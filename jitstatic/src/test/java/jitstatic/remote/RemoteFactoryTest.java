@@ -44,9 +44,12 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
 import io.dropwizard.setup.Environment;
+import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
 
 public class RemoteFactoryTest {
+
+	private static final String STORE = "store";
 
 	private Environment env = mock(Environment.class);
 
@@ -68,7 +71,7 @@ public class RemoteFactoryTest {
 
 	@Test
 	public void testAHostedRemoteBuild()
-			throws URISyntaxException, IOException, IllegalStateException, GitAPIException {
+			throws URISyntaxException, IOException, IllegalStateException, GitAPIException, CorruptedSourceException {
 		setUpRepo();
 		
 		rf.setRemotePassword("pwd");
@@ -82,7 +85,7 @@ public class RemoteFactoryTest {
 	}
 
 	@Test
-	public void testAHostedRemoteBuildWithNoRemoteRepo() throws URISyntaxException, IOException {
+	public void testAHostedRemoteBuildWithNoRemoteRepo() throws URISyntaxException, IOException, CorruptedSourceException {
 		ex.expect(RuntimeException.class);
 		ex.expectCause(isA(InvalidRemoteException.class));
 
@@ -96,7 +99,7 @@ public class RemoteFactoryTest {
 	}
 
 	@Test
-	public void testIfRemoteRepoParameterIsURIAbsolute() throws URISyntaxException {
+	public void testIfRemoteRepoParameterIsURIAbsolute() throws URISyntaxException, CorruptedSourceException, IOException {
 		ex.expect(IllegalArgumentException.class);
 		ex.expectMessage("parameter remoteRepo, /tmp, must be absolute");
 
@@ -111,11 +114,21 @@ public class RemoteFactoryTest {
 		final File base = folder.newFolder();
 		try (Git bare = Git.init().setBare(true).setDirectory(remoteFolder).call();
 				Git git = Git.cloneRepository().setDirectory(base).setURI(remoteFolder.toURI().toString()).call()) {
-			Files.write(base.toPath().resolve(rf.getLocalFilePath()), "{}".getBytes("UTF-8"));
-			git.add().addFilepattern(rf.getLocalFilePath()).call();
+			Files.write(base.toPath().resolve(STORE), getData().getBytes("UTF-8"));
+			git.add().addFilepattern(STORE).call();
 			git.commit().setMessage("Commit").call();
 			git.push().call();
 		}
+	}
+	
+	
+	private String getData() {
+		return getData(1);
+	}
+
+	private String getData(int i) {
+		return "{\"data\":{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}},\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
 	}
 
 }

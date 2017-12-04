@@ -17,5 +17,4 @@ hosted:
     servletName: selfhosted
     hostedEndpoint: git
     userName: huser
-    secret: hseCr3t
-    localFilePath: accept/storage2    
+    secret: hseCr3t 

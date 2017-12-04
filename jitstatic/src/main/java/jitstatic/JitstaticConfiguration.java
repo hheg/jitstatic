@@ -20,8 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
-
 import javax.validation.Valid;
 
 import com.fasterxml.jackson.annotation.JsonProperty;

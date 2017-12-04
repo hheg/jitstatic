@@ -25,154 +25,107 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
-import javax.servlet.ServletRequestListener;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.TreeFormatter;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 
+import jitstatic.CorruptedSourceException;
+import jitstatic.LinkedException;
+import jitstatic.SourceChecker;
+import jitstatic.SourceExtractor;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
+import jitstatic.util.Pair;
 
 class HostedGitRepositoryManager implements Source {
 
 	private final Repository bareRepository;
 	private final String endPointName;
-	private final GitRecievePackListener listener;
-	private final String branch;
-	private final String storageFile;
+	private final JitStaticPostReceiveHook postHook;
+	private final JitStaticPreReceiveHook preHook;
+	private final SourceExtractor extractor;
 
-	public HostedGitRepositoryManager(final Path workingDirectory, String endPointName, String store, String branch) {
-		Objects.requireNonNull(workingDirectory);
-		Objects.requireNonNull(endPointName);
-		Objects.requireNonNull(store);
-		Objects.requireNonNull(branch);
+	public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
+			throws CorruptedSourceException, IOException {
 
-		endPointName = endPointName.trim();
-		if (endPointName.isEmpty()) {
-			throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
-		}
-		this.endPointName = endPointName;
-
-		if (!Files.isDirectory(workingDirectory)) {
+		if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
 			throw new IllegalArgumentException(String.format("Path %s is not a directory", workingDirectory));
 		}
 		if (!Files.isWritable(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not writeable", workingDirectory));
 		}
 
-		store = store.trim();
-		if (store.isEmpty()) {
-			throw new IllegalArgumentException("Storage name cannot be empty");
-		}
+		this.endPointName = Objects.requireNonNull(endPointName).trim();
 
-		branch = branch.trim();
-		if (branch.isEmpty()) {
-			throw new IllegalArgumentException("Branch name cannot be empty");
-		}
-
-		final String normalizedBranchName = normalizeBranchName(branch);
-
-		if (!Repository.isValidRefName(normalizedBranchName)) {
-			throw new IllegalArgumentException(branch + " is not an valid branch reference");
+		if (this.endPointName.isEmpty()) {
+			throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
 		}
 
 		try {
-			this.bareRepository = setUpBareRepository(workingDirectory, store, normalizedBranchName);
+			this.bareRepository = setUpBareRepository(workingDirectory);
 		} catch (final IllegalStateException | GitAPIException | IOException e) {
 			throw new RuntimeException(e);
-		} catch (final BranchNotFoundException bnfe) {
-			// Transform to current scope.
-			throw new BranchNotFoundException(branch);
 		}
-		this.branch = normalizedBranchName;
-		this.storageFile = store;
-		this.listener = new GitRecievePackListener();
+
+		final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(
+				this.bareRepository);
+
+		if (!errors.isEmpty()) {
+			throw new CorruptedSourceException(errors);
+		}
+		checkIfDefaultBranchExist(defaultRef);
+		this.extractor = new SourceExtractor(this.bareRepository);
+
+		this.postHook = new JitStaticPostReceiveHook();
+		this.preHook = new JitStaticPreReceiveHook(defaultRef);
 	}
 
-	private String normalizeBranchName(String branch) {
-		if (!branch.startsWith(Constants.R_HEADS)) {
-			branch = Constants.R_HEADS + branch;
+	private void checkIfDefaultBranchExist(String defaultRef) throws IOException {
+		Objects.requireNonNull(defaultRef,"defaultBranch cannot be null");
+		if(defaultRef.isEmpty()) {
+			throw new IllegalArgumentException("defaultBranch cannot be empty");
 		}
-		return Repository.normalizeBranchName(branch);
+		try(SourceChecker sc = new SourceChecker(bareRepository)){
+			sc.checkIfDefaultBranchExists(defaultRef);
+		}
 	}
 
-	private Repository setUpBareRepository(final Path repositoryBase, final String store, final String branch)
+	private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(
+			final Repository bareRepository) {
+		try (final SourceChecker sc = new SourceChecker(bareRepository)) {
+			return sc.check();
+		}
+	}
+
+	private static Repository setUpBareRepository(final Path repositoryBase)
 			throws IOException, IllegalStateException, GitAPIException {
 		final Repository repo = getRepository(repositoryBase);
 		if (repo == null) {
 			Files.createDirectories(repositoryBase);
 			final Repository repository = Git.init().setDirectory(repositoryBase.toFile()).setBare(true).call()
 					.getRepository();
-			initializeRepo(repository, store, branch);
 			return repository;
-		} else {
-			try (final StorageChecker sc = new StorageChecker(repo)) {
-				sc.check(store, branch);
-			}
-			return repo;
 		}
+		return repo;
 	}
 
-	private Repository getRepository(final Path baseDirectory) {
+	private static Repository getRepository(final Path baseDirectory) {
 		try {
 			return Git.open(baseDirectory.toFile()).getRepository();
 		} catch (final IOException ignore) {
 		}
 		return null;
-	}
-
-	private void initializeRepo(final Repository repository, final String store, String branch) throws IOException {
-		try (RevWalk rw = new RevWalk(repository)) {
-			ObjectInserter oi = repository.newObjectInserter();
-			final ObjectId blob = oi.insert(Constants.OBJ_BLOB, Constants.encode("{}"));
-
-			final String[] path = store.split("/");
-
-			FileMode mode = FileMode.REGULAR_FILE;
-			oi = repository.newObjectInserter();
-			ObjectId id = blob;
-
-			for (int i = path.length - 1; i >= 0; --i) {
-				final TreeFormatter treeFormatter = new TreeFormatter();
-				treeFormatter.append(path[i], mode, id);
-				id = oi.insert(treeFormatter);
-				mode = FileMode.TREE;
-			}
-
-			final CommitBuilder commitBuilder = new CommitBuilder();
-			final PersonIdent person = new PersonIdent("JitStatic", "");
-			commitBuilder.setAuthor(person);
-			final String msg = "Initializing commit";
-			commitBuilder.setMessage(msg);
-			commitBuilder.setCommitter(person);
-			commitBuilder.setTreeId(id);
-			final ObjectId inserted = oi.insert(commitBuilder);
-			oi.flush();
-
-			rw.parseCommit(inserted);
-
-			final RefUpdate ru = repository.updateRef(branch);
-
-			ru.setNewObjectId(inserted);
-			ru.setRefLogMessage(msg, false);
-			ru.setExpectedOldObjectId(ObjectId.zeroId());
-			ru.update(rw);
-		}
 	}
 
 	@Override
@@ -187,10 +140,6 @@ class HostedGitRepositoryManager implements Source {
 		return this.bareRepository.getDirectory().toURI();
 	}
 
-	public ServletRequestListener getRequestListener() {
-		return this.listener;
-	}
-
 	public RepositoryResolver<HttpServletRequest> getRepositoryResolver() {
 		return (request, name) -> {
 			if (!endPointName.equals(name)) {
@@ -202,8 +151,8 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	@Override
-	public void addListener(SourceEventListener listener) {
-		this.listener.addListener(listener);
+	public void addListener(final SourceEventListener listener) {
+		this.getPostHook().addListener(listener);
 	}
 
 	@Override
@@ -213,15 +162,36 @@ class HostedGitRepositoryManager implements Source {
 
 	@Override
 	public void checkHealth() {
-		// noop for now
+		final LinkedException linked = new LinkedException();
+		linked.add(getPreHook().getFault());
+		linked.add(getPostHook().getFault());
+		if (!linked.isEmpty()) {
+			throw new RuntimeException(linked);
+		}
 	}
 
 	@Override
-	public InputStream getSourceStream() {
+	public InputStream getSourceStream(final String key, final String ref) {
+		Objects.requireNonNull(key);
+		Objects.requireNonNull(ref);
 		try {
-			return StorageExtractor.sourceExtractor(bareRepository, branch, storageFile);
+			if (ref.startsWith(Constants.R_HEADS)) {
+				return extractor.openBranch(ref, key);
+			} else if (ref.startsWith(Constants.R_TAGS)) {
+				return extractor.openTag(ref, key);
+			}
+			throw new RefNotFoundException(ref);
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}
+
+	}
+
+	public JitStaticPostReceiveHook getPostHook() {
+		return postHook;
+	}
+
+	public JitStaticPreReceiveHook getPreHook() {
+		return preHook;
 	}
 }

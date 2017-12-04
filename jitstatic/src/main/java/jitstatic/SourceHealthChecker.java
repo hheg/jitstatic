@@ -1,7 +1,5 @@
 package jitstatic;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -22,16 +20,15 @@ import java.util.Objects;
  * #L%
  */
 
-
+import java.util.Objects;
 import com.codahale.metrics.health.HealthCheck;
-
 import jitstatic.source.Source;
 
 public class SourceHealthChecker extends HealthCheck {
 	
 	private final Source source;
 
-	public SourceHealthChecker(Source source) {
+	public SourceHealthChecker(final Source source) {
 		this.source = Objects.requireNonNull(source);
 	}
 

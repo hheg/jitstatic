@@ -47,6 +47,7 @@ import org.mockito.Mockito;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.jetty.setup.ServletEnvironment;
 import io.dropwizard.setup.Environment;
+import jitstatic.CorruptedSourceException;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.source.Source;
 
@@ -63,7 +64,7 @@ public class HostedFactoryTest {
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
 
 	@Test
-	public void testAHostedRemoteFileBuild() throws IOException {
+	public void testAHostedRemoteFileBuild() throws IOException, CorruptedSourceException {
 		when(env.servlets()).thenReturn(senv);
 		when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
 		when(env.getApplicationContext()).thenReturn(handler);
@@ -81,7 +82,7 @@ public class HostedFactoryTest {
 	}
 
 	@Test
-	public void testWithFulldBranchName() throws IOException {
+	public void testWithFulldBranchName() throws IOException, CorruptedSourceException {
 		when(env.servlets()).thenReturn(senv);
 		when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
 		when(env.getApplicationContext()).thenReturn(handler);

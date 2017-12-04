@@ -27,5 +27,5 @@ public interface Source extends AutoCloseable {
 	public void addListener(SourceEventListener listener);
 	public void start();
 	public void checkHealth();
-	public InputStream getSourceStream();
+	public InputStream getSourceStream(String key, String ref);
 }

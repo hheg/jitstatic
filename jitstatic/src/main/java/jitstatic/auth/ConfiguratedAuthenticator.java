@@ -20,7 +20,6 @@ package jitstatic.auth;
  * #L%
  */
 
-
 import java.util.Optional;
 
 import io.dropwizard.auth.AuthenticationException;

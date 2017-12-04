@@ -20,15 +20,16 @@ package jitstatic.storage;
  * #L%
  */
 
-
-
-
 import static org.junit.Assert.assertNull;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+
+import org.eclipse.jgit.lib.Constants;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.Rule;
 import org.junit.Test;
@@ -49,30 +50,30 @@ public class StorageFactoryTest {
 
 	@Rule
 	public final ExpectedException ex = ExpectedException.none();
-	
+
 	@Rule
 	public final TemporaryFolder tempFolder = new TemporaryFolder();
 
 	private StorageFactory sf = new StorageFactory();
 
 	@Test
-	public void testBuild() throws LoaderException {
+	public void testBuild() throws InterruptedException, ExecutionException {
 		when(env.jersey()).thenReturn(jersey);
-		try (Storage storage = sf.build(source, env);) {
-			storage.load();
-			assertNull(storage.get("key"));
+		try (Storage storage = sf.build(source, env, null);) {
+			storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
+			assertNull(storage.get("key", null).get());
 		}
 		verify(jersey).register(isA(AuthDynamicFeature.class));
 		verify(jersey).register(RolesAllowedDynamicFeature.class);
 		verify(jersey).register(isA(AuthValueFactoryProvider.Binder.class));
 	}
-	
+
 	@Test
 	public void testEmptyStoragePath() {
 		when(env.jersey()).thenReturn(jersey);
 		ex.expect(NullPointerException.class);
 		ex.expectMessage("Source cannot be null");
-		try (Storage storage = sf.build(null, env);) {
+		try (Storage storage = sf.build(null, env, null);) {
 		}
 	}
 }

@@ -55,9 +55,10 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		try {
 			final StorageFactory storageFactory = config.getStorageFactory();
 			final HostedFactory hostedFactory = config.getHostedFactory();
-
+			String ref = null;
 			if (hostedFactory != null) {
 				source = hostedFactory.build(env);
+				ref = hostedFactory.getBranch();
 				if (config.getRemoteFactory() != null) {
 					log.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
 				}
@@ -67,12 +68,13 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 					throw new IllegalStateException("Either hosted or remote must be chosen");
 				}
 				source = remoteFactory.build(env);
+				ref = remoteFactory.getBranch();
 			}
 
-			final Storage s = storage = storageFactory.build(source, env);
-			source.addListener(() -> {
+			final Storage s = storage = storageFactory.build(source, env, ref);
+			source.addListener((updatedRefs) -> {
 				try {
-					s.load();
+					s.reload(updatedRefs);
 				} catch (Exception e) {
 					LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
 				}
@@ -80,6 +82,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
 			env.lifecycle().manage(new ManagedObject<>(source));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
+			env.healthChecks().register("Source", new SourceHealthChecker(source));
 			env.jersey().register(new MapResource(storage));
 		} catch (final Exception e) {
 			guard = e;
