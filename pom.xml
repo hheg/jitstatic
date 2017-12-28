@@ -283,7 +283,17 @@
 							<goal>update-file-header</goal>
 						</goals>
 					</execution>
-				</executions>
+					<execution>
+						<id>check-license</id>
+						<goals>
+							<goal>check-file-header</goal>
+						</goals>
+						<phase>package</phase>
+						<configuration>
+							<failOnMissingHeader>true</failOnMissingHeader>
+						</configuration>
+					</execution>					
+				</executions>				
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
