@@ -4,14 +4,14 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.3.0-SNAPSHOT</version>
+		<version>0.3.0</version>
 	</parent>
 	<artifactId>jitstatic-IT</artifactId>
 	<dependencies>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
-			<version>0.3.0-SNAPSHOT</version>
+			<version>0.3.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
