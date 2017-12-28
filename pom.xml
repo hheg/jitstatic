@@ -392,20 +392,18 @@
 					</gitFlowConfig>
 
 					<commitMessages>
-						<commitMessages>
-							<featureStartMessage>@{feature} update versions for feature
-								branch</featureStartMessage>
-							<featureFinishMessage>@{feature} update versions for development
-								branch</featureFinishMessage>
-							<hotfixStartMessage>@{version} update versions for hotfix</hotfixStartMessage>
-							<hotfixFinishMessage>@{version} update for next development
-								version</hotfixFinishMessage>
-							<releaseStartMessage>@{version} update versions for release</releaseStartMessage>
-							<releaseFinishMessage>@{version} update for next development
-								version</releaseFinishMessage>
-							<tagHotfixMessage>tag hotfix</tagHotfixMessage>
-							<tagReleaseMessage>tag release</tagReleaseMessage>
-						</commitMessages>
+						<featureStartMessage>@{feature} update versions for feature
+							branch</featureStartMessage>
+						<featureFinishMessage>@{feature} update versions for development
+							branch</featureFinishMessage>
+						<hotfixStartMessage>@{version} update versions for hotfix</hotfixStartMessage>
+						<hotfixFinishMessage>@{version} update for next development
+							version</hotfixFinishMessage>
+						<releaseStartMessage>@{version} update versions for release</releaseStartMessage>
+						<releaseFinishMessage>@{version} update for next development
+							version</releaseFinishMessage>
+						<tagHotfixMessage>tag hotfix</tagHotfixMessage>
+						<tagReleaseMessage>tag release</tagReleaseMessage>
 					</commitMessages>
 				</configuration>
 			</plugin>
