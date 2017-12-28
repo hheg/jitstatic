@@ -1,4 +1,4 @@
-package jitstatic.hosted;
+package jitstatic;
 
 /*-
  * #%L
@@ -30,7 +30,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 
-class StorageJSONParser {
+public class SourceJSONParser {
 
 	private static final int SECOND = 0xF0;
 	private static final int FIRST = 0xF;
@@ -40,12 +40,9 @@ class StorageJSONParser {
 
 	public void parse(InputStream bc) throws IOException {
 		try (final JsonParser parser = mapper.createParser(bc);) {
-			if (parser.nextToken() != JsonToken.START_OBJECT) {
-				errorParsingJSONFormat(parser);
-			}
-
-			while (parser.nextToken() == JsonToken.FIELD_NAME) {
+			try {
 				if (parser.nextToken() != JsonToken.START_OBJECT) {
+
 					errorParsingJSONFormat(parser);
 				}
 				int m = 0;
@@ -55,6 +52,10 @@ class StorageJSONParser {
 				if ((m & MASK) != MASK) {
 					errorParsingStorageFormat(parser);
 				}
+			} catch (final StorageParseException spe) {
+				throw spe;
+			} catch (final IOException e) {
+				errorParsingJSONFormat(parser, e);
 			}
 		}
 	}
@@ -139,13 +140,32 @@ class StorageJSONParser {
 
 	private void errorParsingStorageFormat(final JsonParser parser) throws IOException {
 		final JsonLocation cl = parser.getCurrentLocation();
-		throw new IOException(String.format("File does not have valid store file format at line: %s, column: %s ",
-				cl.getLineNr(), cl.getColumnNr()));
+		throw new StorageParseException(
+				String.format("File does not have valid store file format at line: %s, column: %s ", cl.getLineNr(),
+						cl.getColumnNr()));
 	}
 
 	private void errorParsingJSONFormat(final JsonParser parser) throws IOException {
+		errorParsingJSONFormat(parser, null);
+	}
+
+	private void errorParsingJSONFormat(final JsonParser parser, final IOException e) throws StorageParseException {
 		final JsonLocation cl = parser.getCurrentLocation();
-		throw new IOException(
-				String.format("File is not valid JSON at line: %s, column: %s", cl.getLineNr(), cl.getColumnNr()));
+		throw new StorageParseException(
+				String.format("File is not valid JSON at line: %s, column: %s", cl.getLineNr(), cl.getColumnNr()), e);
+	}
+
+	private static class StorageParseException extends IOException {
+
+		private static final long serialVersionUID = 1774575933983877566L;
+
+		public StorageParseException(final String message) {
+			super(message);
+		}
+
+		public StorageParseException(final String message, final IOException e) {
+			super(message, e);
+		}
+
 	}
 }

@@ -20,7 +20,6 @@ package jitstatic.hosted;
  * #L%
  */
 
-
 import java.util.Arrays;
 import java.util.Objects;
 

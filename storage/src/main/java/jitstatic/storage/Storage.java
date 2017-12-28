@@ -1,5 +1,8 @@
 package jitstatic.storage;
 
+import java.util.List;
+import java.util.concurrent.Future;
+
 /*-
  * #%L
  * jitstatic
@@ -21,10 +24,8 @@ package jitstatic.storage;
  */
 
 public interface Storage extends AutoCloseable {
-	public StorageData get(String key);
-
-	public void load() throws LoaderException;
-
+	public Future<StorageData> get(String key, String ref);
+	public void reload(List<String> refsToReload);
 	public void close();
 
 	public void checkHealth() throws Exception;

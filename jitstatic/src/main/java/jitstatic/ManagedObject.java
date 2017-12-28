@@ -1,7 +1,5 @@
 package jitstatic;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -22,7 +20,7 @@ import java.util.Objects;
  * #L%
  */
 
-
+import java.util.Objects;
 import io.dropwizard.lifecycle.Managed;
 import jitstatic.source.Source;
 
@@ -30,7 +28,7 @@ public class ManagedObject<T extends AutoCloseable & Source>  implements Managed
 
 	private final T object;
 	
-	public ManagedObject(T object) {
+	public ManagedObject(final T object) {
 		this.object = Objects.requireNonNull(object);
 	}
 	

@@ -20,8 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -40,7 +38,6 @@ public class ManagedObjectTest {
 		verify(m).start();
 		mo.stop();
 		verify(m).close();
-	
 	}
 
 }

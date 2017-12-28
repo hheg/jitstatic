@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic;
 
 /*-
  * #%L
@@ -20,12 +20,12 @@ package jitstatic.storage;
  * #L%
  */
 
+import org.eclipse.jgit.lib.Constants;
 
-public class LoaderException extends Exception {
+public class JitStaticConstants {
 
-	private static final long serialVersionUID = -1946465274123591609L;
+	public static final String REF_JISTSTATIC = Constants.R_REFS + "jistatic/";
 
-	public LoaderException(Throwable e) {
-		super(e);
+	private JitStaticConstants() {
 	}
 }

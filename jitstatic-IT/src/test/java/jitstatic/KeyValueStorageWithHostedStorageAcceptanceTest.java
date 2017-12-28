@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
@@ -33,13 +32,14 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
@@ -55,29 +55,28 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	private static final String ACCEPT_STORAGE = "accept/storage";
 	private static final String USER = "suser";
 	private static final String PASSWORD = "ssecret";
-	private static final TemporaryFolder tmpFolder = new TemporaryFolder();
-	private static final HttpClientConfiguration hcc = new HttpClientConfiguration();
+	private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
+	private static final HttpClientConfiguration HCC = new HttpClientConfiguration();
 	private static final DropwizardAppRule<JitstaticConfiguration> DW;
-	private static final TestRepositoryRule testRepo;
+	private static final TestRepositoryRule TEST_REPO;
 	private static String adress;
 	private static String basic;
 
 	@ClassRule
-	public static final RuleChain chain = RuleChain.outerRule(tmpFolder)
-			.around((testRepo = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
+	public static final RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
+			.around((TEST_REPO = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
-					ConfigOverride.config("remote.basePath", getFolder()),
-					ConfigOverride.config("remote.localFilePath", ACCEPT_STORAGE),
-					ConfigOverride.config("remote.remoteRepo", () -> "file://" + testRepo.getBase.get()))));
+					ConfigOverride.config("remote.basePath", getFolder()),				
+					ConfigOverride.config("remote.remoteRepo", () -> "file://" + TEST_REPO.getBase.get()))));
 
 	@BeforeClass
-	public static void setup() throws UnsupportedEncodingException {
+	public static void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		adress = String.format("http://localhost:%d/application", DW.getLocalPort());
 		basic = basicAuth();
-		hcc.setConnectionRequestTimeout(Duration.minutes(1));
-		hcc.setConnectionTimeout(Duration.minutes(1));
-		hcc.setTimeout(Duration.minutes(1));
+		HCC.setConnectionRequestTimeout(Duration.minutes(1));
+		HCC.setConnectionTimeout(Duration.minutes(1));
+		HCC.setTimeout(Duration.minutes(1));
 	}
 
 	@Test
@@ -107,9 +106,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	public void testGetAKeyValue() {
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = client.target(String.format("%s/storage/key1", adress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals("value1", response.asText());
+			String response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(String.class);
+			assertEquals("{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}", response);
 		} finally {
 			client.close();
 		}
@@ -119,7 +118,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	public void testGetAKeyValueWithoutAuth() {
 		Client client = buildClient("test2 client");
 		try {
-			Response response = client.target(String.format("%s/storage/key1", adress)).request().get();
+			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request().get();
 			assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
 		} finally {
 			client.close();
@@ -129,7 +128,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	private static Supplier<String> getFolder() {
 		return () -> {
 			try {
-				return tmpFolder.newFolder().toString();
+				return TMP_FOLDER.newFolder().toString();
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
@@ -139,12 +138,11 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	private Client buildClient(final String name) {
 		Environment env = DW.getEnvironment();
 		JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(env);
-		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(hcc));
+		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(HCC));
 		return jerseyClientBuilder.build(name);
 	}
 
 	private static String basicAuth() throws UnsupportedEncodingException {
 		return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
 	}
-
 }

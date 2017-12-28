@@ -20,7 +20,6 @@ package jitstatic.auth;
  * #L%
  */
 
-
 import static org.junit.Assert.*;
 
 import org.junit.Test;
@@ -75,5 +74,12 @@ public class UserTest {
 	public void testAgainstAnotherObject() {
 		User u1 = new User(new String("auser"), null);
 		assertNotEquals(u1, new Object());
+	}
+
+	@Test
+	public void testNullUsers() {
+		User u1 = new User(null, null);
+		User u2 = new User(null, null);
+		assertEquals(u1.hashCode(), u2.hashCode());
 	}
 }

@@ -20,7 +20,6 @@ package jitstatic.storage;
  * #L%
  */
 
-
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
@@ -35,15 +34,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
+import org.eclipse.jgit.lib.Constants;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -55,7 +59,7 @@ import jitstatic.source.Source;
 public class GitStorageTest {
 
 	private static final ObjectMapper mapper = new ObjectMapper();
-
+	private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
@@ -80,25 +84,25 @@ public class GitStorageTest {
 	public void testInitGitStorageWithNullSource() {
 		ex.expectMessage("Source cannot be null");
 		ex.expect(NullPointerException.class);
-		try (GitStorage gs = new GitStorage(null);) {
+		try (GitStorage gs = new GitStorage(null, null);) {
 		}
 	}
 
 	@Test
-	public void testLoadCache() throws IOException, LoaderException {
+	public void testLoadCache() throws IOException, InterruptedException, ExecutionException {
 		Set<User> users = new HashSet<>();
 		users.add(new User("user", "1234"));
-		try (GitStorage gs = new GitStorage(source);
+		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test1 = GitStorageTest.class.getResourceAsStream("/test1.json");
 				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json")) {
-			when(source.getSourceStream()).thenReturn(test1);
-			gs.load();
+			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(test1);
+			gs.reload(Arrays.asList(REF_HEADS_MASTER));
 			StorageData storage = new StorageData(users, readData("\"value1\""));
-			assertEquals(storage, gs.get("key"));
-			when(source.getSourceStream()).thenReturn(test2);
-			gs.load();
+			assertEquals(storage, gs.get("key", null).get());
+			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(test2);
+			gs.reload(Arrays.asList(REF_HEADS_MASTER));
 			storage = new StorageData(users, readData("\"value2\""));
-			assertEquals(storage, gs.get("key"));
+			assertEquals(storage, gs.get("key", null).get());
 		}
 	}
 
@@ -107,27 +111,19 @@ public class GitStorageTest {
 	}
 
 	@Test
-	public void testLoadNewCache() throws IOException, LoaderException {
+	public void testLoadNewCache() throws Exception {
 
-		try (GitStorage gs = new GitStorage(source);
+		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
 				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
 
-			when(source.getSourceStream()).thenReturn(test3);
-			gs.load();
-			StorageData key1Data = gs.get("key1");
-			StorageData key3Data = gs.get("key3");
-			assertNotNull(key1Data);
-			assertNotNull(key3Data);
-
-			when(source.getSourceStream()).thenReturn(test4);
-			gs.load();
-			key1Data = gs.get("key1");
-			StorageData key4Data = gs.get("key4");
-			key3Data = gs.get("key3");
-			assertNotNull(key1Data);
-			assertNotNull(key4Data);
-			assertNull(key3Data);
+			when(source.getSourceStream(Mockito.eq("key3"), Mockito.anyString())).thenReturn(test3);
+			when(source.getSourceStream(Mockito.eq("key4"), Mockito.anyString())).thenReturn(test4);
+			Future<StorageData> key3Data = gs.get("key3", null);
+			Future<StorageData> key4Data = gs.get("key4", null);
+			assertNotNull(key3Data.get());
+			assertNotNull(key4Data.get());
+			gs.checkHealth();
 		}
 	}
 
@@ -135,10 +131,10 @@ public class GitStorageTest {
 	public void testCheckHealth() throws Exception {
 		NullPointerException npe = new NullPointerException();
 		ex.expect(is(npe));
-		when(source.getSourceStream()).thenThrow(npe);
-		try (GitStorage gs = new GitStorage(source);) {
+		when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenThrow(npe);
+		try (GitStorage gs = new GitStorage(source, null);) {
 			try {
-				gs.load();
+				gs.get("", null).get();
 			} catch (Exception ignore) {
 			}
 			gs.checkHealth();
@@ -148,23 +144,23 @@ public class GitStorageTest {
 	@Test
 	public void testCheckHealthWithFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
-		doThrow(new RuntimeException("Fault reading something")).when(source).getSourceStream();
+		doThrow(cause).when(source).getSourceStream(Mockito.anyString(), Mockito.anyString());
 
-		try (GitStorage gs = new GitStorage(source);) {
-			try {
-				gs.load();
-			} catch (LoaderException e) {
-				assertTrue(e.getCause() instanceof RuntimeException);
-				assertEquals(cause.getMessage(), e.getCause().getMessage());
-			}
+		try (GitStorage gs = new GitStorage(source, null);
+				InputStream is = GitStorageTest.class.getResourceAsStream("/test3.json")) {
+
+			gs.reload(Arrays.asList(REF_HEADS_MASTER));
+			assertNull(gs.get("test3.json", null).get());
 			try {
 				gs.checkHealth();
 			} catch (Exception e) {
 				assertTrue(e instanceof RuntimeException);
 				assertEquals(cause.getMessage(), e.getMessage());
 			}
-			StorageTestUtils.copy("/test3.json", tempFile);
+			Mockito.reset(source);
+			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(is);
 			gs.checkHealth();
+			assertNotNull(gs.get("test3.json", null));
 		}
 	}
 
@@ -172,35 +168,27 @@ public class GitStorageTest {
 	public void testCheckHealthWithOldFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
 		ex.expect(is(equalTo(cause)));
-		doThrow(cause).when(source).getSourceStream();
+		doThrow(cause).when(source).getSourceStream(Mockito.anyString(), Mockito.anyString());
 
-		try (GitStorage gs = new GitStorage(source);) {
-			try {
-				gs.load();
-			} catch (LoaderException e) {
-				assertTrue(e.getCause() instanceof RuntimeException);
-				assertEquals(cause.getMessage(), e.getCause().getMessage());
-			}
+		try (GitStorage gs = new GitStorage(source, null);) {
+
+			gs.reload(Arrays.asList(REF_HEADS_MASTER));
+			assertNull(gs.get("key", null).get());
 			try {
 				gs.checkHealth();
 			} catch (Exception e) {
 				assertTrue(e instanceof RuntimeException);
 				assertEquals(cause.getMessage(), e.getMessage());
 			}
-			try {
-				gs.load();
-			} catch (LoaderException e) {
-				RuntimeException re = (RuntimeException) e.getCause();
-				assertEquals(cause.getMessage(), re.getMessage());
-			}
+			gs.get("key", null).get();
 			gs.checkHealth();
 		}
 	}
-	
+
 	@Test
 	public void testSourceCloseFailed() {
 		doThrow(new RuntimeException()).when(source).close();
-		try (GitStorage gs = new GitStorage(source);) {
+		try (GitStorage gs = new GitStorage(source, null);) {
 		}
 	}
 }

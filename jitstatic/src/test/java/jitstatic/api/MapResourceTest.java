@@ -20,7 +20,6 @@ package jitstatic.api;
  * #L%
  */
 
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -34,6 +33,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -46,6 +48,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -61,85 +64,129 @@ import jitstatic.storage.Storage;
 import jitstatic.storage.StorageData;
 
 public class MapResourceTest {
-	private static final String user = "user";
-	private static final String secret = "secret";
-	private static final String basicAuthCred;
+	private static final String USER = "user";
+	private static final String SECRET = "secret";
+	private static final String BASIC_AUTH_CRED;
 	static {
 		try {
-			basicAuthCred = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes("UTF-8"));
+			BASIC_AUTH_CRED = "Basic " + Base64.getEncoder().encodeToString((USER + ":" + SECRET).getBytes("UTF-8"));
 		} catch (UnsupportedEncodingException e) {
 			throw new Error(e);
 		}
 	}
-	private static final Storage storage = mock(Storage.class);
-	private static final Map<String, StorageData> data = new HashMap<>();
-	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final Storage STORAGE = mock(Storage.class);
+	private static final Map<String, StorageData> DATA = new HashMap<>();
+	private static final ObjectMapper MAPPER = new ObjectMapper();
+	
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
 	@ClassRule
-	public static final ResourceTestRule resources = ResourceTestRule.builder()
+	public static final ResourceTestRule RESOURCES = ResourceTestRule.builder()
 			.setTestContainerFactory(new GrizzlyWebTestContainerFactory())
 			.addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 					.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()))
 			.addProvider(RolesAllowedDynamicFeature.class)
-			.addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new MapResource(storage))
+			.addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new MapResource(STORAGE))
 			.build();
 
 	@BeforeClass
 	public static void setupClass() throws JsonProcessingException, IOException {
-		JsonNode node = mapper.readTree("{\"food\" : [\"bone\",\"meat\"]}");
-		Set<User> users = new HashSet<>(Arrays.asList(new User(user, secret)));
+		JsonNode node = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
+		Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
 		StorageData dogData = new StorageData(users, node);
-		data.put("dog", dogData);
-		JsonNode horse = mapper.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
+		DATA.put("dog", dogData);
+		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
 		StorageData horseData = new StorageData(new HashSet<>(), horse);
-		data.put("horse", horseData);
+		DATA.put("horse", horseData);
 	}
 
 	@Test
-	public void testGettingKeyFromResource() {
-		StorageData expected = data.get("dog");
-		when(storage.get("dog")).thenReturn(expected);
-		JsonNode response = resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred)
+	public void testGettingKeyFromResource() throws InterruptedException, ExecutionException {
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		when(STORAGE.get("dog", null)).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
 				.get(JsonNode.class);
-		assertEquals(expected.getData(), response);
+		assertEquals(expected.get().getData(), response);
 	}
 
 	@Test
 	public void testGettingKeyFromResourceWithNoAuthentication() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.UNAUTHORIZED.toString());
-		StorageData expected = data.get("dog");
-		when(storage.get("dog")).thenReturn(expected);
-		resources.target("/storage/dog").request().get(JsonNode.class);
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		when(STORAGE.get("dog", null)).thenReturn(expected);
+		RESOURCES.target("/storage/dog").request().get(JsonNode.class);
 	}
 
 	@Test
 	public void testKeyNotFound() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		when(storage.get(any())).thenReturn(null);
-		resources.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, basicAuthCred)
+		when(STORAGE.get(any(), Mockito.anyString())).thenReturn(null);
+		RESOURCES.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
 				.get(StorageData.class);
 	}
 
 	@Test
-	public void testNoAuthorizationOnPermittedResource() {
-		StorageData expected = data.get("horse");
-		when(storage.get("horse")).thenReturn(expected);
-		JsonNode response = resources.target("/storage/horse").request().get(JsonNode.class);
-		assertEquals(expected.getData(), response);
+	public void testNoAuthorizationOnPermittedResource() throws InterruptedException, ExecutionException {
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		when(STORAGE.get("horse", null)).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse").request().get(JsonNode.class);
+		assertEquals(expected.get().getData(), response);
 	}
 
 	@Test
 	public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.UNAUTHORIZED.toString());
-		StorageData expected = data.get("dog");
-		when(storage.get("dog")).thenReturn(expected);
-		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + secret).getBytes("UTF-8"));
-		resources.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
-
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		when(STORAGE.get("dog", null)).thenReturn(expected);
+		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes("UTF-8"));
+		RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
+	}
+	
+	@Test
+	public void testKeyIsFoundWithBranch() throws InterruptedException, ExecutionException {
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/heads/branch"))).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse?ref=refs/heads/branch").request().get(JsonNode.class);
+		assertEquals(expected.get().getData(), response);
+	}
+	
+	@Test
+	public void testKeyIsNotFoundWithMalformedBranch() throws InterruptedException, ExecutionException {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.NOT_FOUND.toString());
+		RESOURCES.target("/storage/horse?ref=refs/beads/branch").request().get(JsonNode.class);		
+	}
+	
+	@Test
+	public void testKeyIsNotFoundWithMalformedTag() throws InterruptedException, ExecutionException {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.NOT_FOUND.toString());
+		RESOURCES.target("/storage/horse?ref=refs/bads/branch").request().get(JsonNode.class);		
+	}
+	
+	@Test
+	public void testKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/tags/branch"))).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse?ref=refs/tags/branch").request().get(JsonNode.class);
+		assertEquals(expected.get().getData(), response);
+	}
+	
+	@Test
+	public void testFaultyRef() {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.NOT_FOUND.toString());
+		RESOURCES.target("/storage/horse?kef=refs/beads/branch").request().get(JsonNode.class);
+	}
+	
+	@Test
+	public void testEmptyRef() {
+		ex.expect(WebApplicationException.class);
+		ex.expectMessage(Status.NOT_FOUND.toString());
+		RESOURCES.target("/storage/horse?ref=").request().get(JsonNode.class);
 	}
 }

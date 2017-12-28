@@ -1,4 +1,4 @@
-package jitstatic.hosted;
+package jitstatic;
 
 /*-
  * #%L
@@ -24,19 +24,23 @@ import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
+import org.eclipse.jgit.lib.Constants;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
-public class StorageCheckerTest {
+import jitstatic.hosted.RemoteTestUtils;
 
+public class SourceCheckerTest {
+
+	private static final String REF_HEAD_MASTER = Constants.R_HEADS + "master";
 	private static final String store = "data";
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
@@ -67,38 +71,40 @@ public class StorageCheckerTest {
 	}
 
 	@Test
-	public void testCheckStorageFileOnBareRepo()
-			throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-		try (StorageChecker sc = new StorageChecker(bareGit.getRepository());) {
-			sc.check(store, "master");
+	public void testCheckSourceFileOnBareRepo() throws RevisionSyntaxException, AmbiguousObjectException,
+			IncorrectObjectTypeException, IOException, RefNotFoundException {
+		try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
+			sc.checkBranchForErrors(REF_HEAD_MASTER);
 		}
 	}
 
 	@Test
-	public void testCheckStorageFileOnNormalRepo()
-			throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-		try (StorageChecker sc = new StorageChecker(bareGit.getRepository());) {
-			sc.check(store, "master");
+	public void testCheckSourceFileOnNormalRepo() throws RevisionSyntaxException, AmbiguousObjectException,
+			IncorrectObjectTypeException, IOException, RefNotFoundException {
+		try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
+			sc.checkBranchForErrors(REF_HEAD_MASTER);
 		}
 	}
 
 	@Test
-	public void testFileIsNotFound()
-			throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-		ex.expect(IllegalStateException.class);
-		ex.expectMessage("Did not find expected file '");
-		try (StorageChecker sc = new StorageChecker(bareGit.getRepository());) {
-			sc.check("someotherfile", "master");
-		}
-	}
-	
-	@Test
-	@Ignore("This must be required?")
-	//TODO FIX this...
-	public void testBranchNotFound() throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-		try (StorageChecker sc = new StorageChecker(bareGit.getRepository());) {
-			sc.check(store, "other");
+	public void testCorrectFormattedBranchNotFound() throws RevisionSyntaxException, AmbiguousObjectException,
+			IncorrectObjectTypeException, IOException, RefNotFoundException {
+		final String branch = Constants.R_HEADS + "other";
+		ex.expect(RefNotFoundException.class);
+		ex.expectMessage(branch);
+		try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
+			sc.checkBranchForErrors(branch);
 		}
 	}
 
+	@Test
+	public void testNotCorrectFormattedBranchNotFound() throws RevisionSyntaxException, AmbiguousObjectException,
+			IncorrectObjectTypeException, IOException, RefNotFoundException {
+		final String branch = "other";
+		ex.expect(RefNotFoundException.class);
+		ex.expectMessage(branch);
+		try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
+			sc.checkBranchForErrors(branch);
+		}
+	}
 }

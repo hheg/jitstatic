@@ -32,11 +32,11 @@ import jitstatic.source.Source;
 
 public class StorageFactory {
 
-	public Storage build(final Source remote, final Environment env) {
+	public Storage build(final Source remote, final Environment env, final String defaultRef) {
 		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-		return new GitStorage(remote);
+		return new GitStorage(remote, defaultRef);
 	}
 }

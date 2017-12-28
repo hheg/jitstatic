@@ -14,5 +14,4 @@ logging:
     - type: console
 remote:
     remoteRepo: file://tmp/remote
-    localFilePath: test/storage
     basePath: /tmp/acceptance   

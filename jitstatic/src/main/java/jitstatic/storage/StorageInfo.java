@@ -1,5 +1,9 @@
 package jitstatic.storage;
 
+import javax.validation.constraints.Pattern;
+
+import org.eclipse.jgit.lib.Constants;
+
 /*-
  * #%L
  * jitstatic
@@ -25,18 +29,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public abstract class StorageInfo {
 
 	@JsonProperty
-	private String branch = "master";
-	
-	@JsonProperty
-	private String localFilePath = "store";
-
-	public String getLocalFilePath() {
-		return localFilePath;
-	}
-
-	public void setLocalFilePath(String localFilePath) {
-		this.localFilePath = localFilePath;
-	}
+	@Pattern(regexp = "^" + Constants.R_HEADS + ".+$|^" + Constants.R_TAGS + ".+$")
+	private String branch = Constants.R_HEADS + Constants.MASTER;
 
 	public String getBranch() {
 		return branch;

@@ -1,7 +1,5 @@
 package jitstatic;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -22,9 +20,8 @@ import java.util.Objects;
  * #L%
  */
 
-
+import java.util.Objects;
 import com.codahale.metrics.health.HealthCheck;
-
 import jitstatic.storage.Storage;
 
 public class StorageHealthChecker extends HealthCheck {
@@ -33,7 +30,7 @@ public class StorageHealthChecker extends HealthCheck {
 	
 	private final Storage storage;
 	
-	public StorageHealthChecker(Storage storage) {
+	public StorageHealthChecker(final Storage storage) {
 		this.storage = Objects.requireNonNull(storage);
 	}
 

@@ -1,5 +1,7 @@
 package jitstatic.remote;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -30,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
+import jitstatic.CorruptedSourceException;
 import jitstatic.remote.RemoteManager;
 import jitstatic.source.Source;
 import jitstatic.storage.StorageInfo;
@@ -76,12 +79,12 @@ public class RemoteFactory extends StorageInfo {
 		this.remotePassword = remotePassword;
 	}
 
-	public Source build(final Environment env) {
+	public Source build(final Environment env) throws CorruptedSourceException, IOException {
 		if (!getRemoteRepo().isAbsolute())
 			throw new IllegalArgumentException(
 					String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
 		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword(), getPollingPeriod().getQuantity(),
-				getPollingPeriod().getUnit(), "refs/heads/" + getBranch(), getLocalFilePath(), getBasePath());
+				getPollingPeriod().getUnit(), getBasePath(), getBranch());
 	}
 
 	public Duration getPollingPeriod() {

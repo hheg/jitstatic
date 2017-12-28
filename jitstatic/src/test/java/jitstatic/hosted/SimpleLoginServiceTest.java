@@ -20,10 +20,8 @@ package jitstatic.hosted;
  * #L%
  */
 
-
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -39,13 +37,11 @@ import org.eclipse.jetty.security.AbstractLoginService;
 import org.eclipse.jetty.security.AbstractLoginService.UserPrincipal;
 import org.eclipse.jetty.server.UserIdentity;
 import org.eclipse.jetty.util.security.Password;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import jitstatic.hosted.SimpleLoginService;
 
 @SuppressFBWarnings(value = { "NP_NULL_PARAM_DEREF_NONVIRTUAL","DM_STRING_CTOR" }, justification = "Testing explicitly for this")
 public class SimpleLoginServiceTest {
@@ -107,13 +103,6 @@ public class SimpleLoginServiceTest {
 		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
 		when(uid.getUserPrincipal()).thenReturn(new AbstractLoginService.UserPrincipal(user, new Password(secret)));
 		assertTrue(sls.validate(uid));
-	}
-
-	@Test
-	@Ignore
-	public void testNotValid() {
-		SimpleLoginService sls = new SimpleLoginService(user, secret, realm);
-		assertFalse(sls.validate(uid));
 	}
 
 	@Test
