@@ -1,5 +1,7 @@
 package jitstatic.hosted;
 
+import static org.junit.Assert.assertEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -43,27 +45,48 @@ public class JitStaticPostReceiveHookTest {
 		JitStaticPostReceiveHook hook = new JitStaticPostReceiveHook();
 		SourceEventListener sel = Mockito.mock(SourceEventListener.class);
 		ReceivePack rp = Mockito.mock(ReceivePack.class);
-		
+
 		hook.addListener(sel);
-		List<ReceiveCommand> commands = Arrays.asList(new ReceiveCommand(ObjectId.zeroId(), ObjectId.zeroId(), REFS_HEADS_MASTER));
+		List<ReceiveCommand> commands = Arrays
+				.asList(new ReceiveCommand(ObjectId.zeroId(), ObjectId.zeroId(), REFS_HEADS_MASTER));
 		Mockito.when(rp.getAllCommands()).thenReturn(commands);
-		hook.onPostReceive(rp,commands);
+		hook.onPostReceive(rp, commands);
 		Mockito.verify(sel).onEvent(Arrays.asList(REFS_HEADS_MASTER));
 		assertNull(hook.getFault());
 	}
-	
+
 	@Test
 	public void testFailedReceiveHook() {
 		JitStaticPostReceiveHook hook = new JitStaticPostReceiveHook();
 		SourceEventListener sel = Mockito.mock(SourceEventListener.class);
 		ReceivePack rp = Mockito.mock(ReceivePack.class);
-		
+
 		hook.addListener(sel);
-		List<ReceiveCommand> commands = Arrays.asList(new ReceiveCommand(ObjectId.zeroId(), ObjectId.zeroId(), REFS_HEADS_MASTER));
+		List<ReceiveCommand> commands = Arrays
+				.asList(new ReceiveCommand(ObjectId.zeroId(), ObjectId.zeroId(), REFS_HEADS_MASTER));
 		Mockito.when(rp.getAllCommands()).thenReturn(Collections.emptyList());
-		hook.onPostReceive(rp,commands);
-		Mockito.verify(sel,Mockito.times(0)).onEvent(Arrays.asList(REFS_HEADS_MASTER));
+		hook.onPostReceive(rp, commands);
+		Mockito.verify(sel, Mockito.times(0)).onEvent(Arrays.asList(REFS_HEADS_MASTER));
 		assertNull(hook.getFault());
 	}
+
+	@Test
+	public void testListenerThrowsException() {
+		JitStaticPostReceiveHook hook = new JitStaticPostReceiveHook();
+		SourceEventListener sel = Mockito.mock(SourceEventListener.class);
+		ReceivePack rp = Mockito.mock(ReceivePack.class);
+
+		hook.addListener(sel);
+		List<ReceiveCommand> commands = Arrays
+				.asList(new ReceiveCommand(ObjectId.zeroId(), ObjectId.zeroId(), REFS_HEADS_MASTER));
+		Mockito.when(rp.getAllCommands()).thenReturn(commands);
+		RuntimeException runtimeException = new RuntimeException("Triggered");
+		Mockito.doThrow(runtimeException).when(sel).onEvent(Arrays.asList(REFS_HEADS_MASTER));
+		hook.onPostReceive(rp, commands);
 	
+		assertEquals(runtimeException, hook.getFault());
+		hook.onPostReceive(rp, commands);
+		hook.onPostReceive(rp, commands);
+		assertEquals(runtimeException, hook.getFault());
+	}
 }
