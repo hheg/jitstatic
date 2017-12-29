@@ -1,5 +1,8 @@
 package jitstatic;
 
+import java.io.IOException;
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -22,14 +25,21 @@ package jitstatic;
 
 import javax.validation.Valid;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
+import io.dropwizard.setup.Environment;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.remote.RemoteFactory;
+import jitstatic.source.Source;
 import jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
+
+	private static final Logger LOG = LoggerFactory.getLogger(JitstaticConfiguration.class);
 
 	private StorageFactory storage = new StorageFactory();
 
@@ -67,4 +77,22 @@ public class JitstaticConfiguration extends Configuration {
 		this.hosted = hosted;
 	}
 
+	public Source build(final Environment env) throws CorruptedSourceException, IOException {
+		Objects.requireNonNull(env);
+		Source source;
+		final HostedFactory hostedFactory = getHostedFactory();
+		final RemoteFactory remoteFactory = getRemoteFactory();
+		if (hostedFactory != null) {
+			source = hostedFactory.build(env);
+			if (remoteFactory != null) {
+				LOG.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
+			}
+		} else {			
+			if (remoteFactory == null) {
+				throw new IllegalStateException("Either hosted or remote must be chosen");
+			}
+			source = remoteFactory.build(env);
+		}
+		return source;
+	}
 }

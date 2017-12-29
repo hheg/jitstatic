@@ -55,6 +55,7 @@ class HostedGitRepositoryManager implements Source {
 	private final JitStaticPostReceiveHook postHook;
 	private final JitStaticPreReceiveHook preHook;
 	private final SourceExtractor extractor;
+	private final String defaultRef;
 
 	public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
 			throws CorruptedSourceException, IOException {
@@ -89,6 +90,7 @@ class HostedGitRepositoryManager implements Source {
 
 		this.postHook = new JitStaticPostReceiveHook();
 		this.preHook = new JitStaticPreReceiveHook(defaultRef);
+		this.defaultRef = defaultRef;
 	}
 
 	private void checkIfDefaultBranchExist(String defaultRef) throws IOException {
@@ -148,6 +150,11 @@ class HostedGitRepositoryManager implements Source {
 			bareRepository.incrementOpen();
 			return bareRepository;
 		};
+	}
+
+	@Override
+	public String getDefaultRef() {
+		return defaultRef;
 	}
 
 	@Override

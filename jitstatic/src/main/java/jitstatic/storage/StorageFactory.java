@@ -21,6 +21,7 @@ package jitstatic.storage;
  */
 
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
+import org.slf4j.LoggerFactory;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
@@ -29,6 +30,7 @@ import io.dropwizard.setup.Environment;
 import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 import jitstatic.source.Source;
+import jitstatic.source.SourceEventListener;
 
 public class StorageFactory {
 
@@ -37,6 +39,14 @@ public class StorageFactory {
 				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-		return new GitStorage(remote, defaultRef);
+		final GitStorage gitStorage = new GitStorage(remote, defaultRef);
+		remote.addListener((updatedRefs) -> {
+			try {
+				gitStorage.reload(updatedRefs);
+			} catch (Exception e) {
+				LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
+			}
+		});
+		return gitStorage;
 	}
 }

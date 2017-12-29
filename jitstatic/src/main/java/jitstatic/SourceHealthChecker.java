@@ -26,6 +26,8 @@ import jitstatic.source.Source;
 
 public class SourceHealthChecker extends HealthCheck {
 	
+	public static final String NAME = "sourcechecker";
+	
 	private final Source source;
 
 	public SourceHealthChecker(final Source source) {
