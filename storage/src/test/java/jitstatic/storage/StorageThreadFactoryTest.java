@@ -22,7 +22,6 @@ package jitstatic.storage;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 

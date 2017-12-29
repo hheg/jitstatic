@@ -82,4 +82,12 @@ public class UserTest {
 		User u2 = new User(null, null);
 		assertEquals(u1.hashCode(), u2.hashCode());
 	}
+
+	@Test
+	public void testGetters() {
+		User u1 = new User(null, null);
+		assertNull(u1.getName());
+		assertNull(u1.getPassword());
+		assertEquals("User [user=null]", u1.toString());
+	}
 }

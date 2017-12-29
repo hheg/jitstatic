@@ -1,7 +1,5 @@
 package jitstatic;
 
-import java.io.IOException;
-
 /*-
  * #%L
  * jitstatic
@@ -22,19 +20,12 @@ import java.io.IOException;
  * #L%
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import jitstatic.api.MapResource;
-import jitstatic.hosted.HostedFactory;
-import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
-import jitstatic.source.SourceEventListener;
 import jitstatic.storage.Storage;
-import jitstatic.storage.StorageFactory;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 

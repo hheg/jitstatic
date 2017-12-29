@@ -43,7 +43,7 @@ public class StorageFactory {
 		remote.addListener((updatedRefs) -> {
 			try {
 				gitStorage.reload(updatedRefs);
-			} catch (Exception e) {
+			} catch (final Exception e) {
 				LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
 			}
 		});

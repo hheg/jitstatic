@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.jgit.lib.Constants;
@@ -35,12 +36,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import jitstatic.source.Source;
+import jitstatic.source.SourceEventListener;
 
 public class StorageFactoryTest {
 
@@ -74,6 +78,26 @@ public class StorageFactoryTest {
 		ex.expect(NullPointerException.class);
 		ex.expectMessage("Source cannot be null");
 		try (Storage storage = sf.build(null, env, null);) {
+		}
+	}
+
+	@Test
+	public void testListener() {
+		when(env.jersey()).thenReturn(jersey);
+		try (Storage build = sf.build(source, env, null);) {
+			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+			verify(source).addListener(c.capture());
+			c.getValue().onEvent(Collections.emptyList());			
+		}
+	}
+	
+	@Test
+	public void testListenerWithNullArgument() {
+		when(env.jersey()).thenReturn(jersey);
+		try (Storage build = sf.build(source, env, null);) {
+			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+			verify(source).addListener(c.capture());
+			c.getValue().onEvent(null);			
 		}
 	}
 }

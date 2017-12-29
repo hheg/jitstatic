@@ -157,14 +157,6 @@ public class JitstaticApplicationTest {
 	}
 
 	@Test
-	public void testAddingAStorageListener() throws Exception {
-		config.setHostedFactory(hostedFactory);
-		when(hostedFactory.build(any())).thenReturn(source);
-		app.run(config, environment);
-		verify(source).addListener(isA(SourceEventListener.class));
-	}
-
-	@Test
 	public void testResourcesAreGettingClosed() throws Exception {
 		ex.expect(RuntimeException.class);
 		config.setHostedFactory(hostedFactory);
@@ -205,19 +197,4 @@ public class JitstaticApplicationTest {
 		when(storageFactory.build(source, environment, null)).thenReturn(storage);
 		app.run(config, environment);
 	}
-	
-	@Test
-	public void testLoaderIsWorking() throws Exception {
-		config.setStorageFactory(storageFactory);
-		config.setHostedFactory(hostedFactory);
-		config.setRemoteFactory(remoteFactory);
-		when(hostedFactory.build(environment)).thenReturn(source);
-		when(storageFactory.build(source, environment, null)).thenReturn(storage);
-		ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
-		app.run(config, environment);
-		verify(source).addListener(c.capture());
-		c.getValue().onEvent(null);
-		verify(storage).reload(any());
-	}
-	
 }
