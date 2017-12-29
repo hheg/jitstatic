@@ -27,7 +27,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -272,24 +274,26 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			return commandResult;
 		}
 		final Pair<ReceiveCommand, ReceiveCommand> receiveCommands = commandResult.getLeft();
+		final ReceiveCommand testReceiveCommand = receiveCommands.getRight();
 		try (final SourceChecker sc = new SourceChecker(repository)) {
-			final String testBranchName = commandResult.getLeft().getRight().getRefName();
+			final String testBranchName = testReceiveCommand.getRefName();
 			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkTest = sc
 					.checkTestBranchForErrors(testBranchName);
 			// Only one branch so 1 element
-			final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> firstError = checkTest.get(0);
-			if (!firstError.getRight().isEmpty()) {
-				final Ref realRef = repository.findRef(receiveCommands.getLeft().getRefName());
-				final Set<Ref> refSet = firstError.getLeft();
-				refSet.clear();
+			final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> refAndErrorPair = checkTest.get(0);
+			final List<Pair<FileObjectIdStore, Exception>> refErrors = refAndErrorPair.getRight();
+			if (!refErrors.isEmpty()) {
+				final ReceiveCommand actualRecieveCommand = receiveCommands.getLeft();
+				final Ref realRef = repository.findRef(actualRecieveCommand.getRefName());
+				final Set<Ref> refSet = new HashSet<>();
 				refSet.add(realRef);
-				receiveCommands.getRight().setResult(Result.REJECTED_OTHER_REASON,
-						"Error in branch " + receiveCommands.getLeft().getRefName());
+				testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON,
+						"Error in branch " + actualRecieveCommand.getRefName());
 				return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands,
-						new CorruptedSourceException(checkTest));
+						new CorruptedSourceException(Arrays.asList(new Pair<>(refSet, refErrors))));
 			}
 		} catch (final RefNotFoundException | IOException e) {
-			receiveCommands.getRight().setResult(Result.REJECTED_OTHER_REASON, e.getMessage());
+			testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON, e.getMessage());
 			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands, e);
 		}
 		return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands, null);

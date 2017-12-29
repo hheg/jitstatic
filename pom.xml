@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
-	<version>0.3.0</version>
+	<version>0.3.1</version>
 	<packaging>pom</packaging>
 	<modules>
 		<module>jitstatic</module>
@@ -283,7 +283,17 @@
 							<goal>update-file-header</goal>
 						</goals>
 					</execution>
-				</executions>
+					<execution>
+						<id>check-license</id>
+						<goals>
+							<goal>check-file-header</goal>
+						</goals>
+						<phase>package</phase>
+						<configuration>
+							<failOnMissingHeader>true</failOnMissingHeader>
+						</configuration>
+					</execution>					
+				</executions>				
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

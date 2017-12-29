@@ -4,14 +4,14 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.3.0</version>
+		<version>0.3.1</version>
 	</parent>
 	<artifactId>storage</artifactId>
 	<dependencies>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.3.0</version>
+			<version>0.3.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -28,6 +28,10 @@
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.google.code.findbugs</groupId>

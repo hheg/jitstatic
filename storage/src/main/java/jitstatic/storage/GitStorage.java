@@ -236,7 +236,7 @@ public class GitStorage implements Storage {
 		} catch (InterruptedException ignore) {
 		}
 		try {
-			refExecutor.awaitTermination(10, TimeUnit.SECONDS);
+			keyExecutor.awaitTermination(10, TimeUnit.SECONDS);
 		} catch (InterruptedException ignore) {
 		}
 		try {
@@ -260,7 +260,7 @@ public class GitStorage implements Storage {
 	}
 
 	// TODO make this a utility class
-	private static class SinkIterator<T> implements Iterator<T> {
+	static class SinkIterator<T> implements Iterator<T> {
 
 		private final List<T> victim;
 		private int cursor = -1;

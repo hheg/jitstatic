@@ -139,7 +139,7 @@ public class HostedFactory extends StorageInfo {
 
 		gs.setReceivePackFactory(new DefaultReceivePackFactory() {
 			@Override
-			public ReceivePack create(HttpServletRequest req, Repository db)
+			public ReceivePack create(final HttpServletRequest req, final Repository db)
 					throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 				final ReceivePack rp = super.create(req, db);
 				rp.setAtomic(true);

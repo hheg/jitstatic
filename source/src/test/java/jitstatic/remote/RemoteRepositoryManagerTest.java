@@ -23,6 +23,7 @@ package jitstatic.remote;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,6 +50,7 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
 import jitstatic.CorruptedSourceException;
+import jitstatic.LinkedException;
 import jitstatic.source.SourceEventListener;
 
 public class RemoteRepositoryManagerTest {
@@ -305,15 +307,17 @@ public class RemoteRepositoryManagerTest {
 			verify(svl).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
 			Files.write(resolved,
-					"{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
+					"\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
 			git.push().call();
 
 			rrm.checkRemote().run();
-			assertNull(rrm.getFault());
-			verify(svl, times(2)).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
+			Exception fault = rrm.getFault();
+			assertEquals(LinkedException.class, fault.getClass());
+			assertTrue(fault.getMessage().startsWith("class jitstatic.CorruptedSourceException: Error in branch refs/remotes/origin/master"));
+			verify(svl, times(1)).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
 		}
 	}
