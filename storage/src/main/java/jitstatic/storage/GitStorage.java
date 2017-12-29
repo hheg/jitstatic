@@ -236,7 +236,7 @@ public class GitStorage implements Storage {
 		} catch (InterruptedException ignore) {
 		}
 		try {
-			refExecutor.awaitTermination(10, TimeUnit.SECONDS);
+			keyExecutor.awaitTermination(10, TimeUnit.SECONDS);
 		} catch (InterruptedException ignore) {
 		}
 		try {

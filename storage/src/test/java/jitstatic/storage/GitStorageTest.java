@@ -191,4 +191,24 @@ public class GitStorageTest {
 		try (GitStorage gs = new GitStorage(source, null);) {
 		}
 	}
+	
+	@Test
+	public void testRefIsFoundButKeyIsNot() throws Exception {
+		
+		try (GitStorage gs = new GitStorage(source, null);
+				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
+
+			when(source.getSourceStream(Mockito.eq("key3"), Mockito.anyString())).thenReturn(test3);
+			when(source.getSourceStream(Mockito.eq("key4"), Mockito.anyString())).thenReturn(test4);
+			Future<StorageData> key3Data = gs.get("key3", null);
+			assertNotNull(key3Data.get());
+			Future<StorageData> key4Data = gs.get("key4", null);			
+			assertNotNull(key4Data.get());
+			key4Data = gs.get("key4", REF_HEADS_MASTER);			
+			assertNotNull(key4Data.get());
+			gs.checkHealth();
+		}
+
+	}
 }
