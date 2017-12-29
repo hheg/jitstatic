@@ -22,9 +22,8 @@ package jitstatic.storage;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.junit.Test;
@@ -34,11 +33,32 @@ public class StorageThreadFactoryTest {
 	@Test
 	public void testCatchingException() throws InterruptedException {
 		RuntimeException runtimeException = new RuntimeException();
-		Consumer<Exception> test = t -> assertEquals(runtimeException, t);
-		ExecutorService service = Executors.newSingleThreadExecutor(new StorageThreadFactory("test", test));
-		service.submit(() -> {
+		AtomicReference<Exception> ar = new AtomicReference<>();
+		Consumer<Exception> test = t -> {
+			ar.set(t);
+		};
+		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		Thread newThread = storageThreadFactory.newThread(() -> {
 			throw runtimeException;
 		});
-		service.awaitTermination(1, TimeUnit.SECONDS);
+		newThread.start();
+		newThread.join();
+		assertEquals(runtimeException, ar.get());
+	}
+	
+	@Test
+	public void testCatchingError() throws InterruptedException {
+		Error error = new Error("error");
+		AtomicReference<Exception> ar = new AtomicReference<>();
+		Consumer<Exception> test = t -> {
+			ar.set(t);
+		};
+		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		Thread newThread = storageThreadFactory.newThread(() -> {
+			throw error;
+		});
+		newThread.start();
+		newThread.join();
+		assertEquals(null, ar.get());
 	}
 }
