@@ -1,5 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
@@ -292,8 +291,8 @@
 						<configuration>
 							<failOnMissingHeader>true</failOnMissingHeader>
 						</configuration>
-					</execution>					
-				</executions>				
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -306,11 +305,9 @@
 								<DependencyConvergence />
 								<bannedDependencies>
 									<excludes>
-										<!-- This should not exist as it will force SLF4J calls to be delegated 
-											to log4j -->
+										<!-- This should not exist as it will force SLF4J calls to be delegated to log4j -->
 										<exclude>org.slf4j:slf4j-log4j12</exclude>
-										<!-- This should not exist as it will force SLF4J calls to be delegated 
-											to jul -->
+										<!-- This should not exist as it will force SLF4J calls to be delegated to jul -->
 										<exclude>org.slf4j:slf4j-jdk14</exclude>
 										<!-- Ensure only the slf4j binding for logback is on the classpath -->
 										<exclude>log4j:log4j</exclude>
@@ -402,16 +399,12 @@
 					</gitFlowConfig>
 
 					<commitMessages>
-						<featureStartMessage>@{feature} update versions for feature
-							branch</featureStartMessage>
-						<featureFinishMessage>@{feature} update versions for development
-							branch</featureFinishMessage>
+						<featureStartMessage>@{feature} update versions for feature branch</featureStartMessage>
+						<featureFinishMessage>@{feature} update versions for development branch</featureFinishMessage>
 						<hotfixStartMessage>@{version} update versions for hotfix</hotfixStartMessage>
-						<hotfixFinishMessage>@{version} update for next development
-							version</hotfixFinishMessage>
+						<hotfixFinishMessage>@{version} update for next development version</hotfixFinishMessage>
 						<releaseStartMessage>@{version} update versions for release</releaseStartMessage>
-						<releaseFinishMessage>@{version} update for next development
-							version</releaseFinishMessage>
+						<releaseFinishMessage>@{version} update for next development version</releaseFinishMessage>
 						<tagHotfixMessage>tag hotfix</tagHotfixMessage>
 						<tagReleaseMessage>tag release</tagReleaseMessage>
 					</commitMessages>
