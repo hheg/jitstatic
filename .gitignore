@@ -5,3 +5,4 @@ target/
 tmp/
 *.dll
 *.log
+dependency-reduced-pom.xml
