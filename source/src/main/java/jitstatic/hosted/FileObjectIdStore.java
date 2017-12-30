@@ -1,5 +1,7 @@
 package jitstatic.hosted;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -27,7 +29,7 @@ public class FileObjectIdStore {
 	private final String fileName;
 	
 	public FileObjectIdStore(final String fileName, final ObjectId id){
-		this.id = id;
+		this.id = Objects.requireNonNull(id);
 		this.fileName = fileName;
 	}
 

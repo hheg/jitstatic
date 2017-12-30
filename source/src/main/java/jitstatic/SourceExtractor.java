@@ -127,17 +127,18 @@ public class SourceExtractor {
 	}
 
 	private Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> mapLoader(
-			final Pair<AnyObjectId, Set<Ref>> p, final String key) {
+			final Pair<AnyObjectId, Set<Ref>> referencePoint, final String key) {
 		final List<Pair<FileObjectIdStore, InputStreamHolder>> files = new ArrayList<>();
+		final AnyObjectId reference = referencePoint.getLeft();
 		try (final RevWalk rev = new RevWalk(repository)) {
-			final RevCommit parsedCommit = rev.parseCommit(p.getLeft());
+			final RevCommit parsedCommit = rev.parseCommit(reference);
 			final RevTree currentTree = rev.parseTree(parsedCommit.getTree());
 			files.addAll(walkTree(currentTree, key));			
 			rev.dispose();
 		} catch (final IOException e) {
-			files.add(new Pair<>(new FileObjectIdStore(null, p.getLeft().toObjectId()), new InputStreamHolder(e)));
+			files.add(new Pair<>(new FileObjectIdStore(null, reference.toObjectId()), new InputStreamHolder(e)));
 		}
-		return new Pair<>(p, files);
+		return new Pair<>(referencePoint, files);
 	}
 	
 	private List<Pair<FileObjectIdStore, InputStreamHolder>> walkTree(final RevTree tree, final String key) {
@@ -178,16 +179,16 @@ public class SourceExtractor {
 	}
 	
 	private Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> mapLoader(
-			final Pair<AnyObjectId, Set<Ref>> p) {
-		return mapLoader(p, null);
+			final Pair<AnyObjectId, Set<Ref>> referencePoint) {
+		return mapLoader(referencePoint, null);
 	}
 
 	public Map<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> extractAll() {
 		final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
 		return allRefs.entrySet().stream().map(e -> {
-			final Set<Ref> refs = e.getValue().stream().filter(r -> !r.isSymbolic())
-					.filter(r -> r.getName().startsWith(Constants.R_HEADS)).collect(Collectors.toSet());
+			final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic())
+					.filter(ref -> ref.getName().startsWith(Constants.R_HEADS)).collect(Collectors.toSet());
 			return new Pair<>(e.getKey(), refs);
-		}).parallel().map(this::mapLoader).collect(Collectors.toConcurrentMap(p -> p.getLeft(), p -> p.getRight()));
+		}).parallel().map(this::mapLoader).collect(Collectors.toConcurrentMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
 	}
 }

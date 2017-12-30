@@ -50,14 +50,14 @@ class JitStaticPostReceiveHook implements PostReceiveHook {
 	public void onPostReceive(final ReceivePack rp, final Collection<ReceiveCommand> commands) {
 		final List<ReceiveCommand> allCommands = rp.getAllCommands();
 		if (allCommands.size() == commands.size()) {
-			final List<String> collected = commands.stream().map(r -> r.getRefName()).collect(Collectors.toList());
-			this.sourceEventListeners.forEach(s -> {
+			final List<String> collected = commands.stream().map(receiveCommand -> receiveCommand.getRefName()).collect(Collectors.toList());
+			this.sourceEventListeners.forEach(sourceEventListener -> {
 				try {
-					s.onEvent(collected);
-				} catch (final Exception e) {
-					final Exception unregistered = fault.getAndSet(e);
+					sourceEventListener.onEvent(collected);
+				} catch (final Exception ex) {
+					final Exception unregistered = fault.getAndSet(ex);
 					if (unregistered != null) {
-						log.error("Unregistered error ", e);
+						log.error("Unregistered error ", ex);
 					}
 				}
 			});

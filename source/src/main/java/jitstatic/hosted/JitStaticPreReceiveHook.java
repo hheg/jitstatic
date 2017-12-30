@@ -94,10 +94,12 @@ class JitStaticPreReceiveHook implements PreReceiveHook {
 			final String testBranchName, final ReceiveCommand testRc) {
 		try (final SourceChecker sc = new SourceChecker(repository)) {
 			rp.sendMessage("Checking " + branch + " branch.");
-			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check = sc
+			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> foundErrors = sc
 					.checkTestBranchForErrors(testBranchName);
-			if (!check.get(0).getRight().isEmpty()) {
-				final String[] message = CorruptedSourceException.compileMessage(check).split(System.lineSeparator());
+			// Only one branch
+			final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> branchErrors = foundErrors.get(0);
+			if (!branchErrors.getRight().isEmpty()) {
+				final String[] message = CorruptedSourceException.compileMessage(foundErrors).split(System.lineSeparator());
 				message[0] = message[0].replace(testBranchName, branch);
 				for (String s : message) {
 					rp.sendError(s);
@@ -108,9 +110,9 @@ class JitStaticPreReceiveHook implements PreReceiveHook {
 			}
 		} catch (final IOException storageIsCorrupt) {
 			rp.sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getMessage());
-			final Result r = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT
+			final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT
 					: Result.REJECTED_OTHER_REASON);
-			testRc.setResult(r, storageIsCorrupt.getMessage());
+			testRc.setResult(result, storageIsCorrupt.getMessage());
 			LOG.error(storageIsCorrupt.getMessage(), storageIsCorrupt);
 		} catch (final Exception unexpected) {
 			rp.sendError("General error " + unexpected.getMessage());
