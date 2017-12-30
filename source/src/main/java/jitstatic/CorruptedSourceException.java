@@ -38,22 +38,23 @@ public class CorruptedSourceException extends Exception {
 		super(compileMessage(errors));
 	}
 
-	public static String compileMessage(final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors) {
+	public static String compileMessage(final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> allBranchErrors) {
 		final StringBuilder sb = new StringBuilder();
-		for (final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> p : errors) {
+		for (final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> branchErrors : allBranchErrors) {
 			sb.append("Error in branch");
-			if (p.getLeft().size() > 1) {
+			final Set<Ref> branchFileErrors = branchErrors.getLeft();
+			if (branchFileErrors.size() > 1) {
 				sb.append("es");
 			}
 			sb.append(" ");
-			sb.append(p.getLeft().stream().map(r -> r.getName()).collect(Collectors.joining(", ")))
+			sb.append(branchFileErrors.stream().map(r -> r.getName()).collect(Collectors.joining(", ")))
 					.append(System.lineSeparator());
-			for (final Pair<FileObjectIdStore, Exception> pe : p.getRight()) {
-				final FileObjectIdStore fileInfo = pe.getLeft();
+			for (final Pair<FileObjectIdStore, Exception> fileError : branchErrors.getRight()) {
+				final FileObjectIdStore fileInfo = fileError.getLeft();
 				sb.append("ID: ").append(fileInfo == null ? "null" : ObjectId.toString(fileInfo.getObjectId())).append(" Name: ")
 						.append((fileInfo == null ? "FILE_NAME_MISSING" : fileInfo.getFileName())).append(" ")
 						.append(" Reason: ")
-						.append((pe.getRight() == null ? "null" : pe.getRight().getMessage())).append(System.lineSeparator());
+						.append((fileError.getRight() == null ? "null" : fileError.getRight().getMessage())).append(System.lineSeparator());
 			}
 		}
 		return sb.toString();
