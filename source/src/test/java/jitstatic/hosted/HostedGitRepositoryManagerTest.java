@@ -25,6 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,6 +36,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
@@ -47,6 +50,8 @@ import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.ReceiveCommand;
+import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
@@ -55,12 +60,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 
 import jitstatic.CorruptedSourceException;
+import jitstatic.LinkedException;
 import jitstatic.remote.RepositoryIsMissingIntendedBranch;
 import jitstatic.source.SourceEventListener;
 
@@ -261,6 +268,33 @@ public class HostedGitRepositoryManagerTest {
 		SourceEventListener svl = mock(SourceEventListener.class);
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
 			grm.addListener(svl);
+		}
+	}
+	
+	@Test
+	public void testCheckHealth() throws CorruptedSourceException, IOException {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+			grm.checkHealth();
+		}
+	}
+	
+	@Test
+	public void testCheckHealthWithError() throws CorruptedSourceException, IOException {
+		ex.expectCause(isA(LinkedException.class));
+		ex.expect(RuntimeException.class);
+		NullPointerException npe = new NullPointerException();
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+			SourceEventListener svl = mock(SourceEventListener.class);
+			Mockito.doThrow(npe).when(svl).onEvent(Mockito.any());
+			grm.addListener(svl);
+			JitStaticPostReceiveHook postHook = grm.getPostHook();
+			ReceivePack rp = mock(ReceivePack.class);
+			ReceiveCommand rc = mock(ReceiveCommand.class);
+			when(rc.getRefName()).thenReturn(REF_HEADS_MASTER);
+			List<ReceiveCommand> cmds = Arrays.asList();
+			when(rp.getAllCommands()).thenReturn(cmds);
+			postHook.onPostReceive(rp, cmds);
+			grm.checkHealth();
 		}
 	}
 
