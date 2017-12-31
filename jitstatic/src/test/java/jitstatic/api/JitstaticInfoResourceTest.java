@@ -1,4 +1,4 @@
-package jitstatic;
+package jitstatic.api;
 
 /*-
  * #%L
@@ -20,18 +20,27 @@ package jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
+import org.junit.ClassRule;
 import org.junit.Test;
 
-public class LinkedExceptionTest {
+import io.dropwizard.testing.junit.ResourceTestRule;
+
+public class JitstaticInfoResourceTest {
+
+	@ClassRule
+	public static final ResourceTestRule resources = ResourceTestRule.builder().addResource(new JitstaticInfoResource())
+			.build();
 
 	@Test
-	public void testLinkedException() {
-		LinkedException le = new LinkedException();
-		le.add(new Exception("OK test Message"));
-		le.add(null);
-		String message = le.getMessage();
-		assertEquals("class java.lang.Exception: OK test Message", message);
+	public void testCommitId() {
+		assertNotNull(resources.target("/info/commitid").request().get(String.class));
 	}
+
+	@Test
+	public void testVersion() {
+		assertNotNull(resources.target("/info/version").request().get(String.class));
+	}
+
 }

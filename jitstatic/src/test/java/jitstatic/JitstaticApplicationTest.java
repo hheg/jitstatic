@@ -34,7 +34,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -49,7 +48,6 @@ import jitstatic.api.MapResource;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
-import jitstatic.source.SourceEventListener;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageFactory;
 

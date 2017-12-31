@@ -34,6 +34,7 @@ import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.remote.RemoteFactory;
+import jitstatic.reporting.ReportingFactory;
 import jitstatic.source.Source;
 import jitstatic.storage.StorageFactory;
 
@@ -44,11 +45,25 @@ public class JitstaticConfiguration extends Configuration {
 	private StorageFactory storage = new StorageFactory();
 
 	@Valid
+	@JsonProperty
 	private RemoteFactory remote;
 
 	@Valid
+	@JsonProperty
 	private HostedFactory hosted;
-
+	
+	@Valid
+	@JsonProperty
+	private ReportingFactory reporting = new ReportingFactory();
+	
+	public ReportingFactory getReportingFactory() {
+		return reporting;
+	}
+	
+	public void setReportingFactory(final ReportingFactory reporting) {
+		this.reporting = reporting;
+	}
+	
 	public StorageFactory getStorageFactory() {
 		return storage;
 	}
@@ -57,22 +72,18 @@ public class JitstaticConfiguration extends Configuration {
 		this.storage = storage;
 	}
 
-	@JsonProperty("remote")
 	public RemoteFactory getRemoteFactory() {
 		return remote;
 	}
 
-	@JsonProperty("remote")
 	public void setRemoteFactory(RemoteFactory remote) {
 		this.remote = remote;
 	}
-
-	@JsonProperty("hosted")
+	
 	public HostedFactory getHostedFactory() {
 		return hosted;
 	}
 
-	@JsonProperty("hosted")
 	public void setHostedFactory(HostedFactory hosted) {
 		this.hosted = hosted;
 	}
@@ -93,6 +104,7 @@ public class JitstaticConfiguration extends Configuration {
 			}
 			source = remoteFactory.build(env);
 		}
+		getReportingFactory().build(env);		
 		return source;
 	}
 }

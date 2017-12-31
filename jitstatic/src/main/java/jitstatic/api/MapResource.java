@@ -39,7 +39,9 @@ import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
+import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.dropwizard.auth.Auth;
@@ -57,10 +59,12 @@ public class MapResource {
 	public MapResource(final Storage storage) {
 		this.storage = Objects.requireNonNull(storage);
 	}
-
-	@Path("/{key : .+}")
-	@Metered
+	
 	@GET
+	@Timed(name = "storage_time")
+	@Metered(name = "storage_counter")
+	@ExceptionMetered(name = "storage_exception")
+	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
 	public JsonNode get(final @PathParam("key") String key, final @Auth Optional<User> user) {
 

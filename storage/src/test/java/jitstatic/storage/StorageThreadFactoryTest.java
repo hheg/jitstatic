@@ -47,7 +47,7 @@ public class StorageThreadFactoryTest {
 	
 	@Test
 	public void testCatchingError() throws InterruptedException {
-		Error error = new Error("error");
+		Error error = new Error("Ok test error");
 		AtomicReference<Exception> ar = new AtomicReference<>();
 		Consumer<Exception> test = t -> {
 			ar.set(t);

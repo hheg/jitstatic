@@ -23,6 +23,7 @@ package jitstatic;
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import jitstatic.api.JitstaticInfoResource;
 import jitstatic.api.MapResource;
 import jitstatic.source.Source;
 import jitstatic.storage.Storage;
@@ -51,6 +52,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
 			env.healthChecks().register(SourceHealthChecker.NAME, new SourceHealthChecker(source));
 			env.jersey().register(new MapResource(storage));
+			env.jersey().register(new JitstaticInfoResource());		
 		} catch (final Exception e) {
 			guard = e;
 			throw e;
