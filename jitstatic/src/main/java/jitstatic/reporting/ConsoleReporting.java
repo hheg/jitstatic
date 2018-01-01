@@ -1,5 +1,7 @@
 package jitstatic.reporting;
 
+import java.util.Locale;
+
 /*-
  * #%L
  * jitstatic
@@ -88,7 +90,7 @@ public class ConsoleReporting {
 	}
 
 	private Function<String, TimeUnit> convertRate = s -> {
-		switch (s.toLowerCase()) {
+		switch (s.toLowerCase(Locale.ROOT)) {
 		case "s":
 			return TimeUnit.SECONDS;
 		case "m":
