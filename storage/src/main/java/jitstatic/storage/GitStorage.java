@@ -23,7 +23,6 @@ package jitstatic.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -51,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.source.Source;
 import jitstatic.util.Pair;
+import jitstatic.util.SinkIterator;
 
 public class GitStorage implements Storage {
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
@@ -70,6 +70,7 @@ public class GitStorage implements Storage {
 	}
 	
 	public void reload(final List<String> refsToReload) {
+		Objects.requireNonNull(refsToReload);
 		final List<CompletableFuture<Void>> tasks = new ArrayList<>(refsToReload.size());
 		refsToReload.stream().forEach(ref -> {
 			tasks.add(CompletableFuture.supplyAsync(() -> {
@@ -256,49 +257,6 @@ public class GitStorage implements Storage {
 	private StorageData readStorage(final InputStream storageStream) throws IOException {
 		try (final JsonParser parser = mapper.getFactory().createParser(storageStream);) {
 			return parser.readValueAs(StorageData.class);
-		}
-	}
-
-	// TODO make this a utility class
-	static class SinkIterator<T> implements Iterator<T> {
-
-		private final List<T> victim;
-		private int cursor = -1;
-		private int lastRet = -1;
-		private int size;
-
-		SinkIterator(final List<T> victim) {
-			this.victim = victim;
-			size = victim.size();
-		}
-
-		@Override
-		public boolean hasNext() {
-			return size > 0;
-		}
-
-		@Override
-		public T next() {
-			int i = cursor;
-			if (i > size) {
-				i = -1;
-			}
-			cursor = i++;
-			return victim.get(lastRet = i);
-		}
-
-		@Override
-		public void remove() {
-			if (lastRet < 0)
-				throw new IllegalStateException();
-			try {
-				victim.remove(lastRet);
-				size--;
-				cursor = lastRet;
-				lastRet = -1;
-			} catch (IndexOutOfBoundsException ex) {
-				throw new ConcurrentModificationException();
-			}
 		}
 	}
 }

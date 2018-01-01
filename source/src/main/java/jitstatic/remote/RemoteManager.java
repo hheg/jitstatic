@@ -102,4 +102,9 @@ class RemoteManager implements Source {
 		}
 	}
 
+	@Override
+	public String getDefaultRef() {
+		return defaultRef;
+	}
+
 }

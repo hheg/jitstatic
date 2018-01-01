@@ -28,4 +28,5 @@ public interface Source extends AutoCloseable {
 	public void start();
 	public void checkHealth();
 	public InputStream getSourceStream(String key, String ref);
+	public String getDefaultRef();
 }

@@ -20,23 +20,15 @@ package jitstatic;
  * #L%
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import jitstatic.api.JitstaticInfoResource;
 import jitstatic.api.MapResource;
-import jitstatic.hosted.HostedFactory;
-import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
-import jitstatic.source.SourceEventListener;
 import jitstatic.storage.Storage;
-import jitstatic.storage.StorageFactory;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
-
-	private static final Logger log = LoggerFactory.getLogger(JitstaticApplication.class);
 
 	public static void main(final String[] args) throws Exception {
 		new JitstaticApplication().run(args);
@@ -53,56 +45,36 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		Source source = null;
 		Storage storage = null;
 		try {
-			final StorageFactory storageFactory = config.getStorageFactory();
-			final HostedFactory hostedFactory = config.getHostedFactory();
-			String ref = null;
-			if (hostedFactory != null) {
-				source = hostedFactory.build(env);
-				ref = hostedFactory.getBranch();
-				if (config.getRemoteFactory() != null) {
-					log.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
-				}
-			} else {
-				final RemoteFactory remoteFactory = config.getRemoteFactory();
-				if (remoteFactory == null) {
-					throw new IllegalStateException("Either hosted or remote must be chosen");
-				}
-				source = remoteFactory.build(env);
-				ref = remoteFactory.getBranch();
-			}
-
-			final Storage s = storage = storageFactory.build(source, env, ref);
-			source.addListener((updatedRefs) -> {
-				try {
-					s.reload(updatedRefs);
-				} catch (Exception e) {
-					LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
-				}
-			});
+			source = config.build(env);
+			storage = config.getStorageFactory().build(source, env, source.getDefaultRef());
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
 			env.lifecycle().manage(new ManagedObject<>(source));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
-			env.healthChecks().register("Source", new SourceHealthChecker(source));
+			env.healthChecks().register(SourceHealthChecker.NAME, new SourceHealthChecker(source));
 			env.jersey().register(new MapResource(storage));
+			env.jersey().register(new JitstaticInfoResource());		
 		} catch (final Exception e) {
 			guard = e;
 			throw e;
 		} finally {
-			if (guard != null) {
-				if (source != null) {
-					try {
-						source.close();
-					} catch (Exception ignore) {
-					}
+			cleanupIfFailed(guard, source, storage);
+		}
+	}
+
+	private void cleanupIfFailed(Exception guard, Source source, Storage storage) {
+		if (guard != null) {
+			if (source != null) {
+				try {
+					source.close();
+				} catch (Exception ignore) {
 				}
-				if (storage != null) {
-					try {
-						storage.close();
-					} catch (Exception ignore) {
-					}
+			}
+			if (storage != null) {
+				try {
+					storage.close();
+				} catch (Exception ignore) {
 				}
 			}
 		}
 	}
-
 }

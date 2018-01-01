@@ -1,4 +1,4 @@
-package jitstatic;
+package jitstatic.version;
 
 /*-
  * #%L
@@ -20,18 +20,19 @@ package jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import java.io.IOException;
 
 import org.junit.Test;
 
-public class LinkedExceptionTest {
-
+public class ProjectVersionTest {
 	@Test
-	public void testLinkedException() {
-		LinkedException le = new LinkedException();
-		le.add(new Exception("OK test Message"));
-		le.add(null);
-		String message = le.getMessage();
-		assertEquals("class java.lang.Exception: OK test Message", message);
+	public void testProjectVersionTest() throws IOException {
+		ProjectVersion pv = ProjectVersion.INSTANCE;
+		System.out.println(pv.getBuildVersion());
+		assertNotNull(pv.getBuildVersion());
+		assertNotNull(pv.getCommitId());
+		assertNotNull(pv.getCommitIdAbbrev());
 	}
 }

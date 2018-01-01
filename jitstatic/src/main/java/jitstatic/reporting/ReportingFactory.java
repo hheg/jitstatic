@@ -1,4 +1,4 @@
-package jitstatic;
+package jitstatic.reporting;
 
 /*-
  * #%L
@@ -20,18 +20,29 @@ package jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
+import javax.validation.Valid;
 
-import org.junit.Test;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class LinkedExceptionTest {
+import io.dropwizard.setup.Environment;
 
-	@Test
-	public void testLinkedException() {
-		LinkedException le = new LinkedException();
-		le.add(new Exception("OK test Message"));
-		le.add(null);
-		String message = le.getMessage();
-		assertEquals("class java.lang.Exception: OK test Message", message);
+public class ReportingFactory {
+	
+	@JsonProperty
+	@Valid
+	private ConsoleReporting console;
+	
+	public void build(final Environment env) {
+		if(getConsole() != null) {
+			getConsole().build(env);
+		}
+	}
+
+	public ConsoleReporting getConsole() {
+		return console;
+	}
+
+	public void setConsole(ConsoleReporting console) {
+		this.console = console;
 	}
 }

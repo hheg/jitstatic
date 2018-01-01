@@ -44,6 +44,8 @@ import org.eclipse.jgit.transport.PreReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -53,6 +55,8 @@ import jitstatic.source.Source;
 import jitstatic.storage.StorageInfo;
 
 public class HostedFactory extends StorageInfo {
+	private static final Logger LOG = LoggerFactory.getLogger(HostedFactory.class);
+
 	public static final String SERVLET_NAME = "servlet-name";
 	public static final String BASE_PATH = "base-path";
 	public static final String EXPOSE_ALL = "expose-all";
@@ -133,8 +137,9 @@ public class HostedFactory extends StorageInfo {
 				getHostedEndpoint(), getBranch());
 
 		final String baseServletPath = "/" + getServletName() + "/*";
+		LOG.info("Configuring hosted GIT environment on " + baseServletPath);
 		final GitServlet gs = new GitServlet();
-		
+
 		gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
 		gs.setReceivePackFactory(new DefaultReceivePackFactory() {
@@ -143,8 +148,8 @@ public class HostedFactory extends StorageInfo {
 					throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 				final ReceivePack rp = super.create(req, db);
 				rp.setAtomic(true);
-				rp.setPreReceiveHook(PreReceiveHookChain.newChain(Arrays.asList(new LogoPoster(),
-						hostedGitRepositoryManager.getPreHook())));
+				rp.setPreReceiveHook(PreReceiveHookChain
+						.newChain(Arrays.asList(new LogoPoster(), hostedGitRepositoryManager.getPreHook())));
 				rp.setPostReceiveHook(hostedGitRepositoryManager.getPostHook());
 				return rp;
 			}
