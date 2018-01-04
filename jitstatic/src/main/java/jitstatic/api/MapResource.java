@@ -27,12 +27,18 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.lib.Constants;
@@ -55,15 +61,19 @@ public class MapResource {
 	private static final Logger log = LoggerFactory.getLogger(MapResource.class);
 	private static final String REF = "ref";
 	private final Storage storage;
+	
+	@Context
+	private HttpHeaders httpHeaders;
+
 
 	public MapResource(final Storage storage) {
 		this.storage = Objects.requireNonNull(storage);
 	}
 	
 	@GET
-	@Timed(name = "storage_time")
-	@Metered(name = "storage_counter")
-	@ExceptionMetered(name = "storage_exception")
+	@Timed(name = "get_storage_time")
+	@Metered(name = "get_storage_counter")
+	@ExceptionMetered(name = "get_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
 	public JsonNode get(final @PathParam("key") String key, final @Auth Optional<User> user) {
@@ -71,7 +81,7 @@ public class MapResource {
 		final String ref = getRef(key);
 
 		final Future<StorageData> future = storage.get(key, ref);
-		final StorageData o = unwrap.apply(future);
+		final StorageData o = unwrap(future);
 		if (o == null) {
 			throw new WebApplicationException(Status.NOT_FOUND);
 		}
@@ -92,7 +102,50 @@ public class MapResource {
 		}
 		return o.getData();
 	}
+	
+	@PUT
+	@Timed(name = "put_storage_time")
+	@Metered(name = "put_storage_counter")
+	@ExceptionMetered(name = "put_storage_exception")
+	@Path("/{key : .+}")
+	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	public Response modifyKey(final @PathParam("key") String key, final @Auth Optional<User> user, final ModifyKeyData data) {
+		final String ref = getRef(key);
+		final Future<StorageData> future = storage.get(key, ref);
+		final StorageData o = unwrap(future);
+		
+		return Response.ok().build();
+	}
 
+	@POST
+	@Timed(name = "post_storage_time")
+	@Metered(name = "post_storage_counter")
+	@ExceptionMetered(name = "post_storage_exception")
+	@Path("/{key : .+}")
+	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	public Response addKey(final @PathParam("key") String key, final @Auth Optional<User> user, final AddKeyData data) {
+		final String ref = getRef(key);
+		final Future<StorageData> future = storage.get(key, ref);
+		final StorageData o = unwrap(future);
+		if(o != null) {
+			throw new WebApplicationException("Key already exist",Status.CONFLICT);
+		}
+		return Response.ok().build();
+	}
+
+	@DELETE
+	@Timed(name = "delete_storage_time")
+	@Metered(name = "delete_storage_counter")
+	@ExceptionMetered(name = "delete_storage_exception")
+	@Path("/{key : .+}")
+	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	public Response deleteKey(final @PathParam("key") String key, final @Auth Optional<User> user) {
+		final String ref = getRef(key);
+		final Future<StorageData> future = storage.delete(key,ref);
+		unwrap(future);
+		return Response.ok().build();
+	}
+	
 	private String getRef(String key) {
 		final String[] split = key.split("\\?");
 		String ref = null;
@@ -113,7 +166,7 @@ public class MapResource {
 		return ref;
 	}
 
-	private static final Function<Future<StorageData>, StorageData> unwrap = (t) -> {
+	private static <T> T unwrap(Future<T> t) {
 		if (t == null) {
 			return null;
 		}

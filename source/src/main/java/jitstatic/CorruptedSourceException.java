@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.util.Pair;
 
 public class CorruptedSourceException extends Exception {

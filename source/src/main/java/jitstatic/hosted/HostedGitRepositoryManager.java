@@ -41,6 +41,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 
 import jitstatic.CorruptedSourceException;
+import jitstatic.FileObjectIdStore;
 import jitstatic.LinkedException;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;

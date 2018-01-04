@@ -62,11 +62,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jitstatic.CorruptedSourceException;
+import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
 import jitstatic.LinkedException;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.source.SourceEventListener;
 import jitstatic.util.Pair;
 
@@ -155,7 +155,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	private void pollAndCheckRemote() {
 		try {
 			final Collection<TrackingRefUpdate> trackingRefUpdates = fetchRemote();
-
+			
 			long defaultrefs = trackingRefUpdates.stream().filter(tru -> defaultRef.equals(tru.getRemoteName()))
 					.count();
 			if (trackingRefUpdates.size() > 0 && defaultrefs != 1) {
@@ -245,8 +245,9 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			final LinkedException storageErrors) {
 		final RemoteConfig remoteConfig = getRemoteConfig();
 		final List<String> refsToBeUpdated = executedCommands.stream().map(pair -> {
-			final ReceiveCommand orig = pair.getLeft().getLeft();
-			final ReceiveCommand test = pair.getLeft().getRight();
+			final Pair<ReceiveCommand, ReceiveCommand> receiveCommands = pair.getLeft();
+			final ReceiveCommand orig = receiveCommands.getLeft();
+			final ReceiveCommand test = receiveCommands.getRight();
 
 			final String remoteRefName = orig.getRefName();
 

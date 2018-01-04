@@ -69,7 +69,6 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.util.Pair;
 

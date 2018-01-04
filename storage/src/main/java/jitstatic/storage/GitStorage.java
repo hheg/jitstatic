@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -57,23 +58,22 @@ public class GitStorage implements Storage {
 	private final Map<String, Map<String, StorageData>> cache = new ConcurrentHashMap<>();
 	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
-	private final ExecutorService refExecutor; 
+	private final ExecutorService refExecutor;
 	private final ExecutorService keyExecutor;
 	private final Source source;
 	private final String defaultRef;
 
 	public GitStorage(final Source source, final String defaultRef) {
 		this.source = Objects.requireNonNull(source, "Source cannot be null");
-		refExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("ref",this::consumeError));
-		keyExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("key",this::consumeError));
+		refExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("ref", this::consumeError));
+		keyExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("key", this::consumeError));
 		this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
 	}
-	
+
 	public void reload(final List<String> refsToReload) {
 		Objects.requireNonNull(refsToReload);
-		final List<CompletableFuture<Void>> tasks = new ArrayList<>(refsToReload.size());
-		refsToReload.stream().forEach(ref -> {
-			tasks.add(CompletableFuture.supplyAsync(() -> {
+		 final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(ref -> {
+			return CompletableFuture.supplyAsync(() -> {
 				final Map<String, StorageData> map = cache.get(ref);
 				if (map != null) {
 					return new HashSet<>(map.keySet());
@@ -100,19 +100,19 @@ public class GitStorage implements Storage {
 					return newMap;
 				}
 				return null;
-			}).thenAcceptAsync(m -> {
-				if (m != null) {
-					if (m.size() > 0) {
-						final Map<String, StorageData> map = cache.get(ref);
-						map.entrySet().stream().filter(e -> !m.containsKey(e.getKey()))
-								.forEach(e -> m.put(e.getKey(), e.getValue()));
-						cache.put(ref, m);
+			}).thenAcceptAsync(map -> {
+				if (map != null) {
+					if (map.size() > 0) {
+						final Map<String, StorageData> originalMap = cache.get(ref);
+						originalMap.entrySet().stream().filter(e -> !map.containsKey(e.getKey()))
+								.forEach(e -> map.put(e.getKey(), e.getValue()));
+						cache.put(ref, map);
 					} else {
 						cache.remove(ref);
 					}
 				}
-			}, refExecutor));
-		});
+			}, refExecutor);
+		}).collect(Collectors.toCollection(() -> new ArrayList<>(refsToReload.size())));
 		// TODO Make detaching selectable
 		waitForTasks(tasks);
 	}
@@ -139,20 +139,16 @@ public class GitStorage implements Storage {
 
 	private List<CompletableFuture<Optional<Pair<String, StorageData>>>> refresh(final String ref,
 			final Set<String> map) {
-		final Iterator<String> itr = map.iterator();
-		final List<CompletableFuture<Optional<Pair<String, StorageData>>>> tasks = new ArrayList<>(map.size());
-		while (itr.hasNext()) {
-			final String next = itr.next();
-			tasks.add(CompletableFuture.supplyAsync(() -> {
+		return map.stream().map(key -> {
+			return CompletableFuture.supplyAsync(() -> {
 				try {
-					return Optional.of(new Pair<String, StorageData>(next, load(next, ref)));
+					return Optional.of(new Pair<String, StorageData>(key, load(key, ref)));
 				} catch (final IOException e) {
 					consumeError(e);
 				}
-				return Optional.empty();
-			}));
-		}
-		return tasks;
+				return Optional.<Pair<String, StorageData>>empty();
+			});
+		}).collect(Collectors.toCollection(() -> new ArrayList<>(map.size())));
 	}
 
 	private void consumeError(final Exception e) {
@@ -234,11 +230,11 @@ public class GitStorage implements Storage {
 		keyExecutor.shutdown();
 		try {
 			refExecutor.awaitTermination(10, TimeUnit.SECONDS);
-		} catch (InterruptedException ignore) {
+		} catch (final InterruptedException ignore) {
 		}
 		try {
 			keyExecutor.awaitTermination(10, TimeUnit.SECONDS);
-		} catch (InterruptedException ignore) {
+		} catch (final InterruptedException ignore) {
 		}
 		try {
 			source.close();
@@ -258,5 +254,11 @@ public class GitStorage implements Storage {
 		try (final JsonParser parser = mapper.getFactory().createParser(storageStream);) {
 			return parser.readValueAs(StorageData.class);
 		}
+	}
+
+	@Override
+	public Future<StorageData> delete(String key, String ref) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

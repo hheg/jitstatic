@@ -27,6 +27,6 @@ public interface Storage extends AutoCloseable {
 	public Future<StorageData> get(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
-
 	public void checkHealth() throws Exception;
+	public Future<StorageData> delete(String key, String ref);
 }

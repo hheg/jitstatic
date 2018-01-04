@@ -42,6 +42,7 @@ import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.ReceivePack;
 
 import jitstatic.CorruptedSourceException;
+import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
 import jitstatic.SourceChecker;
 import jitstatic.util.Pair;

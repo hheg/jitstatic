@@ -44,7 +44,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.util.Pair;
 
@@ -169,8 +168,7 @@ public class SourceExtractor {
 						treeWalker.enterSubtree();
 					}
 				}
-			} catch (final IOException e) {
-				// TODO Remove this.Replace it with an object that can deal with errors.
+			} catch (final IOException e) {				
 				files.add(new Pair<>(new FileObjectIdStore(null, tree.getId()), new InputStreamHolder(e)));
 			}
 		}

@@ -38,7 +38,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
@@ -188,5 +192,20 @@ public class MapResourceTest {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
 		RESOURCES.target("/storage/horse?ref=").request().get(JsonNode.class);
+	}
+	
+	@Test
+	public void testPostAKey() {
+		WebTarget target = RESOURCES.target("/storage/key");
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/tags/branch"))).thenReturn(expected);
+		ModifyKeyData data = new ModifyKeyData();
+		Response response = target.request().buildPost(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.OK,response.getStatus());
+	}
+	
+	@Test
+	public void testDeleteAKey() {
+		
 	}
 }

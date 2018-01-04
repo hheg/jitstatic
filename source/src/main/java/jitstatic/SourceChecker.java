@@ -34,7 +34,6 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.remote.RepositoryIsMissingIntendedBranch;
 import jitstatic.util.Pair;
