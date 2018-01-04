@@ -22,17 +22,24 @@ package jitstatic;
 
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Base64;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation.Builder;
@@ -47,15 +54,17 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.hamcrest.Matchers;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
+import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -67,29 +76,30 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
+import jitstatic.StorageData;
 
 public class RemoteHttpHostedGitRepositoryTest {
 
+	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private static final String PASSWORD = "ssecret";
 	private static final String USER = "suser";
 	private static final String ACCEPT_STORAGE = "accept/storage";
 	private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
-	private static final DropwizardAppRule<JitstaticConfiguration> remote;
-	private static final DropwizardAppRule<JitstaticConfiguration> local;
-	private static final ObjectMapper MAPPER = new ObjectMapper();
+	private DropwizardAppRule<JitstaticConfiguration> remote;
+	private DropwizardAppRule<JitstaticConfiguration> local;
+	
 
-	private static String remoteAdress;
-	private static String localAdress;
+	private String remoteAdress;
+	private String localAdress;
 
-	private static String basicAuth;
+	private String basicAuth;
 
-	private static UsernamePasswordCredentialsProvider provider;
-	private static JsonNode expectedResponse;
+	private UsernamePasswordCredentialsProvider provider;
+	private JsonNode expectedResponse;
 
-	@ClassRule
-	public static RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
+	@Rule
+	public RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
 			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class,
 					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
 					ConfigOverride.config("hosted.basePath", getFolder()))))
@@ -110,8 +120,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 	@Rule
 	public final ExpectedException ex = ExpectedException.none();
 
-	@BeforeClass
-	public static void setup() throws JsonProcessingException, IOException {
+	@Before
+	public void setup() throws JsonProcessingException, IOException {
 		basicAuth = buildBasicAuth(USER, PASSWORD);
 
 		remoteAdress = String.format("http://localhost:%d/application", remote.getLocalPort());
@@ -124,6 +134,15 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try (InputStream is = RemoteHttpHostedGitRepositoryTest.class.getResourceAsStream("/" + ACCEPT_STORAGE)) {
 			expectedResponse = MAPPER.readValue(is, StorageData.class).getData();
 		}
+	}
+	
+	@After
+	public void after() {
+		SortedMap<String, Result> healthChecks = local.getEnvironment().healthChecks().runHealthChecks();
+		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError())
+				.filter(Objects::nonNull).collect(Collectors.toList());
+		errors.stream().forEach(e -> e.printStackTrace());
+		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
 	}
 
 	@Test
@@ -211,6 +230,73 @@ public class RemoteHttpHostedGitRepositoryTest {
 		}
 	}
 
+	@Test
+	public void testSingleGetTag() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+		String tag = "tag";
+		String store = "store";
+		File base = TMP_FOLDER.newFolder();
+		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test9 client");
+		try {
+			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted",
+					"git");
+			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider)
+					.call()) {
+				Path file = base.toPath().resolve(store);
+				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.CREATE_NEW);
+				git.add().addFilepattern(store).call();
+				git.commit().setMessage("First").call();
+				git.tag().setName(tag).call();
+				Files.write(file, getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(store).call();
+				git.commit().setMessage("Second").call();
+				git.push().setCredentialsProvider(provider).call();
+				git.push().setCredentialsProvider(provider).setPushTags().call();
+			}
+			sleep(3000);
+			Builder clientTarget = client
+					.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
+			JsonNode result = clientTarget.get(JsonNode.class);
+			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
+			assertEquals(value.getData(), result);
+		} finally {
+			client.close();
+		}
+	}
+
+	@Test
+	public void testDoubleTag() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+		String tag = "tag";
+		File base = TMP_FOLDER.newFolder();
+		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test8 client");
+		try {
+			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted",
+					"git");
+			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider)
+					.call()) {
+				Path file = base.toPath().resolve(ACCEPT_STORAGE);
+				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(ACCEPT_STORAGE).call();
+				git.commit().setMessage("First").call();
+				git.tag().setName(tag).call();
+				Files.write(file, getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(ACCEPT_STORAGE).call();
+				git.commit().setMessage("Second").call();
+				git.push().setCredentialsProvider(provider).call();
+				git.push().setCredentialsProvider(provider).setPushTags().call();
+			}
+			sleep(3000);
+			Builder clientTarget = client
+					.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
+			JsonNode result = clientTarget.get(JsonNode.class);
+			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
+			assertEquals(value.getData(), result);
+		} finally {
+			client.close();
+		}
+	}
+
 	private static Supplier<String> getFolder() {
 		return () -> {
 			try {
@@ -225,7 +311,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes("UTF-8"));
 	}
 
-	private static Supplier<String> getRepo() {
+	private Supplier<String> getRepo() {
 		return () -> String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(),
 				remote.getConfiguration().getHostedFactory().getServletName(),
 				remote.getConfiguration().getHostedFactory().getHostedEndpoint());
@@ -250,4 +336,11 @@ public class RemoteHttpHostedGitRepositoryTest {
 		} catch (InterruptedException ignore) {
 		}
 	}
+
+	private String getData(int i) {
+		return "{\"data\":{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}},\"users\":[{\"password\":\""
+				+ PASSWORD + "\",\"user\":\"" + USER + "\"}]}";
+	}
+
 }

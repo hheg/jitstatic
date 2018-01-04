@@ -86,9 +86,10 @@ public class GitStorage implements Storage {
 					final Map<String, StorageData> newMap = new ConcurrentHashMap<>(files.size());
 					while (refreshTaskIterator.hasNext()) {
 						final CompletableFuture<Optional<Pair<String, StorageData>>> next = refreshTaskIterator.next();
+						// TODO Fix if a branch is deleted and how to deal with it's absence
 						if (next.isDone()) {
-							final Optional<Pair<String, StorageData>> pair = unwrap(next);
-							pair.ifPresent(p -> {
+							final Optional<Pair<String, StorageData>> fileInfo = unwrap(next);
+							fileInfo.ifPresent(p -> {
 								final StorageData data = p.getRight();
 								if (data != null) {
 									newMap.put(p.getLeft(), data);
@@ -145,6 +146,7 @@ public class GitStorage implements Storage {
 					return Optional.of(new Pair<String, StorageData>(key, load(key, ref)));
 				} catch (final IOException e) {
 					consumeError(e);
+				} catch (final RefNotFoundException ignore) {
 				}
 				return Optional.<Pair<String, StorageData>>empty();
 			});
@@ -204,18 +206,16 @@ public class GitStorage implements Storage {
 				if (storageData != null) {
 					v.put(key, storageData);
 				}
+			} catch (final RefNotFoundException e) {
+				return null;
 			} catch (final Exception e) {
-				if (e.getCause() != null && e.getCause() instanceof RefNotFoundException) {
-					return null;
-				} else {
-					consumeError(e);
-				}
+				consumeError(e);
 			}
 		}
 		return storageData;
 	}
 
-	private StorageData load(final String key, final String ref) throws IOException {
+	private StorageData load(final String key, final String ref) throws IOException, RefNotFoundException {
 		try (final InputStream is = source.getSourceStream(key, ref)) {
 			if (is != null) {
 				return readStorage(is);

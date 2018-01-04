@@ -22,6 +22,7 @@ package jitstatic.hosted;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -95,11 +96,11 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	private void checkIfDefaultBranchExist(String defaultRef) throws IOException {
-		Objects.requireNonNull(defaultRef,"defaultBranch cannot be null");
-		if(defaultRef.isEmpty()) {
+		Objects.requireNonNull(defaultRef, "defaultBranch cannot be null");
+		if (defaultRef.isEmpty()) {
 			throw new IllegalArgumentException("defaultBranch cannot be empty");
 		}
-		try(SourceChecker sc = new SourceChecker(bareRepository)){
+		try (SourceChecker sc = new SourceChecker(bareRepository)) {
 			sc.checkIfDefaultBranchExists(defaultRef);
 		}
 	}
@@ -179,7 +180,7 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	@Override
-	public InputStream getSourceStream(final String key, final String ref) {
+	public InputStream getSourceStream(final String key, final String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(ref);
 		try {
@@ -188,10 +189,14 @@ class HostedGitRepositoryManager implements Source {
 			} else if (ref.startsWith(Constants.R_TAGS)) {
 				return extractor.openTag(ref, key);
 			}
-			throw new RefNotFoundException(ref);
+		} catch (final IOException e) {
+			throw new UncheckedIOException(e);
+		} catch (final RefNotFoundException e) {
+			throw e;
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}
+		throw new RefNotFoundException(ref);
 
 	}
 

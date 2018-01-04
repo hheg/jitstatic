@@ -4,7 +4,7 @@
 JitStatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET.
 It's supposed to work as a online static store where data changes slowly but still need to be under version control.
 
-You can push and pull from it as if it were an ordinary git repo (full git support). Accessing the repo and the data end point can be configured to be on separate user/password combinations.
+You can push and pull from it as if it were an ordinary git repo (full git support except for .gitattributes). Accessing the repo and the data end point can be configured to be on separate user/password combinations.
 
 Use case:
 

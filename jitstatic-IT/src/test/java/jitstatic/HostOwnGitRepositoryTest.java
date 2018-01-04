@@ -86,7 +86,7 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
+import jitstatic.StorageData;
 
 public class HostOwnGitRepositoryTest {
 
@@ -290,6 +290,7 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testPushToOwnHostedRepositoryWithNewBranchAndThenDelete()
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+		Client client = buildClient("test4 client");
 		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
 				.setCredentialsProvider(provider).call()) {
 			String localFilePath = getLocalFilePath();
@@ -309,6 +310,12 @@ public class HostOwnGitRepositoryTest {
 			Map<String, Ref> refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
 			assertNotNull(refs.get(REFS_HEADS_NEWBRANCH));
 
+			JsonNode response = client
+					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/heads/newbranch",
+							storageAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals(MAPPER.readValue(getData(1), StorageData.class).getData(), response);
+
 			git.checkout().setName("master").call();
 			List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
 			assertTrue(call.stream().allMatch(b -> b.equals(REFS_HEADS_NEWBRANCH)));
@@ -316,19 +323,21 @@ public class HostOwnGitRepositoryTest {
 			git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call();
 			refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
 			assertNull(refs.get(REFS_HEADS_NEWBRANCH));
+
+			Response resp = client.target(
+					String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/heads/newbranch", storageAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+
+			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		}
-		
-		Client client = buildClient("test4 client");
+
 		try {
-			JsonNode response = client
-					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=newbranch", storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
+
 		} finally {
 			client.close();
 		}
 	}
-	
+
 	@Test
 	public void testRemoveKey() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		Client client = buildClient("test4 client");
@@ -341,23 +350,21 @@ public class HostOwnGitRepositoryTest {
 			git.add().addFilepattern(localFilePath).call();
 			git.commit().setMessage("Inital commit").call();
 			git.push().setCredentialsProvider(provider).call();
-			
-			JsonNode response = client
-					.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+
+			JsonNode response = client.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
 			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
-			
+
 			git.rm().addFilepattern(localFilePath).call();
 			git.commit().setMessage("Removed file").call();
 			git.push().setCredentialsProvider(provider).call();
-			
-			Response resp = client
-					.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress)).request()
+
+			Response resp = client.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
 			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		} finally {
 			client.close();
-		}		
+		}
 	}
 
 	@Test
@@ -383,8 +390,8 @@ public class HostOwnGitRepositoryTest {
 		Client client = buildClient("test4 client");
 		try {
 			JsonNode response = client
-					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=tag", storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/tags/tag", storageAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
 			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
 		} finally {
 			client.close();

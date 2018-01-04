@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.hamcrest.Matchers;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -133,10 +133,9 @@ public class RemoteManagerTest {
 	
 	@Test
 	public void testGetStorageInptuStreamGetException() throws Exception {
-		ex.expect(RuntimeException.class);
-		ex.expectCause(Matchers.isA(IOException.class));
+		ex.expect(RefNotFoundException.class);
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
-		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenThrow(IOException.class);
+		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenThrow(RefNotFoundException.class);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS, null);) {
 			assertNull(rrm.getSourceStream("key", null));
 		}

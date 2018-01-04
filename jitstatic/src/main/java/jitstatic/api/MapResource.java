@@ -34,6 +34,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
@@ -76,9 +77,14 @@ public class MapResource {
 	@ExceptionMetered(name = "get_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public JsonNode get(final @PathParam("key") String key, final @Auth Optional<User> user) {
+	public JsonNode get(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+			final @Auth Optional<User> user) {
 
-		final String ref = getRef(key);
+		if (ref != null) {
+			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+				throw new WebApplicationException(Status.NOT_FOUND);
+			}
+		}
 
 		final Future<StorageData> future = storage.get(key, ref);
 		final StorageData o = unwrap(future);

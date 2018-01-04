@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
-	<version>0.4.1-modifyapi-SNAPSHOT</version>
+	<version>0.4.3-modifyapi-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<modules>
 		<module>jitstatic</module>
@@ -411,8 +411,8 @@
 					</gitFlowConfig>
 
 					<commitMessages>
-						<featureStartMessage>@{feature} update versions for feature branch</featureStartMessage>
-						<featureFinishMessage>@{feature} update versions for development branch</featureFinishMessage>
+						<featureStartMessage>update versions for feature branch @{featureName}</featureStartMessage>
+						<featureFinishMessage>update versions for development branch @{featureName}</featureFinishMessage>
 						<hotfixStartMessage>@{version} update versions for hotfix</hotfixStartMessage>
 						<hotfixFinishMessage>@{version} update for next development version</hotfixFinishMessage>
 						<releaseStartMessage>@{version} update versions for release</releaseStartMessage>
