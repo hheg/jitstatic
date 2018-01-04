@@ -180,11 +180,12 @@ public class HostedGitRepositoryManagerTest {
 	}
 
 	@Test
-	public void testGetSourceStreamNotValid() throws CorruptedSourceException, IOException {
-		ex.expect(RuntimeException.class);
-		ex.expectCause(isA(RefNotFoundException.class));
+	public void testGetSourceStreamNotValid() throws CorruptedSourceException, IOException, RefNotFoundException {
+		String ref = "refs/somethingelse/ref";
+		ex.expect(RefNotFoundException.class);
+		ex.expectMessage(ref);
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-			grm.getSourceStream("key", "refs/somethingelse/ref");
+			grm.getSourceStream("key", ref);
 		}
 	}
 

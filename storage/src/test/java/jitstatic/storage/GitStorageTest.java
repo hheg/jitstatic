@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.junit.After;
 import org.junit.Before;
@@ -89,7 +90,7 @@ public class GitStorageTest {
 	}
 
 	@Test
-	public void testLoadCache() throws IOException, InterruptedException, ExecutionException {
+	public void testLoadCache() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
 		Set<User> users = new HashSet<>();
 		users.add(new User("user", "1234"));
 		try (GitStorage gs = new GitStorage(source, null);
