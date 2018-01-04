@@ -149,8 +149,8 @@ public class MapResourceTest {
 	@Test
 	public void testKeyIsFoundWithBranch() throws InterruptedException, ExecutionException {
 		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
-		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/heads/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse?ref=refs/heads/branch").request().get(JsonNode.class);
+		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request().get(JsonNode.class);
 		assertEquals(expected.get().getData(), response);
 	}
 	
@@ -158,21 +158,29 @@ public class MapResourceTest {
 	public void testKeyIsNotFoundWithMalformedBranch() throws InterruptedException, ExecutionException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse?ref=refs/beads/branch").request().get(JsonNode.class);		
+		RESOURCES.target("/storage/horse").queryParam("ref", "refs/beads/branch").request().get(JsonNode.class);		
 	}
 	
 	@Test
 	public void testKeyIsNotFoundWithMalformedTag() throws InterruptedException, ExecutionException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse?ref=refs/bads/branch").request().get(JsonNode.class);		
+		RESOURCES.target("/storage/horse").queryParam("ref", "refs/bads/branch").request().get(JsonNode.class);		
 	}
 	
 	@Test
 	public void testKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
 		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
-		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/tags/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse?ref=refs/tags/branch").request().get(JsonNode.class);
+		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
+		assertEquals(expected.get().getData(), response);
+	}
+	
+	@Test
+	public void testDoubleKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
+		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		when(STORAGE.get(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
+		JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
 		assertEquals(expected.get().getData(), response);
 	}
 	
@@ -180,13 +188,13 @@ public class MapResourceTest {
 	public void testFaultyRef() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse?kef=refs/beads/branch").request().get(JsonNode.class);
+		RESOURCES.target("/storage/horse").queryParam("ref", "refs/beads/branch").request().get(JsonNode.class);
 	}
 	
 	@Test
 	public void testEmptyRef() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse?ref=").request().get(JsonNode.class);
+		RESOURCES.target("/storage/horse").queryParam("ref", "").request().get(JsonNode.class);
 	}
 }

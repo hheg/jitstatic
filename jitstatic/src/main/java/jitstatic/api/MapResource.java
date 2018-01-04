@@ -31,6 +31,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
@@ -53,22 +54,26 @@ import jitstatic.storage.StorageData;
 public class MapResource {
 
 	private static final Logger log = LoggerFactory.getLogger(MapResource.class);
-	private static final String REF = "ref";
 	private final Storage storage;
 
 	public MapResource(final Storage storage) {
 		this.storage = Objects.requireNonNull(storage);
 	}
-	
+
 	@GET
 	@Timed(name = "storage_time")
 	@Metered(name = "storage_counter")
 	@ExceptionMetered(name = "storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public JsonNode get(final @PathParam("key") String key, final @Auth Optional<User> user) {
+	public JsonNode get(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+			final @Auth Optional<User> user) {
 
-		final String ref = getRef(key);
+		if (ref != null) {
+			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+				throw new WebApplicationException(Status.NOT_FOUND);
+			}
+		}
 
 		final Future<StorageData> future = storage.get(key, ref);
 		final StorageData o = unwrap.apply(future);
@@ -91,26 +96,6 @@ public class MapResource {
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
 		return o.getData();
-	}
-
-	private String getRef(String key) {
-		final String[] split = key.split("\\?");
-		String ref = null;
-		if (split.length == 2) {
-			if (!split[1].startsWith(REF)) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-			final String refSplit[] = split[1].split("=");
-			if (refSplit.length != 2) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-			ref = refSplit[1];
-			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-
-		}
-		return ref;
 	}
 
 	private static final Function<Future<StorageData>, StorageData> unwrap = (t) -> {

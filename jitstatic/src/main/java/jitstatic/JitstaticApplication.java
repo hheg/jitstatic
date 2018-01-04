@@ -46,9 +46,9 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		Storage storage = null;
 		try {
 			source = config.build(env);
-			storage = config.getStorageFactory().build(source, env, source.getDefaultRef());
-			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
+			storage = config.getStorageFactory().build(source, env, source.getDefaultRef());			
 			env.lifecycle().manage(new ManagedObject<>(source));
+			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
 			env.healthChecks().register(SourceHealthChecker.NAME, new SourceHealthChecker(source));
 			env.jersey().register(new MapResource(storage));
