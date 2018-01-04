@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
 import jitstatic.CorruptedSourceException;
@@ -70,6 +71,7 @@ class RemoteManager implements Source {
 			j.cancel(false);
 		}
 		this.poller.shutdown();
+		this.remoteRepoManager.close();
 	}
 
 	@Override
@@ -91,12 +93,14 @@ class RemoteManager implements Source {
 	}
 
 	@Override
-	public InputStream getSourceStream(final String key, String ref) {
+	public InputStream getSourceStream(final String key, String ref) throws RefNotFoundException {
 		try {
 			if (ref == null) {
 				ref = defaultRef;
 			}
 			return remoteRepoManager.getStorageInputStream(key, ref);
+		} catch (final RefNotFoundException e) {
+			throw e;
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}

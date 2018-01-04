@@ -380,9 +380,18 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	public InputStream getStorageInputStream(final String key, String ref) throws Exception {
+	public InputStream getStorageInputStream(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(ref);
-		return this.extractor.openBranch(ref, key);
+		try {
+			if (ref.startsWith(Constants.R_HEADS)) {
+				return extractor.openBranch(ref, key);
+			} else if (ref.startsWith(Constants.R_TAGS)) {
+				return extractor.openTag(ref, key);
+			}			
+		} catch (final Exception e) {
+			throw new RuntimeException(e);
+		}
+		throw new RefNotFoundException(ref);
 	}
 }

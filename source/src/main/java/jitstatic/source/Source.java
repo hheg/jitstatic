@@ -22,11 +22,13 @@ package jitstatic.source;
 
 import java.io.InputStream;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+
 public interface Source extends AutoCloseable {
 	public void close();
 	public void addListener(SourceEventListener listener);
 	public void start();
 	public void checkHealth();
-	public InputStream getSourceStream(String key, String ref);
+	public InputStream getSourceStream(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
 }
