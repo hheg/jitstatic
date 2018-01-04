@@ -76,7 +76,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
+import jitstatic.StorageData;
 
 public class RemoteHttpHostedGitRepositoryTest {
 

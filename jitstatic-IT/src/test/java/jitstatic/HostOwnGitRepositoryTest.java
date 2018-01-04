@@ -86,7 +86,7 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
+import jitstatic.StorageData;
 
 public class HostOwnGitRepositoryTest {
 
