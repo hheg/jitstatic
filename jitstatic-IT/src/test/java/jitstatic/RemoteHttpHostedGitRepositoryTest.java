@@ -22,6 +22,7 @@ package jitstatic;
 
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -33,8 +34,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Base64;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Invocation.Builder;
@@ -49,7 +54,9 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.hamcrest.Matchers;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,6 +64,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
+import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -126,6 +134,15 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try (InputStream is = RemoteHttpHostedGitRepositoryTest.class.getResourceAsStream("/" + ACCEPT_STORAGE)) {
 			expectedResponse = MAPPER.readValue(is, StorageData.class).getData();
 		}
+	}
+	
+	@After
+	public void after() {
+		SortedMap<String, Result> healthChecks = local.getEnvironment().healthChecks().runHealthChecks();
+		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError())
+				.filter(Objects::nonNull).collect(Collectors.toList());
+		errors.stream().forEach(e -> e.printStackTrace());
+		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
 	}
 
 	@Test
@@ -235,7 +252,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				git.push().setCredentialsProvider(provider).call();
 				git.push().setCredentialsProvider(provider).setPushTags().call();
 			}
-			sleep(1500);
+			sleep(3000);
 			Builder clientTarget = client
 					.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
@@ -268,7 +285,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				git.push().setCredentialsProvider(provider).call();
 				git.push().setCredentialsProvider(provider).setPushTags().call();
 			}
-			sleep(1500);
+			sleep(3000);
 			Builder clientTarget = client
 					.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress))
 					.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
