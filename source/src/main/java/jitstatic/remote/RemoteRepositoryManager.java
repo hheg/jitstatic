@@ -69,7 +69,7 @@ import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
 import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
-import jitstatic.util.Pair;
+import jitstatic.utils.Pair;
 
 public class RemoteRepositoryManager implements AutoCloseable {
 

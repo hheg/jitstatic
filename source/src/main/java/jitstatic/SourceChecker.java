@@ -36,7 +36,7 @@ import org.eclipse.jgit.lib.Repository;
 
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.remote.RepositoryIsMissingIntendedBranch;
-import jitstatic.util.Pair;
+import jitstatic.utils.Pair;
 
 public class SourceChecker implements AutoCloseable {
 

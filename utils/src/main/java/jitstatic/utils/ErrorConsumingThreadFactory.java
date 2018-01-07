@@ -1,4 +1,4 @@
-package jitstatic.util;
+package jitstatic.utils;
 
 /*-
  * #%L

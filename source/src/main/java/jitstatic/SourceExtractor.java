@@ -45,7 +45,7 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.source.SourceInfo;
-import jitstatic.util.Pair;
+import jitstatic.utils.Pair;
 
 public class SourceExtractor {
 

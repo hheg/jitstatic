@@ -53,9 +53,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jitstatic.auth.User;
 import jitstatic.source.Source;
 import jitstatic.source.SourceInfo;
-import jitstatic.util.Pair;
-import jitstatic.util.SinkIterator;
-import jitstatic.util.ErrorConsumingThreadFactory;
+import jitstatic.utils.ErrorConsumingThreadFactory;
+import jitstatic.utils.Pair;
+import jitstatic.utils.SinkIterator;
 
 public class GitStorage implements Storage {
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);

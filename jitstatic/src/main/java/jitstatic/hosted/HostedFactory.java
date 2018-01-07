@@ -22,7 +22,6 @@ package jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.servlet.ServletException;

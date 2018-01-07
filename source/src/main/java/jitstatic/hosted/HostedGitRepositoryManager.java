@@ -49,7 +49,7 @@ import jitstatic.SourceExtractor;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
-import jitstatic.util.Pair;
+import jitstatic.utils.Pair;
 
 class HostedGitRepositoryManager implements Source {
 

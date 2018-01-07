@@ -28,7 +28,7 @@ import jitstatic.CorruptedSourceException;
 import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
 import jitstatic.SourceChecker;
-import jitstatic.util.Pair;
+import jitstatic.utils.Pair;
 
 public class JitStaticReceivePack extends ReceivePack {
 

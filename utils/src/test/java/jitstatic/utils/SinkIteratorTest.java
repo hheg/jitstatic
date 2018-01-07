@@ -1,4 +1,4 @@
-package jitstatic.util;
+package jitstatic.utils;
 
 /*-
  * #%L
@@ -32,6 +32,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+
+import jitstatic.utils.SinkIterator;
 
 public class SinkIteratorTest {
 

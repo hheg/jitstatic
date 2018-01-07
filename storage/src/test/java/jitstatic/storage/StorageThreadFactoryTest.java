@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 
 import org.junit.Test;
 
-import jitstatic.util.ErrorConsumingThreadFactory;
+import jitstatic.utils.ErrorConsumingThreadFactory;
 
 public class StorageThreadFactoryTest {
 
