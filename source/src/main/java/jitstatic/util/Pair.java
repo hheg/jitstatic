@@ -28,7 +28,7 @@ public class Pair<T, U> {
 		this.left = null;
 		this.right = null;
 	}
-	
+
 	public Pair(final T t, final U u) {
 		this.left = t;
 		this.right = u;
@@ -41,8 +41,12 @@ public class Pair<T, U> {
 	public U getRight() {
 		return right;
 	}
-	
-	public boolean isPresent(){
+
+	public boolean isPresent() {
 		return left != null && right != null;
+	}
+
+	public static <T, U> Pair<T, U> of(T t, U u) {
+		return new Pair<>(t, u);
 	}
 }

@@ -27,6 +27,8 @@ import java.util.function.Consumer;
 
 import org.junit.Test;
 
+import jitstatic.util.ErrorConsumingThreadFactory;
+
 public class StorageThreadFactoryTest {
 
 	@Test
@@ -36,7 +38,7 @@ public class StorageThreadFactoryTest {
 		Consumer<Exception> test = t -> {
 			ar.set(t);
 		};
-		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		ErrorConsumingThreadFactory storageThreadFactory = new ErrorConsumingThreadFactory("test", test);
 		Thread newThread = storageThreadFactory.newThread(() -> {
 			throw runtimeException;
 		});
@@ -52,7 +54,7 @@ public class StorageThreadFactoryTest {
 		Consumer<Exception> test = t -> {
 			ar.set(t);
 		};
-		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		ErrorConsumingThreadFactory storageThreadFactory = new ErrorConsumingThreadFactory("test", test);
 		Thread newThread = storageThreadFactory.newThread(() -> {
 			throw error;
 		});

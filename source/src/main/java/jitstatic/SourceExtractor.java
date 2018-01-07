@@ -21,7 +21,6 @@ package jitstatic;
  */
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +44,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 import jitstatic.hosted.InputStreamHolder;
+import jitstatic.source.SourceInfo;
 import jitstatic.util.Pair;
 
 public class SourceExtractor {
@@ -55,21 +55,22 @@ public class SourceExtractor {
 		this.repository = repository;
 	}
 
-	public InputStream openTag(final String tagName, final String file) throws Exception {
+	public SourceInfo openTag(final String tagName, final String file) throws RefNotFoundException, IOException {
 		if (!Objects.requireNonNull(tagName).startsWith(Constants.R_TAGS)) {
 			throw new RefNotFoundException(tagName);
 		}
 		return sourceExtractor(tagName, file);
 	}
 
-	public InputStream openBranch(final String branchName, final String file) throws Exception {
+	public SourceInfo openBranch(final String branchName, final String file) throws RefNotFoundException, IOException {
 		if (!Objects.requireNonNull(branchName).startsWith(Constants.R_HEADS)) {
 			throw new RefNotFoundException(branchName);
 		}
 		return sourceExtractor(branchName, file);
 	}
 
-	private InputStream sourceExtractor(final String refName, final String file) throws Exception {
+	private SourceInfo sourceExtractor(final String refName, final String file)
+			throws RefNotFoundException, IOException {
 		final Ref branchRef = findBranch(refName);
 		final Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> source = this
 				.mapLoader(new Pair<>(branchRef.getObjectId(), Collections.singleton(branchRef)), file);
@@ -82,11 +83,7 @@ public class SourceExtractor {
 				throw new IllegalStateException(
 						"inputStreamHolder is null " + foids.getFileName() + " " + foids.getObjectId());
 			}
-			if (inputStreamHolder.isPresent()) {
-				return inputStreamHolder.inputStream();
-			} else {
-				throw inputStreamHolder.exception();
-			}
+			return new SourceInfo(element.getLeft(), inputStreamHolder);
 		} else if (sourceInfo.size() == 0) {
 			return null;
 		}
@@ -136,9 +133,9 @@ public class SourceExtractor {
 			files.addAll(walkTree(currentTree, key));
 			rev.dispose();
 		} catch (final IOException e) {
-			files.add(new Pair<>(new FileObjectIdStore(null, reference.toObjectId()), new InputStreamHolder(e)));
+			files.add(Pair.of(new FileObjectIdStore(null, reference.toObjectId()), new InputStreamHolder(e)));
 		}
-		return new Pair<>(referencePoint, files);
+		return Pair.of(referencePoint, files);
 	}
 
 	private List<Pair<FileObjectIdStore, InputStreamHolder>> walkTree(final RevTree tree, final String key) {
@@ -159,18 +156,18 @@ public class SourceExtractor {
 							final String path = treeWalker.getPathString();
 							try {
 								final ObjectLoader loader = repository.open(objectId);
-								files.add(new Pair<>(new FileObjectIdStore(path, objectId),
+								files.add(Pair.of(new FileObjectIdStore(path, objectId),
 										new InputStreamHolder(loader)));
 							} catch (final IOException e) {
-								files.add(new Pair<>(new FileObjectIdStore(path, objectId), new InputStreamHolder(e)));
+								files.add(Pair.of(new FileObjectIdStore(path, objectId), new InputStreamHolder(e)));
 							}
 						}
 					} else {
 						treeWalker.enterSubtree();
 					}
 				}
-			} catch (final IOException e) {				
-				files.add(new Pair<>(new FileObjectIdStore(null, tree.getId()), new InputStreamHolder(e)));
+			} catch (final IOException e) {
+				files.add(Pair.of(new FileObjectIdStore(null, tree.getId()), new InputStreamHolder(e)));
 			}
 		}
 		return files;
@@ -187,7 +184,7 @@ public class SourceExtractor {
 		return allRefs.entrySet().stream().map(e -> {
 			final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic())
 					.filter(ref -> ref.getName().startsWith(Constants.R_HEADS)).collect(Collectors.toSet());
-			return new Pair<>(e.getKey(), refs);
+			return Pair.of(e.getKey(), refs);
 		}).parallel().map(this::mapLoader).collect(Collectors.toConcurrentMap(branchErrors -> branchErrors.getLeft(),
 				branchErrors -> branchErrors.getRight()));
 	}

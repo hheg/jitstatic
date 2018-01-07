@@ -56,11 +56,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.auth.User;
 import jitstatic.source.Source;
+import jitstatic.source.SourceInfo;
 
 public class GitStorageTest {
 
 	private static final ObjectMapper mapper = new ObjectMapper();
 	private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
+	private static final String SHA_1 = "67adef5dab64f8f4cb50712ab24bda6605befa79";
+	private static final String SHA_2 = "67adef5dab64f8f4cb50712ab24bda6605befa80";
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
@@ -96,13 +99,20 @@ public class GitStorageTest {
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test1 = GitStorageTest.class.getResourceAsStream("/test1.json");
 				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json")) {
-			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(test1);
+			SourceInfo si1 = mock(SourceInfo.class);
+			SourceInfo si2 = mock(SourceInfo.class);
+			when(si1.getInputStream()).thenReturn(test1);
+			when(si2.getInputStream()).thenReturn(test2);			
+			when(si1.getVersion()).thenReturn(SHA_1);			
+			when(si2.getVersion()).thenReturn(SHA_2);
+		
+			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si1);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			StorageData storage = new StorageData(users, readData("\"value1\""));
+			StoreInfo storage = new StoreInfo(new  StorageData(users, readData("\"value1\"")),SHA_1);
 			assertEquals(storage, gs.get("key", null).get());
-			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(test2);
+			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			storage = new StorageData(users, readData("\"value2\""));
+			storage = new StoreInfo(new StorageData(users, readData("\"value2\"")),SHA_2);
 			assertEquals(storage, gs.get("key", null).get());
 		}
 	}
@@ -117,11 +127,16 @@ public class GitStorageTest {
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
 				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
-
-			when(source.getSourceStream(Mockito.eq("key3"), Mockito.anyString())).thenReturn(test3);
-			when(source.getSourceStream(Mockito.eq("key4"), Mockito.anyString())).thenReturn(test4);
-			Future<StorageData> key3Data = gs.get("key3", null);
-			Future<StorageData> key4Data = gs.get("key4", null);
+			SourceInfo si1 = mock(SourceInfo.class);
+			SourceInfo si2 = mock(SourceInfo.class);
+			when(si1.getInputStream()).thenReturn(test3);
+			when(si1.getVersion()).thenReturn(SHA_1);
+			when(si2.getInputStream()).thenReturn(test4);
+			when(si2.getVersion()).thenReturn(SHA_2);
+			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
+			when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
+			Future<StoreInfo> key3Data = gs.get("key3", null);
+			Future<StoreInfo> key4Data = gs.get("key4", null);
 			assertNotNull(key3Data.get());
 			assertNotNull(key4Data.get());
 			gs.checkHealth();
@@ -132,7 +147,7 @@ public class GitStorageTest {
 	public void testCheckHealth() throws Exception {
 		NullPointerException npe = new NullPointerException();
 		ex.expect(is(npe));
-		when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenThrow(npe);
+		when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenThrow(npe);
 		try (GitStorage gs = new GitStorage(source, null);) {
 			try {
 				gs.get("", null).get();
@@ -145,7 +160,7 @@ public class GitStorageTest {
 	@Test
 	public void testCheckHealthWithFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
-		doThrow(cause).when(source).getSourceStream(Mockito.anyString(), Mockito.anyString());
+		doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
 
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream is = GitStorageTest.class.getResourceAsStream("/test3.json")) {
@@ -159,7 +174,9 @@ public class GitStorageTest {
 				assertEquals(cause.getMessage(), e.getMessage());
 			}
 			Mockito.reset(source);
-			when(source.getSourceStream(Mockito.anyString(), Mockito.anyString())).thenReturn(is);
+			SourceInfo info = mock(SourceInfo.class);
+			when(info.getInputStream()).thenReturn(is);
+			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(info);
 			gs.checkHealth();
 			assertNotNull(gs.get("test3.json", null));
 		}
@@ -169,7 +186,7 @@ public class GitStorageTest {
 	public void testCheckHealthWithOldFault() throws Exception {
 		RuntimeException cause = new RuntimeException("Fault reading something");
 		ex.expect(is(equalTo(cause)));
-		doThrow(cause).when(source).getSourceStream(Mockito.anyString(), Mockito.anyString());
+		doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
 
 		try (GitStorage gs = new GitStorage(source, null);) {
 
@@ -198,13 +215,18 @@ public class GitStorageTest {
 		
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
-
-			when(source.getSourceStream(Mockito.eq("key3"), Mockito.anyString())).thenReturn(test3);
-			when(source.getSourceStream(Mockito.eq("key4"), Mockito.anyString())).thenReturn(test4);
-			Future<StorageData> key3Data = gs.get("key3", null);
+				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {		
+			SourceInfo si1 = mock(SourceInfo.class);
+			SourceInfo si2 = mock(SourceInfo.class);
+			when(si1.getInputStream()).thenReturn(test3);
+			when(si1.getVersion()).thenReturn(SHA_1);
+			when(si2.getInputStream()).thenReturn(test4);
+			when(si2.getVersion()).thenReturn(SHA_2);
+			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
+			when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
+			Future<StoreInfo> key3Data = gs.get("key3", null);
 			assertNotNull(key3Data.get());
-			Future<StorageData> key4Data = gs.get("key4", null);			
+			Future<StoreInfo> key4Data = gs.get("key4", null);			
 			assertNotNull(key4Data.get());
 			key4Data = gs.get("key4", REF_HEADS_MASTER);			
 			assertNotNull(key4Data.get());

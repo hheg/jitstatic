@@ -77,7 +77,7 @@ public class SourceChecker implements AutoCloseable {
 		final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::read)
 				.filter(Pair::isPresent).sequential().collect(Collectors.toList());
 
-		return Arrays.asList(new Pair<>(revCommit.getRight(), branchErrors));
+		return Arrays.asList(Pair.of(revCommit.getRight(), branchErrors));
 	}
 
 	@Override
@@ -92,7 +92,7 @@ public class SourceChecker implements AutoCloseable {
 			final Set<Ref> refs = e.getKey().getRight();
 			final List<Pair<FileObjectIdStore, Exception>> fileStores = e.getValue().stream().map(this::read).filter(Pair::isPresent)
 					.filter(p -> p.getRight() != null).collect(Collectors.toList());
-			return new Pair<>(refs, fileStores);
+			return Pair.of(refs, fileStores);
 		}).filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
 	}
 
@@ -101,20 +101,20 @@ public class SourceChecker implements AutoCloseable {
 		final FileObjectIdStore fileObject = data.getLeft();
 		if (inputStreamHolder == null) {
 			// File is removed
-			return new Pair<>(fileObject, null);
+			return Pair.of(fileObject, null);
 		}
 		if (inputStreamHolder.isPresent()) {
 			try (final InputStream is = inputStreamHolder.inputStream()) {
 				DATA_PARSER.parse(is);
 			} catch (final IOException e) {
 				// File had errors
-				return new Pair<>(fileObject, e);
+				return Pair.of(fileObject, e);
 			}
 			// File is OK
 			return new Pair<>();
 		}
 		// File had an exception at repository level
-		return new Pair<>(fileObject, inputStreamHolder.exception());
+		return Pair.of(fileObject, inputStreamHolder.exception());
 	}
 
 	public void checkIfDefaultBranchExists(final String defaultRef) throws IOException {

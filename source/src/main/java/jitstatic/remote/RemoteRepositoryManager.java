@@ -21,7 +21,6 @@ package jitstatic.remote;
  */
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -68,6 +67,7 @@ import jitstatic.LinkedException;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
 import jitstatic.source.SourceEventListener;
+import jitstatic.source.SourceInfo;
 import jitstatic.util.Pair;
 
 public class RemoteRepositoryManager implements AutoCloseable {
@@ -84,8 +84,8 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	private final Repository repository;
 	private final String defaultRef;
 
-	public RemoteRepositoryManager(final URI remoteRepo, final String userName, final String password,
-			final Path baseDirectory, final String defaultRef) throws CorruptedSourceException, IOException {
+	public RemoteRepositoryManager(final URI remoteRepo, final String userName, final String password, final Path baseDirectory,
+			final String defaultRef) throws CorruptedSourceException, IOException {
 		this.remoteRepo = Objects.requireNonNull(remoteRepo, "remote endpoint cannot be null");
 
 		this.userName = userName;
@@ -120,8 +120,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		final Repository r = getRepository(baseDirectory);
 		if (r == null) {
 			Files.createDirectories(baseDirectory);
-			final CloneCommand cc = Git.cloneRepository().setDirectory(baseDirectory.toFile())
-					.setURI(remoteRepo.toString());
+			final CloneCommand cc = Git.cloneRepository().setDirectory(baseDirectory.toFile()).setURI(remoteRepo.toString());
 			if (this.userName != null) {
 				cc.setCredentialsProvider(new UsernamePasswordCredentialsProvider(this.userName, this.password));
 			}
@@ -146,26 +145,28 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		return () -> {
 			final Object obj = lock.getAndSet(new Object());
 			if (obj == null) {
-				pollAndCheckRemote();
+				try {
+					pollAndCheckRemote();
+				} finally {
+					lock.set(null);
+				}
 			}
-			lock.set(null);
 		};
 	}
 
 	private void pollAndCheckRemote() {
 		try {
 			final Collection<TrackingRefUpdate> trackingRefUpdates = fetchRemote();
-			
-			long defaultrefs = trackingRefUpdates.stream().filter(tru -> defaultRef.equals(tru.getRemoteName()))
-					.count();
+
+			long defaultrefs = trackingRefUpdates.stream().filter(tru -> defaultRef.equals(tru.getRemoteName())).count();
 			if (trackingRefUpdates.size() > 0 && defaultrefs != 1) {
 				setFault(new RepositoryIsMissingIntendedBranch(defaultRef));
 			} else {
 				final ReceivePack receivePack = new ReceivePack(repository);
 
-				final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands = trackingRefUpdates
-						.stream().map(tru -> extractCommands(receivePack, tru)).parallel().map(this::checkBranchSource)
-						.sequential().collect(Collectors.toList());
+				final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands = trackingRefUpdates.stream()
+						.map(tru -> extractCommands(receivePack, tru)).parallel().map(this::checkBranchSource).sequential()
+						.collect(Collectors.toList());
 				final LinkedException storageErrors = tryUpdate(receivePack, executedCommands);
 				if (storageErrors.isEmpty()) {
 					setFault(null);
@@ -178,8 +179,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	private Collection<TrackingRefUpdate> fetchRemote()
-			throws GitAPIException, InvalidRemoteException, TransportException {
+	private Collection<TrackingRefUpdate> fetchRemote() throws GitAPIException, InvalidRemoteException, TransportException {
 		final Git git = Git.wrap(repository);
 		final FetchCommand fetch = git.fetch();
 		if (userName != null) {
@@ -195,8 +195,8 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands) {
 		final LinkedException storageErrors = new LinkedException();
 		try {
-			final List<Exception> errors = executedCommands.stream().filter(p -> p.getRight() != null)
-					.map(p -> p.getRight()).collect(Collectors.toList());
+			final List<Exception> errors = executedCommands.stream().filter(p -> p.getRight() != null).map(p -> p.getRight())
+					.collect(Collectors.toList());
 			if (errors.isEmpty()) {
 				updateLocalData(executedCommands, storageErrors);
 			} else {
@@ -214,24 +214,20 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		final String testBranchName = JitStaticConstants.REF_JISTSTATIC + UUID.randomUUID();
 
 		try {
-			final ReceiveCommand testCommand = new ReceiveCommand(receiveCommand.getOldId(), receiveCommand.getNewId(),
-					testBranchName);
-			if (trackingRefUpdate.getRemoteName().equals(defaultRef)
-					&& ObjectId.zeroId().equals(trackingRefUpdate.getNewObjectId())) {
+			final ReceiveCommand testCommand = new ReceiveCommand(receiveCommand.getOldId(), receiveCommand.getNewId(), testBranchName);
+			if (trackingRefUpdate.getRemoteName().equals(defaultRef) && ObjectId.zeroId().equals(trackingRefUpdate.getNewObjectId())) {
 				return new Pair<>(new Pair<>(receiveCommand, null), new RepositoryIsMissingIntendedBranch(defaultRef));
 			}
 			createTmpBranch(repository, testBranchName, trackingRefUpdate); // Cheating here
 			testCommand.execute(receivePack);
-			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(new Pair<>(receiveCommand, testCommand),
-					null);
+			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(new Pair<>(receiveCommand, testCommand), null);
 		} catch (final IOException e) {
 			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(new Pair<>(receiveCommand, null), e);
 		}
 	}
 
 	private void cleanRepository(final ReceivePack receivePack,
-			final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands,
-			final LinkedException storageErrors) {
+			final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands, final LinkedException storageErrors) {
 		executedCommands.stream().forEach(pair -> {
 			try {
 				deleteTempBranch(receivePack, pair.getLeft().getRight(), repository);
@@ -278,8 +274,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		final ReceiveCommand testReceiveCommand = receiveCommands.getRight();
 		try (final SourceChecker sc = new SourceChecker(repository)) {
 			final String testBranchName = testReceiveCommand.getRefName();
-			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkTest = sc
-					.checkTestBranchForErrors(testBranchName);
+			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkTest = sc.checkTestBranchForErrors(testBranchName);
 			// Only one branch so 1 element
 			final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> refAndErrorPair = checkTest.get(0);
 			final List<Pair<FileObjectIdStore, Exception>> refErrors = refAndErrorPair.getRight();
@@ -288,8 +283,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 				final Ref realRef = repository.findRef(actualRecieveCommand.getRefName());
 				final Set<Ref> refSet = new HashSet<>();
 				refSet.add(realRef);
-				testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON,
-						"Error in branch " + actualRecieveCommand.getRefName());
+				testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON, "Error in branch " + actualRecieveCommand.getRefName());
 				return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands,
 						new CorruptedSourceException(Arrays.asList(new Pair<>(refSet, refErrors))));
 			}
@@ -320,8 +314,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result)
-			throws IOException {
+	private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result) throws IOException {
 		switch (result) {
 		case FAST_FORWARD:
 		case FORCED:
@@ -339,8 +332,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	private void createTmpBranch(final Repository repository, final String testBranchName, TrackingRefUpdate tru)
-			throws IOException {
+	private void createTmpBranch(final Repository repository, final String testBranchName, TrackingRefUpdate tru) throws IOException {
 		final RefUpdate updateRef = repository.updateRef(testBranchName);
 		updateRef.setExpectedOldObjectId(ObjectId.zeroId());
 		updateRef.setNewObjectId(tru.getOldObjectId());
@@ -349,8 +341,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		checkResult(testBranchName, updateRef.forceUpdate());
 	}
 
-	private void deleteTempBranch(final ReceivePack rp, final ReceiveCommand rc, final Repository repository)
-			throws IOException {
+	private void deleteTempBranch(final ReceivePack rp, final ReceiveCommand rc, final Repository repository) throws IOException {
 		if (rc != null) {
 			final RefUpdate ru = repository.updateRef(rc.getRefName());
 			ru.disableRefLog();
@@ -381,7 +372,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	public InputStream getStorageInputStream(final String key, String ref) throws RefNotFoundException {
+	public SourceInfo getStorageInputStream(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(ref);
 		try {
@@ -389,7 +380,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 				return extractor.openBranch(ref, key);
 			} else if (ref.startsWith(Constants.R_TAGS)) {
 				return extractor.openTag(ref, key);
-			}			
+			}
 		} catch (final Exception e) {
 			throw new RuntimeException(e);
 		}

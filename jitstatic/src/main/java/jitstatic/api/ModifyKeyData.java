@@ -35,4 +35,12 @@ public class ModifyKeyData {
 	public void setData(final JsonNode data) {
 		this.data = data;
 	}
+
+	public String getMessage() {		
+		return message;
+	}
+	
+	public void setMessage(final String message) {
+		this.message = message;
+	}
 }

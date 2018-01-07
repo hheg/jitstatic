@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -70,6 +69,7 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
 import jitstatic.hosted.InputStreamHolder;
+import jitstatic.source.SourceInfo;
 import jitstatic.util.Pair;
 
 public class SourceExtractorTest {
@@ -188,7 +188,7 @@ public class SourceExtractorTest {
 			final SourceExtractor se = new SourceExtractor(git.getRepository());
 			Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> sourceBranchExtractor = se
 					.sourceBranchExtractor(REFS_HEADS_MASTER);
-			assertEquals(1,sourceBranchExtractor.getRight().size());
+			assertEquals(1, sourceBranchExtractor.getRight().size());
 			Pair<FileObjectIdStore, InputStreamHolder> p = sourceBranchExtractor.getRight().get(0);
 			assertNotNull(p.getRight());
 			local.rm().addFilepattern(key).call();
@@ -196,9 +196,8 @@ public class SourceExtractorTest {
 			local.commit().setMessage("Removed file").call();
 			local.push().call();
 
-			sourceBranchExtractor = se
-					.sourceBranchExtractor(REFS_HEADS_MASTER);
-			assertEquals(0,sourceBranchExtractor.getRight().size());
+			sourceBranchExtractor = se.sourceBranchExtractor(REFS_HEADS_MASTER);
+			assertEquals(0, sourceBranchExtractor.getRight().size());
 		}
 	}
 
@@ -216,7 +215,8 @@ public class SourceExtractorTest {
 			local.push().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openBranch(Constants.R_HEADS + Constants.MASTER, key);) {
+		SourceInfo branch = se.openBranch(Constants.R_HEADS + Constants.MASTER, key);
+		try (final InputStream is = branch.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);
@@ -254,7 +254,8 @@ public class SourceExtractorTest {
 			local.push().setPushTags().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openTag(Constants.R_TAGS + "tag", key);) {
+		SourceInfo tag = se.openTag(Constants.R_TAGS + "tag", key);
+		try (final InputStream is = tag.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);
@@ -276,7 +277,8 @@ public class SourceExtractorTest {
 			local.push().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openBranch(Constants.R_HEADS + "notexisting", key);) {
+		SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
+		try (final InputStream is = branch.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);

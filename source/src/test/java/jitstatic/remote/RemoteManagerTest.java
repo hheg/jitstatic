@@ -127,7 +127,7 @@ public class RemoteManagerTest {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
 		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenReturn(null);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS, null);) {
-			assertNull(rrm.getSourceStream("key", null));
+			assertNull(rrm.getSourceInfo("key", null));
 		}
 	}
 	
@@ -137,7 +137,7 @@ public class RemoteManagerTest {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
 		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenThrow(RefNotFoundException.class);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS, null);) {
-			assertNull(rrm.getSourceStream("key", null));
+			assertNull(rrm.getSourceInfo("key", null));
 		}
 	}
 

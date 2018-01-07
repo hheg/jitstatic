@@ -22,10 +22,10 @@ import java.io.IOException;
  * #L%
  */
 
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -37,6 +37,7 @@ import org.eclipse.jgit.lib.Constants;
 import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
+import jitstatic.source.SourceInfo;
 
 class RemoteManager implements Source {
 
@@ -93,7 +94,7 @@ class RemoteManager implements Source {
 	}
 
 	@Override
-	public InputStream getSourceStream(final String key, String ref) throws RefNotFoundException {
+	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
 		try {
 			if (ref == null) {
 				ref = defaultRef;
@@ -109,6 +110,11 @@ class RemoteManager implements Source {
 	@Override
 	public String getDefaultRef() {
 		return defaultRef;
+	}
+
+	@Override
+	public ExecutorService getRepositoryQueue() {
+		throw new UnsupportedOperationException("Not implemented");
 	}
 
 }

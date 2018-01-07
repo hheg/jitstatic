@@ -34,13 +34,13 @@ import jitstatic.source.SourceEventListener;
 
 public class StorageFactory {
 
-	public Storage build(final Source remote, final Environment env, final String defaultRef) {
+	public Storage build(final Source source, final Environment env) {
 		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-		final GitStorage gitStorage = new GitStorage(remote, defaultRef);
-		remote.addListener((updatedRefs) -> {
+		final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());
+		source.addListener((updatedRefs) -> {
 			try {
 				gitStorage.reload(updatedRefs);
 			} catch (final Exception e) {

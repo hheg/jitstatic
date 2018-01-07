@@ -66,6 +66,7 @@ import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageData;
+import jitstatic.storage.StoreInfo;
 
 public class MapResourceTest {
 	private static final String USER = "user";
@@ -79,9 +80,11 @@ public class MapResourceTest {
 		}
 	}
 	private static final Storage STORAGE = mock(Storage.class);
-	private static final Map<String, StorageData> DATA = new HashMap<>();
+	private static final Map<String, StoreInfo> DATA = new HashMap<>();
 	private static final ObjectMapper MAPPER = new ObjectMapper();
-	
+	private static String returnedDog;
+	private static String returnedHorse;
+
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
@@ -96,29 +99,32 @@ public class MapResourceTest {
 
 	@BeforeClass
 	public static void setupClass() throws JsonProcessingException, IOException {
-		JsonNode node = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
+		JsonNode dog = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
 		Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
-		StorageData dogData = new StorageData(users, node);
+		StoreInfo dogData = new StoreInfo(new StorageData(users, dog), "1");
+		returnedDog = MAPPER.writeValueAsString(new KeyData(dogData.getVersion(), dogData.getStorageData().getData()));
 		DATA.put("dog", dogData);
 		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
-		StorageData horseData = new StorageData(new HashSet<>(), horse);
+		StoreInfo horseData = new StoreInfo(new StorageData(new HashSet<>(), horse), "1");
+		returnedHorse = MAPPER
+				.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getStorageData().getData()));
 		DATA.put("horse", horseData);
 	}
 
 	@Test
 	public void testGettingKeyFromResource() throws InterruptedException, ExecutionException {
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
 		when(STORAGE.get("dog", null)).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-				.get(JsonNode.class);
-		assertEquals(expected.get().getData(), response);
+		JsonNode response = RESOURCES.target("/storage/dog").request()
+				.header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(JsonNode.class);
+		assertEquals(returnedDog, response.toString());
 	}
 
 	@Test
 	public void testGettingKeyFromResourceWithNoAuthentication() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.UNAUTHORIZED.toString());
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
 		when(STORAGE.get("dog", null)).thenReturn(expected);
 		RESOURCES.target("/storage/dog").request().get(JsonNode.class);
 	}
@@ -134,86 +140,104 @@ public class MapResourceTest {
 
 	@Test
 	public void testNoAuthorizationOnPermittedResource() throws InterruptedException, ExecutionException {
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get("horse", null)).thenReturn(expected);
 		JsonNode response = RESOURCES.target("/storage/horse").request().get(JsonNode.class);
-		assertEquals(expected.get().getData(), response);
+		assertEquals(returnedHorse, response.toString());
 	}
 
 	@Test
 	public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.UNAUTHORIZED.toString());
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
 		when(STORAGE.get("dog", null)).thenReturn(expected);
 		final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes("UTF-8"));
 		RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
 	}
-	
+
 	@Test
 	public void testKeyIsFoundWithBranch() throws InterruptedException, ExecutionException {
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request().get(JsonNode.class);
-		assertEquals(expected.get().getData(), response);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request()
+				.get(JsonNode.class);
+		assertEquals(returnedHorse, response.toString());
 	}
-	
+
 	@Test
 	public void testKeyIsNotFoundWithMalformedBranch() throws InterruptedException, ExecutionException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse").queryParam("ref", "refs/beads/branch").request().get(JsonNode.class);		
+		RESOURCES.target("/storage/horse").queryParam("ref", "refs/beads/branch").request().get(JsonNode.class);
 	}
-	
+
 	@Test
 	public void testKeyIsNotFoundWithMalformedTag() throws InterruptedException, ExecutionException {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
-		RESOURCES.target("/storage/horse").queryParam("ref", "refs/bads/branch").request().get(JsonNode.class);		
+		RESOURCES.target("/storage/horse").queryParam("ref", "refs/bads/branch").request().get(JsonNode.class);
 	}
-	
+
 	@Test
 	public void testKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
-		assertEquals(expected.get().getData(), response);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request()
+				.get(JsonNode.class);
+		assertEquals(returnedHorse, response.toString());
 	}
-	
+
 	@Test
 	public void testDoubleKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
-		assertEquals(expected.get().getData(), response);
+		JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request()
+				.get(JsonNode.class);
+		assertEquals(returnedHorse, response.toString());
 	}
-	
+
 	@Test
 	public void testFaultyRef() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
 		RESOURCES.target("/storage/horse").queryParam("ref", "refs/beads/branch").request().get(JsonNode.class);
 	}
-	
+
 	@Test
 	public void testEmptyRef() {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
 		RESOURCES.target("/storage/horse").queryParam("ref", "").request().get(JsonNode.class);
 	}
-	
+
 	@Test
-	public void testPostAKey() {
-		WebTarget target = RESOURCES.target("/storage/key");
-		Future<StorageData> expected = CompletableFuture.completedFuture(DATA.get("horse"));
-		when(STORAGE.get(Mockito.contains("horse"), Mockito.contains("refs/tags/branch"))).thenReturn(expected);
+	public void testPutAKey() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/horse");
+		StoreInfo storeInfo = DATA.get("horse");
+		Future<Void> expected = CompletableFuture.completedFuture(null);
+		when(STORAGE.put(Mockito.eq(storeInfo.getStorageData().getData()), Mockito.eq("1"), Mockito.eq("message"),
+				Mockito.any(), Mockito.eq("horse"), Mockito.any())).thenReturn(expected);
 		ModifyKeyData data = new ModifyKeyData();
-		Response response = target.request().buildPost(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
-		assertEquals(Status.OK,response.getStatus());
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
+		data.setMessage("message");
+		data.setVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.OK,response.getStatus());		
 	}
 	
 	@Test
-	public void testDeleteAKey() {
-		
+	public void testPutAMissingKey() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/horse");
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
+		data.setMessage("message");
+		data.setVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
 }

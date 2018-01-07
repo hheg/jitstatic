@@ -52,6 +52,7 @@ import org.mockito.Mockito;
 import jitstatic.CorruptedSourceException;
 import jitstatic.LinkedException;
 import jitstatic.source.SourceEventListener;
+import jitstatic.source.SourceInfo;
 
 public class RemoteRepositoryManagerTest {
 
@@ -164,14 +165,16 @@ public class RemoteRepositoryManagerTest {
 		}
 		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
 				"other");) {
-			try (InputStream is = rrm.getStorageInputStream(STORAGE, "refs/heads/other")) {
+			SourceInfo sourceInfo = rrm.getStorageInputStream(STORAGE, "refs/heads/other");
+			try (InputStream is = sourceInfo.getInputStream()) {
 				assertNotNull(is);
 			}
 			try (Git git = Git.init().setDirectory(remoteFolder).call()) {
 				git.branchDelete().setBranchNames("other").call();
 				rrm.checkRemote().run();
 				Exception fault = rrm.getFault();
-				try (InputStream is = rrm.getStorageInputStream(STORAGE, "refs/heads/other")) {
+				SourceInfo sourceInfo2 = rrm.getStorageInputStream(STORAGE, "refs/heads/other");
+				try (InputStream is = sourceInfo2.getInputStream()) {
 					assertNotNull(is);
 				}
 				throw fault;
@@ -408,8 +411,11 @@ public class RemoteRepositoryManagerTest {
 		setUpRepo();
 		// ex.expect(RuntimeException.class);
 		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER); InputStream is = rrm.getStorageInputStream(STORAGE, REF_HEADS_MASTER)) {
-			assertNotNull(is);
+				REF_HEADS_MASTER); ) {
+			 SourceInfo sourceInfo = rrm.getStorageInputStream(STORAGE, REF_HEADS_MASTER);
+			try(InputStream is = sourceInfo.getInputStream()){
+				assertNotNull(is);
+			}
 		}
 	}
 

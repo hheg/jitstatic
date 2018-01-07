@@ -25,11 +25,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.function.Function;
 
-import javax.ws.rs.DELETE;
+import javax.validation.Valid;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -49,52 +47,47 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import jitstatic.auth.User;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageData;
+import jitstatic.storage.StoreInfo;
 
 @Path("storage")
 public class MapResource {
 
 	private static final Logger log = LoggerFactory.getLogger(MapResource.class);
-	private static final String REF = "ref";
 	private final Storage storage;
-	
+
 	@Context
 	private HttpHeaders httpHeaders;
-
 
 	public MapResource(final Storage storage) {
 		this.storage = Objects.requireNonNull(storage);
 	}
-	
+
 	@GET
 	@Timed(name = "get_storage_time")
 	@Metered(name = "get_storage_counter")
 	@ExceptionMetered(name = "get_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public JsonNode get(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+	public KeyData get(final @PathParam("key") String key, final @QueryParam("ref") String ref,
 			final @Auth Optional<User> user) {
 
-		if (ref != null) {
-			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-		}
+		checkRef(ref);
 
-		final Future<StorageData> future = storage.get(key, ref);
-		final StorageData o = unwrap(future);
-		if (o == null) {
+		final Future<StoreInfo> future = storage.get(key, ref);
+		final StoreInfo si = unwrap(future);
+		if (si == null) {
 			throw new WebApplicationException(Status.NOT_FOUND);
 		}
-
-		final Set<User> allowedUsers = o.getUsers();
+		final StorageData data = si.getStorageData();
+		final Set<User> allowedUsers = data.getUsers();
 		if (allowedUsers.isEmpty()) {
-			return o.getData();
+			return new KeyData(si.getVersion(), data.getData());
 		}
 
 		if (!user.isPresent()) {
@@ -103,73 +96,39 @@ public class MapResource {
 		}
 
 		if (!allowedUsers.contains(user.get())) {
-			log.info("Resource " + key + "is denied with user " + user);
+			log.info("Resource " + key + "is denied for user " + user);
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return o.getData();
+		return new KeyData(si.getVersion(), data.getData());
 	}
-	
+
 	@PUT
 	@Timed(name = "put_storage_time")
 	@Metered(name = "put_storage_counter")
 	@ExceptionMetered(name = "put_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public Response modifyKey(final @PathParam("key") String key, final @Auth Optional<User> user, final ModifyKeyData data) {
-		final String ref = getRef(key);
-		final Future<StorageData> future = storage.get(key, ref);
-		final StorageData o = unwrap(future);
-		
-		return Response.ok().build();
-	}
+	public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+			final @Auth Optional<User> user, final @Valid ModifyKeyData data) {
 
-	@POST
-	@Timed(name = "post_storage_time")
-	@Metered(name = "post_storage_counter")
-	@ExceptionMetered(name = "post_storage_exception")
-	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public Response addKey(final @PathParam("key") String key, final @Auth Optional<User> user, final AddKeyData data) {
-		final String ref = getRef(key);
-		final Future<StorageData> future = storage.get(key, ref);
-		final StorageData o = unwrap(future);
-		if(o != null) {
-			throw new WebApplicationException("Key already exist",Status.CONFLICT);
+		if (!user.isPresent()) {
+			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return Response.ok().build();
-	}
-
-	@DELETE
-	@Timed(name = "delete_storage_time")
-	@Metered(name = "delete_storage_counter")
-	@ExceptionMetered(name = "delete_storage_exception")
-	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public Response deleteKey(final @PathParam("key") String key, final @Auth Optional<User> user) {
-		final String ref = getRef(key);
-		final Future<StorageData> future = storage.delete(key,ref);
-		unwrap(future);
-		return Response.ok().build();
-	}
-	
-	private String getRef(String key) {
-		final String[] split = key.split("\\?");
-		String ref = null;
-		if (split.length == 2) {
-			if (!split[1].startsWith(REF)) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-			final String refSplit[] = split[1].split("=");
-			if (refSplit.length != 2) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-			ref = refSplit[1];
-			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-
+		checkRef(ref);
+		final Future<StoreInfo> future = storage.get(key, ref);
+		final StoreInfo storeInfo = unwrap(future);
+		if(storeInfo == null) {
+			throw new WebApplicationException(Status.NOT_FOUND);
 		}
-		return ref;
+		final String currentVersion = storeInfo.getVersion();
+		final String requestedVersion = data.getVersion();
+		if (!currentVersion.equals(requestedVersion)) {
+			throw new WebApplicationException(currentVersion, Status.BAD_REQUEST);
+		}
+		final Future<Void> exec = storage.put(data.getData(), data.getVersion(), data.getMessage(), user.get(), key,
+				ref);
+		unwrap(exec); // TODO fix this.
+		return Response.ok().build();
 	}
 
 	private static <T> T unwrap(Future<T> t) {
@@ -181,5 +140,13 @@ public class MapResource {
 		} catch (final InterruptedException | ExecutionException e) {
 			return null;
 		}
-	};
+	}
+
+	private void checkRef(final String ref) {
+		if (ref != null) {
+			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+				throw new WebApplicationException(Status.NOT_FOUND);
+			}
+		}
+	}
 }

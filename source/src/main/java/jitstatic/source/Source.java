@@ -1,5 +1,7 @@
 package jitstatic.source;
 
+import java.util.concurrent.ExecutorService;
+
 /*-
  * #%L
  * jitstatic
@@ -20,8 +22,6 @@ package jitstatic.source;
  * #L%
  */
 
-import java.io.InputStream;
-
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
 public interface Source extends AutoCloseable {
@@ -29,6 +29,7 @@ public interface Source extends AutoCloseable {
 	public void addListener(SourceEventListener listener);
 	public void start();
 	public void checkHealth();
-	public InputStream getSourceStream(String key, String ref) throws RefNotFoundException;
+	public ExecutorService getRepositoryQueue();
+	public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
 }
