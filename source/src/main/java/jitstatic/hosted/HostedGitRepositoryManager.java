@@ -57,7 +57,7 @@ class HostedGitRepositoryManager implements Source {
 	private final String endPointName;
 	private final SourceExtractor extractor;
 	private final String defaultRef;
-	private final JitstaticReceivePackFactory receivePackFactory;
+	private final JitStaticReceivePackFactory receivePackFactory;
 	private final ErrorReporter errorReporter;
 	private final RepositoryBus repositoryBus;
 
@@ -90,7 +90,7 @@ class HostedGitRepositoryManager implements Source {
 		checkIfDefaultBranchExist(defaultRef);
 		this.extractor = new SourceExtractor(this.bareRepository);
 		this.repositoryBus = new RepositoryBus(errorReporter);
-		this.receivePackFactory = new JitstaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
+		this.receivePackFactory = new JitStaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
 				errorReporter, defaultRef);
 		this.defaultRef = defaultRef;
 		this.errorReporter = errorReporter;

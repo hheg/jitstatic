@@ -14,13 +14,13 @@ import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-public class JitstaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
+public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
 	private final String defaultRef;
 	private final ExecutorService repoExecutor;
 	private final ErrorReporter errorReporter;
 
-	public JitstaticReceivePackFactory(final ExecutorService repoExecutor, final ErrorReporter reporter,
+	public JitStaticReceivePackFactory(final ExecutorService repoExecutor, final ErrorReporter reporter,
 			final String defaultRef) {
 		this.defaultRef = defaultRef;
 		this.errorReporter = reporter;
@@ -59,7 +59,7 @@ public class JitstaticReceivePackFactory implements ReceivePackFactory<HttpServl
 	}
 
 	protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-		final ReceivePack rp = new JitstaticReceivePack(db, defaultRef, getRepoExecutor(), errorReporter);
+		final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, getRepoExecutor(), errorReporter);
 		rp.setRefLogIdent(toPersonIdent(req, user));
 		rp.setAtomic(true);
 		rp.setPreReceiveHook(PreReceiveHookChain.newChain(Arrays.asList(new LogoPoster())));

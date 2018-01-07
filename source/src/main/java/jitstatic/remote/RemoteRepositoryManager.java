@@ -21,6 +21,7 @@ package jitstatic.remote;
  */
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -381,8 +382,8 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			} else if (ref.startsWith(Constants.R_TAGS)) {
 				return extractor.openTag(ref, key);
 			}
-		} catch (final Exception e) {
-			throw new RuntimeException(e);
+		} catch (final IOException e) {
+			throw new UncheckedIOException(e);
 		}
 		throw new RefNotFoundException(ref);
 	}

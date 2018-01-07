@@ -53,7 +53,7 @@ public class JitStaticReceivePackFactoryTest {
 	@Test
 	public void testJitStaticReceivePackFactory() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 		String user = "user", host = "remotehost";
-		JitstaticReceivePackFactory jsrpf = new JitstaticReceivePackFactory(service, reporter, defaultRef);
+		JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(service, reporter, defaultRef);
 		when(req.getRemoteUser()).thenReturn(user);
 		when(req.getRemoteHost()).thenReturn(host);
 		ReceivePack create = jsrpf.create(req, git.getRepository());
@@ -70,7 +70,7 @@ public class JitStaticReceivePackFactoryTest {
 		ex.expect(ServiceNotAuthorizedException.class);
 		ex.expectMessage("Unauthorized");
 		String host = "remotehost";
-		JitstaticReceivePackFactory jsrpf = new JitstaticReceivePackFactory(service, reporter, defaultRef);
+		JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(service, reporter, defaultRef);
 		when(req.getRemoteHost()).thenReturn(host);
 		jsrpf.create(req, git.getRepository());
 	}
@@ -80,7 +80,7 @@ public class JitStaticReceivePackFactoryTest {
 		ex.expect(ServiceNotEnabledException.class);
 		ex.expectMessage("Service not enabled");		
 		String user = "user", host = "remotehost";
-		JitstaticReceivePackFactory jsrpf = new JitstaticReceivePackFactory(service, reporter, defaultRef);
+		JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(service, reporter, defaultRef);
 		git.getRepository().getConfig().setString("http", null, "receivepack", "false");
 		when(req.getRemoteUser()).thenReturn(user);
 		when(req.getRemoteHost()).thenReturn(host);
@@ -90,7 +90,7 @@ public class JitStaticReceivePackFactoryTest {
 	@Test
 	public void testJitStaticReceivePackFactoryReceivePackTurnedOn() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 		String user = "user", host = "remotehost";
-		JitstaticReceivePackFactory jsrpf = new JitstaticReceivePackFactory(service, reporter, defaultRef);
+		JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(service, reporter, defaultRef);
 		git.getRepository().getConfig().setString("http", null, "receivepack", "true");
 		when(req.getRemoteUser()).thenReturn(user);
 		when(req.getRemoteHost()).thenReturn(host);

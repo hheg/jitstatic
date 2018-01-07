@@ -30,14 +30,14 @@ import jitstatic.JitStaticConstants;
 import jitstatic.SourceChecker;
 import jitstatic.util.Pair;
 
-public class JitstaticReceivePack extends ReceivePack {
+public class JitStaticReceivePack extends ReceivePack {
 
-	private static final Logger LOG = LogManager.getLogger(JitstaticReceivePack.class);
+	private static final Logger LOG = LogManager.getLogger(JitStaticReceivePack.class);
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
 	private final String defaultRef;
 	private final ExecutorService repoExecutor;
 
-	public JitstaticReceivePack(final Repository into, final String defaultRef, ExecutorService service, ErrorReporter errorReporter) {
+	public JitStaticReceivePack(final Repository into, final String defaultRef, ExecutorService service, ErrorReporter errorReporter) {
 		super(into);
 		this.defaultRef = Objects.requireNonNull(defaultRef);
 		this.repoExecutor = Executors.newSingleThreadExecutor();
