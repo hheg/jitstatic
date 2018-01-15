@@ -125,9 +125,9 @@ public class RemoteManagerTest {
 	@Test
 	public void testGetStorageInptuStream() throws Exception {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
-		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenReturn(null);
+		when(rmr.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(null);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS, null);) {
-			assertNull(rrm.getSourceStream("key", null));
+			assertNull(rrm.getSourceInfo("key", null));
 		}
 	}
 	
@@ -135,9 +135,28 @@ public class RemoteManagerTest {
 	public void testGetStorageInptuStreamGetException() throws Exception {
 		ex.expect(RefNotFoundException.class);
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
-		when(rmr.getStorageInputStream(Mockito.anyString(), Mockito.anyString())).thenThrow(RefNotFoundException.class);
+		when(rmr.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenThrow(RefNotFoundException.class);
 		try (RemoteManager rrm = new RemoteManager(rmr, exec, 1, TimeUnit.SECONDS, null);) {
-			assertNull(rrm.getSourceStream("key", null));
+			assertNull(rrm.getSourceInfo("key", null));
+		}
+	}
+	
+	@Test
+	public void testModify() {
+		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
+		try (RemoteManager rrm = new RemoteManager(rmr, exec, 0, TimeUnit.SECONDS, null);) {
+			rrm.modify(null, "1", "some", "test", "mail", "key", rrm.getDefaultRef());
+			rrm.modify(null, "1", "some", "test", "mail", "key", null);
+		}
+	}
+	
+	@Test
+	public void testModifyTag() {
+		ex.expect(UnsupportedOperationException.class);
+		ex.expectMessage("Tags cannot be modified");
+		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
+		try (RemoteManager rrm = new RemoteManager(rmr, exec, 0, TimeUnit.SECONDS, null);) {
+			rrm.modify(null, "1", "some", "test", "mail", "key", "refs/tags/tag");
 		}
 	}
 

@@ -22,7 +22,6 @@ package jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration.Dynamic;
@@ -38,12 +37,6 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jgit.http.server.GitServlet;
-import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PreReceiveHookChain;
-import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,8 +126,8 @@ public class HostedFactory extends StorageInfo {
 	}
 
 	public Source build(final Environment env) throws CorruptedSourceException, IOException {
-		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(),
-				getHostedEndpoint(), getBranch());
+		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
+				getBranch());
 
 		final String baseServletPath = "/" + getServletName() + "/*";
 		LOG.info("Configuring hosted GIT environment on " + baseServletPath);
@@ -142,18 +135,7 @@ public class HostedFactory extends StorageInfo {
 
 		gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
-		gs.setReceivePackFactory(new DefaultReceivePackFactory() {
-			@Override
-			public ReceivePack create(final HttpServletRequest req, final Repository db)
-					throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-				final ReceivePack rp = super.create(req, db);
-				rp.setAtomic(true);
-				rp.setPreReceiveHook(PreReceiveHookChain
-						.newChain(Arrays.asList(new LogoPoster(), hostedGitRepositoryManager.getPreHook())));
-				rp.setPostReceiveHook(hostedGitRepositoryManager.getPostHook());
-				return rp;
-			}
-		});
+		gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
 
 		final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
 		servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());

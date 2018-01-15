@@ -37,6 +37,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -78,7 +81,9 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
-public class JitStaticPreReceiveHookTest {
+import jitstatic.utils.ErrorConsumingThreadFactory;
+
+public class JitStaticReceivePackTest {
 
 	private static final String REF_HEADS_MASTER = "refs/heads/master";
 	private static final String STORE = "store";
@@ -101,6 +106,9 @@ public class JitStaticPreReceiveHookTest {
 	private Path storePath;
 	private TestProtocol<Object> protocol;
 	private URIish uri;
+	private ExecutorService service;
+	private ErrorReporter errorReporter;
+	private RepositoryBus bus;
 
 	@Before
 	public void setup() throws IllegalStateException, GitAPIException, IOException {
@@ -113,10 +121,13 @@ public class JitStaticPreReceiveHookTest {
 		clientGit.add().addFilepattern(STORE).call();
 		clientGit.commit().setMessage("Initial commit").call();
 		clientGit.push().call();
-
+		
+		errorReporter = new ErrorReporter();
+		bus = new RepositoryBus(errorReporter);
+		service = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("testRepo", errorReporter::setFault));
+		
 		protocol = new TestProtocol<Object>(null, (req, db) -> {
-			final ReceivePack receivePack = new ReceivePack(db);
-			receivePack.setPreReceiveHook(new JitStaticPreReceiveHook(REF_HEADS_MASTER));
+			final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
 			return receivePack;
 
 		});
@@ -124,10 +135,13 @@ public class JitStaticPreReceiveHookTest {
 	}
 
 	@After
-	public void tearDown() {
+	public void tearDown() throws InterruptedException {
 		remoteBareGit.close();
 		clientGit.close();
 		Transport.unregister(protocol);
+		service.shutdown();
+		service.awaitTermination(1, TimeUnit.SECONDS);
+		assertEquals(null,errorReporter.getFault());
 	}
 
 	@Test
@@ -157,7 +171,7 @@ public class JitStaticPreReceiveHookTest {
 			tn.push(NullProgressMonitor.INSTANCE, toPush);
 			for (RemoteRefUpdate rru : toPush) {
 				assertEquals("" + rru.getMessage(), Status.REJECTED_OTHER_REASON, rru.getStatus());
-				assertEquals("Error in branch refs/heads/newbranch",rru.getMessage());
+				assertEquals("Error in branch refs/heads/newbranch", rru.getMessage());
 			}
 		}
 	}
@@ -178,7 +192,8 @@ public class JitStaticPreReceiveHookTest {
 		clientGit.commit().setMessage("Newer commit").call();
 		Iterable<PushResult> pushCall = clientGit.push().call();
 		int cntr = 0;
-		for (@SuppressWarnings("unused") PushResult pr : pushCall) {
+		for (@SuppressWarnings("unused")
+		PushResult pr : pushCall) {
 			cntr++;
 		}
 		assertTrue(cntr == 1);
@@ -245,21 +260,26 @@ public class JitStaticPreReceiveHookTest {
 		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
 		RevCommit c = clientGit.commit().setMessage("New commit").call();
 
-		ReceivePack rp = new ReceivePack(remoteRepository);
-
 		ReceiveCommand rc = new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE);
 
-		JitStaticPreReceiveHook js = new JitStaticPreReceiveHook(REF_HEADS_MASTER);
-		js.onPreReceive(rp, Arrays.asList(rc));
+		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+			@Override
+			protected List<ReceiveCommand> filterCommands(Result want) {
+				return Arrays.asList(rc);
+			}
+		};
+		rp.executeCommands();
+
 		assertEquals(Result.REJECTED_NOCREATE, rc.getResult());
 		assertEquals("Couldn't create test branch for " + REF_HEADS_MASTER + " because " + errormsg, rc.getMessage());
+		assertEquals(null, rp.getFault());
 	}
 
 	@Test
 	public void testRepositoryFailsIOExceptionWhenGettingRef() throws Exception {
 		Repository remoteRepository = Mockito.mock(Repository.class);
 		RefUpdate ru = Mockito.mock(RefUpdate.class);
-		
+
 		final String errormsg = "Triggered fault";
 
 		RemoteTestUtils.copy("/test3.json", storePath);
@@ -268,29 +288,70 @@ public class JitStaticPreReceiveHookTest {
 		RevCommit c = clientGit.commit().setMessage("New commit").call();
 
 		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
-		ReceivePack rp = Mockito.spy(new ReceivePack(remoteRepository));
-		
+
 		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-		
+
 		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
 		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+		Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
 		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
 		Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-		JitStaticPreReceiveHook js = new JitStaticPreReceiveHook(REF_HEADS_MASTER);
-		js.onPreReceive(rp, Arrays.asList(rc));
+		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+			@Override
+			protected List<ReceiveCommand> filterCommands(Result want) {
+				return Arrays.asList(rc);
+			}
+		};
+		rp.executeCommands();
 
 		assertEquals(errormsg, rc.getMessage());
 		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+		assertEquals(errormsg, rp.getFault().getMessage());
+	}
 
+	@Test
+	public void testRepositoryFailsIOExceptionWhenDeletingTemporaryBranch() throws Exception {
+		Repository remoteRepository = Mockito.mock(Repository.class);
+		RefUpdate ru = Mockito.mock(RefUpdate.class);
+
+		final String errormsg = "Test Triggered fault";
+
+		RemoteTestUtils.copy("/test3.json", storePath);
+		clientGit.add().addFilepattern(STORE).call();
+		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+		RevCommit c = clientGit.commit().setMessage("New commit").call();
+
+		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+
+		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
+
+		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
+		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+		Mockito.when(ru.delete()).thenThrow(new RuntimeException(errormsg));
+		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
+		Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+
+		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+			@Override
+			protected List<ReceiveCommand> filterCommands(Result want) {
+				return Arrays.asList(rc);
+			}
+		};
+		rp.executeCommands();
+
+		assertEquals(errormsg, rc.getMessage());
+		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+		assertEquals("General error while deleting branches " + errormsg, rp.getFault().getMessage());
 	}
 
 	@Test
 	public void testRepositoryFailsGeneralError() throws Exception {
 		Repository remoteRepository = Mockito.mock(Repository.class);
 		RefUpdate ru = Mockito.mock(RefUpdate.class);
-		
+
 		final String errormsg = "Triggered error";
 
 		RemoteTestUtils.copy("/test3.json", storePath);
@@ -299,21 +360,26 @@ public class JitStaticPreReceiveHookTest {
 		RevCommit c = clientGit.commit().setMessage("New commit").call();
 
 		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
-		ReceivePack rp = Mockito.spy(new ReceivePack(remoteRepository));
-		
+
 		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-		
+		JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+			@Override
+			protected List<ReceiveCommand> filterCommands(Result want) {
+				return Arrays.asList(rc);
+			}
+		});
 		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
 		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+		Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
 		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
 		Mockito.doThrow(new RuntimeException(errormsg)).doCallRealMethod().when(rp).sendMessage(Mockito.any());
 
-		JitStaticPreReceiveHook js = new JitStaticPreReceiveHook(REF_HEADS_MASTER);
-		js.onPreReceive(rp, Arrays.asList(rc));
+		rp.executeCommands();
 
-		assertEquals(errormsg, rc.getMessage());
+		assertEquals("General error " + errormsg, rc.getMessage());
 		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+		assertEquals("General error " + errormsg, rp.getFault().getMessage());
 	}
 
 	@Test
@@ -323,11 +389,16 @@ public class JitStaticPreReceiveHookTest {
 		Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
 		clientGit.checkout().setName("other").call();
 		clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
-		ReceivePack rp = new ReceivePack(remoteBareGit.getRepository());
-
 		ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
-		JitStaticPreReceiveHook js = new JitStaticPreReceiveHook(REF_HEADS_MASTER);
-		js.onPreReceive(rp, Arrays.asList(rc));
+		JitStaticReceivePack rp = Mockito
+				.spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
+					@Override
+					protected List<ReceiveCommand> filterCommands(Result want) {
+						return Arrays.asList(rc);
+					}
+				});
+		rp.executeCommands();
 		assertEquals(Result.REJECTED_NODELETE, rc.getResult());
+		assertEquals(null, rp.getFault());
 	}
 }

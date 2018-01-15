@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic.utils;
 
 /*-
  * #%L
@@ -27,7 +27,9 @@ import java.util.function.Consumer;
 
 import org.junit.Test;
 
-public class StorageThreadFactoryTest {
+import jitstatic.utils.ErrorConsumingThreadFactory;
+
+public class ErrorConssumingThreadFactoryTest {
 
 	@Test
 	public void testCatchingException() throws InterruptedException {
@@ -36,7 +38,7 @@ public class StorageThreadFactoryTest {
 		Consumer<Exception> test = t -> {
 			ar.set(t);
 		};
-		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		ErrorConsumingThreadFactory storageThreadFactory = new ErrorConsumingThreadFactory("test", test);
 		Thread newThread = storageThreadFactory.newThread(() -> {
 			throw runtimeException;
 		});
@@ -52,7 +54,7 @@ public class StorageThreadFactoryTest {
 		Consumer<Exception> test = t -> {
 			ar.set(t);
 		};
-		StorageThreadFactory storageThreadFactory = new StorageThreadFactory("test", test);
+		ErrorConsumingThreadFactory storageThreadFactory = new ErrorConsumingThreadFactory("test", test);
 		Thread newThread = storageThreadFactory.newThread(() -> {
 			throw error;
 		});
