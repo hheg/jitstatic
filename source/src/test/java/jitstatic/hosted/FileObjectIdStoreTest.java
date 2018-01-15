@@ -26,6 +26,8 @@ import static org.junit.Assert.assertNotEquals;
 import org.eclipse.jgit.lib.ObjectId;
 import org.junit.Test;
 
+import jitstatic.FileObjectIdStore;
+
 public class FileObjectIdStoreTest {
 
 	@Test

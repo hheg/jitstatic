@@ -1,4 +1,4 @@
-package jitstatic.hosted;
+package jitstatic;
 
 import java.util.Objects;
 

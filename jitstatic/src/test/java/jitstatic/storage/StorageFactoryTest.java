@@ -62,7 +62,7 @@ public class StorageFactoryTest {
 	@Test
 	public void testBuild() throws InterruptedException, ExecutionException {
 		when(env.jersey()).thenReturn(jersey);
-		try (Storage storage = sf.build(source, env, null);) {
+		try (Storage storage = sf.build(source, env);) {
 			storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
 			assertNull(storage.get("key", null).get());
 		}
@@ -76,14 +76,14 @@ public class StorageFactoryTest {
 		when(env.jersey()).thenReturn(jersey);
 		ex.expect(NullPointerException.class);
 		ex.expectMessage("Source cannot be null");
-		try (Storage storage = sf.build(null, env, null);) {
+		try (Storage storage = sf.build(null, env);) {
 		}
 	}
 
 	@Test
 	public void testListener() {
 		when(env.jersey()).thenReturn(jersey);
-		try (Storage build = sf.build(source, env, null);) {
+		try (Storage build = sf.build(source, env);) {
 			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
 			verify(source).addListener(c.capture());
 			c.getValue().onEvent(Collections.emptyList());			
@@ -93,7 +93,7 @@ public class StorageFactoryTest {
 	@Test
 	public void testListenerWithNullArgument() {
 		when(env.jersey()).thenReturn(jersey);
-		try (Storage build = sf.build(source, env, null);) {
+		try (Storage build = sf.build(source, env);) {
 			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
 			verify(source).addListener(c.capture());
 			c.getValue().onEvent(null);			

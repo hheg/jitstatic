@@ -1,10 +1,10 @@
-package jitstatic;
+package jitstatic.remote;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,42 +20,26 @@ package jitstatic;
  * #L%
  */
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class LinkedException extends Exception {
+public class RemoteUpdateException extends Exception {
 
 	private static final long serialVersionUID = 1L;
-	private final List<Exception> exceptions = new ArrayList<>();
 
-	public LinkedException() {
-		super("");
+	private final List<String> errors;
+	
+	public RemoteUpdateException(final List<String> errors) {
+		this.errors = errors;
 	}
-
-	public void add(final Exception e) {
-		if (e != null) {
-			exceptions.add(e);
-		}
-	}
-
+	
 	@Override
 	public Throwable fillInStackTrace() {
 		return this;
 	}
-
+	
 	@Override
 	public String getMessage() {
-		return exceptions.stream().map(e -> e.getClass().toString() + ": " + e.getMessage())
-				.collect(Collectors.joining(System.lineSeparator()));
-	}
-
-	public void addAll(List<Exception> errors) {
-		exceptions.addAll(Objects.requireNonNull(errors));
-	}
-
-	public boolean isEmpty() {
-		return exceptions.isEmpty();
+		return errors.stream().collect(Collectors.joining(System.lineSeparator()));
 	}
 }

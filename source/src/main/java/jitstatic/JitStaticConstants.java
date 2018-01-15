@@ -22,10 +22,8 @@ package jitstatic;
 
 import org.eclipse.jgit.lib.Constants;
 
-public class JitStaticConstants {
+public interface JitStaticConstants {
 
-	public static final String REF_JISTSTATIC = Constants.R_REFS + "jistatic/";
+	public static final String REFS_JISTSTATIC = Constants.R_REFS + "jistatic/";
 
-	private JitStaticConstants() {
-	}
 }

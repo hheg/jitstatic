@@ -23,8 +23,8 @@ package jitstatic.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,12 +32,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,15 +46,20 @@ import org.eclipse.jgit.lib.Constants;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.spencerwi.either.Either;
 
 import jitstatic.source.Source;
-import jitstatic.util.Pair;
-import jitstatic.util.SinkIterator;
+import jitstatic.source.SourceInfo;
+import jitstatic.utils.WrappingAPIException;
+import jitstatic.utils.ErrorConsumingThreadFactory;
+import jitstatic.utils.LinkedException;
+import jitstatic.utils.Pair;
 
 public class GitStorage implements Storage {
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
-	private final Map<String, Map<String, StorageData>> cache = new ConcurrentHashMap<>();
+	private final Map<String, Map<String, StoreInfo>> cache = new ConcurrentHashMap<>();
 	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
 	private final ExecutorService refExecutor;
@@ -64,97 +69,73 @@ public class GitStorage implements Storage {
 
 	public GitStorage(final Source source, final String defaultRef) {
 		this.source = Objects.requireNonNull(source, "Source cannot be null");
-		refExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("ref", this::consumeError));
-		keyExecutor = Executors.newSingleThreadExecutor(new StorageThreadFactory("key", this::consumeError));
+		this.refExecutor = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("ref", this::consumeError));
+		this.keyExecutor = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("key", this::consumeError));
 		this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
 	}
 
 	public void reload(final List<String> refsToReload) {
 		Objects.requireNonNull(refsToReload);
-		final List<CompletableFuture<Void>> tasks = new ArrayList<>(refsToReload.size());
-		refsToReload.stream().forEach(ref -> {
-			tasks.add(CompletableFuture.supplyAsync(() -> {
-				final Map<String, StorageData> map = cache.get(ref);
+		final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(ref -> {
+			LOG.info("Reloading " + ref);
+			return CompletableFuture.supplyAsync(() -> {
+				final Map<String, StoreInfo> map = cache.get(ref);
 				if (map != null) {
 					return new HashSet<>(map.keySet());
 				}
-				return null;
+				return Collections.<String>emptySet();
 			}, refExecutor).thenApplyAsync(files -> {
-				if (files != null) {
-					final Iterator<CompletableFuture<Optional<Pair<String, StorageData>>>> refreshTaskIterator = new SinkIterator<>(
-							refresh(ref, files));
-					final Map<String, StorageData> newMap = new ConcurrentHashMap<>(files.size());
-					while (refreshTaskIterator.hasNext()) {
-						final CompletableFuture<Optional<Pair<String, StorageData>>> next = refreshTaskIterator.next();
-						// TODO Fix if a branch is deleted and how to deal with it's absence
-						if (next.isDone()) {
-							final Optional<Pair<String, StorageData>> fileInfo = unwrap(next);
-							fileInfo.ifPresent(p -> {
-								final StorageData data = p.getRight();
-								if (data != null) {
-									newMap.put(p.getLeft(), data);
-								}
-							});
-							refreshTaskIterator.remove();
-						}
+				return waitForTasks(refresh(ref, files)).thenApply(list -> {
+					final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
+					if (!faults.isEmpty()) {
+						throw new LinkedException(faults);
 					}
-					return newMap;
+					return list.stream().filter(Either::isLeft).map(Either::getLeft).filter(Optional::isPresent).map(Optional::get)
+							.filter(p -> p.getRight() != null).collect(Collectors.toConcurrentMap(Pair::getLeft, Pair::getRight));
+				});
+			}).thenCompose(future -> future).thenAcceptAsync(map -> {
+				if (map.size() > 0) {
+					final Map<String, StoreInfo> originalMap = cache.get(ref);
+					originalMap.entrySet().stream().filter(e -> !map.containsKey(e.getKey()))
+							.forEach(e -> map.put(e.getKey(), e.getValue()));
+					cache.put(ref, map);
+				} else {
+					cache.remove(ref);
 				}
-				return null;
-			}).thenAcceptAsync(m -> {
-				if (m != null) {
-					if (m.size() > 0) {
-						final Map<String, StorageData> map = cache.get(ref);
-						map.entrySet().stream().filter(e -> !m.containsKey(e.getKey()))
-								.forEach(e -> m.put(e.getKey(), e.getValue()));
-						cache.put(ref, m);
-					} else {
-						cache.remove(ref);
-					}
-				}
-			}, refExecutor));
-		});
+			},refExecutor);
+		}).collect(Collectors.toCollection(() -> new ArrayList<>(refsToReload.size())));
 		// TODO Make detaching selectable
-		waitForTasks(tasks);
-	}
-
-	private void waitForTasks(final List<CompletableFuture<Void>> t) {
-		final Iterator<CompletableFuture<Void>> tasksIterator = new SinkIterator<>(t);
-		while (tasksIterator.hasNext()) {
-			final CompletableFuture<Void> next = tasksIterator.next();
-			if (next.isDone()) {
-				tasksIterator.remove();
+		waitForTasks(tasks).thenAccept(l -> {
+			final List<Exception> errors = l.stream().filter(Either::isRight).map(e -> e.getRight()).collect(Collectors.toList());
+			if (!errors.isEmpty()) {
+				consumeError(new LinkedException(errors));
 			}
-		}
+		}).join();
 	}
 
-	private Optional<Pair<String, StorageData>> unwrap(
-			final CompletableFuture<Optional<Pair<String, StorageData>>> next) {
-		try {
-			return next.get();
-		} catch (InterruptedException | ExecutionException e) {
-			consumeError(e);
-		}
-		return Optional.empty();
+	private static <T> CompletableFuture<List<Either<T, Exception>>> waitForTasks(final List<CompletableFuture<T>> task) {
+		CompletableFuture<Void> all = CompletableFuture.allOf(task.toArray(new CompletableFuture[task.size()]));
+		return all.thenApply(v -> task.stream().map(future -> {
+			try {
+				return Either.<T, Exception>left(future.join());
+			} catch (final Exception e) {
+				return Either.<T, Exception>right(e);
+			}
+		}).collect(Collectors.toList()));
 	}
 
-	private List<CompletableFuture<Optional<Pair<String, StorageData>>>> refresh(final String ref,
-			final Set<String> map) {
-		final Iterator<String> itr = map.iterator();
-		final List<CompletableFuture<Optional<Pair<String, StorageData>>>> tasks = new ArrayList<>(map.size());
-		while (itr.hasNext()) {
-			final String next = itr.next();
-			tasks.add(CompletableFuture.supplyAsync(() -> {
+	private List<CompletableFuture<Optional<Pair<String, StoreInfo>>>> refresh(final String ref, final Set<String> map) {
+		return map.stream().map(key -> {
+			return CompletableFuture.supplyAsync(() -> {
 				try {
-					return Optional.of(new Pair<String, StorageData>(next, load(next, ref)));
+					return Optional.of(Pair.of(key, load(key, ref)));
 				} catch (final IOException e) {
 					consumeError(e);
 				} catch (final RefNotFoundException ignore) {
 				}
-				return Optional.empty();
-			}));
-		}
-		return tasks;
+				return Optional.<Pair<String, StoreInfo>>empty();
+			});
+		}).collect(Collectors.toCollection(() -> new ArrayList<>(map.size())));
 	}
 
 	private void consumeError(final Exception e) {
@@ -165,23 +146,23 @@ public class GitStorage implements Storage {
 	}
 
 	@Override
-	public Future<StorageData> get(final String key, String ref) {
+	public Future<StoreInfo> get(final String key, String ref) {
 		Objects.requireNonNull(key);
 		if (ref == null) {
 			ref = defaultRef;
 		}
 		final String r = ref;
-		final Map<String, StorageData> refMap = cache.get(ref);
+		final Map<String, StoreInfo> refMap = cache.get(ref);
 		if (refMap == null) {
 			return CompletableFuture.supplyAsync(() -> {
-				Map<String, StorageData> map = cache.get(r);
+				Map<String, StoreInfo> map = cache.get(r);
 				if (map == null) {
 					map = new ConcurrentHashMap<>();
 					cache.put(r, map);
 				}
 				return map;
 			}, refExecutor).thenApplyAsync((map) -> {
-				final StorageData sd = this.loadAndStore(map, key, r);
+				final StoreInfo sd = this.loadAndStore(map, key, r);
 				if (map.isEmpty()) {
 					refExecutor.execute(() -> {
 						if (map.isEmpty()) {
@@ -193,22 +174,22 @@ public class GitStorage implements Storage {
 			}, keyExecutor);
 		}
 
-		final StorageData storageData = refMap.get(key);
-		if (storageData == null) {
+		final StoreInfo storeInfo = refMap.get(key);
+		if (storeInfo == null) {
 			return CompletableFuture.supplyAsync(() -> {
 				return this.loadAndStore(refMap, key, r);
 			}, keyExecutor);
 		}
-		return CompletableFuture.completedFuture(storageData);
+		return CompletableFuture.completedFuture(storeInfo);
 	}
 
-	private StorageData loadAndStore(final Map<String, StorageData> v, final String key, final String r) {
-		StorageData storageData = v.get(key);
-		if (storageData == null) {
+	private StoreInfo loadAndStore(final Map<String, StoreInfo> v, final String key, final String r) {
+		StoreInfo storeInfo = v.get(key);
+		if (storeInfo == null) {
 			try {
-				storageData = load(key, r);
-				if (storageData != null) {
-					v.put(key, storageData);
+				storeInfo = load(key, r);
+				if (storeInfo != null) {
+					v.put(key, storeInfo);
 				}
 			} catch (final RefNotFoundException e) {
 				return null;
@@ -216,13 +197,14 @@ public class GitStorage implements Storage {
 				consumeError(e);
 			}
 		}
-		return storageData;
+		return storeInfo;
 	}
 
-	private StorageData load(final String key, final String ref) throws IOException, RefNotFoundException {
-		try (final InputStream is = source.getSourceStream(key, ref)) {
-			if (is != null) {
-				return readStorage(is);
+	private StoreInfo load(final String key, final String ref) throws IOException, RefNotFoundException {
+		final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
+		if (sourceInfo != null) {
+			try (final InputStream is = sourceInfo.getInputStream()) {
+				return new StoreInfo(readStorage(is), sourceInfo.getVersion());
 			}
 		}
 		return null;
@@ -234,11 +216,11 @@ public class GitStorage implements Storage {
 		keyExecutor.shutdown();
 		try {
 			refExecutor.awaitTermination(10, TimeUnit.SECONDS);
-		} catch (InterruptedException ignore) {
+		} catch (final InterruptedException ignore) {
 		}
 		try {
 			keyExecutor.awaitTermination(10, TimeUnit.SECONDS);
-		} catch (InterruptedException ignore) {
+		} catch (final InterruptedException ignore) {
 		}
 		try {
 			source.close();
@@ -257,6 +239,45 @@ public class GitStorage implements Storage {
 	private StorageData readStorage(final InputStream storageStream) throws IOException {
 		try (final JsonParser parser = mapper.getFactory().createParser(storageStream);) {
 			return parser.readValueAs(StorageData.class);
+		}
+	}
+
+	@Override
+	public CompletableFuture<String> put(final JsonNode data, final String oldVersion, final String message, final String userInfo,
+			String userEmail, final String key, String ref) {
+		if (ref == null) {
+			ref = defaultRef;
+		}
+		Objects.requireNonNull(key, "key cannot be null");
+		Objects.requireNonNull(data, "data cannot be null");
+		Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
+		Objects.requireNonNull(userInfo, "userInfo cannot be null");
+
+		if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
+			throw new IllegalArgumentException("message cannot be empty");
+		}
+		final String finalRef = ref;
+		return CompletableFuture.supplyAsync(() -> {
+			final Map<String, StoreInfo> refMap = cache.get(finalRef);
+			if (refMap == null) {
+				throw new WrappingAPIException(new RefNotFoundException(finalRef));
+			}
+			final StoreInfo storeInfo = refMap.get(key);
+			if (storeInfo == null) {
+				throw new WrappingAPIException(new UnsupportedOperationException(key));
+			}
+			final String newVersion = source.modify(data, oldVersion, message, userInfo, userEmail, key, finalRef).join();
+			refreshKey(data, key, oldVersion, newVersion, refMap);
+			return newVersion;
+		}, keyExecutor);
+	}
+
+	private void refreshKey(final JsonNode data, final String key, final String oldversion, final String newVersion,
+			final Map<String, StoreInfo> refMap) {
+		final StoreInfo si = refMap.get(key);
+		if (si.getVersion().equals(oldversion)) {
+			final StorageData sd = si.getStorageData();
+			refMap.put(key, new StoreInfo(new StorageData(sd.getUsers(), data), newVersion));
 		}
 	}
 }

@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic.utils;
 
 /*-
  * #%L
@@ -27,14 +27,14 @@ import java.util.function.Consumer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-class StorageThreadFactory implements ThreadFactory {
+public class ErrorConsumingThreadFactory implements ThreadFactory {
 
-	private static final Logger LOG = LogManager.getLogger(StorageThreadFactory.class);
+	private static final Logger LOG = LogManager.getLogger(ErrorConsumingThreadFactory.class);
 	private final java.util.concurrent.ThreadFactory defaultThreadFactory;
 	private final String name;
 	private final Consumer<Exception> errorConsumer;
 
-	public StorageThreadFactory(final String name, final Consumer<Exception> errorConsumer) {
+	public ErrorConsumingThreadFactory(final String name, final Consumer<Exception> errorConsumer) {
 		defaultThreadFactory = Executors.defaultThreadFactory();
 		this.name = name;
 		this.errorConsumer = errorConsumer;

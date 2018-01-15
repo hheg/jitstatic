@@ -21,8 +21,8 @@ package jitstatic;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
@@ -57,6 +57,7 @@ import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
@@ -86,10 +87,10 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
 
 public class HostOwnGitRepositoryTest {
 
+	private static final String STORE = "store";
 	private static final String REFS_HEADS_NEWBRANCH = "refs/heads/newbranch";
 	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private static final String USER = "suser";
@@ -102,10 +103,8 @@ public class HostOwnGitRepositoryTest {
 	private final DropwizardAppRule<JitstaticConfiguration> DW;
 
 	@Rule
-	public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
-			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
-					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
-					ConfigOverride.config("hosted.basePath", getFolder()))));
+	public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
+			ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
@@ -121,28 +120,27 @@ public class HostOwnGitRepositoryTest {
 		provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
 		basic = getBasicAuth();
 		int localPort = DW.getLocalPort();
-		gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(),
-				hf.getHostedEndpoint());
+		gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
 		storageAdress = String.format("http://localhost:%d/application", localPort);
-		HCC.setConnectionRequestTimeout(Duration.minutes(1));
-		HCC.setConnectionTimeout(Duration.minutes(1));
-		HCC.setTimeout(Duration.minutes(1));
+		HCC.setConnectionRequestTimeout(Duration.hours(1));
+		HCC.setConnectionTimeout(Duration.hours(1));
+		HCC.setTimeout(Duration.hours(1));
 	}
 
 	@After
 	public void after() {
 		SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError())
-				.filter(Objects::nonNull).collect(Collectors.toList());
+		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
+				.collect(Collectors.toList());
 		errors.stream().forEach(e -> e.printStackTrace());
 		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
 	}
 
 	@Test
 	public void testCloneOwnHostedRepository() throws Exception {
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setCredentialsProvider(provider)
-				.setURI(gitAdress).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setCredentialsProvider(provider).setURI(gitAdress)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW);
@@ -151,9 +149,9 @@ public class HostOwnGitRepositoryTest {
 			git.push().setCredentialsProvider(provider).call();
 			assertTrue(Files.exists(path));
 		}
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setCredentialsProvider(provider)
-				.setURI(gitAdress).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setCredentialsProvider(provider).setURI(gitAdress)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			assertTrue(Files.exists(path));
 		}
@@ -164,8 +162,8 @@ public class HostOwnGitRepositoryTest {
 		ex.expect(NotFoundException.class);
 		Client client = buildClient("test10 client");
 		try {
-			client.target(String.format("%s/storage/key1", storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			client.target(String.format("%s/storage/key1", storageAdress)).request().header(HttpHeader.AUTHORIZATION.asString(), basic)
+					.get(JsonNode.class);
 		} finally {
 			client.close();
 		}
@@ -173,9 +171,9 @@ public class HostOwnGitRepositoryTest {
 
 	@Test
 	public void testPushToOwnHostedRepositoryAndFetchResultFromKeyValuestorage() throws Exception {
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -190,9 +188,9 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = client.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
+			JsonNode response = client.target(String.format("%s/storage/" + STORE, storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response.get("data"));
 		} finally {
 			client.close();
 		}
@@ -201,8 +199,8 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testPushToOwnHostedRepositoryAndFetchResultFromDoubleKeyValuestorage() throws Exception {
 		String localFilePath = "key/key1";
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
 
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
@@ -220,7 +218,7 @@ public class HostOwnGitRepositoryTest {
 		try {
 			JsonNode response = client.target(String.format("%s/storage/" + localFilePath, storageAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
+			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response.get("data"));
 		} finally {
 			client.close();
 		}
@@ -229,9 +227,9 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testPushToOwnHostedRepositoryWithBrokenJSONStorage() throws Exception {
 		String originalSHA = null;
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -255,9 +253,9 @@ public class HostOwnGitRepositoryTest {
 					remoteUpdate.getMessage().startsWith("Error in branch " + REFS_HEADS_MASTER));
 
 		}
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			assertNotNull(readSource(Paths.get(getRepopath(git), getLocalFilePath())));
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			assertNotNull(readSource(Paths.get(getRepopath(git), STORE)));
 			assertEquals(originalSHA, git.getRepository().resolve(Constants.MASTER).getName());
 		}
 	}
@@ -265,9 +263,9 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testPushToOwnHostedRepositoryWithNewBranch()
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -291,9 +289,9 @@ public class HostOwnGitRepositoryTest {
 	public void testPushToOwnHostedRepositoryWithNewBranchAndThenDelete()
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		Client client = buildClient("test4 client");
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -310,11 +308,9 @@ public class HostOwnGitRepositoryTest {
 			Map<String, Ref> refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
 			assertNotNull(refs.get(REFS_HEADS_NEWBRANCH));
 
-			JsonNode response = client
-					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/heads/newbranch",
-							storageAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(1), StorageData.class).getData(), response);
+			JsonNode response = client.target(String.format("%s/storage/" + STORE + "?ref=refs/heads/newbranch", storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals(MAPPER.readValue(getData(1), StorageData.class).getData(), response.get("data"));
 
 			git.checkout().setName("master").call();
 			List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
@@ -322,11 +318,10 @@ public class HostOwnGitRepositoryTest {
 
 			git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call();
 			refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
-			assertNull(refs.get(REFS_HEADS_NEWBRANCH));
+			assertEquals(ObjectId.zeroId(), refs.get(REFS_HEADS_NEWBRANCH).getObjectId());
 
-			Response resp = client.target(
-					String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/heads/newbranch", storageAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			Response resp = client.target(String.format("%s/storage/" + STORE + "?ref=refs/heads/newbranch", storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
 
 			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		}
@@ -341,9 +336,9 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testRemoveKey() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		Client client = buildClient("test4 client");
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -351,16 +346,19 @@ public class HostOwnGitRepositoryTest {
 			git.commit().setMessage("Inital commit").call();
 			git.push().setCredentialsProvider(provider).call();
 
-			JsonNode response = client.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
+			JsonNode response = client.target(String.format("%s/storage/" + STORE, storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			JsonNode version = response.get("version");
+			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response.get("data"));
 
 			git.rm().addFilepattern(localFilePath).call();
 			git.commit().setMessage("Removed file").call();
 			git.push().setCredentialsProvider(provider).call();
 
-			Response resp = client.target(String.format("%s/storage/" + getLocalFilePath(), storageAdress)).request()
+			Response resp = client.target(String.format("%s/storage/" + STORE, storageAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			JsonNode readEntity = resp.readEntity(JsonNode.class);
+			assertNotEquals(version, readEntity.get("version"));
 			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		} finally {
 			client.close();
@@ -368,12 +366,11 @@ public class HostOwnGitRepositoryTest {
 	}
 
 	@Test
-	public void testGetTag()
-			throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
+	public void testGetTag() throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException, AbortedByHookException, GitAPIException, IOException {
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress)
-				.setCredentialsProvider(provider).call()) {
-			String localFilePath = getLocalFilePath();
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
+				.call()) {
+			String localFilePath = STORE;
 			Path path = Paths.get(getRepopath(git), localFilePath);
 			Files.createDirectories(path.getParent());
 			Files.write(path, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
@@ -389,14 +386,12 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = client
-					.target(String.format("%s/storage/" + getLocalFilePath() + "?ref=refs/tags/tag", storageAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response);
+			JsonNode response = client.target(String.format("%s/storage/" + STORE + "?ref=refs/tags/tag", storageAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+			assertEquals(MAPPER.readValue(getData(), StorageData.class).getData(), response.get("data"));
 		} finally {
 			client.close();
 		}
-
 	}
 
 	private static Supplier<String> getFolder() {
@@ -429,11 +424,6 @@ public class HostOwnGitRepositoryTest {
 
 	private static String getRepopath(Git git) {
 		return git.getRepository().getDirectory().getParentFile().getAbsolutePath();
-	}
-
-	@Deprecated
-	private String getLocalFilePath() {
-		return "store";
 	}
 
 	private String getData() {

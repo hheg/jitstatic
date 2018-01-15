@@ -20,10 +20,10 @@ package jitstatic;
  * #L%
  */
 
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -50,10 +50,12 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -69,9 +71,9 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
-import jitstatic.hosted.FileObjectIdStore;
 import jitstatic.hosted.InputStreamHolder;
-import jitstatic.util.Pair;
+import jitstatic.source.SourceInfo;
+import jitstatic.utils.Pair;
 
 public class SourceExtractorTest {
 
@@ -161,7 +163,7 @@ public class SourceExtractorTest {
 			assertFalse(hasException.isPresent());
 
 			Optional<Pair<ObjectId, Set<String>>> reduce = allExtracted.values().stream().flatMap(l -> l.stream())
-					.map(m -> new Pair<ObjectId, Set<String>>(m.getLeft().getObjectId(),
+					.map(m -> Pair.<ObjectId, Set<String>>of(m.getLeft().getObjectId(),
 							new HashSet<>(Arrays.asList(m.getLeft().getFileName()))))
 					.reduce((a, b) -> {
 						assertEquals(a.getLeft(), b.getLeft());
@@ -189,7 +191,7 @@ public class SourceExtractorTest {
 			final SourceExtractor se = new SourceExtractor(git.getRepository());
 			Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> sourceBranchExtractor = se
 					.sourceBranchExtractor(REFS_HEADS_MASTER);
-			assertEquals(1,sourceBranchExtractor.getRight().size());
+			assertEquals(1, sourceBranchExtractor.getRight().size());
 			Pair<FileObjectIdStore, InputStreamHolder> p = sourceBranchExtractor.getRight().get(0);
 			assertNotNull(p.getRight());
 			local.rm().addFilepattern(key).call();
@@ -197,9 +199,8 @@ public class SourceExtractorTest {
 			local.commit().setMessage("Removed file").call();
 			local.push().call();
 
-			sourceBranchExtractor = se
-					.sourceBranchExtractor(REFS_HEADS_MASTER);
-			assertEquals(0,sourceBranchExtractor.getRight().size());
+			sourceBranchExtractor = se.sourceBranchExtractor(REFS_HEADS_MASTER);
+			assertEquals(0, sourceBranchExtractor.getRight().size());
 		}
 	}
 
@@ -217,7 +218,8 @@ public class SourceExtractorTest {
 			local.push().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openBranch(Constants.R_HEADS + Constants.MASTER, key);) {
+		SourceInfo branch = se.openBranch(Constants.R_HEADS + Constants.MASTER, key);
+		try (final InputStream is = branch.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);
@@ -255,7 +257,8 @@ public class SourceExtractorTest {
 			local.push().setPushTags().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openTag(Constants.R_TAGS + "tag", key);) {
+		SourceInfo tag = se.openTag(Constants.R_TAGS + "tag", key);
+		try (final InputStream is = tag.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);
@@ -277,7 +280,8 @@ public class SourceExtractorTest {
 			local.push().call();
 		}
 		SourceExtractor se = new SourceExtractor(git.getRepository());
-		try (final InputStream is = se.openBranch(Constants.R_HEADS + "notexisting", key);) {
+		SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
+		try (final InputStream is = branch.getInputStream();) {
 			assertNotNull(is);
 			String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
 			assertEquals(getData(), parsed);
@@ -330,7 +334,7 @@ public class SourceExtractorTest {
 	public void testSourceTestBranchExtractorWrongRefName()
 			throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException, AbortedByHookException, GitAPIException, IOException {
-		final String branch = JitStaticConstants.REF_JISTSTATIC + "something";
+		final String branch = JitStaticConstants.REFS_JISTSTATIC + "something";
 		final String key = "file";
 		File temporaryGitFolder = folder.newFolder();
 		try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder)
@@ -376,6 +380,23 @@ public class SourceExtractorTest {
 		se.openBranch("branch", null);
 	}
 
+	@Test
+	public void testCheckNotExistingFile() throws IOException, InvalidRemoteException, TransportException, GitAPIException {
+		final String key = "file";
+		final File tempGitFolder = folder.newFolder();
+		try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString())
+				.setDirectory(tempGitFolder).call()) {
+			final Path file = tempGitFolder.toPath().resolve(key);
+			Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW,
+					StandardOpenOption.TRUNCATE_EXISTING);
+			local.add().addFilepattern(key).call();
+			local.commit().setMessage("Init commit").call();
+			local.push().call();
+		}
+		SourceExtractor se = new SourceExtractor(git.getRepository());
+		assertNull(se.openBranch(REFS_HEADS_MASTER, "notexisting"));
+	}
+	
 	private final Function<Exception, String> pe = (e) -> {
 		return e.getMessage() + Stream.of(e.getStackTrace()).map(st -> st.toString())
 				.collect(Collectors.joining(System.lineSeparator()));
