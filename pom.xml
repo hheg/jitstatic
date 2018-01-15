@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
-	<version>0.4.3-modifyapi-SNAPSHOT</version>
+	<version>0.4.3-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<modules>
 		<module>jitstatic</module>
