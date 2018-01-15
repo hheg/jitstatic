@@ -85,7 +85,7 @@ public class JitstaticApplicationTest {
 		when(environment.lifecycle()).thenReturn(lifecycle);
 		when(environment.jersey()).thenReturn(jersey);
 		when(environment.healthChecks()).thenReturn(hcr);
-		when(storageFactory.build(any(), isA(Environment.class), any())).thenReturn(storage);
+		when(storageFactory.build(any(), isA(Environment.class))).thenReturn(storage);
 	}
 
 	@Test
@@ -192,7 +192,7 @@ public class JitstaticApplicationTest {
 		config.setHostedFactory(hostedFactory);
 		config.setRemoteFactory(remoteFactory);
 		when(hostedFactory.build(environment)).thenReturn(source);
-		when(storageFactory.build(source, environment, null)).thenReturn(storage);
+		when(storageFactory.build(source, environment)).thenReturn(storage);
 		app.run(config, environment);
 	}
 }

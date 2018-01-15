@@ -24,6 +24,8 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import jitstatic.utils.LinkedException;
+
 public class LinkedExceptionTest {
 
 	@Test

@@ -22,10 +22,10 @@ import java.io.IOException;
  * #L%
  */
 
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -34,9 +34,12 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
+import jitstatic.source.SourceInfo;
 
 class RemoteManager implements Source {
 
@@ -55,8 +58,8 @@ class RemoteManager implements Source {
 				new ScheduledThreadPoolExecutor(1), duration, unit, defaultRef);
 	}
 
-	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledExecutorService scheduler,
-			final long duration, final TimeUnit unit, final String defaultRef) {
+	RemoteManager(final RemoteRepositoryManager remoteRepoManager, final ScheduledExecutorService scheduler, final long duration,
+			final TimeUnit unit, final String defaultRef) {
 		this.remoteRepoManager = Objects.requireNonNull(remoteRepoManager);
 		this.poller = Objects.requireNonNull(scheduler);
 		this.unit = Objects.requireNonNull(unit);
@@ -71,6 +74,10 @@ class RemoteManager implements Source {
 			j.cancel(false);
 		}
 		this.poller.shutdown();
+		try {
+			this.poller.awaitTermination(10, TimeUnit.SECONDS);
+		} catch (final InterruptedException ignore) {
+		}
 		this.remoteRepoManager.close();
 	}
 
@@ -93,22 +100,28 @@ class RemoteManager implements Source {
 	}
 
 	@Override
-	public InputStream getSourceStream(final String key, String ref) throws RefNotFoundException {
-		try {
-			if (ref == null) {
-				ref = defaultRef;
-			}
-			return remoteRepoManager.getStorageInputStream(key, ref);
-		} catch (final RefNotFoundException e) {
-			throw e;
-		} catch (final Exception e) {
-			throw new RuntimeException(e);
+	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
+		if (ref == null) {
+			ref = defaultRef;
 		}
+		return remoteRepoManager.getSourceInfo(key, ref);
 	}
 
 	@Override
 	public String getDefaultRef() {
 		return defaultRef;
+	}
+
+	@Override
+	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
+			final String userMail, final String key, String ref) {
+		if(ref == null){
+			ref = defaultRef;
+		}
+		if(ref.startsWith(Constants.R_TAGS)) {
+			throw new UnsupportedOperationException("Tags cannot be modified");
+		}
+		return remoteRepoManager.modify(data, version, message, userInfo, userMail, key, ref);
 	}
 
 }

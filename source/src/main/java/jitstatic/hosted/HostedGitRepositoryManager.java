@@ -21,7 +21,6 @@ package jitstatic.hosted;
  */
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -29,6 +28,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -39,28 +42,40 @@ import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+
 import jitstatic.CorruptedSourceException;
-import jitstatic.LinkedException;
+import jitstatic.FileObjectIdStore;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
+import jitstatic.SourceUpdater;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
-import jitstatic.util.Pair;
+import jitstatic.source.SourceInfo;
+import jitstatic.utils.ErrorConsumingThreadFactory;
+import jitstatic.utils.Pair;
+import jitstatic.utils.VersionIsNotSameException;
+import jitstatic.utils.WrappingAPIException;
 
 class HostedGitRepositoryManager implements Source {
-
+	private static final ObjectWriter MAPPER = new ObjectMapper().writerFor(JsonNode.class).withDefaultPrettyPrinter();
 	private final Repository bareRepository;
 	private final String endPointName;
-	private final JitStaticPostReceiveHook postHook;
-	private final JitStaticPreReceiveHook preHook;
 	private final SourceExtractor extractor;
 	private final String defaultRef;
+	private final JitStaticReceivePackFactory receivePackFactory;
+	private final ErrorReporter errorReporter;
+	private final RepositoryBus repositoryBus;
+	private final ExecutorService repoExecutor;
+	private final SourceUpdater updater;
 
-	public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
-			throws CorruptedSourceException, IOException {
-
+	HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
+			final ExecutorService repoExecutor, final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
 		if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
 			throw new IllegalArgumentException(String.format("Path %s is not a directory", workingDirectory));
 		}
@@ -80,21 +95,34 @@ class HostedGitRepositoryManager implements Source {
 			throw new RuntimeException(e);
 		}
 
-		final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(
-				this.bareRepository);
+		final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(this.bareRepository);
 
 		if (!errors.isEmpty()) {
 			throw new CorruptedSourceException(errors);
 		}
 		checkIfDefaultBranchExist(defaultRef);
 		this.extractor = new SourceExtractor(this.bareRepository);
-
-		this.postHook = new JitStaticPostReceiveHook();
-		this.preHook = new JitStaticPreReceiveHook(defaultRef);
+		this.updater = new SourceUpdater(this.bareRepository);
+		this.repositoryBus = new RepositoryBus(errorReporter);
+		this.receivePackFactory = new JitStaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
+				errorReporter, defaultRef, repositoryBus);
 		this.defaultRef = defaultRef;
+		this.errorReporter = errorReporter;
+		this.repoExecutor = repoExecutor;
 	}
 
-	private void checkIfDefaultBranchExist(String defaultRef) throws IOException {
+	private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
+			final ErrorReporter reporter) throws CorruptedSourceException, IOException {
+		this(workingDirectory, endPointName, defaultRef,
+				Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("repo", reporter::setFault)), reporter);
+	}
+
+	public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
+			throws CorruptedSourceException, IOException {
+		this(workingDirectory, endPointName, defaultRef, new ErrorReporter());
+	}
+
+	private void checkIfDefaultBranchExist(final String defaultRef) throws IOException {
 		Objects.requireNonNull(defaultRef, "defaultBranch cannot be null");
 		if (defaultRef.isEmpty()) {
 			throw new IllegalArgumentException("defaultBranch cannot be empty");
@@ -104,22 +132,19 @@ class HostedGitRepositoryManager implements Source {
 		}
 	}
 
-	private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(
-			final Repository bareRepository) {
+	private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(final Repository bareRepository) {
 		try (final SourceChecker sc = new SourceChecker(bareRepository)) {
 			return sc.check();
 		}
 	}
 
-	private static Repository setUpBareRepository(final Path repositoryBase)
-			throws IOException, IllegalStateException, GitAPIException {
-		final Repository repo = getRepository(repositoryBase);
+	private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
+		Repository repo = getRepository(repositoryBase);
 		if (repo == null) {
 			Files.createDirectories(repositoryBase);
-			final Repository repository = Git.init().setDirectory(repositoryBase.toFile()).setBare(true).call()
-					.getRepository();
-			return repository;
+			repo = Git.init().setDirectory(repositoryBase.toFile()).setBare(true).call().getRepository();			
 		}
+		repo.incrementOpen();
 		return repo;
 	}
 
@@ -133,6 +158,11 @@ class HostedGitRepositoryManager implements Source {
 
 	@Override
 	public void close() {
+		repoExecutor.shutdown();
+		try {
+			repoExecutor.awaitTermination(10, TimeUnit.SECONDS);
+		} catch (InterruptedException ignore) {
+		}
 		try {
 			this.bareRepository.close();
 		} catch (final Exception ignore) {
@@ -153,6 +183,10 @@ class HostedGitRepositoryManager implements Source {
 		};
 	}
 
+	public ReceivePackFactory<HttpServletRequest> getReceivePackFactory() {
+		return receivePackFactory;
+	}
+
 	@Override
 	public String getDefaultRef() {
 		return defaultRef;
@@ -160,7 +194,7 @@ class HostedGitRepositoryManager implements Source {
 
 	@Override
 	public void addListener(final SourceEventListener listener) {
-		this.getPostHook().addListener(listener);
+		this.repositoryBus.addListener(listener);
 	}
 
 	@Override
@@ -170,18 +204,18 @@ class HostedGitRepositoryManager implements Source {
 
 	@Override
 	public void checkHealth() {
-		final LinkedException linked = new LinkedException();
-		linked.add(getPreHook().getFault());
-		linked.add(getPostHook().getFault());
-		if (!linked.isEmpty()) {
-			throw new RuntimeException(linked);
+		final Exception fault = this.errorReporter.getFault();
+		if (fault != null) {
+			throw new RuntimeException(fault);
 		}
 	}
 
 	@Override
-	public InputStream getSourceStream(final String key, final String ref) throws RefNotFoundException {
+	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
-		Objects.requireNonNull(ref);
+		if (ref == null) {
+			ref = defaultRef;
+		}
 		try {
 			if (ref.startsWith(Constants.R_HEADS)) {
 				return extractor.openBranch(ref, key);
@@ -190,20 +224,41 @@ class HostedGitRepositoryManager implements Source {
 			}
 		} catch (final IOException e) {
 			throw new UncheckedIOException(e);
-		} catch (final RefNotFoundException e) {
-			throw e;
-		} catch (final Exception e) {
-			throw new RuntimeException(e);
 		}
 		throw new RefNotFoundException(ref);
-
 	}
 
-	public JitStaticPostReceiveHook getPostHook() {
-		return postHook;
+	@Override
+	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
+			String userMail, final String key, String ref) {
+		if (ref == null) {
+			ref = defaultRef;
+		}
+		if(ref.startsWith(Constants.R_TAGS)) {
+			throw new UnsupportedOperationException("Tags cannot be modified");
+		}
+		final String finalRef = ref;
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				if (!checkVersion(version, key, finalRef)) {
+					throw new WrappingAPIException(new VersionIsNotSameException());
+				}
+				final Ref actualRef = bareRepository.findRef(finalRef);
+				if (actualRef == null) {
+					throw new WrappingAPIException(new RefNotFoundException(finalRef));
+				}
+				return this.updater.updateKey(key, actualRef, MAPPER.writeValueAsBytes(data), message, userInfo, userMail);
+			} catch (final IOException | RefNotFoundException e) {
+				throw new WrappingAPIException(e);
+			}
+		}, repoExecutor);
 	}
 
-	public JitStaticPreReceiveHook getPreHook() {
-		return preHook;
+	private boolean checkVersion(final String version, final String key, final String ref) throws RefNotFoundException {
+		final SourceInfo sourceInfo = getSourceInfo(key, ref);
+		if (sourceInfo == null) {
+			return false;
+		}
+		return version.equals(sourceInfo.getVersion());
 	}
 }

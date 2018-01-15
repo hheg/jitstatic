@@ -22,11 +22,13 @@ import java.io.IOException;
  * #L%
  */
 
-
 import java.net.URI;
 import java.nio.file.Path;
 
 import javax.validation.constraints.NotNull;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -38,7 +40,7 @@ import jitstatic.source.Source;
 import jitstatic.storage.StorageInfo;
 
 public class RemoteFactory extends StorageInfo {
-
+	private static final Logger LOG = LoggerFactory.getLogger(RemoteFactory.class);
 	@NotNull
 	@JsonProperty
 	private URI remoteRepo;
@@ -81,8 +83,8 @@ public class RemoteFactory extends StorageInfo {
 
 	public Source build(final Environment env) throws CorruptedSourceException, IOException {
 		if (!getRemoteRepo().isAbsolute())
-			throw new IllegalArgumentException(
-					String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
+			throw new IllegalArgumentException(String.format("parameter remoteRepo, %s, must be absolute", getRemoteRepo()));
+		LOG.info("Loading a remote repo at " + getRemoteRepo());
 		return new RemoteManager(getRemoteRepo(), getUserName(), getRemotePassword(), getPollingPeriod().getQuantity(),
 				getPollingPeriod().getUnit(), getBasePath(), getBranch());
 	}

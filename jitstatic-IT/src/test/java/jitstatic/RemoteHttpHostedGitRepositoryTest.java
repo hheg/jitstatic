@@ -22,6 +22,7 @@ package jitstatic;
 
 import static org.hamcrest.core.Is.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -37,12 +38,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
-import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Invocation.Builder;
+import javax.ws.rs.client.WebTarget;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
@@ -54,8 +54,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
-import org.hamcrest.Matchers;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -76,7 +76,6 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.storage.StorageData;
 
 public class RemoteHttpHostedGitRepositoryTest {
 
@@ -88,7 +87,6 @@ public class RemoteHttpHostedGitRepositoryTest {
 	private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
 	private DropwizardAppRule<JitstaticConfiguration> remote;
 	private DropwizardAppRule<JitstaticConfiguration> local;
-	
 
 	private String remoteAdress;
 	private String localAdress;
@@ -100,21 +98,15 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 	@Rule
 	public RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
-			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class,
-					ResourceHelpers.resourceFilePath("simpleserver.yaml"),
+			.around((remote = new DropwizardAppRule<>(JitstaticApplication.class, ResourceHelpers.resourceFilePath("simpleserver.yaml"),
 					ConfigOverride.config("hosted.basePath", getFolder()))))
 			.around(new EraseSystemProperties("hosted.basePath"))
-			.around(new TestClientRepositoryRule(getFolder(),
-					() -> remote.getConfiguration().getHostedFactory().getUserName(),
+			.around(new TestClientRepositoryRule(getFolder(), () -> remote.getConfiguration().getHostedFactory().getUserName(),
 					() -> remote.getConfiguration().getHostedFactory().getSecret(), getRepo(), ACCEPT_STORAGE))
-			.around((local = new DropwizardAppRule<>(JitstaticApplication.class,
-					ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
-					ConfigOverride.config("remote.basePath", getFolder()),
-					ConfigOverride.config("remote.remoteRepo", getRepo()),
-					ConfigOverride.config("remote.userName",
-							() -> remote.getConfiguration().getHostedFactory().getUserName()),
-					ConfigOverride.config("remote.remotePassword",
-							() -> remote.getConfiguration().getHostedFactory().getSecret()),
+			.around((local = new DropwizardAppRule<>(JitstaticApplication.class, ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
+					ConfigOverride.config("remote.basePath", getFolder()), ConfigOverride.config("remote.remoteRepo", getRepo()),
+					ConfigOverride.config("remote.userName", () -> remote.getConfiguration().getHostedFactory().getUserName()),
+					ConfigOverride.config("remote.remotePassword", () -> remote.getConfiguration().getHostedFactory().getSecret()),
 					ConfigOverride.config("remote.pollingPeriod", "1 second"))));
 
 	@Rule
@@ -135,12 +127,12 @@ public class RemoteHttpHostedGitRepositoryTest {
 			expectedResponse = MAPPER.readValue(is, StorageData.class).getData();
 		}
 	}
-	
+
 	@After
 	public void after() {
 		SortedMap<String, Result> healthChecks = local.getEnvironment().healthChecks().runHealthChecks();
-		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError())
-				.filter(Objects::nonNull).collect(Collectors.toList());
+		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
+				.collect(Collectors.toList());
 		errors.stream().forEach(e -> e.printStackTrace());
 		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
 	}
@@ -151,7 +143,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try {
 			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, remoteAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			assertEquals(expectedResponse, response);
+			assertEquals(expectedResponse, response.get("data"));
 		} finally {
 			client.close();
 		}
@@ -159,33 +151,30 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try {
 			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			assertEquals(expectedResponse, response);
+			assertEquals(expectedResponse, response.get("data"));
 		} finally {
 			client.close();
 		}
 	}
 
 	@Test
-	public void testRemoteHostedGitUpdate()
-			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		final String newValue = UUID.randomUUID().toString();
+	public void testRemoteHostedGitUpdate() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		JsonNode originalValue = null;
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test7 client");
 		try {
-			Builder clientTarget = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
-			JsonNode response = clientTarget.get(JsonNode.class);
-
-			assertEquals(expectedResponse, response);
+			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress));
+			JsonNode response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
+			JsonNode oldVersion = response.get("version");
+			assertEquals(expectedResponse, response.get("data"));
 			originalValue = response;
 
 			Path newFolder = TMP_FOLDER.newFolder().toPath();
 			Path storage = newFolder.resolve(ACCEPT_STORAGE);
-			try (Git git = Git.cloneRepository().setDirectory(newFolder.toFile()).setURI(getRepo().get())
-					.setCredentialsProvider(provider).call();) {
+			try (Git git = Git.cloneRepository().setDirectory(newFolder.toFile()).setURI(getRepo().get()).setCredentialsProvider(provider)
+					.call();) {
 
 				StorageData data = readSource(storage);
-				JsonNode readTree = MAPPER.readTree("\"" + newValue + "\"");
+				JsonNode readTree = MAPPER.readTree("{\"one\":\"two\"}");
 				StorageData newData = new StorageData(data.getUsers(), readTree);
 
 				writeSource(newData, storage);
@@ -199,8 +188,9 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				sleep(1500);
 
-				response = clientTarget.get(JsonNode.class);
-				assertEquals(readTree, response);
+				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
+				assertNotEquals(oldVersion, response.get("version"));
+				assertEquals(readTree, response.get("data"));
 
 				git.revert().include(commit).call();
 				result = git.push().setCredentialsProvider(provider).call();
@@ -209,7 +199,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				sleep(1500);
 
-				response = clientTarget.get(JsonNode.class);
+				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
 				assertEquals(originalValue, response);
 
 			}
@@ -224,8 +214,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		ex.expect(InvalidRemoteException.class);
 		ex.expectCause(isA(NoRemoteRepositoryException.class));
 		String host = String.format("http://localhost:%d/application/%s/%s", local.getLocalPort(), "selfhosted", "git");
-		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(host)
-				.setCredentialsProvider(provider).call()) {
+		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(host).setCredentialsProvider(provider).call()) {
 			fail("There shouldn't be any git repo when not hosted");
 		}
 	}
@@ -237,10 +226,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 		File base = TMP_FOLDER.newFolder();
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test9 client");
 		try {
-			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted",
-					"git");
-			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider)
-					.call()) {
+			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
+			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
 				Path file = base.toPath().resolve(store);
 				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.CREATE_NEW);
 				git.add().addFilepattern(store).call();
@@ -253,12 +240,10 @@ public class RemoteHttpHostedGitRepositoryTest {
 				git.push().setCredentialsProvider(provider).setPushTags().call();
 			}
 			sleep(3000);
-			Builder clientTarget = client
-					.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
-			JsonNode result = clientTarget.get(JsonNode.class);
+			JsonNode result = client.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
 			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
-			assertEquals(value.getData(), result);
+			assertEquals(value.getData(), result.get("data"));
 		} finally {
 			client.close();
 		}
@@ -270,10 +255,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 		File base = TMP_FOLDER.newFolder();
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test8 client");
 		try {
-			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted",
-					"git");
-			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider)
-					.call()) {
+			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
+			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
 				Path file = base.toPath().resolve(ACCEPT_STORAGE);
 				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
 				git.add().addFilepattern(ACCEPT_STORAGE).call();
@@ -286,12 +269,11 @@ public class RemoteHttpHostedGitRepositoryTest {
 				git.push().setCredentialsProvider(provider).setPushTags().call();
 			}
 			sleep(3000);
-			Builder clientTarget = client
-					.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth);
-			JsonNode result = clientTarget.get(JsonNode.class);
+			JsonNode result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress))
+					.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
+			
 			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
-			assertEquals(value.getData(), result);
+			assertEquals(value.getData(), result.get("data"));
 		} finally {
 			client.close();
 		}

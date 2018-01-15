@@ -46,7 +46,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		Storage storage = null;
 		try {
 			source = config.build(env);
-			storage = config.getStorageFactory().build(source, env, source.getDefaultRef());			
+			storage = config.getStorageFactory().build(source, env);			
 			env.lifecycle().manage(new ManagedObject<>(source));
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
 			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
@@ -61,7 +61,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 		}
 	}
 
-	private void cleanupIfFailed(Exception guard, Source source, Storage storage) {
+	private void cleanupIfFailed(final Exception guard, final Source source, final Storage storage) {
 		if (guard != null) {
 			if (source != null) {
 				try {

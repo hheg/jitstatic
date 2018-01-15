@@ -20,15 +20,18 @@ package jitstatic.source;
  * #L%
  */
 
-import java.io.InputStream;
-
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.concurrent.CompletableFuture;
 
 public interface Source extends AutoCloseable {
 	public void close();
 	public void addListener(SourceEventListener listener);
 	public void start();
 	public void checkHealth();
-	public InputStream getSourceStream(String key, String ref) throws RefNotFoundException;
+	public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
+	public CompletableFuture<String> modify(JsonNode data, String version, String message, String userInfo, String userMail, String key, String ref);
 }
