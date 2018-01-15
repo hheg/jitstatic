@@ -4,7 +4,7 @@ package jitstatic;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,18 @@ package jitstatic;
  * #L%
  */
 
-import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 
-public interface JitStaticConstants {
+public class UpdateFailedException extends RuntimeException {
 
-	public static final String REFS_JISTSTATIC = Constants.R_REFS + "jistatic/";
-
+	private static final long serialVersionUID = 1L;
+	
+	public UpdateFailedException(final Result update) {
+		super(update.name());
+	}
+	
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

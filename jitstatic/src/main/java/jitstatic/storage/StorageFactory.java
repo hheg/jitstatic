@@ -1,5 +1,7 @@
 package jitstatic.storage;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -35,6 +37,7 @@ import jitstatic.source.SourceEventListener;
 public class StorageFactory {
 
 	public Storage build(final Source source, final Environment env) {
+		Objects.requireNonNull(source, "Source cannot be null");
 		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);

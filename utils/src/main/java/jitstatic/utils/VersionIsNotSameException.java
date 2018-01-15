@@ -1,10 +1,10 @@
-package jitstatic;
+package jitstatic.utils;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,16 @@ package jitstatic;
  * #L%
  */
 
-import org.eclipse.jgit.lib.Constants;
+public class VersionIsNotSameException extends Exception {
 
-public interface JitStaticConstants {
+	private static final long serialVersionUID = 1L;
 
-	public static final String REFS_JISTSTATIC = Constants.R_REFS + "jistatic/";
-
+	public VersionIsNotSameException() {
+		super();
+	}
+	
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

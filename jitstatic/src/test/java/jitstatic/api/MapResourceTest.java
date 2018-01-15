@@ -45,10 +45,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.glassfish.jersey.test.grizzly.GrizzlyWebTestContainerFactory;
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -67,6 +67,8 @@ import jitstatic.auth.User;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageData;
 import jitstatic.storage.StoreInfo;
+import jitstatic.utils.VersionIsNotSameException;
+import jitstatic.utils.WrappingAPIException;
 
 public class MapResourceTest {
 	private static final String USER = "user";
@@ -79,7 +81,7 @@ public class MapResourceTest {
 			throw new Error(e);
 		}
 	}
-	private static final Storage STORAGE = mock(Storage.class);
+	private Storage STORAGE = mock(Storage.class);
 	private static final Map<String, StoreInfo> DATA = new HashMap<>();
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static String returnedDog;
@@ -88,14 +90,12 @@ public class MapResourceTest {
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 
-	@ClassRule
-	public static final ResourceTestRule RESOURCES = ResourceTestRule.builder()
-			.setTestContainerFactory(new GrizzlyWebTestContainerFactory())
+	@Rule
+	public ResourceTestRule RESOURCES = ResourceTestRule.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
 			.addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
 					.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()))
-			.addProvider(RolesAllowedDynamicFeature.class)
-			.addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new MapResource(STORAGE))
-			.build();
+			.addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
+			.addResource(new MapResource(STORAGE)).build();
 
 	@BeforeClass
 	public static void setupClass() throws JsonProcessingException, IOException {
@@ -106,17 +106,20 @@ public class MapResourceTest {
 		DATA.put("dog", dogData);
 		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
 		StoreInfo horseData = new StoreInfo(new StorageData(new HashSet<>(), horse), "1");
-		returnedHorse = MAPPER
-				.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getStorageData().getData()));
+		returnedHorse = MAPPER.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getStorageData().getData()));
 		DATA.put("horse", horseData);
+		JsonNode cat = MAPPER.readTree("{\"food\" : [\"fish\",\"bird\"]}");
+		users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
+		StoreInfo catData = new StoreInfo(new StorageData(users, cat), "1");
+		DATA.put("cat", catData);
 	}
 
 	@Test
 	public void testGettingKeyFromResource() throws InterruptedException, ExecutionException {
 		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
 		when(STORAGE.get("dog", null)).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/dog").request()
-				.header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(JsonNode.class);
+		JsonNode response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.get(JsonNode.class);
 		assertEquals(returnedDog, response.toString());
 	}
 
@@ -134,8 +137,7 @@ public class MapResourceTest {
 		ex.expect(WebApplicationException.class);
 		ex.expectMessage(Status.NOT_FOUND.toString());
 		when(STORAGE.get(any(), Mockito.anyString())).thenReturn(null);
-		RESOURCES.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-				.get(StorageData.class);
+		RESOURCES.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(StorageData.class);
 	}
 
 	@Test
@@ -160,8 +162,7 @@ public class MapResourceTest {
 	public void testKeyIsFoundWithBranch() throws InterruptedException, ExecutionException {
 		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request()
-				.get(JsonNode.class);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request().get(JsonNode.class);
 		assertEquals(returnedHorse, response.toString());
 	}
 
@@ -183,8 +184,7 @@ public class MapResourceTest {
 	public void testKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
 		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request()
-				.get(JsonNode.class);
+		JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
 		assertEquals(returnedHorse, response.toString());
 	}
 
@@ -192,8 +192,7 @@ public class MapResourceTest {
 	public void testDoubleKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
 		Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
 		when(STORAGE.get(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
-		JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request()
-				.get(JsonNode.class);
+		JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
 		assertEquals(returnedHorse, response.toString());
 	}
 
@@ -212,32 +211,216 @@ public class MapResourceTest {
 	}
 
 	@Test
-	public void testPutAKey() throws IOException {
+	public void testPutAKeyWithNoUser() throws IOException {
 		WebTarget target = RESOURCES.target("/storage/horse");
-		StoreInfo storeInfo = DATA.get("horse");
-		Future<Void> expected = CompletableFuture.completedFuture(null);
-		when(STORAGE.put(Mockito.eq(storeInfo.getStorageData().getData()), Mockito.eq("1"), Mockito.eq("message"),
-				Mockito.any(), Mockito.eq("horse"), Mockito.any())).thenReturn(expected);
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
-		data.setVersion("1");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutADeletedKey() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"meat\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
 		data.setData(readTree);
 		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
-		assertEquals(Status.OK,response.getStatus());		
+
+		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
-	
+
+	@Test
+	public void testPutAKey() throws IOException, RefNotFoundException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(expected);
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.OK.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutAKeyOtherVersion() throws RefNotFoundException, IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(expected);
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("2");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+
+		assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+	}
+
 	@Test
 	public void testPutAMissingKey() throws IOException {
 		WebTarget target = RESOURCES.target("/storage/horse");
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
-		data.setVersion("1");
+		data.setHaveVersion("1");
 		data.setData(readTree);
 		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutAKeyWithNoUsers() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/horse");
+		StoreInfo storeInfo = DATA.get("horse");
+		when(STORAGE.get(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutAKeyWithWrongUser() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/cat");
+		StoreInfo storeInfo = DATA.get("cat");
+		when(STORAGE.get(Mockito.eq("cat"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"rat\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+
+		System.out.println(response);
+		assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyIsFoundButNotFoundWhenModifying() throws RefNotFoundException, IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(null);
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyButRefIsDeletedWhilst() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
+					throw new WrappingAPIException(new RefNotFoundException(""));
+				}));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyButKeyIsDeletedWhilst() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
+					throw new WrappingAPIException(new UnsupportedOperationException(""));
+				}));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyButVersionIsChangedWhilst() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
+					throw new WrappingAPIException(new VersionIsNotSameException());
+				}));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyGeneralError() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
+					throw new WrappingAPIException(new Exception("Test exception"));
+				}));
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutKeyOnTag() throws IOException {
+		WebTarget target = RESOURCES.target("/storage/dog").queryParam("ref", "refs/tags/tag");
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
+		data.setHaveVersion("1");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
 	}
 }

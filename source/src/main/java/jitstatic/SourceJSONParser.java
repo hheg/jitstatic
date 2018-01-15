@@ -35,11 +35,11 @@ public class SourceJSONParser {
 	private static final int SECOND = 0xF0;
 	private static final int FIRST = 0xF;
 	private static final int MASK = 0xFF;
-	private static final JsonFactory mapper = new JsonFactory().enable(Feature.ALLOW_COMMENTS)
+	private static final JsonFactory MAPPER = new JsonFactory().enable(Feature.ALLOW_COMMENTS)
 			.enable(Feature.STRICT_DUPLICATE_DETECTION);
 
 	public void parse(InputStream bc) throws IOException {
-		try (final JsonParser parser = mapper.createParser(bc);) {
+		try (final JsonParser parser = MAPPER.createParser(bc);) {
 			try {
 				if (parser.nextToken() != JsonToken.START_OBJECT) {
 

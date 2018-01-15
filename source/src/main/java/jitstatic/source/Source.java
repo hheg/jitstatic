@@ -1,7 +1,5 @@
 package jitstatic.source;
 
-import java.util.concurrent.ExecutorService;
-
 /*-
  * #%L
  * jitstatic
@@ -24,12 +22,16 @@ import java.util.concurrent.ExecutorService;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.concurrent.CompletableFuture;
+
 public interface Source extends AutoCloseable {
 	public void close();
 	public void addListener(SourceEventListener listener);
 	public void start();
 	public void checkHealth();
-	public ExecutorService getRepositoryQueue();
 	public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
+	public CompletableFuture<String> modify(JsonNode data, String version, String message, String userInfo, String userMail, String key, String ref);
 }

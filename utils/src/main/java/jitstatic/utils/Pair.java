@@ -49,4 +49,8 @@ public class Pair<T, U> {
 	public static <T, U> Pair<T, U> of(T t, U u) {
 		return new Pair<>(t, u);
 	}
+	
+	public static <T,U> Pair<T,U> ofNothing(){
+		return new Pair<>();
+	}
 }

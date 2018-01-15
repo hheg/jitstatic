@@ -1,6 +1,27 @@
 package jitstatic.hosted;
 
+/*-
+ * #%L
+ * jitstatic
+ * %%
+ * Copyright (C) 2017 - 2018 H.Hegardt
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 
 import javax.servlet.http.HttpServletRequest;
@@ -19,12 +40,14 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
 	private final String defaultRef;
 	private final ExecutorService repoExecutor;
 	private final ErrorReporter errorReporter;
+	private final RepositoryBus bus;
 
 	public JitStaticReceivePackFactory(final ExecutorService repoExecutor, final ErrorReporter reporter,
-			final String defaultRef) {
-		this.defaultRef = defaultRef;
-		this.errorReporter = reporter;
-		this.repoExecutor = repoExecutor;
+			final String defaultRef, final RepositoryBus bus) {
+		this.defaultRef = Objects.requireNonNull(defaultRef);
+		this.errorReporter = Objects.requireNonNull(reporter);
+		this.repoExecutor = Objects.requireNonNull(repoExecutor);
+		this.bus = Objects.requireNonNull(bus);
 	}
 
 	static class ServiceConfig {
@@ -59,7 +82,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
 	}
 
 	protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-		final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, getRepoExecutor(), errorReporter);
+		final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, repoExecutor, errorReporter, bus);
 		rp.setRefLogIdent(toPersonIdent(req, user));
 		rp.setAtomic(true);
 		rp.setPreReceiveHook(PreReceiveHookChain.newChain(Arrays.asList(new LogoPoster())));
@@ -69,9 +92,4 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
 	private static PersonIdent toPersonIdent(final HttpServletRequest req, final String user) {
 		return new PersonIdent(user, user + "@" + req.getRemoteHost());
 	}
-
-	public ExecutorService getRepoExecutor() {
-		return repoExecutor;
-	}
-
 }

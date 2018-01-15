@@ -8,16 +8,12 @@
 	</parent>
 	<artifactId>jitstatic-IT</artifactId>
 	<dependencies>
+	<!-- Should only depend on the shaded jar, but eclipse isn't smart enough to understand that it is one. Fix this -->
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
 			<version>0.4.3-modifyapi-SNAPSHOT</version>
-			<exclusions>
-				<exclusion>
-					<groupId>*</groupId>
-					<artifactId>*</artifactId>
-				</exclusion>
-			</exclusions>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>

@@ -1,12 +1,5 @@
 package jitstatic.storage;
 
-import java.util.List;
-import java.util.concurrent.Future;
-
-import com.fasterxml.jackson.databind.JsonNode;
-
-import jitstatic.auth.User;
-
 /*-
  * #%L
  * jitstatic
@@ -27,10 +20,14 @@ import jitstatic.auth.User;
  * #L%
  */
 
+import java.util.List;
+import java.util.concurrent.Future;
+import com.fasterxml.jackson.databind.JsonNode;
+
 public interface Storage extends AutoCloseable {
 	public Future<StoreInfo> get(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
 	public void checkHealth() throws Exception;
-	public Future<Void> put(JsonNode data, String version, String message, User user, String key, String ref);
+	public Future<String> put(JsonNode data, String version, String message, String userInfo, String userEmail, String key, String ref);
 }

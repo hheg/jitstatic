@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic.utils;
 
 /*-
  * #%L
@@ -29,7 +29,7 @@ import org.junit.Test;
 
 import jitstatic.utils.ErrorConsumingThreadFactory;
 
-public class StorageThreadFactoryTest {
+public class ErrorConssumingThreadFactoryTest {
 
 	@Test
 	public void testCatchingException() throws InterruptedException {

@@ -22,7 +22,6 @@ package jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.Executors;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration.Dynamic;
@@ -127,15 +126,15 @@ public class HostedFactory extends StorageInfo {
 	}
 
 	public Source build(final Environment env) throws CorruptedSourceException, IOException {
-		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(),
-				getHostedEndpoint(), getBranch(), Executors.newSingleThreadExecutor());
+		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
+				getBranch());
 
 		final String baseServletPath = "/" + getServletName() + "/*";
 		LOG.info("Configuring hosted GIT environment on " + baseServletPath);
 		final GitServlet gs = new GitServlet();
 
 		gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
-		
+
 		gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
 
 		final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);

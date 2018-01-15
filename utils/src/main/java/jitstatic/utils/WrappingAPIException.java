@@ -1,10 +1,10 @@
-package jitstatic.storage;
+package jitstatic.utils;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,21 +20,16 @@ package jitstatic.storage;
  * #L%
  */
 
+public class WrappingAPIException extends RuntimeException {
 
-
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-
-public class StorageTestUtils {
-
-	public static void copy(final String resourceName, final Path fileDestination) throws IOException {
-		try (InputStream json = StorageTestUtils.class.getResourceAsStream(resourceName);) {
-			Files.copy(json, fileDestination, StandardCopyOption.REPLACE_EXISTING);
-		}
+	private static final long serialVersionUID = -4543727042344595312L;
+	
+	public WrappingAPIException(final Exception e) {
+		super(e);
 	}
-
+	
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

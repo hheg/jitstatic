@@ -1,10 +1,10 @@
-package jitstatic;
+package jitstatic.api;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,29 @@ package jitstatic;
  * #L%
  */
 
-import org.eclipse.jgit.lib.Constants;
+import javax.validation.constraints.NotNull;
 
-public interface JitStaticConstants {
+import org.hibernate.validator.constraints.NotEmpty;
 
-	public static final String REFS_JISTSTATIC = Constants.R_REFS + "jistatic/";
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public class VersionData {
+
+	@JsonProperty
+	@NotNull
+	@NotEmpty
+	private String version;
+
+	public VersionData(final String version) {
+		this.version = version;
+	}
+
+	public String getVersion() {
+		return version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
+	}
 
 }

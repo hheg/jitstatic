@@ -31,17 +31,28 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.eclipse.jgit.api.CloneCommand;
+import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.FetchCommand;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListBranchCommand.ListMode;
+import org.eclipse.jgit.api.LsRemoteCommand;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
@@ -51,6 +62,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.FetchResult;
+import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.ReceivePack;
@@ -61,19 +73,29 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+
 import jitstatic.CorruptedSourceException;
 import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
-import jitstatic.LinkedException;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
+import jitstatic.SourceUpdater;
 import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
+import jitstatic.utils.ErrorConsumingThreadFactory;
+import jitstatic.utils.LinkedException;
 import jitstatic.utils.Pair;
+import jitstatic.utils.VersionIsNotSameException;
+import jitstatic.utils.WrappingAPIException;
 
 public class RemoteRepositoryManager implements AutoCloseable {
 
-	private static final Logger log = LoggerFactory.getLogger(RemoteRepositoryManager.class);
+	private static final ObjectWriter MAPPER = new ObjectMapper().writerFor(JsonNode.class).withDefaultPrettyPrinter();
+	private static final Logger LOG = LoggerFactory.getLogger(RemoteRepositoryManager.class);
+	private static final String REMOTE_PREFIX = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME + "/";
 	private final URI remoteRepo;
 	private final List<SourceEventListener> listeners = new ArrayList<>();
 	private final SourceExtractor extractor;
@@ -81,9 +103,11 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	private final String password;
 
 	private final AtomicReference<Exception> faultRef = new AtomicReference<>();
-	private final AtomicReference<Object> lock = new AtomicReference<Object>();
+	private final AtomicReference<Object> lock = new AtomicReference<>();
 	private final Repository repository;
 	private final String defaultRef;
+	private final SourceUpdater updater;
+	private final ExecutorService repoExecutor;
 
 	public RemoteRepositoryManager(final URI remoteRepo, final String userName, final String password, final Path baseDirectory,
 			final String defaultRef) throws CorruptedSourceException, IOException {
@@ -91,12 +115,13 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 		this.userName = userName;
 		this.password = password == null ? "" : password;
+
 		try {
 			this.repository = setUpRepository(Objects.requireNonNull(baseDirectory));
-		} catch (GitAPIException | IOException e) {
+		} catch (final GitAPIException | IOException e) {
 			throw new RuntimeException(e);
 		}
-		this.defaultRef = Objects.requireNonNull(defaultRef, "defaultBranch cannot be null");
+		this.defaultRef = Objects.requireNonNull(defaultRef, "defaultRef cannot be null");
 		pollAndCheckRemote();
 		final Exception exception = faultRef.get();
 		if (exception != null) {
@@ -104,11 +129,12 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 		checkStorage(defaultRef);
 		this.extractor = new SourceExtractor(this.repository);
+		this.updater = new SourceUpdater(this.repository);
+		this.repoExecutor = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("repo", this::setFault));
 	}
 
 	private void checkStorage(final String defaultRef) throws CorruptedSourceException, IOException {
-		try (SourceChecker sc = new SourceChecker(this.repository)) {
-			sc.checkIfDefaultBranchExists(defaultRef);
+		try (final SourceChecker sc = new SourceChecker(this.repository)) {
 			final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checked = sc.check();
 			if (!checked.isEmpty()) {
 				throw new CorruptedSourceException(checked);
@@ -118,15 +144,21 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	private Repository setUpRepository(final Path baseDirectory)
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		final Repository r = getRepository(baseDirectory);
+		Repository r = getRepository(baseDirectory);
 		if (r == null) {
 			Files.createDirectories(baseDirectory);
-			final CloneCommand cc = Git.cloneRepository().setDirectory(baseDirectory.toFile()).setURI(remoteRepo.toString());
-			if (this.userName != null) {
-				cc.setCredentialsProvider(new UsernamePasswordCredentialsProvider(this.userName, this.password));
-			}
-			return cc.call().getRepository();
+			final Git git = Git.cloneRepository().setDirectory(baseDirectory.toFile()).setURI(remoteRepo.toString())
+					.setCredentialsProvider(getRemoteCredentials()).call();
+			r = git.getRepository();
+			final List<Ref> remoteRefs = git.branchList().setListMode(ListMode.REMOTE).call();
+			for (Ref ref : remoteRefs) {
+				final String localRefName = getRefName(ref.getName());
+				if (!Constants.MASTER.equals(localRefName)) {
+					git.checkout().setName(localRefName).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
+				}
+			}			
 		}
+		r.incrementOpen();
 		return r;
 	}
 
@@ -147,8 +179,12 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			final Object obj = lock.getAndSet(new Object());
 			if (obj == null) {
 				try {
-					pollAndCheckRemote();
+					LOG.info("Checking remote " + remoteRepo);					
+					repoExecutor.submit(this::pollAndCheckRemote).get();
+				} catch (final InterruptedException | ExecutionException e) {
+					setFault(e);
 				} finally {
+					LOG.info("Remote checked");
 					lock.set(null);
 				}
 			}
@@ -157,10 +193,10 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	private void pollAndCheckRemote() {
 		try {
+			final Collection<String> deletedBranches = checkRemoteForNewAndDeletedBranches();
 			final Collection<TrackingRefUpdate> trackingRefUpdates = fetchRemote();
 
-			long defaultrefs = trackingRefUpdates.stream().filter(tru -> defaultRef.equals(tru.getRemoteName())).count();
-			if (trackingRefUpdates.size() > 0 && defaultrefs != 1) {
+			if (deletedBranches.contains(defaultRef)) {
 				setFault(new RepositoryIsMissingIntendedBranch(defaultRef));
 			} else {
 				final ReceivePack receivePack = new ReceivePack(repository);
@@ -168,7 +204,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 				final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands = trackingRefUpdates.stream()
 						.map(tru -> extractCommands(receivePack, tru)).parallel().map(this::checkBranchSource).sequential()
 						.collect(Collectors.toList());
-				final LinkedException storageErrors = tryUpdate(receivePack, executedCommands);
+				final LinkedException storageErrors = tryUpdate(executedCommands, deletedBranches);
 				if (storageErrors.isEmpty()) {
 					setFault(null);
 				} else {
@@ -180,31 +216,76 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		}
 	}
 
-	private Collection<TrackingRefUpdate> fetchRemote() throws GitAPIException, InvalidRemoteException, TransportException {
+	private void checkForNewBranches(final Set<String> remoteRefs) throws IOException, RefAlreadyExistsException, RefNotFoundException,
+			InvalidRefNameException, CheckoutConflictException, GitAPIException {
 		final Git git = Git.wrap(repository);
-		final FetchCommand fetch = git.fetch();
-		if (userName != null) {
-			fetch.setCredentialsProvider(new UsernamePasswordCredentialsProvider(userName, password));
+		for (final String remoteRef : remoteRefs) {
+			final Ref localRef = repository.findRef(remoteRef);
+			if (localRef == null) {
+				git.checkout().setName(Repository.shortenRefName(remoteRef)).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK)
+						.call();
+			}
 		}
-		final FetchResult fetchResult = fetch.call();
-
-		final Collection<TrackingRefUpdate> trackingRefUpdates = fetchResult.getTrackingRefUpdates();
-		return trackingRefUpdates;
+		git.checkout().setName(defaultRef).call();
 	}
 
-	private LinkedException tryUpdate(final ReceivePack rp,
-			final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands) {
+	private Collection<String> checkRemoteForNewAndDeletedBranches()
+			throws IOException, InvalidRemoteException, TransportException, GitAPIException {
+		final Git git = Git.wrap(repository);
+		final LsRemoteCommand lsRemote = git.lsRemote();
+		lsRemote.setCredentialsProvider(getRemoteCredentials());
+
+		final Set<String> remoteRefs = lsRemote.callAsMap().entrySet().stream()
+				.filter(e -> e.getValue().getName().startsWith(Constants.R_HEADS)).map(Map.Entry::getKey).collect(Collectors.toSet());
+		checkForNewBranches(remoteRefs);
+		return checkForDeletedBranches(remoteRefs);
+	}
+
+	private Collection<String> checkForDeletedBranches(Set<String> remoteRefs) throws IOException {
+		final Set<String> localRefs = repository.getRefDatabase().getRefs(Constants.R_HEADS).values().stream().map(r -> r.getName())
+				.collect(Collectors.toSet());
+		localRefs.removeAll(remoteRefs);
+		return localRefs;
+	}
+
+	private UsernamePasswordCredentialsProvider getRemoteCredentials() {
+		if (userName == null) {
+			return null;
+		}
+		return new UsernamePasswordCredentialsProvider(userName, password);
+	}
+
+	private Collection<TrackingRefUpdate> fetchRemote() throws GitAPIException, InvalidRemoteException, TransportException, IOException {
+		final Git git = Git.wrap(repository);
+		final FetchCommand fetch = git.fetch();
+		fetch.setCredentialsProvider(getRemoteCredentials());
+		final FetchResult fetchResult = fetch.call();
+		return fetchResult.getTrackingRefUpdates();
+	}
+
+	private String getRefName(final String key) {
+		if (key.startsWith(REMOTE_PREFIX)) {
+			return key.substring(REMOTE_PREFIX.length(), key.length());
+		}
+		if (key.startsWith(Constants.R_TAGS)) {
+			return key.substring(Constants.R_TAGS.length(), key.length());
+		}
+		throw new RuntimeException(new RefNotFoundException(key));
+	}
+
+	private LinkedException tryUpdate(final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands,
+			final Collection<String> deletedBranches) {
 		final LinkedException storageErrors = new LinkedException();
 		try {
 			final List<Exception> errors = executedCommands.stream().filter(p -> p.getRight() != null).map(p -> p.getRight())
 					.collect(Collectors.toList());
 			if (errors.isEmpty()) {
-				updateLocalData(executedCommands, storageErrors);
+				updateLocalData(executedCommands, storageErrors, deletedBranches);
 			} else {
 				storageErrors.addAll(errors);
 			}
 		} finally {
-			cleanRepository(rp, executedCommands, storageErrors);
+			cleanRepository(executedCommands, storageErrors);
 		}
 		return storageErrors;
 	}
@@ -212,26 +293,23 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	private Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception> extractCommands(final ReceivePack receivePack,
 			final TrackingRefUpdate trackingRefUpdate) {
 		final ReceiveCommand receiveCommand = trackingRefUpdate.asReceiveCommand();
-		final String testBranchName = JitStaticConstants.REF_JISTSTATIC + UUID.randomUUID();
+		final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
 
 		try {
 			final ReceiveCommand testCommand = new ReceiveCommand(receiveCommand.getOldId(), receiveCommand.getNewId(), testBranchName);
-			if (trackingRefUpdate.getRemoteName().equals(defaultRef) && ObjectId.zeroId().equals(trackingRefUpdate.getNewObjectId())) {
-				return new Pair<>(new Pair<>(receiveCommand, null), new RepositoryIsMissingIntendedBranch(defaultRef));
-			}
 			createTmpBranch(repository, testBranchName, trackingRefUpdate); // Cheating here
 			testCommand.execute(receivePack);
-			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(new Pair<>(receiveCommand, testCommand), null);
+			return Pair.of(Pair.of(receiveCommand, testCommand), null);
 		} catch (final IOException e) {
-			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(new Pair<>(receiveCommand, null), e);
+			return Pair.of(Pair.of(receiveCommand, null), e);
 		}
 	}
 
-	private void cleanRepository(final ReceivePack receivePack,
-			final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands, final LinkedException storageErrors) {
+	private void cleanRepository(final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands,
+			final LinkedException storageErrors) {
 		executedCommands.stream().forEach(pair -> {
 			try {
-				deleteTempBranch(receivePack, pair.getLeft().getRight(), repository);
+				deleteTempBranch(pair.getLeft().getRight(), repository);
 			} catch (final IOException e) {
 				storageErrors.add(e);
 			}
@@ -239,7 +317,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	}
 
 	private void updateLocalData(final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands,
-			final LinkedException storageErrors) {
+			final LinkedException storageErrors, final Collection<String> deletedBranches) {
 		final RemoteConfig remoteConfig = getRemoteConfig();
 		final List<String> refsToBeUpdated = executedCommands.stream().map(pair -> {
 			final Pair<ReceiveCommand, ReceiveCommand> receiveCommands = pair.getLeft();
@@ -262,12 +340,23 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			}
 		}).filter(Objects::nonNull).collect(Collectors.toList());
 		if (storageErrors.isEmpty()) {
+			deletedBranches.stream().forEach(this::deleteBranch);
 			listeners.forEach(l -> l.onEvent(refsToBeUpdated));
 		}
 	}
 
+	private void deleteBranch(final String branch) {
+		try {
+			final RefUpdate updateRef = repository.updateRef(branch);
+			updateRef.setForceUpdate(true);
+			checkResult(branch, updateRef.delete());
+		} catch (final IOException e) {
+			throw new UncheckedIOException("Delete " + branch + " failed", e);
+		}
+	}
+
 	private Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception> checkBranchSource(
-			Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception> commandResult) {
+			final Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception> commandResult) {
 		if (commandResult.getRight() != null) {
 			return commandResult;
 		}
@@ -280,19 +369,18 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> refAndErrorPair = checkTest.get(0);
 			final List<Pair<FileObjectIdStore, Exception>> refErrors = refAndErrorPair.getRight();
 			if (!refErrors.isEmpty()) {
-				final ReceiveCommand actualRecieveCommand = receiveCommands.getLeft();
-				final Ref realRef = repository.findRef(actualRecieveCommand.getRefName());
+				final ReceiveCommand actualReceiveCommand = receiveCommands.getLeft();
+				final Ref realRef = repository.findRef(actualReceiveCommand.getRefName());
 				final Set<Ref> refSet = new HashSet<>();
 				refSet.add(realRef);
-				testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON, "Error in branch " + actualRecieveCommand.getRefName());
-				return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands,
-						new CorruptedSourceException(Arrays.asList(new Pair<>(refSet, refErrors))));
+				testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON, "Error in branch " + actualReceiveCommand.getRefName());
+				return Pair.of(receiveCommands, new CorruptedSourceException(Arrays.asList(Pair.of(refSet, refErrors))));
 			}
 		} catch (final RefNotFoundException | IOException e) {
 			testReceiveCommand.setResult(Result.REJECTED_OTHER_REASON, e.getMessage());
-			return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands, e);
+			return Pair.of(receiveCommands, e);
 		}
-		return new Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>(receiveCommands, null);
+		return Pair.of(receiveCommands, null);
 	}
 
 	private RefSpec getRefSpec(final List<RefSpec> fetchRefSpecs, final String refName) {
@@ -303,19 +391,19 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			}
 		}
 		final RefSpec refSpec = new RefSpec();
-		final String branch = refName.replaceAll(Constants.R_REMOTES + "origin/", "");
+		final String branch = getRefName(refName);
 		return refSpec.setSourceDestination(refName, Constants.R_HEADS + branch);
 	}
 
 	private RemoteConfig getRemoteConfig() {
 		try {
-			return new RemoteConfig(repository.getConfig(), "origin");
+			return new RemoteConfig(repository.getConfig(), Constants.DEFAULT_REMOTE_NAME);
 		} catch (final URISyntaxException e) {
 			throw new RevisionSyntaxException("");
 		}
 	}
 
-	private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result) throws IOException {
+	private void checkResult(final String branchName, final org.eclipse.jgit.lib.RefUpdate.Result result) throws IOException {
 		switch (result) {
 		case FAST_FORWARD:
 		case FORCED:
@@ -329,7 +417,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		case REJECTED:
 		case REJECTED_CURRENT_BRANCH:
 		default:
-			throw new IOException("Created branch " + testBranchName + " failed with " + result);
+			throw new IOException("Action on branch " + branchName + " failed with " + result);
 		}
 	}
 
@@ -342,7 +430,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		checkResult(testBranchName, updateRef.forceUpdate());
 	}
 
-	private void deleteTempBranch(final ReceivePack rp, final ReceiveCommand rc, final Repository repository) throws IOException {
+	private void deleteTempBranch(final ReceiveCommand rc, final Repository repository) throws IOException {
 		if (rc != null) {
 			final RefUpdate ru = repository.updateRef(rc.getRefName());
 			ru.disableRefLog();
@@ -358,7 +446,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 	private void setFault(final Exception fault) {
 		final Exception old = faultRef.getAndSet(fault);
 		if (old != null) {
-			log.warn("Unregistered exception", old);
+			LOG.warn("Unregistered exception", old);
 		}
 	}
 
@@ -368,12 +456,17 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	@Override
 	public void close() {
+		this.repoExecutor.shutdown();
+		try {
+			this.repoExecutor.awaitTermination(10, TimeUnit.SECONDS);
+		} catch (InterruptedException ignore) {
+		}
 		if (this.repository != null) {
 			this.repository.close();
 		}
 	}
 
-	public SourceInfo getStorageInputStream(final String key, String ref) throws RefNotFoundException {
+	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(ref);
 		try {
@@ -386,5 +479,62 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			throw new UncheckedIOException(e);
 		}
 		throw new RefNotFoundException(ref);
+	}
+
+	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
+			final String userMail, final String key, String ref) {
+		if (ref == null) {
+			ref = defaultRef;
+		}
+		if(ref.startsWith(Constants.R_TAGS)) {
+			throw new UnsupportedOperationException("Tags cannot be modified");
+		}
+		final String finalRef = ref;
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				if (!checkVersion(version, key, finalRef)) {
+					throw new WrappingAPIException(new VersionIsNotSameException());
+				}
+				final Ref actualRef = repository.findRef(finalRef);
+				if (actualRef == null) {
+					throw new WrappingAPIException(new RefNotFoundException(finalRef));
+				}
+				final String newVersion = this.updater.updateKey(key, actualRef, MAPPER.writeValueAsBytes(data), message, userInfo,
+						userMail);
+				pushChangesToRemote();
+				return newVersion;
+			} catch (final IOException | RefNotFoundException e) {
+				throw new WrappingAPIException(e);
+			}
+		}, repoExecutor);
+	}
+
+	// TODO Better fault handling here if remote somehow fails
+	private void pushChangesToRemote() {
+		try (Git git = Git.wrap(repository)) {
+			try {
+				final Iterable<PushResult> results = git.push().setRemote(Constants.DEFAULT_REMOTE_NAME).setPushAll().call();
+				final List<String> updateErrors = new ArrayList<>();
+				for (final PushResult pr : results) {
+					updateErrors.addAll(pr.getRemoteUpdates().stream()
+							.filter(rru -> org.eclipse.jgit.transport.RemoteRefUpdate.Status.OK != rru.getStatus())
+							.map(rru -> rru.getRemoteName() + " isn't updated due to " + rru.getStatus() + ":" + rru.getMessage())
+							.collect(Collectors.toList()));
+				}
+				if (!updateErrors.isEmpty()) {
+					setFault(new RemoteUpdateException(updateErrors));
+				}
+			} catch (final GitAPIException e) {
+				setFault(e);
+			}
+		}
+	}
+
+	private boolean checkVersion(final String version, final String key, final String ref) throws RefNotFoundException {
+		final SourceInfo sourceInfo = getSourceInfo(key, ref);
+		if (sourceInfo == null) {
+			return false;
+		}
+		return version.equals(sourceInfo.getVersion());
 	}
 }

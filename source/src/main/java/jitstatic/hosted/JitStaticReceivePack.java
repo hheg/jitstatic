@@ -1,5 +1,25 @@
 package jitstatic.hosted;
 
+/*-
+ * #%L
+ * jitstatic
+ * %%
+ * Copyright (C) 2017 - 2018 H.Hegardt
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,8 +28,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -36,11 +56,13 @@ public class JitStaticReceivePack extends ReceivePack {
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
 	private final String defaultRef;
 	private final ExecutorService repoExecutor;
+	private final RepositoryBus bus;
 
-	public JitStaticReceivePack(final Repository into, final String defaultRef, ExecutorService service, ErrorReporter errorReporter) {
+	public JitStaticReceivePack(final Repository into, final String defaultRef, final ExecutorService service, final ErrorReporter errorReporter, final RepositoryBus bus) {
 		super(into);
 		this.defaultRef = Objects.requireNonNull(defaultRef);
-		this.repoExecutor = Executors.newSingleThreadExecutor();
+		this.bus = Objects.requireNonNull(bus);
+		this.repoExecutor = Objects.requireNonNull(service);
 	}
 	// TODO do the checks the original code does
 	@Override
@@ -49,33 +71,36 @@ public class JitStaticReceivePack extends ReceivePack {
 		final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted = new ArrayList<>();
 		for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {
 			if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
-				final String branch = rc.getRefName();
-				final String testBranchName = JitStaticConstants.REF_JISTSTATIC + UUID.randomUUID();
-				try {
-					createTmpBranch(testBranchName, branch);
-					final ReceiveCommand testRc = new ReceiveCommand(rc.getOldId(), rc.getNewId(), testBranchName,
-							rc.getType());
-					testRc.execute(this);
-					cmdsToBeExecuted.add(Pair.of(rc, testRc));
-					if (testRc.getResult() == Result.OK) {
-						checkBranchData(branch, testBranchName, testRc);
-					}
-					if (testRc.getResult() != Result.OK) {
-						rc.setResult(testRc.getResult(), testRc.getMessage());
-						sendMessage(branch + " failed with " + rc.getResult() + " " + rc.getMessage());
-					}
-				} catch (final IOException e) {
-					rc.setResult(Result.REJECTED_NOCREATE,
-							"Couldn't create test branch for " + branch + " because " + e.getMessage());
-				}
+				checkBranch(cmdsToBeExecuted, rc);
 			} else {
 				if (rc.getRefName().equals(defaultRef)) {
 					rc.setResult(Result.REJECTED_NODELETE, "Cannot delete default branch " + defaultRef);
 				}
-				cmdsToBeExecuted.add(Pair.of(rc, null));
+				cmdsToBeExecuted.add(Pair.of(rc, null)); // Deleted branches
 			}
 		}
 		tryAndCommit(cmdsToBeExecuted);
+	}
+	private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc) {
+		final String branch = rc.getRefName();
+		final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
+		try {
+			createTmpBranch(testBranchName, branch);
+			final ReceiveCommand testRc = new ReceiveCommand(rc.getOldId(), rc.getNewId(), testBranchName,
+					rc.getType());
+			testRc.execute(this);
+			cmdsToBeExecuted.add(Pair.of(rc, testRc));
+			if (testRc.getResult() == Result.OK) {
+				checkBranchData(branch, testBranchName, testRc);
+			}
+			if (testRc.getResult() != Result.OK) {
+				rc.setResult(testRc.getResult(), testRc.getMessage());
+				sendMessage(branch + " failed with " + rc.getResult() + " " + rc.getMessage());
+			}
+		} catch (final IOException e) {
+			rc.setResult(Result.REJECTED_NOCREATE,
+					"Couldn't create test branch for " + branch + " because " + e.getMessage());
+		}
 	}
 
 	private void checkBranchData(final String branch, final String testBranchName, final ReceiveCommand testRc) {
@@ -123,8 +148,8 @@ public class JitStaticReceivePack extends ReceivePack {
 		}
 	}
 	private void signalReload(List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-		// TODO Auto-generated method stub
-		
+		final List<String> refsToUpdate = cmds.stream().map(p -> p.getLeft().getRefName()).collect(Collectors.toList());
+		bus.process(refsToUpdate);
 	}
 	private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds)
 			throws InterruptedException, ExecutionException {

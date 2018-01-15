@@ -21,6 +21,7 @@ package jitstatic.remote;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -37,10 +38,20 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.CompletionException;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -49,13 +60,20 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import jitstatic.CorruptedSourceException;
-import jitstatic.LinkedException;
 import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
+import jitstatic.utils.LinkedException;
+import jitstatic.utils.VersionIsNotSameException;
+import jitstatic.utils.WrappingAPIException;
 
 public class RemoteRepositoryManagerTest {
-
+	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final String STORAGE = "storage";
 	private static final String REF_HEADS_MASTER = "refs/heads/master";
 	@ClassRule
@@ -80,9 +98,8 @@ public class RemoteRepositoryManagerTest {
 			throws CorruptedSourceException, IOException, IllegalStateException, GitAPIException {
 		setUpRepo();
 		ex.expect(NullPointerException.class);
-		ex.expectMessage("defaultBranch cannot be null");
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				null)) {
+		ex.expectMessage("defaultRef cannot be null");
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, null)) {
 		}
 	}
 
@@ -91,36 +108,31 @@ public class RemoteRepositoryManagerTest {
 			throws CorruptedSourceException, IOException, IllegalStateException, GitAPIException {
 		setUpRepo();
 		final String branch = "somebranch";
-		ex.expect(RepositoryIsMissingIntendedBranch.class);
-		ex.expectMessage(branch);
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				branch)) {
+		ex.expect(RuntimeException.class);
+		ex.expectCause(Matchers.isA(RefNotFoundException.class));
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, branch)) {
 		}
 	}
 
 	@Test
-	public void testRemoteRepostioryManager() throws CorruptedSourceException, IOException {
+	public void testRemoteRepositoryManagerNullRemoteEndpoint() throws CorruptedSourceException, IOException {
 		ex.expect(NullPointerException.class);
 		ex.expectMessage("remote endpoint cannot be null");
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(null, null, null, workingDir,
-				REF_HEADS_MASTER);) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(null, null, null, workingDir, REF_HEADS_MASTER);) {
 		}
 	}
 
 	@Test
 	public void testRemoteRepositoryManagerWithValidBranch() throws Exception {
 		setUpRepo();
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
 		}
 	}
 
 	@Test
-	public void testRemoteRepositoryManager()
-			throws IOException, IllegalStateException, GitAPIException, CorruptedSourceException {
+	public void testRemoteRepositoryManager() throws IOException, IllegalStateException, GitAPIException, CorruptedSourceException {
 		setUpRepo();
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
 		}
 	}
 
@@ -149,8 +161,8 @@ public class RemoteRepositoryManagerTest {
 			git.add().addFilepattern(fileData.getFileName().toString()).call();
 			git.commit().setMessage("First").call();
 
-			try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), user, password,
-					workingDir, REF_HEADS_MASTER);) {
+			try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), user, password, workingDir,
+					REF_HEADS_MASTER);) {
 				assertNull(rrm.getFault());
 			}
 		}
@@ -158,54 +170,75 @@ public class RemoteRepositoryManagerTest {
 
 	@Test
 	public void testFailPullIfDefaultBranchHasBeenRemoved() throws Exception {
-		ex.expect(RepositoryIsMissingIntendedBranch.class);
 		setUpRepo();
 		try (Git git = Git.open(remoteFolder)) {
 			git.branchCreate().setName("other").call();
 		}
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				"other");) {
-			SourceInfo sourceInfo = rrm.getStorageInputStream(STORAGE, "refs/heads/other");
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, "refs/heads/other");) {
+
+			SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, "refs/heads/other");
 			try (InputStream is = sourceInfo.getInputStream()) {
 				assertNotNull(is);
 			}
-			try (Git git = Git.init().setDirectory(remoteFolder).call()) {
+			try (Git git = Git.open(remoteFolder)) {
 				git.branchDelete().setBranchNames("other").call();
 				rrm.checkRemote().run();
+
 				Exception fault = rrm.getFault();
-				SourceInfo sourceInfo2 = rrm.getStorageInputStream(STORAGE, "refs/heads/other");
+				assertEquals(RepositoryIsMissingIntendedBranch.class, fault.getClass());
+				assertEquals("refs/heads/other", fault.getMessage());
+
+				SourceInfo sourceInfo2 = rrm.getSourceInfo(STORAGE, "refs/heads/other");
 				try (InputStream is = sourceInfo2.getInputStream()) {
 					assertNotNull(is);
 				}
-				throw fault;
 			}
 		}
 	}
 
 	@Test
-	public void testCheckFailedRemotePoll()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testDeleteBranch() throws Exception {
 		setUpRepo();
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER);) {
+		try (Git git = Git.open(remoteFolder)) {
+			git.branchCreate().setName("other").call();
+			try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
+					REF_HEADS_MASTER);) {
+
+				SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, "refs/heads/other");
+				try (InputStream is = sourceInfo.getInputStream()) {
+					assertNotNull(is);
+				}
+				git.branchDelete().setBranchNames("other").call();
+				rrm.checkRemote().run();
+				assertNull(rrm.getFault());
+				ex.expect(RefNotFoundException.class);
+				rrm.getSourceInfo(STORAGE, "refs/heads/other");
+			}
+		}
+	}
+
+	@Test
+	public void testCheckFailedRemotePoll() throws Exception {
+		setUpRepo();
+		ex.expect(TransportException.class);
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
 			Files.walk(remoteFolder.toPath()).filter(Files::isRegularFile).map(Path::toFile).forEach(File::delete);
 			rrm.checkRemote().run();
 			Exception fault = rrm.getFault();
 			assertNotNull(fault);
-			assertEquals(InvalidRemoteException.class, fault.getClass());
+			throw fault;
 		}
 	}
 
 	@Test
-	public void testMasterBranchNotFound()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testMasterBranchNotFound() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
 		try (Git git = Git.init().setDirectory(remoteFolder).call();) {
 			Files.write(Paths.get(remoteFolder.getAbsolutePath(), STORAGE), getData().getBytes("UTF-8"));
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Initial commit").call();
 
-			try (final RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null,
-					workingDir, REF_HEADS_MASTER);) {
+			try (final RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
+					REF_HEADS_MASTER);) {
 				git.checkout().setName("other").setCreateBranch(true).call();
 				git.branchDelete().setBranchNames("master").setForce(true).call();
 				rrm.addListeners(svl);
@@ -219,8 +252,7 @@ public class RemoteRepositoryManagerTest {
 	}
 
 	@Test
-	public void testCheckUpdatedRemotePoll()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testCheckUpdatedRemotePoll() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
 		setUpRepo();
 		File base = folder.newFolder();
 		try (Git git = Git.cloneRepository().setDirectory(base).setURI(remoteFolder.toURI().toString()).call();
@@ -228,8 +260,7 @@ public class RemoteRepositoryManagerTest {
 						REF_HEADS_MASTER);) {
 			rrm.addListeners(svl);
 			Path resolved = base.toPath().resolve(STORAGE);
-			Files.write(resolved,
-					"{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
@@ -239,8 +270,7 @@ public class RemoteRepositoryManagerTest {
 			assertNull(rrm.getFault());
 			verify(svl).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
-			Files.write(resolved,
-					"{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
@@ -263,8 +293,7 @@ public class RemoteRepositoryManagerTest {
 						REF_HEADS_MASTER);) {
 			rrm.addListeners(svl);
 			Path resolved = base.toPath().resolve(STORAGE);
-			Files.write(resolved,
-					"{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
@@ -274,8 +303,7 @@ public class RemoteRepositoryManagerTest {
 			assertNull(rrm.getFault());
 			verify(svl).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
-			Files.write(resolved,
-					"{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
@@ -298,8 +326,7 @@ public class RemoteRepositoryManagerTest {
 						REF_HEADS_MASTER);) {
 			rrm.addListeners(svl);
 			Path resolved = base.toPath().resolve(STORAGE);
-			Files.write(resolved,
-					"{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
@@ -309,8 +336,7 @@ public class RemoteRepositoryManagerTest {
 			assertNull(rrm.getFault());
 			verify(svl).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
-			Files.write(resolved,
-					"\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
@@ -319,7 +345,8 @@ public class RemoteRepositoryManagerTest {
 			rrm.checkRemote().run();
 			Exception fault = rrm.getFault();
 			assertEquals(LinkedException.class, fault.getClass());
-			assertTrue(fault.getMessage().startsWith("class jitstatic.CorruptedSourceException: Error in branch refs/remotes/origin/master"));
+			assertTrue(
+					fault.getMessage().startsWith("class jitstatic.CorruptedSourceException: Error in branch refs/remotes/origin/master"));
 			verify(svl, times(1)).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
 		}
@@ -335,8 +362,7 @@ public class RemoteRepositoryManagerTest {
 						REF_HEADS_MASTER);) {
 			rrm.addListeners(svl);
 			Path resolved = base.toPath().resolve(STORAGE);
-			Files.write(resolved,
-					"{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value1\",\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
@@ -346,8 +372,7 @@ public class RemoteRepositoryManagerTest {
 			assertNull(rrm.getFault());
 			verify(svl).onEvent(Mockito.eq(Arrays.asList(REF_HEADS_MASTER)));
 
-			Files.write(resolved,
-					"{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
+			Files.write(resolved, "{\"data\":\"value2\",\"users\":[{\"user\":\"user\",\"password\":\"4321\"}]}".getBytes("UTF-8"),
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
@@ -361,26 +386,21 @@ public class RemoteRepositoryManagerTest {
 	}
 
 	@Test
-	public void testFaultyRemote()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testFaultyRemote() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
 		setUpFaultyRepo();
 		ex.expect(CorruptedSourceException.class);
 		ex.expectMessage("Error in branch " + REF_HEADS_MASTER);
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER);) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
 		}
 	}
 
 	@Test
-	public void testReEntryRemoteRepository()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testReEntryRemoteRepository() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
 		setUpRepo();
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
 			assertNull(rrm.getFault());
 		}
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
 			assertNull(rrm.getFault());
 		}
 
@@ -390,9 +410,8 @@ public class RemoteRepositoryManagerTest {
 	public void testRefNull() throws Exception {
 		setUpRepo();
 		ex.expect(NullPointerException.class);
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
-			rrm.getStorageInputStream("key", null);
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
+			rrm.getSourceInfo("key", null);
 		}
 	}
 
@@ -400,33 +419,144 @@ public class RemoteRepositoryManagerTest {
 	public void testKeyNull() throws Exception {
 		setUpRepo();
 		ex.expect(NullPointerException.class);
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER)) {
-			rrm.getStorageInputStream(null, null);
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER)) {
+			rrm.getSourceInfo(null, null);
 		}
 	}
 
 	@Test
 	public void testGetStorageInput() throws Exception {
 		setUpRepo();
-		// ex.expect(RuntimeException.class);
-		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
-				REF_HEADS_MASTER); ) {
-			 SourceInfo sourceInfo = rrm.getStorageInputStream(STORAGE, REF_HEADS_MASTER);
-			try(InputStream is = sourceInfo.getInputStream()){
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, REF_HEADS_MASTER);
+			try (InputStream is = sourceInfo.getInputStream()) {
 				assertNotNull(is);
 			}
 		}
 	}
 
+	@Test
+	public void testModifyAKey() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+		setUpRepo();
+		String message = "commit message";
+		String userInfo = "test User";
+		String userMail = "test@test.org";
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, REF_HEADS_MASTER);
+			JsonNode originalData = readJsonData(sourceInfo);
+			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
+			assertNotEquals(originalData, newData);
+			String newVersion = rrm.modify(newData, sourceInfo.getVersion(), message, userInfo, userMail, STORAGE, null).join();
+			assertNotEquals(sourceInfo.getVersion(), newVersion);
+			sourceInfo = rrm.getSourceInfo(STORAGE, REF_HEADS_MASTER);
+			assertEquals(newData, readJsonData(sourceInfo));
+			assertNull(rrm.getFault());
+			Git git = Git.open(remoteFolder);
+			RevCommit revCommit = getRevCommit(git.getRepository(), REF_HEADS_MASTER);
+			assertEquals(message,revCommit.getFullMessage());
+		}
+	}
+	// TODO Better mechanics
+	@Test
+	public void testModifyAKeyButFailPushing() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+		setUpRepo();
+		Path store = remoteFolder.toPath().resolve(STORAGE);
+		assertTrue(Files.exists(store));
+		String message = "commit message";
+		String userInfo = "test User";
+		String userMail = "test@test.org";
+		
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			assertTrue(Files.exists(store));
+			SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, REF_HEADS_MASTER);
+			assertTrue(Files.exists(store));
+			JsonNode originalData = readJsonData(sourceInfo);
+			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
+			assertNotEquals(originalData, newData);
+			Git git = Git.open(remoteFolder);
+			Files.write(store, getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+			git.add().addFilepattern(STORAGE).call();
+			git.commit().setMessage("new commit").call();
+			String newVersion = rrm.modify(newData, sourceInfo.getVersion(), message, userInfo, userMail, STORAGE, null).join();
+			assertNotNull(newVersion);
+			Exception fault = rrm.getFault();
+			assertEquals(RemoteUpdateException.class,fault.getClass());
+			assertEquals("refs/heads/master isn't updated due to REJECTED_NONFASTFORWARD:null",fault.getMessage());
+		}
+	}
+
+	@Test
+	public void testModifyAKeyWithWrongVersion() throws Throwable {
+		setUpRepo();
+		ex.expect(WrappingAPIException.class);
+		ex.expectCause(Matchers.isA(VersionIsNotSameException.class));
+		String message = "commit message";
+		String userInfo = "test User";
+		String userMail = "test@test.org";
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			SourceInfo sourceInfo = rrm.getSourceInfo(STORAGE, REF_HEADS_MASTER);
+			JsonNode originalData = readJsonData(sourceInfo);
+			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
+			assertNotEquals(originalData, newData);
+			try {
+				rrm.modify(newData, "1", message, userInfo, userMail, STORAGE, null).join();
+			} catch (CompletionException e) {
+				throw e.getCause();
+			}
+		}
+	}
+
+	@Test
+	public void testModifyAKeyWithMissingBranch() throws Throwable {
+		setUpRepo();
+		ex.expect(WrappingAPIException.class);
+		ex.expectCause(Matchers.isA(RefNotFoundException.class));
+		String message = "commit message";
+		String userInfo = "test User";
+		String userMail = "test@test.org";
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
+			try {
+				rrm.modify(newData, "1", message, userInfo, userMail, STORAGE, "refs/heads/someother").join();
+			} catch (CompletionException e) {
+				throw e.getCause();
+			}
+		}
+	}
+	
+	@Test
+	public void testModifyTag() throws CorruptedSourceException, IOException, IllegalStateException, GitAPIException {
+		setUpRepo();
+		ex.expect(UnsupportedOperationException.class);
+		ex.expectMessage("Tags cannot be modified");
+		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
+			rrm.modify(null, "1", "m", "ui", "m", "key", "refs/tags/tag");
+		}
+	}
+
+	private RevCommit getRevCommit(Repository repository, String targetRef) throws IOException {
+		try (RevWalk revWalk = new RevWalk(repository)) {
+			revWalk.sort(RevSort.COMMIT_TIME_DESC);
+			Map<String, Ref> allRefs = repository.getRefDatabase().getRefs(RefDatabase.ALL);
+			Ref actualTargetRef = allRefs.get(targetRef);
+			RevCommit commit = revWalk.parseCommit(actualTargetRef.getLeaf().getObjectId());
+			revWalk.markStart(commit);
+			return revWalk.next();
+		}
+	}
+
+	private JsonNode readJsonData(SourceInfo sourceInfo) throws IOException, JsonParseException, JsonMappingException {
+		assertNotNull(sourceInfo);
+		try (InputStream is = sourceInfo.getInputStream()) {
+			return MAPPER.readValue(is, JsonNode.class);
+		}
+	}
+
 	private void setUpRepo() throws IllegalStateException, GitAPIException, IOException {
-		final File base = folder.newFolder();
-		try (Git bare = Git.init().setBare(true).setDirectory(remoteFolder).call();
-				Git git = Git.cloneRepository().setDirectory(base).setURI(remoteFolder.toURI().toString()).call()) {
-			Files.write(base.toPath().resolve(STORAGE), getData().getBytes("UTF-8"));
+		try (Git git = Git.init().setBare(false).setDirectory(remoteFolder).call();) {
+			Files.write(remoteFolder.toPath().resolve(STORAGE), getData().getBytes("UTF-8"));
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Commit").call();
-			git.push().call();
 		}
 	}
 
