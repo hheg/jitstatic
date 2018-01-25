@@ -68,11 +68,11 @@ class BranchData {
 			filePairs.add(Pair.of(value, sourceFiles.get(key)));
 			keys.add(key);
 		}
-		final Iterator<String> sourceDataIterator = sourceFiles.keySet().iterator();
+		final Iterator<Entry<String, SourceFileData>> sourceDataIterator = sourceFiles.entrySet().iterator();
 		while (sourceDataIterator.hasNext()) {
-			final String sourceDataKey = sourceDataIterator.next();
-			if(!keys.contains(sourceDataKey)) {
-				filePairs.add(Pair.of(null, sourceFiles.get(sourceDataKey)));
+			final Entry<String, SourceFileData> sourceDataEntries = sourceDataIterator.next();
+			if(!keys.contains(sourceDataEntries.getKey())) {
+				filePairs.add(Pair.of(null, sourceDataEntries.getValue()));
 			}			
 		}
 		return filePairs;
