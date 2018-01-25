@@ -30,8 +30,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import jitstatic.SourceJSONParser;
-
 public class SourceJSONParserTest {
 
 	@Rule
@@ -40,17 +38,9 @@ public class SourceJSONParserTest {
 	private final SourceJSONParser p = new SourceJSONParser();
 
 	@Test
+//	@Ignore
 	public void testReadValidParser() throws IOException {
-		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test3.json")) {
-			p.parse(bc);
-		}
-	}
-
-	@Test
-	public void testReadFaultyJSON() throws IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("File is not valid JSON at line: 48, column: 950");
-		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test4.json")) {
+		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test3.md.json")) {
 			p.parse(bc);
 		}
 	}
@@ -58,17 +48,8 @@ public class SourceJSONParserTest {
 	@Test
 	public void testReadJSONWithMissingUserField() throws IOException {
 		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line:");
+		ex.expectMessage("metadata");
 		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test5.json")) {
-			p.parse(bc);
-		}
-	}
-
-	@Test
-	public void testReadJSONWithMissingDataField() throws IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line:");
-		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test6.json")) {
 			p.parse(bc);
 		}
 	}
@@ -76,7 +57,7 @@ public class SourceJSONParserTest {
 	@Test
 	public void testReadObjectWithNoUsers() throws UnsupportedEncodingException, IOException {
 		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line: 1, column: 18");
+		ex.expectMessage("metadata is missing users node");
 		try (InputStream bc = new ByteArrayInputStream(
 				"{\"data\":\"value1\"}".getBytes(StandardCharsets.UTF_8.name()))) {
 			p.parse(bc);
@@ -84,43 +65,12 @@ public class SourceJSONParserTest {
 	}
 
 	@Test
-	public void testReadObjectWithNoData() throws UnsupportedEncodingException, IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line: 1, column: 46");
-		try (InputStream bc = new ByteArrayInputStream(
-				"{\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}"
-						.getBytes(StandardCharsets.UTF_8.name()))) {
-			p.parse(bc);
-		}
-	}
-
-	@Test
-	public void testReadObjectWithUserWithNoPassword() throws UnsupportedEncodingException, IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line: 1, column: 26");
-		try (InputStream bc = new ByteArrayInputStream(
-				"{\"users\":[{\"user\":\"user\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
-			p.parse(bc);
-		}
-	}
-
-	@Test
 	public void testReadObjectWithUserWithNoUser() throws UnsupportedEncodingException, IOException {
 		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line: 1, column: 30");
+		ex.expectMessage("metadata is missing user name");
 		try (InputStream bc = new ByteArrayInputStream(
 				"{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
 			p.parse(bc);
 		}
 	}
-
-	@Test
-	public void testReadObjectFieldNoStart() throws UnsupportedEncodingException, IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("File does not have valid store file format at line: 1, column: 3");
-		try (InputStream bc = new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8.name()))) {
-			p.parse(bc);
-		}
-	}
-
 }

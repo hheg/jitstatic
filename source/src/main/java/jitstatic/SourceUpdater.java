@@ -21,7 +21,14 @@ package jitstatic;
  */
 
 import java.io.IOException;
+import java.time.Instant;
 
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -31,9 +38,11 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.lib.RefUpdate.Result;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 public class SourceUpdater {
 
@@ -45,46 +54,78 @@ public class SourceUpdater {
 
 	public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo,
 			final String userMail) throws IOException {
-		try (final RevWalk rw = new RevWalk(repository)) {
-			ObjectInserter objectInserter = repository.newObjectInserter();
-			final ObjectId blob = objectInserter.insert(Constants.OBJ_BLOB, data);
-
-			final String[] path = key.split("/");
-
-			FileMode mode = FileMode.REGULAR_FILE;
-			objectInserter = repository.newObjectInserter();
-			ObjectId id = blob;
-
-			for (int i = path.length - 1; i >= 0; --i) {
-				final TreeFormatter treeFormatter = new TreeFormatter();
-				treeFormatter.append(path[i], mode, id);
-				id = objectInserter.insert(treeFormatter);
-				mode = FileMode.TREE;
-			}
-
-			final CommitBuilder commitBuilder = new CommitBuilder();
-			commitBuilder.setAuthor(new PersonIdent(userInfo, (userMail != null ? userMail : "")));
-
-			commitBuilder.setMessage(message);
+		final DirCache inCoreIndex = DirCache.newInCore();
+		try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter();) {
+			final ObjectId headRef = ref.getObjectId();
+			final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
+			final ObjectId blob = addBlob(key, data, objectInserter, dirCacheBuilder);
+			
+			buildTreeIndex(key, rw, headRef, dirCacheBuilder);
+			
+			final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
 			// TODO fix this
-			PersonIdent commiter = new PersonIdent("JitStatic API put operation", "none@nowhere.org");
-			commitBuilder.setCommitter(commiter);
-			commitBuilder.setTreeId(id);
-			commitBuilder.setParentId(ref.getObjectId());
-			final ObjectId inserted = objectInserter.insert(commitBuilder);
-			objectInserter.flush();
+			final PersonIdent commiter = new PersonIdent("JitStatic API put operation", "none@nowhere.org");
+			final ObjectId inserted = buildCommit(ref, message, userInfo, userMail, objectInserter, fullTree, commiter);
 
-			rw.parseCommit(inserted);
-
-			final RefUpdate ru = repository.updateRef(ref.getName());
-			ru.setRefLogIdent(commiter);
-			ru.setNewObjectId(inserted);
-			ru.setForceRefLog(true);
-			ru.setRefLogMessage("jitstatic modify", false);
-			ru.setExpectedOldObjectId(ref.getObjectId());
-			checkResult(ru.update(rw));
+			insertCommit(ref, rw, commiter, inserted);
 			return blob.name();
 		}
+	}
+
+	private void insertCommit(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted)
+			throws MissingObjectException, IncorrectObjectTypeException, IOException {
+		final RevCommit newCommit = rw.parseCommit(inserted);
+		final RefUpdate ru = repository.updateRef(ref.getName());
+		ru.setRefLogIdent(commiter);
+		ru.setNewObjectId(newCommit);
+		ru.setForceRefLog(true);
+		ru.setRefLogMessage("jitstatic modify", false);
+		ru.setExpectedOldObjectId(ref.getObjectId());
+		checkResult(ru.update(rw));
+	}
+
+	private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail,
+			final ObjectInserter objectInserter, final ObjectId fullTree, final PersonIdent commiter) throws IOException {
+		final CommitBuilder commitBuilder = new CommitBuilder();
+		commitBuilder.setAuthor(new PersonIdent(userInfo, (userMail != null ? userMail : "")));
+		commitBuilder.setMessage(message);
+		commitBuilder.setCommitter(commiter);
+		commitBuilder.setTreeId(fullTree);
+		commitBuilder.setParentId(ref.getObjectId());
+		final ObjectId inserted = objectInserter.insert(commitBuilder);
+		objectInserter.flush();
+		return inserted;
+	}
+
+	private void buildTreeIndex(final String key, final RevWalk rw, final ObjectId headRef, final DirCacheBuilder dcBuilder)
+			throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
+		try (final TreeWalk treeWalk = new TreeWalk(repository);) {
+			final int hIdx = treeWalk.addTree(rw.parseTree(headRef));
+			treeWalk.setRecursive(true);	
+			while (treeWalk.next()) {
+				final String entryPath = treeWalk.getPathString();
+				final CanonicalTreeParser hTree = treeWalk.getTree(hIdx, CanonicalTreeParser.class);
+				if (!entryPath.equals(key)) {
+					final DirCacheEntry dcEntry = new DirCacheEntry(entryPath);
+					dcEntry.setObjectId(hTree.getEntryObjectId());
+					dcEntry.setFileMode(hTree.getEntryFileMode());
+					dcBuilder.add(dcEntry);
+				}
+			}
+		}
+		dcBuilder.finish();
+	}
+
+	private ObjectId addBlob(final String key, final byte[] data, final ObjectInserter objectInserter, final DirCacheBuilder dcBuilder)
+			throws IOException {
+		final DirCacheEntry changedFileEntry = new DirCacheEntry(key);
+		changedFileEntry.setLength(data.length);
+		changedFileEntry.setLastModified(Instant.now().getEpochSecond());
+		changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
+		changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data));
+		final ObjectId blob = changedFileEntry.getObjectId();
+		dcBuilder.add(changedFileEntry);
+		return blob;
 	}
 
 	private void checkResult(Result update) {

@@ -85,6 +85,7 @@ import jitstatic.utils.ErrorConsumingThreadFactory;
 
 public class JitStaticReceivePackTest {
 
+	private static final String METADATA = ".metadata";
 	private static final String REF_HEADS_MASTER = "refs/heads/master";
 	private static final String STORE = "store";
 	private final Object o = new Object();
@@ -104,6 +105,7 @@ public class JitStaticReceivePackTest {
 	private Git remoteBareGit;
 	private Git clientGit;
 	private Path storePath;
+	private Path storeMetaPath;
 	private TestProtocol<Object> protocol;
 	private URIish uri;
 	private ExecutorService service;
@@ -114,18 +116,20 @@ public class JitStaticReceivePackTest {
 	public void setup() throws IllegalStateException, GitAPIException, IOException {
 		remoteBareGit = Git.init().setDirectory(folder.newFolder()).setBare(true).call();
 		File workingFolder = folder.newFolder();
-		clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
-				.setDirectory(workingFolder).call();
+		clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder)
+				.call();
 		storePath = workingFolder.toPath().resolve(STORE);
+		storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
 		Files.write(storePath, data, StandardOpenOption.CREATE);
+		Files.write(storeMetaPath, data, StandardOpenOption.CREATE);
 		clientGit.add().addFilepattern(STORE).call();
 		clientGit.commit().setMessage("Initial commit").call();
 		clientGit.push().call();
-		
+
 		errorReporter = new ErrorReporter();
 		bus = new RepositoryBus(errorReporter);
 		service = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("testRepo", errorReporter::setFault));
-		
+
 		protocol = new TestProtocol<Object>(null, (req, db) -> {
 			final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
 			return receivePack;
@@ -141,12 +145,11 @@ public class JitStaticReceivePackTest {
 		Transport.unregister(protocol);
 		service.shutdown();
 		service.awaitTermination(1, TimeUnit.SECONDS);
-		assertEquals(null,errorReporter.getFault());
+		assertEquals(null, errorReporter.getFault());
 	}
 
 	@Test
-	public void testNewBranch()
-			throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException,
+	public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException,
 			RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
 		Repository localRepository = clientGit.getRepository();
 		RemoteTestUtils.copy("/test3.json", storePath);
@@ -204,7 +207,8 @@ public class JitStaticReceivePackTest {
 		final Repository localRepository = clientGit.getRepository();
 		final ObjectId oldId = localRepository.resolve(Constants.HEAD);
 		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
+		RemoteTestUtils.copy("/test3.md.json", storeMetaPath);
+		clientGit.add().addFilepattern(".").call();
 		RevCommit c = clientGit.commit().setMessage("New commit").call();
 		assertFalse(oldId.equals(c));
 		Ref ref = localRepository.findRef(REF_HEADS_MASTER);
@@ -243,8 +247,8 @@ public class JitStaticReceivePackTest {
 		assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
 		assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
 		final File newFolder = folder.newFolder();
-		try (Git git = Git.cloneRepository().setDirectory(newFolder)
-				.setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
+		try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
+				.call()) {
 			byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
 			assertArrayEquals(data, readAllBytes);
 		}
@@ -383,8 +387,8 @@ public class JitStaticReceivePackTest {
 	}
 
 	@Test
-	public void testDeleteDefaultBranch() throws RefAlreadyExistsException, RefNotFoundException,
-			InvalidRefNameException, GitAPIException, IOException {
+	public void testDeleteDefaultBranch()
+			throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
 		clientGit.branchCreate().setName("other").call();
 		Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
 		clientGit.checkout().setName("other").call();

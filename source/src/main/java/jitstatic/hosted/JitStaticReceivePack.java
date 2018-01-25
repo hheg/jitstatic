@@ -185,7 +185,7 @@ public class JitStaticReceivePack extends ReceivePack {
 	}
 
 	private boolean ifAllOk(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-		final boolean allOK = cmds.stream().allMatch(p -> {
+		return cmds.stream().allMatch(p -> {
 			if (p.getRight() == null) {
 				if(p.getLeft().getResult() != Result.NOT_ATTEMPTED) {
 					return false;
@@ -194,7 +194,6 @@ public class JitStaticReceivePack extends ReceivePack {
 			}
 			return p.getRight().getResult() == Result.OK;
 		});
-		return allOK;
 	}
 
 	private void setFault(final Exception e) {

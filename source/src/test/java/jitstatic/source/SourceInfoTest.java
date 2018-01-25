@@ -33,6 +33,8 @@ import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
 
 import jitstatic.FileObjectIdStore;
+import jitstatic.MetaFileData;
+import jitstatic.SourceFileData;
 import jitstatic.hosted.InputStreamHolder;
 
 public class SourceInfoTest {
@@ -45,14 +47,20 @@ public class SourceInfoTest {
 	@Test
 	public void testSourceInfo() throws IOException {
 		InputStream is = Mockito.mock(InputStream.class);
+		
 		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
 		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+		
 		Mockito.when(ish.inputStream()).thenReturn(is);
 		Mockito.when(fois.getObjectId()).thenReturn(ObjectId.fromString(SHA_1));
 		Mockito.when(ish.isPresent()).thenReturn(true);
-		SourceInfo si = new SourceInfo(fois, ish);
-		assertEquals(is, si.getInputStream());
-		assertEquals(SHA_1, si.getVersion());
+		SourceFileData sdf = new SourceFileData(fois, ish);
+		MetaFileData mfd = new MetaFileData(fois2, ish2);
+		SourceInfo si = new SourceInfo(mfd,sdf,null);
+		assertEquals(is, si.getSourceInputStream());
+		assertEquals(SHA_1, si.getSourceVersion());
 	}
 
 	@Test
@@ -61,10 +69,14 @@ public class SourceInfoTest {
 		ex.expectCause(Matchers.isA(IOException.class));
 		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
 		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
 		Mockito.when(ish.exception()).thenReturn(new IOException("Fake IO"));
 		Mockito.when(ish.isPresent()).thenReturn(false);
-		SourceInfo si = new SourceInfo(fois, ish);
-		si.getInputStream();
+		SourceFileData sdf = new SourceFileData(fois, ish);
+		MetaFileData mfd = new MetaFileData(fois2, ish2);
+		SourceInfo si = new SourceInfo(mfd,sdf,null);		
+		si.getSourceInputStream();
 	}
 	
 	@Test
@@ -73,9 +85,14 @@ public class SourceInfoTest {
 		ex.expectMessage("Error reading null");
 		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
 		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+
 		Mockito.when(ish.inputStream()).thenThrow(new IOException("Fake IO"));
 		Mockito.when(ish.isPresent()).thenReturn(true);
-		SourceInfo si = new SourceInfo(fois, ish);
-		si.getInputStream();
+		SourceFileData sdf = new SourceFileData(fois, ish);
+		MetaFileData mfd = new MetaFileData(fois2, ish2);
+		SourceInfo si = new SourceInfo(mfd,sdf,null);		
+		si.getSourceInputStream();
 	}
 }

@@ -82,7 +82,7 @@ public class MapResource {
 		final StorageData data = si.getStorageData();
 		final Set<User> allowedUsers = data.getUsers();
 		if (allowedUsers.isEmpty()) {
-			return new KeyData(si.getVersion(), data.getData());
+			return new KeyData(si.getVersion(), si.getData());
 		}
 
 		if (!user.isPresent()) {
@@ -94,7 +94,7 @@ public class MapResource {
 			LOG.info("Resource " + key + "is denied for user " + user);
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return new KeyData(si.getVersion(), data.getData());
+		return new KeyData(si.getVersion(), si.getData());
 	}
 
 	@PUT

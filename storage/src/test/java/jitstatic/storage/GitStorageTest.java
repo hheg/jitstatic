@@ -97,27 +97,32 @@ public class GitStorageTest {
 	}
 
 	@Test
-	public void testLoadCache() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
+	public void testLoadCache() throws Exception {
 		Set<User> users = new HashSet<>();
 		users.add(new User("user", "1234"));
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test1 = GitStorageTest.class.getResourceAsStream("/test1.json");
-				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json")) {
+				InputStream mtest1 = GitStorageTest.class.getResourceAsStream("/test1.md.json");
+				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json");
+				InputStream mtest2 = GitStorageTest.class.getResourceAsStream("/test2.md.json");) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
-			when(si1.getInputStream()).thenReturn(test1);
-			when(si2.getInputStream()).thenReturn(test2);
-			when(si1.getVersion()).thenReturn(SHA_1);
-			when(si2.getVersion()).thenReturn(SHA_2);
+			when(si1.getSourceInputStream()).thenReturn(test1);
+			when(si1.getMetadataInputStream()).thenReturn(mtest1);
+			when(si2.getSourceInputStream()).thenReturn(test2);
+			when(si2.getMetadataInputStream()).thenReturn(mtest2);
+			when(si1.getSourceVersion()).thenReturn(SHA_1);
+			when(si2.getSourceVersion()).thenReturn(SHA_2);
 
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si1);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			StoreInfo storage = new StoreInfo(new StorageData(users, readData("\"value1\"")), SHA_1);
-			assertEquals(storage, gs.get("key", null).get());
+			StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users), SHA_1);
+			assertEquals(storage.getData(), gs.get("key", null).get().getData());
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			storage = new StoreInfo(new StorageData(users, readData("\"value2\"")), SHA_2);
-			assertEquals(storage, gs.get("key", null).get());
+			storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users), SHA_2);
+			assertEquals(storage.getData(), gs.get("key", null).get().getData());
+			gs.checkHealth();
 		}
 	}
 
@@ -130,13 +135,17 @@ public class GitStorageTest {
 
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
+				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json");
+				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json");
+				InputStream mtest4 = GitStorageTest.class.getResourceAsStream("/test4.md.json")) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
-			when(si1.getInputStream()).thenReturn(test3);
-			when(si1.getVersion()).thenReturn(SHA_1);
-			when(si2.getInputStream()).thenReturn(test4);
-			when(si2.getVersion()).thenReturn(SHA_2);
+			when(si1.getSourceInputStream()).thenReturn(test3);
+			when(si1.getMetadataInputStream()).thenReturn(mtest3);
+			when(si1.getSourceVersion()).thenReturn(SHA_1);
+			when(si2.getSourceInputStream()).thenReturn(test4);
+			when(si2.getMetadataInputStream()).thenReturn(mtest4);
+			when(si2.getSourceVersion()).thenReturn(SHA_2);
 			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
 			when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
 			Future<StoreInfo> key3Data = gs.get("key3", null);
@@ -178,7 +187,7 @@ public class GitStorageTest {
 			}
 			Mockito.reset(source);
 			SourceInfo info = mock(SourceInfo.class);
-			when(info.getInputStream()).thenReturn(is);
+			when(info.getSourceInputStream()).thenReturn(is);
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(info);
 			gs.checkHealth();
 			assertNotNull(gs.get("test3.json", null));
@@ -218,13 +227,17 @@ public class GitStorageTest {
 
 		try (GitStorage gs = new GitStorage(source, null);
 				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json")) {
+				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json");
+				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json");
+				InputStream mtest4 = GitStorageTest.class.getResourceAsStream("/test4.md.json")) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
-			when(si1.getInputStream()).thenReturn(test3);
-			when(si1.getVersion()).thenReturn(SHA_1);
-			when(si2.getInputStream()).thenReturn(test4);
-			when(si2.getVersion()).thenReturn(SHA_2);
+			when(si1.getSourceInputStream()).thenReturn(test3);
+			when(si1.getMetadataInputStream()).thenReturn(mtest3);
+			when(si1.getSourceVersion()).thenReturn(SHA_1);
+			when(si2.getSourceInputStream()).thenReturn(test4);
+			when(si2.getMetadataInputStream()).thenReturn(mtest4);
+			when(si2.getSourceVersion()).thenReturn(SHA_2);
 			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
 			when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
 			Future<StoreInfo> key3Data = gs.get("key3", null);
@@ -240,28 +253,30 @@ public class GitStorageTest {
 
 	@Test
 	public void testPutAKey() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
-		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json")) {
+		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
 			SourceInfo si = mock(SourceInfo.class);
 			JsonNode data = readData("{\"one\" : \"two\"}");
 			String message = "one message";
 			String userInfo = "test@test";
 			String key = "key3";
-			when(si.getInputStream()).thenReturn(test3);
-			when(si.getVersion()).thenReturn(SHA_1);
+			when(si.getSourceInputStream()).thenReturn(test3);
+			when(si.getMetadataInputStream()).thenReturn(mtest3);
+			when(si.getSourceVersion()).thenReturn(SHA_1);
 			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
 			when(source.modify(Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
 					Mockito.eq(key), Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2));
 			Future<StoreInfo> first = gs.get(key, null);
 			StoreInfo storeInfo = first.get();
 			assertNotNull(storeInfo);
-			assertNotEquals(data, storeInfo.getStorageData().getData());
+			assertNotEquals(data, storeInfo.getData());
 			CompletableFuture<String> put = gs.put(data, SHA_1, message, userInfo, "", key, null);
 			String newVersion = put.get();
 			assertEquals(SHA_2, newVersion);
 			first = gs.get(key, null);
 			storeInfo = first.get();
 			assertNotNull(storeInfo);
-			assertEquals(data, storeInfo.getStorageData().getData());
+			assertEquals(data, storeInfo.getData());
 		}
 	}
 
@@ -298,21 +313,23 @@ public class GitStorageTest {
 	public void testPutKeyWithNoKey() throws Throwable {
 		ex.expect(WrappingAPIException.class);
 		ex.expectCause(Matchers.isA(UnsupportedOperationException.class));
-		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json")) {
+		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
 			SourceInfo si = mock(SourceInfo.class);
 			JsonNode data = readData("{\"one\" : \"two\"}");
 			String message = "one message";
 			String userInfo = "test@test";
 			String key = "key3";
-			when(si.getInputStream()).thenReturn(test3);
-			when(si.getVersion()).thenReturn(SHA_1);
+			when(si.getSourceInputStream()).thenReturn(test3);
+			when(si.getMetadataInputStream()).thenReturn(mtest3);
+			when(si.getSourceVersion()).thenReturn(SHA_1);
 			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
 			when(source.modify(Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
 					Mockito.eq(key), Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2));
 			Future<StoreInfo> first = gs.get(key, null);
 			StoreInfo storeInfo = first.get();
 			assertNotNull(storeInfo);
-			assertNotEquals(data, storeInfo.getStorageData().getData());
+			assertNotEquals(data, storeInfo.getData());
 			CompletableFuture<String> put = gs.put(data, SHA_1, message, userInfo, null, "other", null);
 			try {
 				put.get();

@@ -1,4 +1,4 @@
-package jitstatic;
+package jitstatic.tools;
 
 /*-
  * #%L

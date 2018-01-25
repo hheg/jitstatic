@@ -1,4 +1,6 @@
-package jitstatic;
+package jitstatic.tools;
+
+import java.io.IOException;
 
 /*-
  * #%L
@@ -54,15 +56,20 @@ public class TestRepositoryRule extends ExternalResource {
 				Git git = Git.cloneRepository().setURI(bareBase.toUri().toString()).setDirectory(workBase.toFile())
 						.call();) {
 			for (String file : filesToCommit) {
-				final Path filePath = workBase.resolve(file);
-				Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
-				try (InputStream is = getClass().getResourceAsStream("/" + file)) {
-					Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
-				}
-				git.add().addFilepattern(file).call();
+				writeFile(workBase, file);
+				writeFile(workBase,file+".metadata");				
 			}
+			git.add().addFilepattern(".").call();
 			git.commit().setMessage("Initial commit").call();
 			git.push().call();
+		}
+	}
+
+	private void writeFile(Path workBase, String file) throws IOException {
+		final Path filePath = workBase.resolve(file);
+		Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
+		try (InputStream is = getClass().getResourceAsStream("/" + file)) {
+			Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
 		}
 	}
 

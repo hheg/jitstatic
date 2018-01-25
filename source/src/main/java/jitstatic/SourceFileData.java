@@ -1,10 +1,10 @@
-package jitstatic.remote;
+package jitstatic;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,19 +20,12 @@ package jitstatic.remote;
  * #L%
  */
 
+import jitstatic.hosted.InputStreamHolder;
 
-public class RepositoryIsMissingIntendedBranch extends RuntimeException {
-	public RepositoryIsMissingIntendedBranch(String msg) {
-		super(msg);
-	}
+public class SourceFileData extends FileData {
 
-	private static final long serialVersionUID = -7606348017682123021L;
-	/*
-	 * (non-Javadoc) Not caring about the stack here, just for signaling an error;
-	 * @see java.lang.Throwable#fillInStackTrace()
-	 */
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
+	public SourceFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+		super(fileInfo, inputStreamHolder);
 	}
+	
 }

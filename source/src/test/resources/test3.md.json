@@ -2,7 +2,7 @@
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
  * limitations under the License.
  * #L%
  */
-
 {
-	"data": "value1"
+ "users": [{"user": "user1","password": "1234"},{"user": "user2","password": "1234"}]
 }

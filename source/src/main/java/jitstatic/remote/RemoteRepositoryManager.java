@@ -80,6 +80,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import jitstatic.CorruptedSourceException;
 import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
+import jitstatic.RepositoryIsMissingIntendedBranch;
 import jitstatic.SourceChecker;
 import jitstatic.SourceExtractor;
 import jitstatic.SourceUpdater;
@@ -151,12 +152,15 @@ public class RemoteRepositoryManager implements AutoCloseable {
 					.setCredentialsProvider(getRemoteCredentials()).call();
 			r = git.getRepository();
 			final List<Ref> remoteRefs = git.branchList().setListMode(ListMode.REMOTE).call();
+			if (remoteRefs.isEmpty()) {
+				throw new RefNotFoundException("Remote contains no branches. Need atleast " + defaultRef);
+			}
 			for (Ref ref : remoteRefs) {
 				final String localRefName = getRefName(ref.getName());
 				if (!Constants.MASTER.equals(localRefName)) {
 					git.checkout().setName(localRefName).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
 				}
-			}			
+			}
 		}
 		r.incrementOpen();
 		return r;
@@ -179,7 +183,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			final Object obj = lock.getAndSet(new Object());
 			if (obj == null) {
 				try {
-					LOG.info("Checking remote " + remoteRepo);					
+					LOG.info("Checking remote " + remoteRepo);
 					repoExecutor.submit(this::pollAndCheckRemote).get();
 				} catch (final InterruptedException | ExecutionException e) {
 					setFault(e);
@@ -226,7 +230,9 @@ public class RemoteRepositoryManager implements AutoCloseable {
 						.call();
 			}
 		}
-		git.checkout().setName(defaultRef).call();
+		if (remoteRefs.size() > 0) {
+			git.checkout().setName(defaultRef).call();
+		}
 	}
 
 	private Collection<String> checkRemoteForNewAndDeletedBranches()
@@ -486,7 +492,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		if (ref == null) {
 			ref = defaultRef;
 		}
-		if(ref.startsWith(Constants.R_TAGS)) {
+		if (ref.startsWith(Constants.R_TAGS)) {
 			throw new UnsupportedOperationException("Tags cannot be modified");
 		}
 		final String finalRef = ref;
@@ -535,6 +541,6 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		if (sourceInfo == null) {
 			return false;
 		}
-		return version.equals(sourceInfo.getVersion());
+		return version.equals(sourceInfo.getSourceVersion());
 	}
 }

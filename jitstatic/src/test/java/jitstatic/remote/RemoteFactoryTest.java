@@ -49,6 +49,8 @@ import jitstatic.source.Source;
 
 public class RemoteFactoryTest {
 
+	private static final String METADATA = ".metadata";
+
 	private static final String STORE = "store";
 
 	private Environment env = mock(Environment.class);
@@ -115,20 +117,24 @@ public class RemoteFactoryTest {
 		try (Git bare = Git.init().setBare(true).setDirectory(remoteFolder).call();
 				Git git = Git.cloneRepository().setDirectory(base).setURI(remoteFolder.toURI().toString()).call()) {
 			Files.write(base.toPath().resolve(STORE), getData().getBytes("UTF-8"));
-			git.add().addFilepattern(STORE).call();
+			Files.write(base.toPath().resolve(STORE + METADATA), getMetaData().getBytes("UTF-8"));
+			git.add().addFilepattern(".").call();
 			git.commit().setMessage("Commit").call();
 			git.push().call();
 		}
 	}
 	
+	private String getMetaData() {
+		return "{\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+	}
 	
 	private String getData() {
 		return getData(1);
 	}
 
 	private String getData(int i) {
-		return "{\"data\":{\"key" + i
-				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}},\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+		return "{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
 	}
 
 }

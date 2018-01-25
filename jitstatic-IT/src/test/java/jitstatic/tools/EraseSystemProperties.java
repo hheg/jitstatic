@@ -1,3 +1,5 @@
+package jitstatic.tools;
+
 /*-
  * #%L
  * jitstatic
@@ -18,6 +20,27 @@
  * #L%
  */
 
-{
-	"data": "value1"
+import org.junit.rules.ExternalResource;
+
+public class EraseSystemProperties extends ExternalResource {
+	private final String[] strings;
+
+	/**
+	 * Hack for removing system properties which the dropwizard testing harness is
+	 * adding.
+	 * 
+	 * @param strings
+	 */
+	public EraseSystemProperties(final String... strings) {
+		this.strings = strings;
+	}
+
+	@Override
+	protected void before() throws Throwable {
+		final String prefix = "dw.";
+		for (String s : strings) {
+			System.clearProperty(prefix + s);
+		}
+		super.before();
+	}
 }

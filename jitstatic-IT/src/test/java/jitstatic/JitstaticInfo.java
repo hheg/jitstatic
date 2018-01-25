@@ -21,17 +21,26 @@ package jitstatic;
  */
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
 
+import org.hamcrest.Matchers;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
+
+import com.codahale.metrics.health.HealthCheck.Result;
 
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
@@ -59,6 +68,14 @@ public class JitstaticInfo {
 	@BeforeClass
 	public static void setupClass() {
 		adress = String.format("http://localhost:%d/application/info", DW.getLocalPort());
+	}
+	@After
+	public void after() {
+		SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
+		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
+				.collect(Collectors.toList());
+		errors.stream().forEach(e -> e.printStackTrace());
+		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
 	}
 
 	@Test
