@@ -46,9 +46,16 @@ import javax.ws.rs.client.WebTarget;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.PushResult;
@@ -182,10 +189,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				git.add().addFilepattern(ACCEPT_STORAGE).call();
 				RevCommit commit = git.commit().setMessage("Evolve").call();
-				Iterable<PushResult> result = git.push().setCredentialsProvider(provider).call();
-
-				RemoteRefUpdate remoteUpdate = result.iterator().next().getRemoteUpdate(REFS_HEADS_MASTER);
-				assertEquals(Status.OK, remoteUpdate.getStatus());
+				verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
 				sleep(1500);
 
@@ -194,9 +198,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				assertEquals(readTree, response.get("data"));
 
 				git.revert().include(commit).call();
-				result = git.push().setCredentialsProvider(provider).call();
-				remoteUpdate = result.iterator().next().getRemoteUpdate(REFS_HEADS_MASTER);
-				assertEquals(Status.OK, remoteUpdate.getStatus());
+				verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
 				sleep(1500);
 
@@ -229,18 +231,13 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try {
 			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
 			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
-				Path file = base.toPath().resolve(store);
-				Path mfile = base.toPath().resolve(store + METADATA);
-				Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
-				Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
-				git.add().addFilepattern(".").call();
-				git.commit().setMessage("First").call();
+				Path file = addAndCommit(store, base, git);
 				git.tag().setName(tag).call();
 				Files.write(file, getData(2).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
 				git.add().addFilepattern(".").call();
 				git.commit().setMessage("Second").call();
-				git.push().setCredentialsProvider(provider).call();
-				git.push().setCredentialsProvider(provider).setPushTags().call();
+				verifyOkPush(git.push().setCredentialsProvider(provider).call());
+				verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(),"refs/tags/tag");
 			}
 			sleep(3000);
 			JsonNode result = client.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
@@ -252,6 +249,18 @@ public class RemoteHttpHostedGitRepositoryTest {
 		}
 	}
 
+	private Path addAndCommit(String store, File base, Git git)
+			throws IOException, UnsupportedEncodingException, GitAPIException, NoFilepatternException, NoHeadException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException {
+		Path file = base.toPath().resolve(store);
+		Path mfile = base.toPath().resolve(store + METADATA);
+		Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+		Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("First").call();
+		return file;
+	}
+
 	@Test
 	public void testDoubleTag() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		String tag = "tag";
@@ -260,18 +269,13 @@ public class RemoteHttpHostedGitRepositoryTest {
 		try {
 			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
 			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
-				Path file = base.toPath().resolve(ACCEPT_STORAGE);
-				Path mfile = base.toPath().resolve(ACCEPT_STORAGE+METADATA);
-				Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-				Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(".").call();
-				git.commit().setMessage("First").call();
+				Path file = addAndCommit(base, git);
 				git.tag().setName(tag).call();
 				Files.write(file, getData(2).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
 				git.add().addFilepattern(".").call();
 				git.commit().setMessage("Second").call();
-				git.push().setCredentialsProvider(provider).call();
-				git.push().setCredentialsProvider(provider).setPushTags().call();
+				verifyOkPush(git.push().setCredentialsProvider(provider).call());
+				verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(),"refs/tags/"+tag);
 			}
 			sleep(3000);
 			JsonNode result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress)).request()
@@ -282,6 +286,28 @@ public class RemoteHttpHostedGitRepositoryTest {
 		} finally {
 			client.close();
 		}
+	}
+
+	private Path addAndCommit(File base, Git git)
+			throws IOException, UnsupportedEncodingException, GitAPIException, NoFilepatternException, NoHeadException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException {
+		Path file = base.toPath().resolve(ACCEPT_STORAGE);
+		Path mfile = base.toPath().resolve(ACCEPT_STORAGE+METADATA);
+		Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+		Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("First").call();
+		return file;
+	}
+	
+	private void verifyOkPush(Iterable<PushResult> iterable) {
+		verifyOkPush(iterable, REFS_HEADS_MASTER);
+	}
+
+	private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+		PushResult pushResult = iterable.iterator().next();
+		RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
+		assertEquals(Status.OK, remoteUpdate.getStatus());
 	}
 
 	private static Supplier<String> getFolder() {

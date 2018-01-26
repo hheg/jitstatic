@@ -137,7 +137,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
 			assertEquals(
-					"{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}",
+					getData(),
 					response.get("data").toString());
 			assertNotNull(response.get("version").toString());
 		} finally {
@@ -162,9 +162,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 		try {
 			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
 			JsonNode response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(
-					"{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}",
-					response.get("data").toString());
+			assertEquals(getData(),response.get("data").toString());
 			JsonNode jsonNode = response.get("version");
 			String oldVersion = jsonNode.asText();
 			ModifyKeyData data = new ModifyKeyData();
@@ -200,5 +198,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
 	private static String basicAuth() throws UnsupportedEncodingException {
 		return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
+	}
+
+	private static String getData() {
+		return "{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
 	}
 }

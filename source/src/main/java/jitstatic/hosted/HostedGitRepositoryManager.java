@@ -77,7 +77,10 @@ class HostedGitRepositoryManager implements Source {
 	HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
 			final ExecutorService repoExecutor, final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
 		if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
-			throw new IllegalArgumentException(String.format("Path %s is not a directory", workingDirectory));
+			if(Files.isRegularFile(workingDirectory)) {
+				throw new IllegalArgumentException(String.format("Path %s is a file",workingDirectory));
+			}
+			Files.createDirectories(workingDirectory);
 		}
 		if (!Files.isWritable(workingDirectory)) {
 			throw new IllegalArgumentException(String.format("Path %s is not writeable", workingDirectory));
