@@ -24,33 +24,33 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 
-import jitstatic.FileObjectIdStore;
-import jitstatic.hosted.InputStreamHolder;
+import jitstatic.MetaFileData;
+import jitstatic.RepositoryDataError;
+import jitstatic.SourceFileData;
 
 public class SourceInfo {
 
-	private final FileObjectIdStore fileInfo;
-	private final InputStreamHolder inputStreamHolder;
+	private final MetaFileData metaFileData;
+	private final SourceFileData sourceFileData;
+	// TODO Deal with this
+	private final RepositoryDataError fileDataError;
 
-	public SourceInfo(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-		this.fileInfo = Objects.requireNonNull(fileInfo);
-		this.inputStreamHolder = Objects.requireNonNull(inputStreamHolder);
+	public SourceInfo(MetaFileData metaFileData, SourceFileData sourceFileData, RepositoryDataError fileDataError) {
+		this.metaFileData = Objects.requireNonNull(metaFileData);
+		this.sourceFileData = Objects.requireNonNull(sourceFileData);
+		this.fileDataError = fileDataError;
 	}
 
-	public InputStream getInputStream() throws IOException {
-		if (inputStreamHolder.isPresent()) {
-			try {
-				return inputStreamHolder.inputStream();
-			} catch (final IOException e) {
-				throw new IOException("Error reading " + fileInfo.getFileName(), e);
-			}
-		} else {
-			throw new RuntimeException(inputStreamHolder.exception());
-		}
+	public InputStream getSourceInputStream() throws IOException {
+		return sourceFileData.getInputStream();
 	}
 
-	public String getVersion() {
-		return fileInfo.getObjectId().name();
+	public String getSourceVersion() {
+		return sourceFileData.getVersion();
+	}
+	
+	public InputStream getMetadataInputStream() throws IOException {
+		return metaFileData.getInputStream();
 	}
 
 }

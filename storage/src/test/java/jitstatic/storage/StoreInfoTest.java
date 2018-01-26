@@ -39,15 +39,15 @@ public class StoreInfoTest {
 	
 	@Test
 	public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-		StoreInfo si1 = new StoreInfo(new StorageData(new HashSet<>(),MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class)),"1");
-		StoreInfo si2 = new StoreInfo(new StorageData(new HashSet<>(),MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class)),"1");
-		StoreInfo si3 = new StoreInfo(new StorageData(new HashSet<>(),MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class)),"2");
-		StoreInfo si4 = new StoreInfo(new StorageData(new HashSet<>(),MAPPER.readValue("{\"two\":\"one\"}", JsonNode.class)),"1");
+		StoreInfo si1 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class),new StorageData(new HashSet<>()), "1");
+		StoreInfo si2 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class),new StorageData(new HashSet<>()), "1");
+		StoreInfo si3 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class),new StorageData(new HashSet<>()), "2");
+		
 		assertEquals(si1,si1);
 		assertEquals(si1.hashCode(),si2.hashCode());
 		assertEquals(si1,si2);
 		assertNotEquals(si1,si3);
-		assertNotEquals(si1,si4);
+		
 		assertNotEquals(si1,null);
 		assertNotEquals(si1,new Object());
 	}

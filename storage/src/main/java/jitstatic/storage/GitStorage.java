@@ -22,6 +22,7 @@ package jitstatic.storage;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,8 +45,10 @@ import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
@@ -59,8 +62,9 @@ import jitstatic.utils.Pair;
 
 public class GitStorage implements Storage {
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
+	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
+
 	private final Map<String, Map<String, StoreInfo>> cache = new ConcurrentHashMap<>();
-	private final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
 	private final ExecutorService refExecutor;
 	private final ExecutorService keyExecutor;
@@ -102,7 +106,7 @@ public class GitStorage implements Storage {
 				} else {
 					cache.remove(ref);
 				}
-			},refExecutor);
+			}, refExecutor);
 		}).collect(Collectors.toCollection(() -> new ArrayList<>(refsToReload.size())));
 		// TODO Make detaching selectable
 		waitForTasks(tasks).thenAccept(l -> {
@@ -129,9 +133,9 @@ public class GitStorage implements Storage {
 			return CompletableFuture.supplyAsync(() -> {
 				try {
 					return Optional.of(Pair.of(key, load(key, ref)));
-				} catch (final IOException e) {
-					consumeError(e);
 				} catch (final RefNotFoundException ignore) {
+				} catch (final Exception e) {
+					consumeError(new RuntimeException(key + " in " + ref + " had the following error",e));
 				}
 				return Optional.<Pair<String, StoreInfo>>empty();
 			});
@@ -200,14 +204,26 @@ public class GitStorage implements Storage {
 		return storeInfo;
 	}
 
-	private StoreInfo load(final String key, final String ref) throws IOException, RefNotFoundException {
+	private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
 		final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
 		if (sourceInfo != null) {
-			try (final InputStream is = sourceInfo.getInputStream()) {
-				return new StoreInfo(readStorage(is), sourceInfo.getVersion());
+			final CompletableFuture<StorageData> metaDataFuture = CompletableFuture.supplyAsync(() -> {
+				try (final InputStream is = sourceInfo.getMetadataInputStream()) {
+					return readStorage(is);
+				} catch (final IOException e) {
+					throw new UncheckedIOException(e);
+				}
+			});
+
+			try (final InputStream is = sourceInfo.getSourceInputStream()) {
+				return new StoreInfo(readStorageData(is), metaDataFuture.join(), sourceInfo.getSourceVersion());
 			}
 		}
 		return null;
+	}
+
+	private JsonNode readStorageData(InputStream is) throws JsonParseException, JsonMappingException, IOException {
+		return MAPPER.readValue(is, JsonNode.class);
 	}
 
 	@Override
@@ -237,7 +253,7 @@ public class GitStorage implements Storage {
 	}
 
 	private StorageData readStorage(final InputStream storageStream) throws IOException {
-		try (final JsonParser parser = mapper.getFactory().createParser(storageStream);) {
+		try (final JsonParser parser = MAPPER.getFactory().createParser(storageStream);) {
 			return parser.readValueAs(StorageData.class);
 		}
 	}
@@ -277,7 +293,7 @@ public class GitStorage implements Storage {
 		final StoreInfo si = refMap.get(key);
 		if (si.getVersion().equals(oldversion)) {
 			final StorageData sd = si.getStorageData();
-			refMap.put(key, new StoreInfo(new StorageData(sd.getUsers(), data), newVersion));
+			refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers()), newVersion));
 		}
 	}
 }

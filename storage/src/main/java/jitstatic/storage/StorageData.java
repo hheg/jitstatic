@@ -28,7 +28,6 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -39,27 +38,19 @@ public class StorageData {
 
 	private final Set<User> users;
 
-	private final JsonNode data;
-
 	@JsonCreator
-	public StorageData(final @JsonDeserialize(as=LinkedHashSet.class) @JsonProperty("users") Set<User> users, final @JsonProperty("data") JsonNode data) {
+	public StorageData(final @JsonDeserialize(as=LinkedHashSet.class) @JsonProperty("users") Set<User> users) {
 		this.users = Objects.requireNonNull(users);
-		this.data = Objects.requireNonNull(data);
 	}
 
 	public Set<User> getUsers() {
 		return users;
-	}
-
-	public JsonNode getData() {
-		return data;
 	}
 	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + data.hashCode();
 		result = prime * result + users.hashCode();
 		return result;
 	}
@@ -69,7 +60,6 @@ public class StorageData {
 		return Optional.ofNullable(other)
 				.filter(that -> that instanceof StorageData)
 				.map(that -> (StorageData) that)
-				.filter(that -> Objects.equals(this.data, that.data))
 				.filter(that -> Objects.equals(this.users, that.users))
 				.isPresent();
 	}

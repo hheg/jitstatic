@@ -18,6 +18,12 @@
  * #L%
  */
 
+
 {
-	"data": "value1"
+	"users": [
+		{
+			"user": "user",
+			"password": "1234"
+		}
+	]
 }

@@ -1,8 +1,10 @@
+package jitstatic;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +20,17 @@
  * #L%
  */
 
-{
-	"data": "value1"
+public class MetaDataFileIsMissingSourceFile extends Exception {
+
+	private static final long serialVersionUID = 6044973559570290649L;
+
+	public MetaDataFileIsMissingSourceFile(final String file) {
+		super(file + " is missing matching source file");
+	}
+
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
+
 }

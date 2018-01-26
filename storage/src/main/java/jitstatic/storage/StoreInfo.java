@@ -22,28 +22,35 @@ package jitstatic.storage;
 
 import java.util.Objects;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 public class StoreInfo {
-	private final StorageData data;
+	private final StorageData metaData;
 	private final String version;
-	
-	public StoreInfo(final StorageData data, final String version) {
+	private final JsonNode data;
+
+	public StoreInfo(final JsonNode data, final StorageData metaData, final String version) {
 		this.data = Objects.requireNonNull(data);
+		this.metaData = Objects.requireNonNull(metaData);
 		this.version = Objects.requireNonNull(version);
 	}
 
 	public StorageData getStorageData() {
-		return data;
+		return metaData;
 	}
 
 	public String getVersion() {
 		return version;
 	}
 
+	public JsonNode getData() {
+		return data;
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + data.hashCode();
 		result = prime * result + version.hashCode();
 		return result;
 	}
@@ -57,10 +64,7 @@ public class StoreInfo {
 		if (getClass() != obj.getClass())
 			return false;
 		StoreInfo other = (StoreInfo) obj;
-		if (!data.equals(other.data))
-			return false;
-		if (!version.equals(other.version))
-			return false;
-		return true;
+		return version.equals(other.version);
 	}
+
 }

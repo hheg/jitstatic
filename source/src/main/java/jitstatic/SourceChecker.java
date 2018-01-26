@@ -22,12 +22,14 @@ package jitstatic;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -35,14 +37,13 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 
 import jitstatic.hosted.InputStreamHolder;
-import jitstatic.remote.RepositoryIsMissingIntendedBranch;
 import jitstatic.utils.Pair;
 
 public class SourceChecker implements AutoCloseable {
 
+	private static final SourceJSONParser PARSER = new SourceJSONParser();
 	private final Repository repository;
 	private final SourceExtractor extractor;
-	private static final SourceJSONParser DATA_PARSER = new SourceJSONParser();
 
 	public SourceChecker(final Repository repository) {
 		this(repository, new SourceExtractor(repository));
@@ -67,15 +68,14 @@ public class SourceChecker implements AutoCloseable {
 	}
 
 	private List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check(final String branch,
-			final Pair<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> branchSource)
-			throws RefNotFoundException {
+			final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> branchSource) throws RefNotFoundException {
 		if (!branchSource.isPresent()) {
 			throw new RefNotFoundException(branch);
 		}
 		final Pair<AnyObjectId, Set<Ref>> revCommit = branchSource.getLeft();
-		final List<Pair<FileObjectIdStore, InputStreamHolder>> branchData = branchSource.getRight();
-		final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::read).filter(Pair::isPresent)
-				.sequential().collect(Collectors.toList());
+		final List<BranchData> branchData = branchSource.getRight();
+		final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData)
+				.flatMap(List::stream).filter(Pair::isPresent).sequential().collect(Collectors.toList());
 
 		return Arrays.asList(Pair.of(revCommit.getRight(), branchErrors));
 	}
@@ -86,25 +86,64 @@ public class SourceChecker implements AutoCloseable {
 	}
 
 	public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
-		final Map<Pair<AnyObjectId, Set<Ref>>, List<Pair<FileObjectIdStore, InputStreamHolder>>> sources = extractor.extractAll();
+		final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
 		return sources.entrySet().stream().parallel().map(e -> {
 			final Set<Ref> refs = e.getKey().getRight();
-			final List<Pair<FileObjectIdStore, Exception>> fileStores = e.getValue().stream().map(this::read).filter(Pair::isPresent)
-					.collect(Collectors.toList());
+			final List<Pair<FileObjectIdStore, Exception>> fileStores = e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream)
+					.filter(Pair::isPresent).collect(Collectors.toList());
 			return Pair.of(refs, fileStores);
 		}).filter(p -> !p.getRight().isEmpty()).sequential().collect(Collectors.toList());
 	}
 
-	private Pair<FileObjectIdStore, Exception> read(final Pair<FileObjectIdStore, InputStreamHolder> data) {
-		final InputStreamHolder inputStreamHolder = data.getRight();
-		final FileObjectIdStore fileObject = data.getLeft();
+	private List<Pair<FileObjectIdStore, Exception>> readRepositoryData(final BranchData data) {
+		final List<Pair<FileObjectIdStore, Exception>> fileErrors = data.pair().stream().map(this::parseErrors).flatMap(s -> s)
+				.collect(Collectors.toCollection(() -> new ArrayList<>()));
+		final RepositoryDataError fileDataError = data.getFileDataError();
+		if (fileDataError != null) {
+			fileErrors.add(Pair.of(fileDataError.getFileInfo(), fileDataError.getInputStreamHolder().exception()));
+		}
+		return fileErrors;
+	}
+
+	private Stream<Pair<FileObjectIdStore, Exception>> parseErrors(final Pair<MetaFileData, SourceFileData> data) {
+		final SourceFileData sourceFileData = data.getRight();
+		final MetaFileData metaFileData = data.getLeft();
+		if (metaFileData == null) {
+			final FileObjectIdStore fileInfo = sourceFileData.getFileInfo();
+			return Stream.of(Pair.of(fileInfo, new FileIsMissingMetaData(fileInfo.getFileName())));
+		}
+		if (sourceFileData == null) {
+			final FileObjectIdStore fileInfo = metaFileData.getFileInfo();
+			return Stream.of(Pair.of(fileInfo, new MetaDataFileIsMissingSourceFile(fileInfo.getFileName())));
+		}
+		return Stream.of(readAndCheckMetaFileData(data.getLeft()), readAndCheckSourceFileData(sourceFileData));
+	}
+
+	private Pair<FileObjectIdStore, Exception> readAndCheckSourceFileData(final SourceFileData data) {
+		final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
+		if (inputStreamHolder.isPresent()) {
+			try (InputStream is = inputStreamHolder.inputStream()) {
+				// TODO What to check here?
+			} catch (final IOException e) {
+				return Pair.of(data.getFileInfo(), e);
+			}
+			// File OK
+			return Pair.ofNothing();
+		}
+		// File had a repository exception
+		return Pair.of(data.getFileInfo(), inputStreamHolder.exception());
+	}
+
+	private Pair<FileObjectIdStore, Exception> readAndCheckMetaFileData(final MetaFileData data) {
+		final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
+		final FileObjectIdStore fileObject = data.getFileInfo();
 		if (inputStreamHolder == null) {
 			// File is removed
 			return Pair.of(fileObject, null);
 		}
 		if (inputStreamHolder.isPresent()) {
 			try (final InputStream is = inputStreamHolder.inputStream()) {
-				DATA_PARSER.parse(is);
+				PARSER.parse(is);
 			} catch (final IOException e) {
 				// File had errors
 				return Pair.of(fileObject, e);

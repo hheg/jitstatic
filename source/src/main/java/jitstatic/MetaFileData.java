@@ -1,8 +1,10 @@
+package jitstatic;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +20,12 @@
  * #L%
  */
 
-{
-	"data": "value1"
+import jitstatic.hosted.InputStreamHolder;
+
+public class MetaFileData extends FileData {
+
+	public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+		super(fileInfo, inputStreamHolder);
+	}
+
 }
