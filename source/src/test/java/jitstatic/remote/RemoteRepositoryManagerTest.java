@@ -51,6 +51,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
+import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -143,9 +146,8 @@ public class RemoteRepositoryManagerTest {
 		try (Git git = Git.init().setDirectory(remoteFolder).call()) {
 			Files.write(remoteFolder.toPath().resolve(STORAGE), "{\"data\":\"value1\"}".getBytes("UTF-8"));
 			Files.write(remoteFolder.toPath().resolve(STORAGE + METADATA),
-					"{\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"));
-			git.add().addFilepattern(STORAGE + METADATA).call();
-			git.add().addFilepattern(STORAGE).call();
+					"{\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"));			
+			git.add().addFilepattern(".").call();
 			git.commit().setMessage("First").call();
 
 			try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
@@ -162,9 +164,8 @@ public class RemoteRepositoryManagerTest {
 		try (Git git = Git.init().setDirectory(remoteFolder).call()) {
 			Files.write(remoteFolder.toPath().resolve(STORAGE), "{\"data\":\"value1\"}".getBytes("UTF-8"));
 			Files.write(remoteFolder.toPath().resolve(STORAGE + METADATA),
-					"{\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"));
-			git.add().addFilepattern(STORAGE + METADATA).call();
-			git.add().addFilepattern(STORAGE).call();
+					"{\"users\":[{\"user\":\"user\",\"password\":\"1234\"}]}".getBytes("UTF-8"));			
+			git.add().addFilepattern(".").call();
 			git.commit().setMessage("First").call();
 
 			try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), user, password, workingDir,
@@ -241,8 +242,7 @@ public class RemoteRepositoryManagerTest {
 		try (Git git = Git.init().setDirectory(remoteFolder).call();) {
 			Files.write(Paths.get(remoteFolder.getAbsolutePath(), STORAGE + METADATA), getMetaData().getBytes("UTF-8"));
 			Files.write(Paths.get(remoteFolder.getAbsolutePath(), STORAGE), getData().getBytes("UTF-8"));
-			git.add().addFilepattern(STORAGE).call();
-			git.add().addFilepattern(STORAGE + METADATA).call();
+			git.add().addFilepattern(".").call();			
 			git.commit().setMessage("Initial commit").call();
 
 			try (final RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir,
@@ -272,7 +272,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -282,7 +282,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -305,7 +305,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -315,7 +315,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -340,7 +340,7 @@ public class RemoteRepositoryManagerTest {
 			git.add().addFilepattern(STORAGE).call();
 			git.add().addFilepattern(STORAGE + METADATA).call();
 			git.commit().setMessage("First").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -351,7 +351,7 @@ public class RemoteRepositoryManagerTest {
 			git.add().addFilepattern(STORAGE).call();
 			git.add().addFilepattern(STORAGE + METADATA).call();
 			git.commit().setMessage("Second").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			Exception fault = rrm.getFault();
@@ -378,7 +378,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("First").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -388,7 +388,7 @@ public class RemoteRepositoryManagerTest {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(STORAGE).call();
 			git.commit().setMessage("Second").call();
-			git.push().call();
+			verifyOkPush(git.push().call());
 
 			rrm.checkRemote().run();
 			assertNull(rrm.getFault());
@@ -547,6 +547,16 @@ public class RemoteRepositoryManagerTest {
 		try (RemoteRepositoryManager rrm = new RemoteRepositoryManager(remoteFolder.toURI(), null, null, workingDir, REF_HEADS_MASTER);) {
 			rrm.modify(null, "1", "m", "ui", "m", "key", "refs/tags/tag");
 		}
+	}
+	
+	private void verifyOkPush(Iterable<PushResult> iterable) {
+		verifyOkPush(iterable, REF_HEADS_MASTER);
+	}
+
+	private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+		PushResult pushResult = iterable.iterator().next();
+		RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
+		assertEquals(Status.OK, remoteUpdate.getStatus());
 	}
 
 	private RevCommit getRevCommit(Repository repository, String targetRef) throws IOException {

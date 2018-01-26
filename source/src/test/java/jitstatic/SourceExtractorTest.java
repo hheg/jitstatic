@@ -391,7 +391,7 @@ public class SourceExtractorTest {
 	}
 
 	private String getData() {
-		return getData(1);
+		return getData(0);
 	}
 
 	private String getMetaData() {
