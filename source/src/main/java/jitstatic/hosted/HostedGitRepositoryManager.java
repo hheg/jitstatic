@@ -259,6 +259,6 @@ class HostedGitRepositoryManager implements Source {
 		if (sourceInfo == null) {
 			return false;
 		}
-		return version.equals(sourceInfo.getVersion());
+		return version.equals(sourceInfo.getSourceVersion());
 	}
 }

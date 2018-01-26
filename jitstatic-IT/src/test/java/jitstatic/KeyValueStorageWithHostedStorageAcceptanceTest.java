@@ -67,6 +67,7 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import jitstatic.api.ModifyKeyData;
+import jitstatic.tools.TestRepositoryRule;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 

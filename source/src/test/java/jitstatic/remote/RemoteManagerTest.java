@@ -53,6 +53,7 @@ import jitstatic.source.SourceEventListener;
 
 public class RemoteManagerTest {
 
+	private static final String METADATA = ".metadata";
 	@Rule
 	public ExpectedException ex = ExpectedException.none();
 	@Rule
@@ -61,13 +62,12 @@ public class RemoteManagerTest {
 	private RemoteRepositoryManager rmr = mock(RemoteRepositoryManager.class);
 
 	@Test
-	public void testRemoteManagerPublicConstructor()
-			throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
+	public void testRemoteManagerPublicConstructor() throws IllegalStateException, GitAPIException, IOException, CorruptedSourceException {
 		String store = "storage";
 		File base = folder.newFolder();
 		try (Git git = setUpRepo(base, store);) {
-			try (RemoteManager rrm = new RemoteManager(base.toURI(), null, null, 1, TimeUnit.SECONDS,
-					folder.newFolder().toPath(), "refs/heads/master")) {
+			try (RemoteManager rrm = new RemoteManager(base.toURI(), null, null, 1, TimeUnit.SECONDS, folder.newFolder().toPath(),
+					"refs/heads/master")) {
 
 			}
 		}
@@ -78,8 +78,7 @@ public class RemoteManagerTest {
 		SourceEventListener mock = mock(SourceEventListener.class);
 		Runnable r = () -> mock.onEvent(null);
 		when(rmr.checkRemote()).thenReturn(r);
-		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS,
-				null);) {
+		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS, null);) {
 			rrm.addListener(mock);
 			rrm.start();
 			// TODO make this more deterministic...
@@ -93,8 +92,7 @@ public class RemoteManagerTest {
 	public void testRemoteHealthCheck() {
 		ex.expect(RuntimeException.class);
 		ex.expectCause(isA(IllegalArgumentException.class));
-		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS,
-				null);) {
+		try (RemoteManager rrm = new RemoteManager(rmr, new ScheduledThreadPoolExecutor(1), 1, TimeUnit.SECONDS, null);) {
 			when(rmr.getFault()).thenReturn(new IllegalArgumentException("Illegal"));
 			rrm.checkHealth();
 		}
@@ -121,7 +119,7 @@ public class RemoteManagerTest {
 			assertEquals(Long.valueOf(1), captor.getValue());
 		}
 	}
-	
+
 	@Test
 	public void testGetStorageInptuStream() throws Exception {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
@@ -130,7 +128,7 @@ public class RemoteManagerTest {
 			assertNull(rrm.getSourceInfo("key", null));
 		}
 	}
-	
+
 	@Test
 	public void testGetStorageInptuStreamGetException() throws Exception {
 		ex.expect(RefNotFoundException.class);
@@ -140,7 +138,7 @@ public class RemoteManagerTest {
 			assertNull(rrm.getSourceInfo("key", null));
 		}
 	}
-	
+
 	@Test
 	public void testModify() {
 		ScheduledExecutorService exec = mock(ScheduledExecutorService.class);
@@ -149,7 +147,7 @@ public class RemoteManagerTest {
 			rrm.modify(null, "1", "some", "test", "mail", "key", null);
 		}
 	}
-	
+
 	@Test
 	public void testModifyTag() {
 		ex.expect(UnsupportedOperationException.class);
@@ -163,7 +161,8 @@ public class RemoteManagerTest {
 	private Git setUpRepo(File base, String store) throws IllegalStateException, GitAPIException, IOException {
 		Git git = Git.init().setDirectory(base).call();
 		Files.write(base.toPath().resolve(store), getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
-		git.add().addFilepattern(store).call();
+		Files.write(base.toPath().resolve(store + METADATA), getMetaData().getBytes("UTF-8"), StandardOpenOption.CREATE);
+		git.add().addFilepattern(".").call();	
 		git.commit().setMessage("Init").call();
 		return git;
 	}
@@ -171,10 +170,14 @@ public class RemoteManagerTest {
 	private String getData() {
 		return getData(1);
 	}
+	
+	private String getMetaData() {
+		return "{\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+	}
 
 	private String getData(int i) {
-		return "{\"data\":{\"key" + i
-				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}},\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+		return "{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
 	}
 
 }

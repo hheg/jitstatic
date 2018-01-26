@@ -21,10 +21,5 @@
 
 
 {
-	"data": "value2",
-	"users": [
-		{
-			"user": "user",
-			"password": "1234"
-		}
-	]}
+	"data": "value2"
+}

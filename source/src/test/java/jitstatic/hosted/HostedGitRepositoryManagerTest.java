@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,11 +45,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
@@ -76,12 +83,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.CorruptedSourceException;
-import jitstatic.remote.RepositoryIsMissingIntendedBranch;
+import jitstatic.RepositoryIsMissingIntendedBranch;
 import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
 
 public class HostedGitRepositoryManagerTest {
 
+	private static final String METADATA = ".metadata";
 	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
 	private static final String ENDPOINT = "endpoint";
 	private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
@@ -181,14 +189,17 @@ public class HostedGitRepositoryManagerTest {
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
 				Git git = Git.cloneRepository().setDirectory(workFolder).setURI(tempDir.toUri().toString()).call();) {
 			Path file = workFolder.toPath().resolve("other");
+			Path mfile = workFolder.toPath().resolve("other" + METADATA);
+			Files.write(mfile, getMetaData().getBytes("UTF-8"), StandardOpenOption.CREATE);
 			Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE);
 			git.add().addFilepattern("other").call();
+			git.add().addFilepattern("other" + METADATA).call();
 			git.commit().setMessage("Initial commit").call();
 			git.push().call();
 			git.tag().setName("tag").call();
 			git.push().setPushTags().call();
 			SourceInfo sourceInfo = grm.getSourceInfo("other", "refs/tags/tag");
-			try (InputStream is = sourceInfo.getInputStream()) {
+			try (InputStream is = sourceInfo.getSourceInputStream()) {
 				assertNotNull(is);
 			}
 		}
@@ -241,18 +252,28 @@ public class HostedGitRepositoryManagerTest {
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
 			final File localGitDir = tempFolder.newFolder();
 			try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {
-				Files.write(Paths.get(localGitDir.toURI()).resolve(STORE), "{".getBytes("UTF-8"), StandardOpenOption.CREATE_NEW,
-						StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(STORE).call();
-				git.commit().setMessage("Test commit").call();
-				// This works since there's no check done on the repository
-				final Iterable<PushResult> push = git.push().call();
-				final PushResult pushResult = push.iterator().next();
+				final PushResult pushResult = addFilesAndPush(localGitDir, git);
 				assertEquals(Status.OK, pushResult.getRemoteUpdate(REF_HEADS_MASTER).getStatus());
 			}
 		}
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, null)) {
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
 		}
+	}
+
+	private PushResult addFilesAndPush(final File localGitDir, Git git) throws IOException, UnsupportedEncodingException, GitAPIException,
+			NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+		final Path file = localGitDir.toPath().resolve(STORE);
+		final Path mfile = localGitDir.toPath().resolve(STORE + METADATA);
+		Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+		Files.write(mfile, getMetaData().substring(1).getBytes("UTF-8"), StandardOpenOption.CREATE_NEW,
+				StandardOpenOption.TRUNCATE_EXISTING);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Test commit").call();
+		// This works since there's no check done on the repository
+		final Iterable<PushResult> push = git.push().call();
+		final PushResult pushResult = push.iterator().next();
+		return pushResult;
 	}
 
 	@Test
@@ -261,15 +282,10 @@ public class HostedGitRepositoryManagerTest {
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
 			final File localGitDir = tempFolder.newFolder();
 			try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {
-				Files.write(Paths.get(localGitDir.toURI()).resolve(STORE), "{}".getBytes("UTF-8"), StandardOpenOption.CREATE_NEW,
-						StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(STORE).call();
-				git.commit().setMessage("Test commit").call();
-				final Iterable<PushResult> push = git.push().call();
-				final PushResult pushResult = push.iterator().next();
+				PushResult pushResult = addFilesAndPush(localGitDir, git);
 				assertEquals(Status.OK, pushResult.getRemoteUpdate(REF_HEADS_MASTER).getStatus());
 				SourceInfo sourceInfo = grm.getSourceInfo(STORE, REF_HEADS_MASTER);
-				try (InputStream is = sourceInfo.getInputStream()) {
+				try (InputStream is = sourceInfo.getSourceInputStream()) {
 					JsonParser parser = MAPPER.getFactory().createParser(is);
 					while (parser.nextToken() != null)
 						;
@@ -313,22 +329,18 @@ public class HostedGitRepositoryManagerTest {
 		File gitFolder = tempFolder.newFolder();
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
 				Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
-			Path keyFile = gitFolder.toPath().resolve(STORE);
-			Files.write(keyFile, getData().getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE_NEW);
-			git.add().addFilepattern(STORE).call();
-			git.commit().setMessage("first").call();
-			git.push().call();
+			addFilesAndPush(gitFolder, git);
 			SourceInfo firstSourceInfo = grm.getSourceInfo(STORE, null);
 			assertNotNull(firstSourceInfo);
 			JsonNode firstValue = readJsonData(firstSourceInfo);
-			String firstVersion = firstSourceInfo.getVersion();
+			String firstVersion = firstSourceInfo.getSourceVersion();
 			JsonNode modified = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
 			String newVersion = grm.modify(modified, firstVersion, message, userInfo, null, STORE, null).get();
 			assertNotEquals(firstVersion, newVersion);
 			SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
 			JsonNode secondValue = readJsonData(secondSourceInfo);
 			assertNotEquals(firstValue, secondValue);
-			assertEquals(newVersion, secondSourceInfo.getVersion());
+			assertEquals(newVersion, secondSourceInfo.getSourceVersion());
 			git.pull().call();
 			RevCommit revCommit = getRevCommit(git.getRepository(), REF_HEADS_MASTER);
 			assertEquals(message, revCommit.getShortMessage());
@@ -337,15 +349,15 @@ public class HostedGitRepositoryManagerTest {
 			assertEquals("JitStatic API put operation", revCommit.getCommitterIdent().getName());
 		}
 	}
-	
+
 	@Test
 	public void testModifyTag() throws CorruptedSourceException, IOException {
 		ex.expect(UnsupportedOperationException.class);
 		ex.expectMessage("Tags cannot be modified");
-		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);){
+		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
 			grm.modify(null, "1", "m", "ui", "m", "key", "refs/tags/tag");
 		}
-				
+
 	}
 
 	private RevCommit getRevCommit(Repository repository, String targetRef) throws IOException {
@@ -360,9 +372,13 @@ public class HostedGitRepositoryManagerTest {
 	}
 
 	private JsonNode readJsonData(SourceInfo sourceInfo) throws IOException, JsonParseException, JsonMappingException {
-		try (InputStream is = sourceInfo.getInputStream()) {
+		try (InputStream is = sourceInfo.getSourceInputStream()) {
 			return MAPPER.readValue(is, JsonNode.class);
 		}
+	}
+
+	private String getMetaData() {
+		return "{\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
 	}
 
 	private String getData() {
@@ -370,8 +386,8 @@ public class HostedGitRepositoryManagerTest {
 	}
 
 	private String getData(int i) {
-		return "{\"data\":{\"key" + i
-				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}},\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+		return "{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
 	}
 
 }

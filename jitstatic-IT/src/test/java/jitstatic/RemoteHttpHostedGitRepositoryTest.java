@@ -76,9 +76,13 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import jitstatic.hosted.HostedFactory;
+import jitstatic.tools.EraseSystemProperties;
+import jitstatic.tools.TestClientRepositoryRule;
 
 public class RemoteHttpHostedGitRepositoryTest {
 
+	private static final String METADATA = ".metadata";
+	private static final String UTF_8 = "UTF-8";
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final String REFS_HEADS_MASTER = "refs/heads/master";
 	private static final String PASSWORD = "ssecret";
@@ -124,7 +128,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 		localAdress = String.format("http://localhost:%d/application", local.getLocalPort());
 		assertTrue(local.getConfiguration().getHostedFactory() == null);
 		try (InputStream is = RemoteHttpHostedGitRepositoryTest.class.getResourceAsStream("/" + ACCEPT_STORAGE)) {
-			expectedResponse = MAPPER.readValue(is, StorageData.class).getData();
+			expectedResponse = MAPPER.readValue(is, JsonNode.class);
 		}
 	}
 
@@ -172,12 +176,9 @@ public class RemoteHttpHostedGitRepositoryTest {
 			Path storage = newFolder.resolve(ACCEPT_STORAGE);
 			try (Git git = Git.cloneRepository().setDirectory(newFolder.toFile()).setURI(getRepo().get()).setCredentialsProvider(provider)
 					.call();) {
-
-				StorageData data = readSource(storage);
 				JsonNode readTree = MAPPER.readTree("{\"one\":\"two\"}");
-				StorageData newData = new StorageData(data.getUsers(), readTree);
 
-				writeSource(newData, storage);
+				writeSource(readTree, storage);
 
 				git.add().addFilepattern(ACCEPT_STORAGE).call();
 				RevCommit commit = git.commit().setMessage("Evolve").call();
@@ -229,12 +230,14 @@ public class RemoteHttpHostedGitRepositoryTest {
 			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
 			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
 				Path file = base.toPath().resolve(store);
-				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.CREATE_NEW);
-				git.add().addFilepattern(store).call();
+				Path mfile = base.toPath().resolve(store + METADATA);
+				Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+				Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+				git.add().addFilepattern(".").call();
 				git.commit().setMessage("First").call();
 				git.tag().setName(tag).call();
-				Files.write(file, getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(store).call();
+				Files.write(file, getData(2).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(".").call();
 				git.commit().setMessage("Second").call();
 				git.push().setCredentialsProvider(provider).call();
 				git.push().setCredentialsProvider(provider).setPushTags().call();
@@ -242,8 +245,8 @@ public class RemoteHttpHostedGitRepositoryTest {
 			sleep(3000);
 			JsonNode result = client.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
 					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
-			assertEquals(value.getData(), result.get("data"));
+			JsonNode value = MAPPER.readValue(getData(1), JsonNode.class);
+			assertEquals(value, result.get("data"));
 		} finally {
 			client.close();
 		}
@@ -258,22 +261,24 @@ public class RemoteHttpHostedGitRepositoryTest {
 			String host = String.format("http://localhost:%d/application/%s/%s", remote.getLocalPort(), "selfhosted", "git");
 			try (Git git = Git.cloneRepository().setDirectory(base).setURI(host).setCredentialsProvider(provider).call()) {
 				Path file = base.toPath().resolve(ACCEPT_STORAGE);
-				Files.write(file, getData(1).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(ACCEPT_STORAGE).call();
+				Path mfile = base.toPath().resolve(ACCEPT_STORAGE+METADATA);
+				Files.write(file, getData(1).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+				Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(".").call();
 				git.commit().setMessage("First").call();
 				git.tag().setName(tag).call();
-				Files.write(file, getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
-				git.add().addFilepattern(ACCEPT_STORAGE).call();
+				Files.write(file, getData(2).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+				git.add().addFilepattern(".").call();
 				git.commit().setMessage("Second").call();
 				git.push().setCredentialsProvider(provider).call();
 				git.push().setCredentialsProvider(provider).setPushTags().call();
 			}
 			sleep(3000);
-			JsonNode result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress))
-					.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			
-			StorageData value = MAPPER.readValue(getData(1), StorageData.class);
-			assertEquals(value.getData(), result.get("data"));
+			JsonNode result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
+
+			JsonNode value = MAPPER.readValue(getData(1), JsonNode.class);
+			assertEquals(value, result.get("data"));
 		} finally {
 			client.close();
 		}
@@ -290,7 +295,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 	}
 
 	private static String buildBasicAuth(final String user, final String password) throws UnsupportedEncodingException {
-		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes("UTF-8"));
+		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(UTF_8));
 	}
 
 	private Supplier<String> getRepo() {
@@ -299,14 +304,7 @@ public class RemoteHttpHostedGitRepositoryTest {
 				remote.getConfiguration().getHostedFactory().getHostedEndpoint());
 	}
 
-	private static StorageData readSource(final Path storage) throws IOException {
-		assertTrue(Files.exists(storage));
-		try (InputStream bc = Files.newInputStream(storage);) {
-			return MAPPER.readValue(bc, StorageData.class);
-		}
-	}
-
-	private static void writeSource(final StorageData data, final Path storage)
+	private static void writeSource(final JsonNode data, final Path storage)
 			throws JsonGenerationException, JsonMappingException, IOException {
 		assertTrue(Files.exists(storage));
 		MAPPER.writeValue(storage.toFile(), data);
@@ -319,10 +317,13 @@ public class RemoteHttpHostedGitRepositoryTest {
 		}
 	}
 
+	private String getMetaData() {
+		return "{\"users\":[{\"password\":\"" + PASSWORD + "\",\"user\":\"" + USER + "\"}]}";
+	}
+
 	private String getData(int i) {
-		return "{\"data\":{\"key" + i
-				+ "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}},\"users\":[{\"password\":\""
-				+ PASSWORD + "\",\"user\":\"" + USER + "\"}]}";
+		return "{\"key" + i
+				+ "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
 	}
 
 }

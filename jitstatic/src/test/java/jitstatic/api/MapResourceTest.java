@@ -101,16 +101,16 @@ public class MapResourceTest {
 	public static void setupClass() throws JsonProcessingException, IOException {
 		JsonNode dog = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
 		Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
-		StoreInfo dogData = new StoreInfo(new StorageData(users, dog), "1");
-		returnedDog = MAPPER.writeValueAsString(new KeyData(dogData.getVersion(), dogData.getStorageData().getData()));
+		StoreInfo dogData = new StoreInfo(dog, new StorageData(users), "1");
+		returnedDog = MAPPER.writeValueAsString(new KeyData(dogData.getVersion(), dogData.getData()));
 		DATA.put("dog", dogData);
 		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
-		StoreInfo horseData = new StoreInfo(new StorageData(new HashSet<>(), horse), "1");
-		returnedHorse = MAPPER.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getStorageData().getData()));
+		StoreInfo horseData = new StoreInfo(horse, new StorageData(new HashSet<>()), "1");
+		returnedHorse = MAPPER.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getData()));
 		DATA.put("horse", horseData);
 		JsonNode cat = MAPPER.readTree("{\"food\" : [\"fish\",\"bird\"]}");
 		users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
-		StoreInfo catData = new StoreInfo(new StorageData(users, cat), "1");
+		StoreInfo catData = new StoreInfo(cat, new StorageData(users), "1");
 		DATA.put("cat", catData);
 	}
 

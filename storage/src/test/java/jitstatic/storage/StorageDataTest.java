@@ -32,14 +32,10 @@ import java.util.Set;
 import org.junit.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.auth.User;
 
 public class StorageDataTest {
-
-	private static final ObjectMapper mapper = new ObjectMapper();
 
 	@Test
 	public void testEquals() throws JsonProcessingException, IOException {
@@ -48,8 +44,8 @@ public class StorageDataTest {
 
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
-		StorageData sd2 = new StorageData(users2, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
+		StorageData sd2 = new StorageData(users2);
 		assertEquals(sd1, sd2);
 	}
 
@@ -58,9 +54,9 @@ public class StorageDataTest {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
-		StorageData sd2 = new StorageData(users2, readJson("{\"data\": \"value2\"}"));
+		users2.add(new User("user2", "p"));
+		StorageData sd1 = new StorageData(users1);
+		StorageData sd2 = new StorageData(users2);
 		assertNotEquals(sd1, sd2);
 	}
 
@@ -70,8 +66,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
-		StorageData sd2 = new StorageData(users2, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
+		StorageData sd2 = new StorageData(users2);
 		assertEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -80,9 +76,9 @@ public class StorageDataTest {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
-		StorageData sd2 = new StorageData(users2, readJson("{\"data\": \"value2\"}"));
+		users2.add(new User("user2", "p"));
+		StorageData sd1 = new StorageData(users1);
+		StorageData sd2 = new StorageData(users2);
 		assertNotEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -90,7 +86,7 @@ public class StorageDataTest {
 	public void testEqualsInstance() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
 		assertTrue(sd1.equals(sd1));
 	}
 	
@@ -98,7 +94,7 @@ public class StorageDataTest {
 	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
 		assertFalse(sd1.equals(null));
 	}
 
@@ -106,7 +102,7 @@ public class StorageDataTest {
 	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
 		assertFalse(sd1.equals(new Object()));
 	}
 	
@@ -114,15 +110,10 @@ public class StorageDataTest {
 	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, readJson("{\"data\": \"value1\"}"));
+		StorageData sd1 = new StorageData(users1);
 		Set<User> users2 = new HashSet<>();
 		users1.add(new User("user2", "p"));
-		StorageData sd2 = new StorageData(users2, readJson("{\"data\": \"value1\"}"));
+		StorageData sd2 = new StorageData(users2);
 		assertFalse(sd1.equals(sd2));
 	}
-	
-	private JsonNode readJson(String content) throws JsonProcessingException, IOException {
-		return mapper.readTree(content);
-	}
-	
 }
