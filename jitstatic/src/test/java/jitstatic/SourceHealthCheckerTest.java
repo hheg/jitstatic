@@ -38,7 +38,7 @@ public class SourceHealthCheckerTest {
 
 	@Test
 	public void testSourceHealthCheckerHealthy() throws Exception {		
-		SourceHealthChecker shc = new SourceHealthChecker(source);
+		HealthChecker shc = new HealthChecker(source);
 		assertTrue(shc.check().isHealthy());
 	}
 
@@ -46,7 +46,7 @@ public class SourceHealthCheckerTest {
 	public void testSourceHealthCheckerNotHealthy() throws Exception {
 		RuntimeException runtimeException = new RuntimeException("error");
 		doThrow(runtimeException).when(source).checkHealth();
-		SourceHealthChecker shc = new SourceHealthChecker(source);
+		HealthChecker shc = new HealthChecker(source);
 		Result check = shc.check();
 		assertFalse(check.isHealthy());
 		assertEquals(runtimeException, check.getError());
