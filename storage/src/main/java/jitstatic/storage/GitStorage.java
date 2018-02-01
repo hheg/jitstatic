@@ -207,6 +207,9 @@ public class GitStorage implements Storage {
 	private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
 		final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
 		if (sourceInfo != null) {
+			if(sourceInfo.hasFailed()) {
+				throw new RuntimeException(sourceInfo.getFailiure());
+			}
 			final CompletableFuture<StorageData> metaDataFuture = CompletableFuture.supplyAsync(() -> {
 				try (final InputStream is = sourceInfo.getMetadataInputStream()) {
 					return readStorage(is);

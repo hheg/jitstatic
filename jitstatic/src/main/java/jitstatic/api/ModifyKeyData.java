@@ -36,10 +36,6 @@ public class ModifyKeyData {
 	
 	@JsonProperty
 	@NotNull
-	private String haveVersion;
-	
-	@JsonProperty
-	@NotNull
 	private JsonNode data;
 	
 	@JsonProperty
@@ -59,14 +55,6 @@ public class ModifyKeyData {
 	
 	public void setMessage(final String message) {
 		this.message = message;
-	}
-
-	public String getHaveVersion() {
-		return haveVersion;
-	}
-
-	public void setHaveVersion(String haveVersion) {
-		this.haveVersion = haveVersion;
 	}
 
 	public String getUserMail() {

@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jgit.api.Git;
@@ -152,17 +153,17 @@ public class RemoteHttpHostedGitRepositoryTest {
 	public void testRemoteHostedGitRepository() {
 		Client client = new JerseyClientBuilder(remote.getEnvironment()).build("test5 client");
 		try {
-			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, remoteAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			assertEquals(expectedResponse, response.get("data"));
+			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, remoteAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+			assertEquals(expectedResponse.toString(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
 		client = new JerseyClientBuilder(local.getEnvironment()).build("test6 client");
 		try {
-			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			assertEquals(expectedResponse, response.get("data"));
+			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+			assertEquals(expectedResponse.toString(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -170,14 +171,14 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 	@Test
 	public void testRemoteHostedGitUpdate() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		JsonNode originalValue = null;
+		String originalValue = null;
 		Client client = new JerseyClientBuilder(local.getEnvironment()).build("test7 client");
 		try {
 			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, localAdress));
-			JsonNode response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			JsonNode oldVersion = response.get("version");
-			assertEquals(expectedResponse, response.get("data"));
-			originalValue = response;
+			Response response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+			String oldVersion = response.getEntityTag().getValue();
+			originalValue = response.readEntity(String.class);
+			assertEquals(expectedResponse.toString(), originalValue);			
 
 			Path newFolder = TMP_FOLDER.newFolder().toPath();
 			Path storage = newFolder.resolve(ACCEPT_STORAGE);
@@ -193,17 +194,17 @@ public class RemoteHttpHostedGitRepositoryTest {
 
 				sleep(1500);
 
-				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-				assertNotEquals(oldVersion, response.get("version"));
-				assertEquals(readTree, response.get("data"));
+				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+				assertNotEquals(oldVersion, response.getEntityTag().getValue());
+				assertEquals(readTree.toString(), response.readEntity(String.class));
 
 				git.revert().include(commit).call();
 				verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
 				sleep(1500);
 
-				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-				assertEquals(originalValue, response);
+				response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+				assertEquals(originalValue, response.readEntity(String.class));
 
 			}
 		} finally {
@@ -240,10 +241,9 @@ public class RemoteHttpHostedGitRepositoryTest {
 				verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(),"refs/tags/tag");
 			}
 			sleep(3000);
-			JsonNode result = client.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
-			JsonNode value = MAPPER.readValue(getData(1), JsonNode.class);
-			assertEquals(value, result.get("data"));
+			Response result = client.target(String.format("%s/storage/" + store + "?ref=refs/tags/" + tag, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
+			assertEquals(getData(1), result.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -278,11 +278,10 @@ public class RemoteHttpHostedGitRepositoryTest {
 				verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(),"refs/tags/"+tag);
 			}
 			sleep(3000);
-			JsonNode result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get(JsonNode.class);
+			Response result = client.target(String.format("%s/storage/" + ACCEPT_STORAGE + "?ref=refs/tags/" + tag, localAdress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basicAuth).get();
 
-			JsonNode value = MAPPER.readValue(getData(1), JsonNode.class);
-			assertEquals(value, result.get("data"));
+			assertEquals(getData(1), result.readEntity(String.class));
 		} finally {
 			client.close();
 		}

@@ -31,8 +31,7 @@ public class ManagedObject<T extends AutoCloseable & Source>  implements Managed
 	public ManagedObject(final T object) {
 		this.object = Objects.requireNonNull(object);
 	}
-	
-	
+		
 	@Override
 	public void start() throws Exception {
 		this.object.start();

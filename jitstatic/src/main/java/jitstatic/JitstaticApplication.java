@@ -49,8 +49,8 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 			storage = config.getStorageFactory().build(source, env);			
 			env.lifecycle().manage(new ManagedObject<>(source));
 			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
-			env.healthChecks().register(StorageHealthChecker.NAME, new StorageHealthChecker(storage));
-			env.healthChecks().register(SourceHealthChecker.NAME, new SourceHealthChecker(source));
+			env.healthChecks().register("storagechecker", new HealthChecker(storage));
+			env.healthChecks().register("sourcechecker", new HealthChecker(source));
 			env.jersey().register(new MapResource(storage));
 			env.jersey().register(new JitstaticInfoResource());		
 		} catch (final Exception e) {

@@ -22,24 +22,22 @@ package jitstatic;
 
 import java.util.Objects;
 import com.codahale.metrics.health.HealthCheck;
-import jitstatic.storage.Storage;
+import jitstatic.utils.CheckHealth;
 
-public class StorageHealthChecker extends HealthCheck {
+public class HealthChecker extends HealthCheck {
+	
+	private final CheckHealth source;
 
-	public static final String NAME = "storagechecker";
-	
-	private final Storage storage;
-	
-	public StorageHealthChecker(final Storage storage) {
-		this.storage = Objects.requireNonNull(storage);
+	public HealthChecker(final CheckHealth source) {
+		this.source = Objects.requireNonNull(source);
 	}
 
 	@Override
-	protected Result check() throws Exception {		
-		try {
-			storage.checkHealth();
+	protected Result check() throws Exception {
+		try{
+			source.checkHealth();
 			return Result.healthy();
-		}catch(Exception e) {
+		}catch(final Exception e) {
 			return Result.unhealthy(e);
 		}
 	}

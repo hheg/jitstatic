@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
@@ -83,8 +84,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	private String basic;
 
 	@Rule
-	public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER)
-			.around((TEST_REPO = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
+	public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((TEST_REPO = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
 			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class, ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
 					ConfigOverride.config("remote.basePath", getFolder()),
 					ConfigOverride.config("remote.remoteRepo", () -> "file://" + TEST_REPO.getBase.get()))));
@@ -134,12 +134,10 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	public void testGetAKeyValue() {
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(
-					getData(),
-					response.get("data").toString());
-			assertNotNull(response.get("version").toString());
+			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
+					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			assertEquals(getData(), response.readEntity(String.class));
+			assertNotNull(response.getEntityTag().getValue());
 		} finally {
 			client.close();
 		}
@@ -161,19 +159,18 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 		Client client = buildClient("testmodify client");
 		try {
 			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
-			JsonNode response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(getData(),response.get("data").toString());
-			JsonNode jsonNode = response.get("version");
-			String oldVersion = jsonNode.asText();
+			Response response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			assertEquals(getData(), response.readEntity(String.class));			
+			String oldVersion = response.getEntityTag().getValue();
 			ModifyKeyData data = new ModifyKeyData();
 			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
 			data.setData(newData);
 			data.setMessage("commit message");
-			data.setHaveVersion(oldVersion);
-			String invoke = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).buildPut(Entity.json(data)).invoke(String.class);
+			String invoke = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\""+oldVersion+"\"")
+					.buildPut(Entity.json(data)).invoke(String.class);
 			assertNotEquals(oldVersion, invoke);
-			response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(newData, response.get("data"));
+			response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			assertEquals(newData.toString(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}

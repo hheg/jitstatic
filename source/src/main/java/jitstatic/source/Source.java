@@ -24,13 +24,14 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import jitstatic.utils.CheckHealth;
+
 import java.util.concurrent.CompletableFuture;
 
-public interface Source extends AutoCloseable {
+public interface Source extends AutoCloseable, CheckHealth {
 	public void close();
 	public void addListener(SourceEventListener listener);
 	public void start();
-	public void checkHealth();
 	public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
 	public CompletableFuture<String> modify(JsonNode data, String version, String message, String userInfo, String userMail, String key, String ref);

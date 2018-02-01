@@ -1,4 +1,4 @@
-package jitstatic.api;
+package jitstatic.utils;
 
 /*-
  * #%L
@@ -20,29 +20,8 @@ package jitstatic.api;
  * #L%
  */
 
-import javax.validation.constraints.NotNull;
+public interface CheckHealth {
 
-import org.hibernate.validator.constraints.NotEmpty;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-public class VersionData {
-
-	@JsonProperty
-	@NotNull
-	@NotEmpty
-	private String version;
-
-	public VersionData(final String version) {
-		this.version = version;
-	}
-
-	public String getVersion() {
-		return version;
-	}
-
-	public void setVersion(String version) {
-		this.version = version;
-	}
+	void checkHealth() throws Exception;
 
 }

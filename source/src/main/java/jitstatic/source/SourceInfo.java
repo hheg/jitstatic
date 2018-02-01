@@ -40,6 +40,20 @@ public class SourceInfo {
 		this.sourceFileData = Objects.requireNonNull(sourceFileData);
 		this.fileDataError = fileDataError;
 	}
+	
+	public boolean hasFailed() {
+		if(fileDataError == null) {
+			return false;
+		}
+		return !fileDataError.getInputStreamHolder().isPresent();
+	}
+	
+	public Exception getFailiure() {
+		if(fileDataError != null) {
+		return fileDataError.getInputStreamHolder().exception();
+		}
+		return null;
+	}
 
 	public InputStream getSourceInputStream() throws IOException {
 		return sourceFileData.getInputStream();
