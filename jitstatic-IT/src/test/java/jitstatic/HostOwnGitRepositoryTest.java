@@ -21,8 +21,8 @@ package jitstatic;
  */
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
@@ -91,7 +91,6 @@ import jitstatic.hosted.HostedFactory;
 
 public class HostOwnGitRepositoryTest {
 
-	private static final String DATA = "data";
 	private static final String S_STORAGE = "%s/storage/";
 	private static final String UTF_8 = "UTF-8";
 	private static final String METADATA = ".metadata";
@@ -179,8 +178,8 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = callTarget(client, STORE, "");
-			assertEquals(getData(), response.get(DATA).toString());
+			Response response = callTarget(client, STORE, "");
+			assertEquals(getData(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -196,8 +195,8 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = callTarget(client, localFilePath, "");
-			assertEquals(getData(), response.get(DATA).toString());
+			Response response = callTarget(client, localFilePath, "");
+			assertEquals(getData(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -252,10 +251,10 @@ public class HostOwnGitRepositoryTest {
 		}
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
-			assertEquals(getData(2), response.get(DATA).toString());
+			Response response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
+			assertEquals(getData(2), response.readEntity(String.class));			
 			response = callTarget(client, STORE, "");
-			assertEquals(getData(), response.get(DATA).toString());
+			assertEquals(getData(), response.readEntity(String.class));			
 		} finally {
 			client.close();
 		}
@@ -279,9 +278,8 @@ public class HostOwnGitRepositoryTest {
 			Map<String, Ref> refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
 			assertNotNull(refs.get(REFS_HEADS_NEWBRANCH));
 
-			JsonNode response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
-
-			assertEquals(MAPPER.readValue(getData(1), JsonNode.class), response.get(DATA));
+			Response response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
+			assertEquals(getData(1), response.readEntity(String.class));			
 
 			git.checkout().setName("master").call();
 			List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
@@ -292,8 +290,7 @@ public class HostOwnGitRepositoryTest {
 			refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
 			assertEquals(ObjectId.zeroId(), refs.get(REFS_HEADS_NEWBRANCH).getObjectId());
 
-			Response resp = client.target(String.format(S_STORAGE + STORE + "?ref=" + REFS_HEADS_NEWBRANCH, storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			Response resp = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
 
 			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		} finally {
@@ -308,20 +305,19 @@ public class HostOwnGitRepositoryTest {
 				.call()) {
 			createData(STORE, git);
 
-			JsonNode response = callTarget(client, STORE, "");
-			JsonNode version = response.get("version");
-			assertEquals(MAPPER.readValue(getData(), JsonNode.class), response.get(DATA));
+			Response response = callTarget(client, STORE, "");
+			String version = response.getEntityTag().getValue();
+			assertNotNull(version);
+			assertEquals(getData(), response.readEntity(String.class));
 
 			git.rm().addFilepattern(STORE).call();
 			git.rm().addFilepattern(STORE + METADATA).call();
 			git.commit().setMessage("Removed file").call();
 			verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
-			Response resp = client.target(String.format(S_STORAGE + STORE, storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+			Response resp = callTarget(client, STORE, "");
 
-			JsonNode readEntity = resp.readEntity(JsonNode.class);
-			assertNotEquals(version, readEntity.get("version"));
+			assertNull(resp.getEntityTag());
 			assertEquals(javax.ws.rs.core.Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
 		} finally {
 			client.close();
@@ -341,8 +337,8 @@ public class HostOwnGitRepositoryTest {
 
 		Client client = buildClient("test4 client");
 		try {
-			JsonNode response = callTarget(client, STORE, "?ref=refs/tags/tag");
-			assertEquals(getData(), response.get(DATA).toString());
+			Response response = callTarget(client, STORE, "?ref=refs/tags/tag");
+			assertEquals(getData(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -358,9 +354,8 @@ public class HostOwnGitRepositoryTest {
 			git.tag().setName("tag").call();
 			verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(), "refs/tags/tag");
 
-			JsonNode response = client.target(String.format(S_STORAGE + STORE, storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(getData(), response.get(DATA).toString());
+			Response response = callTarget(client, STORE, "");
+			assertEquals(getData(), response.readEntity(String.class));
 
 			Files.write(path, getData(1).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
 			git.add().addFilepattern(".").call();
@@ -368,12 +363,11 @@ public class HostOwnGitRepositoryTest {
 			verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
 			response = callTarget(client, STORE, "");
-
-			assertEquals(getData(1), response.get(DATA).toString());
+			assertEquals(getData(1), response.readEntity(String.class));
 
 			response = callTarget(client, STORE, "?ref=refs/tags/tag");
 
-			assertEquals(getData(), response.get(DATA).toString());
+			assertEquals(getData(), response.readEntity(String.class));
 
 		} finally {
 			client.close();
@@ -391,9 +385,9 @@ public class HostOwnGitRepositoryTest {
 			git.tag().setName("tag").call();
 			verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(), "refs/tags/tag");
 
-			JsonNode response = client.target(String.format(S_STORAGE + STORE, storageAdress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
-			assertEquals(getData(), response.get(DATA).toString());
+			Response response = callTarget(client, STORE, "");
+			
+			assertEquals(getData(), response.readEntity(String.class));
 
 			Path otherPath = Paths.get(getRepopath(git), other);
 			Path otherMpath = Paths.get(getRepopath(git), other + METADATA);
@@ -406,14 +400,14 @@ public class HostOwnGitRepositoryTest {
 			verifyOkPush(git.push().setCredentialsProvider(provider).call());
 			response = callTarget(client, STORE, "");
 
-			assertEquals(getData(), response.get(DATA).toString());
+			assertEquals(getData(), response.readEntity(String.class));
 
 			response = callTarget(client, other, "");
-			assertEquals(getData(2), response.get(DATA).toString());
+			assertEquals(getData(2), response.readEntity(String.class));			
 
 			response = callTarget(client, STORE, "?ref=refs/tags/tag");
 
-			assertEquals(getData(), response.get(DATA).toString());
+			assertEquals(getData(), response.readEntity(String.class));
 
 		} finally {
 			client.close();
@@ -421,9 +415,9 @@ public class HostOwnGitRepositoryTest {
 
 	}
 
-	private JsonNode callTarget(Client client, String store2, String ref) {
+	private Response callTarget(Client client, String store2, String ref) {
 		return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request()
-				.header(HttpHeader.AUTHORIZATION.asString(), basic).get(JsonNode.class);
+				.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
 	}
 
 	private void verifyOkPush(Iterable<PushResult> iterable) {
