@@ -20,6 +20,7 @@ package jitstatic.api;
  * #L%
  */
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -34,7 +35,13 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -70,7 +77,8 @@ public class MapResource {
 	@ExceptionMetered(name = "get_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public KeyData get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user) {
+	public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+			final @Context Request request) {
 
 		checkRef(ref);
 
@@ -79,10 +87,17 @@ public class MapResource {
 		if (si == null) {
 			throw new WebApplicationException(Status.NOT_FOUND);
 		}
+		final EntityTag tag = new EntityTag(si.getVersion());
+		final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
+
+		if (noChangeBuilder != null) {
+			return noChangeBuilder.tag(tag).build();
+		}
+
 		final StorageData data = si.getStorageData();
 		final Set<User> allowedUsers = data.getUsers();
 		if (allowedUsers.isEmpty()) {
-			return new KeyData(si.getVersion(), si.getData());
+			return Response.ok(si.getData()).tag(tag).build();
 		}
 
 		if (!user.isPresent()) {
@@ -94,7 +109,7 @@ public class MapResource {
 			LOG.info("Resource " + key + "is denied for user " + user);
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return new KeyData(si.getVersion(), si.getData());
+		return Response.ok(si.getData()).tag(tag).build();
 	}
 
 	@PUT
@@ -103,13 +118,15 @@ public class MapResource {
 	@ExceptionMetered(name = "put_storage_exception")
 	@Path("/{key : .+}")
 	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public VersionData modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-			final @Valid ModifyKeyData data) {
+	public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+			final @Valid ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
 		// All resources without a user cannot be modified with this method. It has to
 		// be done through directly changing the file in the git repository.
 		if (!user.isPresent()) {
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
+		checkHeaders(headers);
+
 		checkValidRef(ref);
 
 		final StoreInfo storeInfo = unwrap(storage.get(key, ref));
@@ -129,23 +146,31 @@ public class MapResource {
 		}
 
 		final String currentVersion = storeInfo.getVersion();
-		final String requestedVersion = data.getHaveVersion();
-		if (!currentVersion.equals(requestedVersion)) {
-			throw new WebApplicationException(currentVersion, Status.BAD_REQUEST);
-		}
+		final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
 
-		final String newVersion = unwrapWithApi(
-				storage.put(data.getData(), data.getHaveVersion(), data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
-		if (newVersion == null) {
-			throw new WebApplicationException(Status.NOT_FOUND);
+		// TODO check if version are correct
+		if (response == null) {
+			final String newVersion = unwrapWithApi(
+					storage.put(data.getData(), currentVersion, data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
+			if (newVersion == null) {
+				throw new WebApplicationException(Status.NOT_FOUND);
+			}
+			return Response.ok().tag(new EntityTag(newVersion)).build();
 		}
-		return new VersionData(newVersion);
+		return response.build();
+	}
+
+	private void checkHeaders(final HttpHeaders headers) {		
+		final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
+		if (header == null || header.isEmpty()) {
+			throw new WebApplicationException(Status.BAD_REQUEST);
+		}
 	}
 
 	private void checkValidRef(final String ref) {
-		if(ref != null) {
+		if (ref != null) {
 			checkRef(ref);
-			if(ref.startsWith(Constants.R_TAGS)) {
+			if (ref.startsWith(Constants.R_TAGS)) {
 				throw new WebApplicationException(Status.FORBIDDEN);
 			}
 		}

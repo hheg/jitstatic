@@ -40,6 +40,7 @@ import java.util.concurrent.Future;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -102,11 +103,11 @@ public class MapResourceTest {
 		JsonNode dog = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
 		Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
 		StoreInfo dogData = new StoreInfo(dog, new StorageData(users), "1");
-		returnedDog = MAPPER.writeValueAsString(new KeyData(dogData.getVersion(), dogData.getData()));
+		returnedDog = MAPPER.writeValueAsString(dogData.getData());
 		DATA.put("dog", dogData);
 		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
 		StoreInfo horseData = new StoreInfo(horse, new StorageData(new HashSet<>()), "1");
-		returnedHorse = MAPPER.writeValueAsString(new KeyData(horseData.getVersion(), horseData.getData()));
+		returnedHorse = MAPPER.writeValueAsString(horseData.getData());
 		DATA.put("horse", horseData);
 		JsonNode cat = MAPPER.readTree("{\"food\" : [\"fish\",\"bird\"]}");
 		users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
@@ -216,9 +217,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		Response response = target.request().header(HttpHeaders.ETAG, "1").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
 	}
 
@@ -228,16 +228,15 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"meat\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "1")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
 
 	@Test
-	public void testPutAKey() throws IOException, RefNotFoundException {
+	public void testPutAKey() throws IOException, RefNotFoundException, InterruptedException, ExecutionException {
 		WebTarget target = RESOURCES.target("/storage/dog");
 		StoreInfo storeInfo = DATA.get("dog");
 		CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
@@ -247,11 +246,12 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.OK.getStatusCode(), response.getStatus());
+		EntityTag entityTag = response.getEntityTag();
+		assertEquals(expected.get(),entityTag.getValue());
 	}
 
 	@Test
@@ -265,23 +265,38 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("2");
+		data.setData(readTree);
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+
+		assertEquals(Status.PRECONDITION_FAILED.getStatusCode(), response.getStatus());
+	}
+
+	@Test
+	public void testPutAKeyOtherVersionMissingHeader() throws RefNotFoundException, IOException {
+		WebTarget target = RESOURCES.target("/storage/dog");
+		StoreInfo storeInfo = DATA.get("dog");
+		CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
+		when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+		when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+				Mockito.eq(null))).thenReturn(expected);
+		ModifyKeyData data = new ModifyKeyData();
+		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
+		data.setMessage("message");
 		data.setData(readTree);
 		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
-
 		assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
 	}
-
+	
 	@Test
 	public void testPutAMissingKey() throws IOException {
 		WebTarget target = RESOURCES.target("/storage/horse");
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
@@ -294,9 +309,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
 	}
@@ -309,9 +323,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"rat\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 
 		System.out.println(response);
@@ -328,9 +341,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
@@ -347,9 +359,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
@@ -366,9 +377,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 	}
@@ -385,9 +395,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
 	}
@@ -404,9 +413,8 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
 	}
@@ -417,10 +425,24 @@ public class MapResourceTest {
 		ModifyKeyData data = new ModifyKeyData();
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"treats\",\"steak\"]}");
 		data.setMessage("message");
-		data.setHaveVersion("1");
+
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+		Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
+	}
+	
+	@Test
+	public void testNotModified() {
+		StoreInfo storeInfo = DATA.get("dog");
+		Future<StoreInfo> expected = CompletableFuture.completedFuture(storeInfo);
+		when(STORAGE.get("dog", null)).thenReturn(expected);
+		Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.get();
+		assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
+		assertEquals(storeInfo.getVersion(),response.getEntityTag().getValue());
+		response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_NONE_MATCH, "\""+storeInfo.getVersion()+"\"")
+				.get();
+		assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
 	}
 }
