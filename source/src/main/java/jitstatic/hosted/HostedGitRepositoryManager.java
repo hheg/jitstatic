@@ -61,8 +61,11 @@ import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.Pair;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class HostedGitRepositoryManager implements Source {
+	private static final Logger LOG = LoggerFactory.getLogger(HostedGitRepositoryManager.class);
 	private static final ObjectWriter MAPPER = new ObjectMapper().writerFor(JsonNode.class).withDefaultPrettyPrinter();
 	private final Repository bareRepository;
 	private final String endPointName;
@@ -142,6 +145,7 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
+		LOG.info("Mounting repository on " + repositoryBase);
 		Repository repo = getRepository(repositoryBase);
 		if (repo == null) {
 			Files.createDirectories(repositoryBase);

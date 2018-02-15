@@ -145,6 +145,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	private Repository setUpRepository(final Path baseDirectory)
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+		LOG.info("Mounting repository on " + baseDirectory);
 		Repository r = getRepository(baseDirectory);
 		if (r == null) {
 			Files.createDirectories(baseDirectory);
