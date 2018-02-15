@@ -1,7 +1,5 @@
 package jitstatic;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -23,6 +21,7 @@ import java.util.Objects;
  */
 
 import org.eclipse.jgit.lib.ObjectId;
+import java.util.Objects;
 
 public class FileObjectIdStore {
 	private final ObjectId id;

@@ -33,7 +33,7 @@ public class LogoPoster implements PreReceiveHook {
 	private static final String line3 =	"    \\ \\ | __\\ \\| __/ _` | __| |/ __|"; 
 	private static final String line4 =	" /\\_/ / | |__\\ \\ || (_| | |_| | (__ "; 
 	private static final String line5 =	" \\___/|_|\\__\\__/\\__\\__,_|\\__|_|\\___|"; 
-	private static final String line6 ="                                    ";
+	private static final String line6 = "                                    ";
 
 	@Override
 	public void onPreReceive(ReceivePack rp, Collection<ReceiveCommand> commands) {
