@@ -47,6 +47,8 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
@@ -120,6 +122,7 @@ import jitstatic.hosted.HostedFactory;
 @RunWith(Parameterized.class)
 public class LoadTesterTest {
 
+	private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");
 	private static final String METADATA = ".metadata";
 	private static final String MASTER = "master";
 	private static final Logger LOG = LoggerFactory.getLogger(LoadTesterTest.class);
@@ -220,15 +223,20 @@ public class LoadTesterTest {
 				Map<String, Integer> cnt = new HashMap<>();
 				for (RevCommit rc : git.log().call()) {
 					String msg = rc.getShortMessage();
-					String[] split = msg.split(":");
-					Integer value = cnt.get(split[1]);
-					Integer newValue = Integer.valueOf(split[2]);
-					if (value != null) {
-						assertEquals(Integer.valueOf(value.intValue() - 1), newValue);
+					Matcher matcher = PAT.matcher(msg);
+					if (matcher.matches()) {
+						String[] split = msg.split(":");
+						Integer value = cnt.get(split[1]);
+						Integer newValue = Integer.valueOf(split[2]);
+						if (value != null) {
+							assertEquals(Integer.valueOf(value.intValue() - 1), newValue);
+						} else {
+							assertEquals(data.get(split[1]), newValue);
+						}
+						cnt.put(split[1], newValue);
 					} else {
-						assertEquals(data.get(split[1]), newValue);
+						LOG.info("Message prints something else {}", msg);
 					}
-					cnt.put(split[1], newValue);
 					LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent());
 				}
 			}
@@ -460,9 +468,14 @@ public class LoadTesterTest {
 	}
 
 	private int readData(Path filedata) throws IOException, JsonParseException, JsonMappingException {
-		JsonNode readValue = MAPPER.readValue(filedata.toFile(), JsonNode.class);
-		int c = readValue.get("data").asInt();
-		return c;
+		try {
+			JsonNode readValue = MAPPER.readValue(filedata.toFile(), JsonNode.class);
+			return readValue.get("data").asInt();
+		} catch (Exception e) {
+			LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata)));
+			throw e;
+		}
+
 	}
 
 	private class ClientUpdater {
