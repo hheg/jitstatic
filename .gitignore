@@ -6,3 +6,5 @@ tmp/
 *.dll
 *.log
 dependency-reduced-pom.xml
+*.iml
+.idea/

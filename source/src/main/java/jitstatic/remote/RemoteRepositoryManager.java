@@ -145,6 +145,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	private Repository setUpRepository(final Path baseDirectory)
 			throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+		LOG.info("Mounting repository on " + baseDirectory);
 		Repository r = getRepository(baseDirectory);
 		if (r == null) {
 			Files.createDirectories(baseDirectory);
@@ -153,7 +154,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 			r = git.getRepository();
 			final List<Ref> remoteRefs = git.branchList().setListMode(ListMode.REMOTE).call();
 			if (remoteRefs.isEmpty()) {
-				throw new RefNotFoundException("Remote contains no branches. Need atleast " + defaultRef);
+				throw new RefNotFoundException("Remote contains no branches. Need at least " + defaultRef);
 			}
 			for (Ref ref : remoteRefs) {
 				final String localRefName = getRefName(ref.getName());
@@ -206,7 +207,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 				final ReceivePack receivePack = new ReceivePack(repository);
 
 				final List<Pair<Pair<ReceiveCommand, ReceiveCommand>, Exception>> executedCommands = trackingRefUpdates.stream()
-						.map(tru -> extractCommands(receivePack, tru)).parallel().map(this::checkBranchSource).sequential()
+						.map(tru -> extractCommands(receivePack, tru)).parallel().map(this::checkBranchSource)
 						.collect(Collectors.toList());
 				final LinkedException storageErrors = tryUpdate(executedCommands, deletedBranches);
 				if (storageErrors.isEmpty()) {
