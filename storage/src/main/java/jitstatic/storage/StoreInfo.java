@@ -22,14 +22,14 @@ package jitstatic.storage;
 
 import java.util.Objects;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import jitstatic.StorageData;
 
 public class StoreInfo {
 	private final StorageData metaData;
 	private final String version;
-	private final JsonNode data;
+	private final Object data;
 
-	public StoreInfo(final JsonNode data, final StorageData metaData, final String version) {
+	public StoreInfo(final Object data, final StorageData metaData, final String version) {
 		this.data = Objects.requireNonNull(data);
 		this.metaData = Objects.requireNonNull(metaData);
 		this.version = Objects.requireNonNull(version);
@@ -43,7 +43,7 @@ public class StoreInfo {
 		return version;
 	}
 
-	public JsonNode getData() {
+	public Object getData() {
 		return data;
 	}
 

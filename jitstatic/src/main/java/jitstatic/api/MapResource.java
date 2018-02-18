@@ -54,9 +54,9 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import jitstatic.StorageData;
 import jitstatic.auth.User;
 import jitstatic.storage.Storage;
-import jitstatic.storage.StorageData;
 import jitstatic.storage.StoreInfo;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
@@ -76,7 +76,6 @@ public class MapResource {
 	@Metered(name = "get_storage_counter")
 	@ExceptionMetered(name = "get_storage_exception")
 	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
 	public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
 			final @Context Request request) {
 
@@ -97,7 +96,7 @@ public class MapResource {
 		final StorageData data = si.getStorageData();
 		final Set<User> allowedUsers = data.getUsers();
 		if (allowedUsers.isEmpty()) {
-			return Response.ok(si.getData()).tag(tag).build();
+			return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).tag(tag).build();
 		}
 
 		if (!user.isPresent()) {
@@ -109,7 +108,7 @@ public class MapResource {
 			LOG.info("Resource " + key + "is denied for user " + user);
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return Response.ok(si.getData()).tag(tag).build();
+		return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).tag(tag).build();
 	}
 
 	@PUT

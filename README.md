@@ -1,14 +1,14 @@
 [![Build Status](https://travis-ci.org/hheg/jitstatic.svg?branch=master)](https://travis-ci.org/hheg/jitstatic)
 [![Coverage Status](https://coveralls.io/repos/github/hheg/jitstatic/badge.svg?branch=master)](https://coveralls.io/github/hheg/jitstatic?branch=master)
 
-#JitStatic
+# JitStatic
 
 JitStatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET.
 It's supposed to work as a online "static" store where data changes but still need to be under version control.
 
 You can push and pull from it as if it were an ordinary git repo (full git support except for .gitattributes). Accessing the repo and the data end point can be configured to be on separate user/password combinations.
 
-###Use case:
+### Use case:
 
 The use case could be used for is business configuration data where the data is not directly related to specific code. These tend to end up in a database where they are logged in some fashion. After some time they ususally gets forgotten why they are there and their purpose. Having them connected to Git could mean you can use them with your documentation or issue tracker in a more natural way than having them stored in a database. 
 
@@ -39,7 +39,7 @@ hosted:
 ```
 storage is the key-value end point and hosted is the git end point. You can configure a remote repo too which is then polled for data in a configurable interval.
 
-##Hello world
+## Hello world
 
 To setup an instance you download a jitstatic.jar and store the above example configuration in a file, lets say `config.yaml`
 To lauch jitstatic you'll type:
@@ -123,7 +123,7 @@ Content-Length: 17
 {"hello":"world"}
 ```
 
-##JitStatic (the long version)
+## JitStatic (the long version)
 
 The repository contains files which contains the data. Each of these files are also the access key and its possible to use directories to separate files. The data in these keys must be in JSON (in this version) however it will be possible to store any data in the future :).
 ```json
@@ -146,7 +146,7 @@ If you leave an metadata file with an empty 'users' entry anyone can access the 
 
 At the moment the application only allows basic authentication so be sure you secure it with HTTPS by using standard Dropwizard HTTPS configuration.
 
-##Cloning the hosted repository
+## Cloning the hosted repository
 
 To clone the repo you just type (the username and password defined in the Dropwizard configuration file)
 ```bash
@@ -164,7 +164,7 @@ Or speficifying a tag it's possible to do this:
 curl --user user1:1234 http://localhost:8080/app/storage/hello_world?ref=refs/tags/sometag
 ``` 
 
-##API for modyfying a key
+## API for modyfying a key
 
 Now there's an API for modifying a `hello_world` from an application. You do it with in three simple steps:
 
@@ -217,7 +217,7 @@ and the git log will look like:
 
 The version number here is the files git blob version and not the git commit's version.
 
-###Modify tags
+### Modify tags
 
 You can't use the modify API on a tag since tags are immutable. You can still change them with Git as usual.
 

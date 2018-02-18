@@ -45,27 +45,24 @@ import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonParser.Feature;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
+import jitstatic.StorageData;
 import jitstatic.source.Source;
 import jitstatic.source.SourceInfo;
-import jitstatic.utils.WrappingAPIException;
 import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.LinkedException;
 import jitstatic.utils.Pair;
+import jitstatic.utils.WrappingAPIException;
 
 public class GitStorage implements Storage {
+	
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
-
+	private static final SourceReader READER = new SourceReader();
 	private final Map<String, Map<String, StoreInfo>> cache = new ConcurrentHashMap<>();
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
+	 
 	private final ExecutorService refExecutor;
 	private final ExecutorService keyExecutor;
 	private final Source source;
@@ -210,23 +207,16 @@ public class GitStorage implements Storage {
 			if(sourceInfo.hasFailed()) {
 				throw new RuntimeException(sourceInfo.getFailiure());
 			}
-			final CompletableFuture<StorageData> metaDataFuture = CompletableFuture.supplyAsync(() -> {
-				try (final InputStream is = sourceInfo.getMetadataInputStream()) {
-					return readStorage(is);
-				} catch (final IOException e) {
-					throw new UncheckedIOException(e);
+			try (final InputStream is = sourceInfo.getMetadataInputStream()) {
+				final StorageData readStorage = READER.readStorage(is);
+				try (final InputStream sourceStream = sourceInfo.getSourceInputStream()) {
+					return new StoreInfo(READER.readStorageData(sourceStream, readStorage.getContentType()), readStorage, sourceInfo.getSourceVersion());
 				}
-			});
-
-			try (final InputStream is = sourceInfo.getSourceInputStream()) {
-				return new StoreInfo(readStorageData(is), metaDataFuture.join(), sourceInfo.getSourceVersion());
-			}
+			} catch (final IOException e) {
+				throw new UncheckedIOException(e);
+			}	
 		}
 		return null;
-	}
-
-	private JsonNode readStorageData(InputStream is) throws JsonParseException, JsonMappingException, IOException {
-		return MAPPER.readValue(is, JsonNode.class);
 	}
 
 	@Override
@@ -252,12 +242,6 @@ public class GitStorage implements Storage {
 		final Exception old = fault.getAndSet(null);
 		if (old != null) {
 			throw old;
-		}
-	}
-
-	private StorageData readStorage(final InputStream storageStream) throws IOException {
-		try (final JsonParser parser = MAPPER.getFactory().createParser(storageStream);) {
-			return parser.readValueAs(StorageData.class);
 		}
 	}
 
@@ -296,7 +280,7 @@ public class GitStorage implements Storage {
 		final StoreInfo si = refMap.get(key);
 		if (si.getVersion().equals(oldversion)) {
 			final StorageData sd = si.getStorageData();
-			refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers()), newVersion));
+			refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(),null), newVersion));
 		}
 	}
 }
