@@ -42,8 +42,7 @@ public class SourceJSONParser {
 		if(!usersNode.isArray()) {
 			throw new StorageParseException("users node is not an array");
 		}
-		checkUsers(usersNode);
-		
+		checkUsers(usersNode);	
 	}
 
 	private void checkUsers(final JsonNode usersNode) throws StorageParseException {

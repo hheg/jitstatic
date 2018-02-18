@@ -57,6 +57,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jitstatic.StorageData;
 import jitstatic.auth.User;
 import jitstatic.source.Source;
 import jitstatic.source.SourceInfo;
@@ -116,11 +117,11 @@ public class GitStorageTest {
 
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si1);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users), SHA_1);
+			StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null), SHA_1);
 			assertEquals(storage.getData(), gs.get("key", null).get().getData());
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
-			storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users), SHA_2);
+			storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users, null), SHA_2);
 			assertEquals(storage.getData(), gs.get("key", null).get().getData());
 			gs.checkHealth();
 		}
@@ -253,7 +254,8 @@ public class GitStorageTest {
 
 	@Test
 	public void testPutAKey() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
-		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+		try (GitStorage gs = new GitStorage(source, null);
+				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
 				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
 			SourceInfo si = mock(SourceInfo.class);
 			JsonNode data = readData("{\"one\" : \"two\"}");
@@ -313,7 +315,8 @@ public class GitStorageTest {
 	public void testPutKeyWithNoKey() throws Throwable {
 		ex.expect(WrappingAPIException.class);
 		ex.expectCause(Matchers.isA(UnsupportedOperationException.class));
-		try (GitStorage gs = new GitStorage(source, null); InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
+		try (GitStorage gs = new GitStorage(source, null);
+				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
 				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
 			SourceInfo si = mock(SourceInfo.class);
 			JsonNode data = readData("{\"one\" : \"two\"}");

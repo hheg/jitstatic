@@ -63,10 +63,10 @@ import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit.ResourceTestRule;
+import jitstatic.StorageData;
 import jitstatic.auth.ConfiguratedAuthenticator;
 import jitstatic.auth.User;
 import jitstatic.storage.Storage;
-import jitstatic.storage.StorageData;
 import jitstatic.storage.StoreInfo;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
@@ -102,16 +102,16 @@ public class MapResourceTest {
 	public static void setupClass() throws JsonProcessingException, IOException {
 		JsonNode dog = MAPPER.readTree("{\"food\" : [\"bone\",\"meat\"]}");
 		Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
-		StoreInfo dogData = new StoreInfo(dog, new StorageData(users), "1");
+		StoreInfo dogData = new StoreInfo(dog, new StorageData(users, null), "1");
 		returnedDog = MAPPER.writeValueAsString(dogData.getData());
 		DATA.put("dog", dogData);
 		JsonNode horse = MAPPER.readTree("{\"food\" : [\"wheat\",\"grass\"]}");
-		StoreInfo horseData = new StoreInfo(horse, new StorageData(new HashSet<>()), "1");
+		StoreInfo horseData = new StoreInfo(horse, new StorageData(new HashSet<>(), null), "1");
 		returnedHorse = MAPPER.writeValueAsString(horseData.getData());
 		DATA.put("horse", horseData);
 		JsonNode cat = MAPPER.readTree("{\"food\" : [\"fish\",\"bird\"]}");
 		users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
-		StoreInfo catData = new StoreInfo(cat, new StorageData(users), "1");
+		StoreInfo catData = new StoreInfo(cat, new StorageData(users, null), "1");
 		DATA.put("cat", catData);
 	}
 
@@ -218,7 +218,8 @@ public class MapResourceTest {
 		JsonNode readTree = MAPPER.readTree("{\"food\" : [\"wheat\",\"carrots\"]}");
 		data.setMessage("message");
 		data.setData(readTree);
-		Response response = target.request().header(HttpHeaders.ETAG, "1").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+		Response response = target.request().header(HttpHeaders.ETAG, "1").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
+				.invoke();
 		assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
 	}
 
@@ -251,7 +252,7 @@ public class MapResourceTest {
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.OK.getStatusCode(), response.getStatus());
 		EntityTag entityTag = response.getEntityTag();
-		assertEquals(expected.get(),entityTag.getValue());
+		assertEquals(expected.get(), entityTag.getValue());
 	}
 
 	@Test
@@ -288,7 +289,7 @@ public class MapResourceTest {
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
 	}
-	
+
 	@Test
 	public void testPutAMissingKey() throws IOException {
 		WebTarget target = RESOURCES.target("/storage/horse");
@@ -431,18 +432,17 @@ public class MapResourceTest {
 				.buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 		assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
 	}
-	
+
 	@Test
 	public void testNotModified() {
 		StoreInfo storeInfo = DATA.get("dog");
 		Future<StoreInfo> expected = CompletableFuture.completedFuture(storeInfo);
 		when(STORAGE.get("dog", null)).thenReturn(expected);
-		Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-				.get();
+		Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
 		assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
-		assertEquals(storeInfo.getVersion(),response.getEntityTag().getValue());
-		response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_NONE_MATCH, "\""+storeInfo.getVersion()+"\"")
-				.get();
+		assertEquals(storeInfo.getVersion(), response.getEntityTag().getValue());
+		response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+				.header(HttpHeaders.IF_NONE_MATCH, "\"" + storeInfo.getVersion() + "\"").get();
 		assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
 	}
 }
