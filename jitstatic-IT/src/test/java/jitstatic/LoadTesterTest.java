@@ -83,6 +83,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -121,6 +122,7 @@ import jitstatic.hosted.HostedFactory;
  *
  */
 @RunWith(Parameterized.class)
+@Category(LoadTest.class)
 public class LoadTesterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");

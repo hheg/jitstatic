@@ -58,6 +58,7 @@ import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
@@ -295,6 +296,7 @@ public class JitStaticReceivePackTest {
 
 		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
 
+		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
 		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
 		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
@@ -330,7 +332,8 @@ public class JitStaticReceivePackTest {
 		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
 		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-
+		
+		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
 		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
 		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
@@ -344,6 +347,7 @@ public class JitStaticReceivePackTest {
 				return Arrays.asList(rc);
 			}
 		};
+
 		rp.executeCommands();
 
 		assertEquals(errormsg, rc.getMessage());
@@ -373,6 +377,7 @@ public class JitStaticReceivePackTest {
 			}
 		});
 		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
 		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
 		Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);

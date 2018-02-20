@@ -104,6 +104,13 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludedGroups>jitstatic.LoadTest</excludedGroups>
+				</configuration>
+			</plugin>
+			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
 				<configuration>
 					<skipIfEmpty>true</skipIfEmpty>
