@@ -3,7 +3,7 @@ jdk:
     - oraclejdk8
 sudo: required
 after_success:
-    - mvn clean test jacoco:report coveralls:report
+    - mvn clean install jacoco:report coveralls:report
 deploy:
     provider: releases
     skip_cleanup: true
