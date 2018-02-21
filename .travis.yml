@@ -6,8 +6,7 @@ jdk:
 sudo: required
 install: true
 script: 
-    - mvn clean install -B -V
-script: 
+    - mvn clean install -B -V 
     - cp jitstatic/target/binary/jitstatic.jar $FILE 
 after_success:
     - mvn test jacoco:report coveralls:report
