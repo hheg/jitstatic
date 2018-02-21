@@ -1,18 +1,15 @@
 language: java
 jdk:
-- oraclejdk8
+    - oraclejdk8
 sudo: required
 after_success:
-- mvn clean test jacoco:report coveralls:report
+    - mvn clean test jacoco:report coveralls:report
 deploy:
-  provider: releases
-  skip_cleanup: true
-  api_key:
-    secure: zLIpTeynElraJOc38h1ML3YiHhjrX8NdXwrgWw8t6rOaBphSNQ1/PzKRFuO8wLNVP5YXbrZbnBJt9krboIASGz7L8/UKRaDSrJiLAzHmIN23PTuzzyG78mJHqA815ZNXD8U3MwcPg0qV8iDAxbDaEQKd9kQPRnhscWjV/8/tUdYOr5wn0SoGlgpRFyg4BNzjYqtZfjX6ghcDEuuR6vfVNXGAeFGsGBW9JucOXleiRNImYvSMa3Y3wSPkSWer8LAkV6olXnH3naVkjz68lqqppenXXQeTaWdKPJhOzXc7GvhIlMoqQohBbjN2aLpJhY4XLq2ZAICAxQ4VfLgK2FjzaXqpQ+GiMdlsR3XBwCBykFHDgn2ZwC2zs8iHGennTy29ov7XPOqcXOjazzVbdTJaWaxW/HpEWcDDaeZsJQibtHoo4R9mMM9Nly+2ptUTmmGURkEXkJv2ip6zfQZymORdGBFJeX9Lzi+0MJfObktnMUfWTLySZKwss0Djtf3DMOiiXB2lEd8HAkxMcnH+Y+ix/Nhy9M8lIboAsdAlTte/D5cO4pFdMbGUMWkqdGIpTv75Sq8HJQcjo/cSbPifngZCqPiPV5E3LwTex5aopNaWf3qohx6V8xWxP/U+0x7Bj7wTr5dpa550GZX9FNbw2xgQAatS3SW6VMJIkhfCKlsBoK0=
-  file_glob: true
-  file: 
-    - jitstatic/target/jitstatic-*.jar
-    - jitstatic/target/jitstatic-*-sources.jar
-  on:
-    branch: master
-    repo: hheg/jitstatic
+    provider: releases
+    skip_cleanup: true
+    api_key:
+        secure: zLIpTeynElraJOc38h1ML3YiHhjrX8NdXwrgWw8t6rOaBphSNQ1/PzKRFuO8wLNVP5YXbrZbnBJt9krboIASGz7L8/UKRaDSrJiLAzHmIN23PTuzzyG78mJHqA815ZNXD8U3MwcPg0qV8iDAxbDaEQKd9kQPRnhscWjV/8/tUdYOr5wn0SoGlgpRFyg4BNzjYqtZfjX6ghcDEuuR6vfVNXGAeFGsGBW9JucOXleiRNImYvSMa3Y3wSPkSWer8LAkV6olXnH3naVkjz68lqqppenXXQeTaWdKPJhOzXc7GvhIlMoqQohBbjN2aLpJhY4XLq2ZAICAxQ4VfLgK2FjzaXqpQ+GiMdlsR3XBwCBykFHDgn2ZwC2zs8iHGennTy29ov7XPOqcXOjazzVbdTJaWaxW/HpEWcDDaeZsJQibtHoo4R9mMM9Nly+2ptUTmmGURkEXkJv2ip6zfQZymORdGBFJeX9Lzi+0MJfObktnMUfWTLySZKwss0Djtf3DMOiiXB2lEd8HAkxMcnH+Y+ix/Nhy9M8lIboAsdAlTte/D5cO4pFdMbGUMWkqdGIpTv75Sq8HJQcjo/cSbPifngZCqPiPV5E3LwTex5aopNaWf3qohx6V8xWxP/U+0x7Bj7wTr5dpa550GZX9FNbw2xgQAatS3SW6VMJIkhfCKlsBoK0=
+    file: jitstatic/target/binary/jitstatic.jar
+    on:
+        tags: true
+        repo: hheg/jitstatic
