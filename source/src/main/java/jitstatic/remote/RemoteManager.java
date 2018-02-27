@@ -34,8 +34,6 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
 import jitstatic.source.SourceEventListener;
@@ -113,7 +111,7 @@ class RemoteManager implements Source {
 	}
 
 	@Override
-	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
+	public CompletableFuture<String> modify(final byte[] data, final String version, final String message, final String userInfo,
 			final String userMail, final String key, String ref) {
 		if(ref == null){
 			ref = defaultRef;

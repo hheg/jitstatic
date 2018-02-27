@@ -32,7 +32,7 @@ public class SourceInfo {
 
 	private final MetaFileData metaFileData;
 	private final SourceFileData sourceFileData;
-	// TODO Deal with this
+	// TODO Deal with this error
 	private final RepositoryDataError fileDataError;
 
 	public SourceInfo(MetaFileData metaFileData, SourceFileData sourceFileData, RepositoryDataError fileDataError) {

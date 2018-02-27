@@ -22,7 +22,6 @@ package jitstatic.storage;
 
 import java.util.List;
 import java.util.concurrent.Future;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import jitstatic.utils.CheckHealth;
 
@@ -30,5 +29,5 @@ public interface Storage extends AutoCloseable, CheckHealth {
 	public Future<StoreInfo> get(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
-	public Future<String> put(JsonNode data, String version, String message, String userInfo, String userEmail, String key, String ref);
+	public Future<String> put(byte[] data, String version, String message, String userInfo, String userEmail, String key, String ref);
 }

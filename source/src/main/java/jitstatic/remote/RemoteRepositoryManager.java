@@ -73,10 +73,6 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-
 import jitstatic.CorruptedSourceException;
 import jitstatic.FileObjectIdStore;
 import jitstatic.JitStaticConstants;
@@ -94,7 +90,6 @@ import jitstatic.utils.WrappingAPIException;
 
 public class RemoteRepositoryManager implements AutoCloseable {
 
-	private static final ObjectWriter MAPPER = new ObjectMapper().writerFor(JsonNode.class).withDefaultPrettyPrinter();
 	private static final Logger LOG = LoggerFactory.getLogger(RemoteRepositoryManager.class);
 	private static final String REMOTE_PREFIX = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME + "/";
 	private final URI remoteRepo;
@@ -466,7 +461,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		this.repoExecutor.shutdown();
 		try {
 			this.repoExecutor.awaitTermination(10, TimeUnit.SECONDS);
-		} catch (InterruptedException ignore) {
+		} catch (final InterruptedException ignore) {
 		}
 		if (this.repository != null) {
 			this.repository.close();
@@ -475,7 +470,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 
 	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
-		Objects.requireNonNull(ref);
+		ref = checkRef(ref);
 		try {
 			if (ref.startsWith(Constants.R_HEADS)) {
 				return extractor.openBranch(ref, key);
@@ -488,11 +483,16 @@ public class RemoteRepositoryManager implements AutoCloseable {
 		throw new RefNotFoundException(ref);
 	}
 
-	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
-			final String userMail, final String key, String ref) {
-		if (ref == null) {
+	private String checkRef(String ref) {
+		if(ref == null) {
 			ref = defaultRef;
 		}
+		return ref;
+	}
+
+	public CompletableFuture<String> modify(final byte[] data, final String version, final String message, final String userInfo,
+			final String userMail, final String key, String ref) {
+		ref = checkRef(ref);
 		if (ref.startsWith(Constants.R_TAGS)) {
 			throw new UnsupportedOperationException("Tags cannot be modified");
 		}
@@ -506,7 +506,7 @@ public class RemoteRepositoryManager implements AutoCloseable {
 				if (actualRef == null) {
 					throw new WrappingAPIException(new RefNotFoundException(finalRef));
 				}
-				final String newVersion = this.updater.updateKey(key, actualRef, MAPPER.writeValueAsBytes(data), message, userInfo,
+				final String newVersion = this.updater.updateKey(key, actualRef, data, message, userInfo,
 						userMail);
 				pushChangesToRemote();
 				return newVersion;

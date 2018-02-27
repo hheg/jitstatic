@@ -54,10 +54,6 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
 import com.codahale.metrics.health.HealthCheck.Result;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
@@ -72,7 +68,6 @@ import jitstatic.tools.TestRepositoryRule;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final String ACCEPT_STORAGE = "accept/storage";
 	private static final String USER = "suser";
 	private static final String PASSWORD = "ssecret";
@@ -155,22 +150,22 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 	}
 
 	@Test
-	public void testModifyAKey() throws JsonParseException, JsonMappingException, IOException {
+	public void testModifyAKey() throws IOException {
 		Client client = buildClient("testmodify client");
 		try {
 			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
 			Response response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(getData(), response.readEntity(String.class));			
+			assertEquals(getData(), response.readEntity(String.class));
 			String oldVersion = response.getEntityTag().getValue();
 			ModifyKeyData data = new ModifyKeyData();
-			JsonNode newData = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
+			byte[] newData = "{\"one\":\"two\"}".getBytes("UTF-8");
 			data.setData(newData);
 			data.setMessage("commit message");
-			String invoke = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\""+oldVersion+"\"")
-					.buildPut(Entity.json(data)).invoke(String.class);
+			String invoke = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic)
+					.header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"").buildPut(Entity.json(data)).invoke(String.class);
 			assertNotEquals(oldVersion, invoke);
 			response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(newData.toString(), response.readEntity(String.class));
+			assertEquals(new String(newData), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}

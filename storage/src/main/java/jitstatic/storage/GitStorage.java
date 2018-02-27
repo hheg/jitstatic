@@ -45,24 +45,25 @@ import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.spencerwi.either.Either;
 
+import jitstatic.JitStaticConstants;
 import jitstatic.StorageData;
 import jitstatic.source.Source;
 import jitstatic.source.SourceInfo;
 import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.LinkedException;
 import jitstatic.utils.Pair;
+import jitstatic.utils.ShouldNeverHappendException;
 import jitstatic.utils.WrappingAPIException;
 
 public class GitStorage implements Storage {
-	
+
 	private static final Logger LOG = LogManager.getLogger(GitStorage.class);
-	private static final SourceReader READER = new SourceReader();
+	private static final SourceHandler HANDLER = new SourceHandler();
 	private final Map<String, Map<String, StoreInfo>> cache = new ConcurrentHashMap<>();
 	private final AtomicReference<Exception> fault = new AtomicReference<>();
-	 
+
 	private final ExecutorService refExecutor;
 	private final ExecutorService keyExecutor;
 	private final Source source;
@@ -132,7 +133,7 @@ public class GitStorage implements Storage {
 					return Optional.of(Pair.of(key, load(key, ref)));
 				} catch (final RefNotFoundException ignore) {
 				} catch (final Exception e) {
-					consumeError(new RuntimeException(key + " in " + ref + " had the following error",e));
+					consumeError(new RuntimeException(key + " in " + ref + " had the following error", e));
 				}
 				return Optional.<Pair<String, StoreInfo>>empty();
 			});
@@ -204,17 +205,18 @@ public class GitStorage implements Storage {
 	private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
 		final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
 		if (sourceInfo != null) {
-			if(sourceInfo.hasFailed()) {
+			if (sourceInfo.hasFailed()) {
 				throw new RuntimeException(sourceInfo.getFailiure());
 			}
 			try (final InputStream is = sourceInfo.getMetadataInputStream()) {
-				final StorageData readStorage = READER.readStorage(is);
+				final StorageData readStorage = HANDLER.readStorage(is);
 				try (final InputStream sourceStream = sourceInfo.getSourceInputStream()) {
-					return new StoreInfo(READER.readStorageData(sourceStream, readStorage.getContentType()), readStorage, sourceInfo.getSourceVersion());
+					return new StoreInfo(HANDLER.readStorageData(sourceStream, readStorage.getContentType()), readStorage,
+							sourceInfo.getSourceVersion());
 				}
 			} catch (final IOException e) {
 				throw new UncheckedIOException(e);
-			}	
+			}
 		}
 		return null;
 	}
@@ -246,7 +248,7 @@ public class GitStorage implements Storage {
 	}
 
 	@Override
-	public CompletableFuture<String> put(final JsonNode data, final String oldVersion, final String message, final String userInfo,
+	public CompletableFuture<String> put(final byte[] data, final String oldVersion, final String message, final String userInfo,
 			String userEmail, final String key, String ref) {
 		if (ref == null) {
 			ref = defaultRef;
@@ -269,18 +271,30 @@ public class GitStorage implements Storage {
 			if (storeInfo == null) {
 				throw new WrappingAPIException(new UnsupportedOperationException(key));
 			}
-			final String newVersion = source.modify(data, oldVersion, message, userInfo, userEmail, key, finalRef).join();
+			final String newVersion = source.modify(formatData(data, storeInfo), oldVersion, message, userInfo, userEmail, key, finalRef).join();
 			refreshKey(data, key, oldVersion, newVersion, refMap);
 			return newVersion;
 		}, keyExecutor);
 	}
 
-	private void refreshKey(final JsonNode data, final String key, final String oldversion, final String newVersion,
+	private byte[] formatData(final byte[] data, final StoreInfo storeInfo) {
+		final String contentType = storeInfo.getStorageData().getContentType();
+		if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
+			try {
+				return HANDLER.formatData(data, contentType);
+			} catch (final IOException e) {
+				throw new ShouldNeverHappendException("", e);
+			}
+		}
+		return data;
+	}
+
+	private void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
 			final Map<String, StoreInfo> refMap) {
 		final StoreInfo si = refMap.get(key);
 		if (si.getVersion().equals(oldversion)) {
 			final StorageData sd = si.getStorageData();
-			refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(),null), newVersion));
+			refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(), null), newVersion));
 		}
 	}
 }

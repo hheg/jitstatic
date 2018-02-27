@@ -25,7 +25,7 @@ public class FileIsMissingMetaData extends Exception {
 	private static final long serialVersionUID = 190867139018903657L;
 
 	public FileIsMissingMetaData(final String file) {
-		super(file + " is missing metadata file i.e '" + file + ".metadata'");
+		super(file + " is missing metadata file i.e '" + file + JitStaticConstants.METADATA + "'");
 	}
 
 	@Override

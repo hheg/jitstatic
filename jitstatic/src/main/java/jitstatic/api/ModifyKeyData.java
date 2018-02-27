@@ -25,34 +25,33 @@ import javax.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 
 public class ModifyKeyData {
-	
+
 	@JsonProperty
 	@NotNull
 	@NotEmpty
 	private String message;
-	
+
 	@JsonProperty
 	@NotNull
-	private JsonNode data;
-	
+	private byte[] data;
+
 	@JsonProperty
 	private String userMail;
 
-	public JsonNode getData() {
+	public byte[] getData() {
 		return data;
 	}
 
-	public void setData(final JsonNode data) {
+	public void setData(final byte[] data) {
 		this.data = data;
 	}
 
-	public String getMessage() {		
+	public String getMessage() {
 		return message;
 	}
-	
+
 	public void setMessage(final String message) {
 		this.message = message;
 	}
@@ -61,7 +60,7 @@ public class ModifyKeyData {
 		return userMail;
 	}
 
-	public void setUserMail(String userMail) {
+	public void setUserMail(final String userMail) {
 		this.userMail = userMail;
 	}
 }

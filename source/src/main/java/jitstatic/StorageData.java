@@ -32,13 +32,13 @@ import jitstatic.auth.User;
 
 @SuppressFBWarnings(justification="Equals used here is not dodgy code",value = {"EQ_UNUSUAL"})
 public class StorageData {
-
+	
 	private final Set<User> users;
 	private final String contentType;
 	
 	@JsonCreator
 	public StorageData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType) {
-		this.users = Objects.requireNonNull(users);
+		this.users = Objects.requireNonNull(users,"metadata is missing users field");
 		this.contentType = contentType == null ? "application/json" : contentType;
 	}
 

@@ -44,10 +44,8 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jitstatic.CorruptedSourceException;
 import jitstatic.FileObjectIdStore;
@@ -61,12 +59,9 @@ import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.Pair;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 class HostedGitRepositoryManager implements Source {
 	private static final Logger LOG = LoggerFactory.getLogger(HostedGitRepositoryManager.class);
-	private static final ObjectWriter MAPPER = new ObjectMapper().writerFor(JsonNode.class).withDefaultPrettyPrinter();
 	private final Repository bareRepository;
 	private final String endPointName;
 	private final SourceExtractor extractor;
@@ -220,9 +215,7 @@ class HostedGitRepositoryManager implements Source {
 	@Override
 	public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
 		Objects.requireNonNull(key);
-		if (ref == null) {
-			ref = defaultRef;
-		}
+		ref = checkRef(ref);
 		try {
 			if (ref.startsWith(Constants.R_HEADS)) {
 				return extractor.openBranch(ref, key);
@@ -236,11 +229,15 @@ class HostedGitRepositoryManager implements Source {
 	}
 
 	@Override
-	public CompletableFuture<String> modify(final JsonNode data, final String version, final String message, final String userInfo,
+	public CompletableFuture<String> modify(final byte[] data, final String version, final String message, final String userInfo,
 			String userMail, final String key, String ref) {
-		if (ref == null) {
-			ref = defaultRef;
-		}
+		Objects.requireNonNull(data);
+		Objects.requireNonNull(version);
+		Objects.requireNonNull(message);
+		Objects.requireNonNull(userInfo);
+		Objects.requireNonNull(userMail);
+		Objects.requireNonNull(key);
+		ref = checkRef(ref);
 		if(ref.startsWith(Constants.R_TAGS)) {
 			throw new UnsupportedOperationException("Tags cannot be modified");
 		}
@@ -254,11 +251,18 @@ class HostedGitRepositoryManager implements Source {
 				if (actualRef == null) {
 					throw new WrappingAPIException(new RefNotFoundException(finalRef));
 				}
-				return this.updater.updateKey(key, actualRef, MAPPER.writeValueAsBytes(data), message, userInfo, userMail);
+				return this.updater.updateKey(key, actualRef, data, message, userInfo, userMail);
 			} catch (final IOException | RefNotFoundException e) {
 				throw new WrappingAPIException(e);
 			}
 		}, repoExecutor);
+	}
+
+	private String checkRef(String ref) {
+		if (ref == null) {
+			ref = defaultRef;
+		}
+		return ref;
 	}
 
 	private boolean checkVersion(final String version, final String key, final String ref) throws RefNotFoundException {

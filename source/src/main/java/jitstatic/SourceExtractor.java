@@ -50,7 +50,6 @@ import jitstatic.utils.Pair;
 
 public class SourceExtractor {
 
-	private static final String METADATA = ".metadata";
 	private final Repository repository;
 
 	public SourceExtractor(final Repository repository) {
@@ -134,15 +133,15 @@ public class SourceExtractor {
 	}
 
 	private BranchData walkTree(final RevTree tree, final String key) {
-		final Map<String, MetaFileData> mFiles = new HashMap<>();
-		final Map<String, SourceFileData> dFiles = new HashMap<>();
+		final Map<String, MetaFileData> metaFiles = new HashMap<>();
+		final Map<String, SourceFileData> dataFiles = new HashMap<>();
 		RepositoryDataError error = null;
 		try (final TreeWalk treeWalker = new TreeWalk(repository)) {
 			treeWalker.addTree(tree);
 			treeWalker.setRecursive(false);
 			treeWalker.setPostOrderTraversal(false);
 			if (key != null) {
-				treeWalker.setFilter(OrTreeFilter.create(PathFilter.create(key), PathFilter.create(key + METADATA)));
+				treeWalker.setFilter(OrTreeFilter.create(PathFilter.create(key), PathFilter.create(key + JitStaticConstants.METADATA)));
 			}
 			while (treeWalker.next()) {
 				if (!treeWalker.isSubtree()) {
@@ -152,11 +151,11 @@ public class SourceExtractor {
 						final String path = treeWalker.getPathString();
 						final InputStreamHolder inputStreamHolder = getInputStreamFor(objectId);
 						final FileObjectIdStore fileObjectIdStore = new FileObjectIdStore(path, objectId);
-						if (path.endsWith(METADATA)) {
-							mFiles.put(path.substring(0, path.length() - METADATA.length()),
+						if (path.endsWith(JitStaticConstants.METADATA)) {
+							metaFiles.put(path.substring(0, path.length() - JitStaticConstants.METADATA.length()),
 									new MetaFileData(fileObjectIdStore, inputStreamHolder));
 						} else {
-							dFiles.put(path, new SourceFileData(fileObjectIdStore, inputStreamHolder));
+							dataFiles.put(path, new SourceFileData(fileObjectIdStore, inputStreamHolder));
 						}
 					}
 				} else {
@@ -166,7 +165,7 @@ public class SourceExtractor {
 		} catch (final IOException e) {
 			error = new RepositoryDataError(new FileObjectIdStore(key, tree.getId()), new InputStreamHolder(e));
 		}
-		return new BranchData(mFiles, dFiles, error);
+		return new BranchData(metaFiles, dataFiles, error);
 	}
 
 	private InputStreamHolder getInputStreamFor(final ObjectId objectId) {
