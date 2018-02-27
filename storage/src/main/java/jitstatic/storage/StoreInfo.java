@@ -22,8 +22,10 @@ package jitstatic.storage;
 
 import java.util.Objects;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jitstatic.StorageData;
 
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "It's exposed when exposed to client and it's serialized")
 public class StoreInfo {
 	private final StorageData metaData;
 	private final String version;

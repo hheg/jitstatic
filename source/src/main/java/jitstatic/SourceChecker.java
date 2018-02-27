@@ -128,10 +128,8 @@ public class SourceChecker implements AutoCloseable {
 		final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
 		if (inputStreamHolder.isPresent()) {
 			try (InputStream is = inputStreamHolder.inputStream()) {
-				switch (contentType) {
-				case JitStaticConstants.APPLICATION_JSON:
+				if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
 					PARSER.parseJson(is);
-					break;
 				}
 			} catch (final IOException e) {
 				return Pair.of(data.getFileInfo(), e);
