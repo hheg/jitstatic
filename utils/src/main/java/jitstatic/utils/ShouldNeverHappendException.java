@@ -1,8 +1,10 @@
+package jitstatic.utils;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +20,11 @@
  * #L%
  */
 
+public class ShouldNeverHappendException extends RuntimeException {
+	
+	private static final long serialVersionUID = -1254892071325637569L;
 
-
-{
-	"users": [
-		{
-			"user": "user",
-			"password": "1234"
-		}
-	]}
+	public ShouldNeverHappendException(final String message, final Throwable t) {
+		super(message,t);
+	}
+}

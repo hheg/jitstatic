@@ -21,5 +21,4 @@ package jitstatic;
  */
 
 public interface LoadTest {
-
 }

@@ -421,7 +421,7 @@ public class LoadTesterTest {
     private Response modifyTarget(Client client, String store, String ref, String oldVersion, int c)
             throws JsonParseException, JsonMappingException, IOException {
         ModifyKeyData data = new ModifyKeyData();
-        JsonNode newData = MAPPER.readValue(getData(c), JsonNode.class);
+        byte[] newData = getData(c);
         data.setData(newData);
         data.setMessage("m:" + store + ":" + c);
         return client.target(String.format(S_STORAGE + store + ref, storageAdress)).request()

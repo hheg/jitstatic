@@ -27,9 +27,9 @@ import jitstatic.StorageData;
 public class StoreInfo {
 	private final StorageData metaData;
 	private final String version;
-	private final Object data;
+	private final byte[] data;
 
-	public StoreInfo(final Object data, final StorageData metaData, final String version) {
+	public StoreInfo(final byte[] data, final StorageData metaData, final String version) {
 		this.data = Objects.requireNonNull(data);
 		this.metaData = Objects.requireNonNull(metaData);
 		this.version = Objects.requireNonNull(version);
@@ -43,7 +43,7 @@ public class StoreInfo {
 		return version;
 	}
 
-	public Object getData() {
+	public byte[] getData() {
 		return data;
 	}
 

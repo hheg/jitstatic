@@ -31,8 +31,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -53,10 +55,6 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import jitstatic.StorageData;
 import jitstatic.auth.User;
 import jitstatic.source.Source;
@@ -65,7 +63,7 @@ import jitstatic.utils.WrappingAPIException;
 
 public class GitStorageTest {
 
-	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String UTF_8 = "UTF-8";
 	private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
 	private static final String SHA_1 = "67adef5dab64f8f4cb50712ab24bda6605befa79";
 	private static final String SHA_2 = "67adef5dab64f8f4cb50712ab24bda6605befa80";
@@ -102,10 +100,10 @@ public class GitStorageTest {
 		Set<User> users = new HashSet<>();
 		users.add(new User("user", "1234"));
 		try (GitStorage gs = new GitStorage(source, null);
-				InputStream test1 = GitStorageTest.class.getResourceAsStream("/test1.json");
-				InputStream mtest1 = GitStorageTest.class.getResourceAsStream("/test1.md.json");
-				InputStream test2 = GitStorageTest.class.getResourceAsStream("/test2.json");
-				InputStream mtest2 = GitStorageTest.class.getResourceAsStream("/test2.md.json");) {
+				InputStream test1 = getInputStream(1);
+				InputStream mtest1 = getUsers();
+				InputStream test2 = getInputStream(2);
+				InputStream mtest2 = getUsers();) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
 			when(si1.getSourceInputStream()).thenReturn(test1);
@@ -114,31 +112,31 @@ public class GitStorageTest {
 			when(si2.getMetadataInputStream()).thenReturn(mtest2);
 			when(si1.getSourceVersion()).thenReturn(SHA_1);
 			when(si2.getSourceVersion()).thenReturn(SHA_2);
-
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si1);
+
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
 			StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null), SHA_1);
-			assertEquals(storage.getData(), gs.get("key", null).get().getData());
+			assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().getData()));
 			when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
 			storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users, null), SHA_2);
-			assertEquals(storage.getData(), gs.get("key", null).get().getData());
+			assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().getData()));
 			gs.checkHealth();
 		}
 	}
 
-	private JsonNode readData(String content) throws JsonProcessingException, IOException {
-		return mapper.readTree(content);
+	private byte[] readData(String content) throws UnsupportedEncodingException {
+		return content.getBytes(UTF_8);
 	}
 
 	@Test
 	public void testLoadNewCache() throws Exception {
 
 		try (GitStorage gs = new GitStorage(source, null);
-				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json");
-				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json");
-				InputStream mtest4 = GitStorageTest.class.getResourceAsStream("/test4.md.json")) {
+				InputStream test3 = getInputStream(1);
+				InputStream mtest3 = getUsers();
+				InputStream test4 = getInputStream(2);
+				InputStream mtest4 = getUsers()) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
 			when(si1.getSourceInputStream()).thenReturn(test3);
@@ -176,7 +174,7 @@ public class GitStorageTest {
 		RuntimeException cause = new RuntimeException("Fault reading something");
 		doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
 
-		try (GitStorage gs = new GitStorage(source, null); InputStream is = GitStorageTest.class.getResourceAsStream("/test3.json")) {
+		try (GitStorage gs = new GitStorage(source, null); InputStream is = getUsers()) {
 
 			gs.reload(Arrays.asList(REF_HEADS_MASTER));
 			assertNull(gs.get("test3.json", null).get());
@@ -227,10 +225,10 @@ public class GitStorageTest {
 	public void testRefIsFoundButKeyIsNot() throws Exception {
 
 		try (GitStorage gs = new GitStorage(source, null);
-				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json");
-				InputStream test4 = GitStorageTest.class.getResourceAsStream("/test4.json");
-				InputStream mtest4 = GitStorageTest.class.getResourceAsStream("/test4.md.json")) {
+				InputStream test3 = getInputStream(1);
+				InputStream mtest3 = getUsers();
+				InputStream test4 = getInputStream(2);
+				InputStream mtest4 = getUsers()) {
 			SourceInfo si1 = mock(SourceInfo.class);
 			SourceInfo si2 = mock(SourceInfo.class);
 			when(si1.getSourceInputStream()).thenReturn(test3);
@@ -255,10 +253,10 @@ public class GitStorageTest {
 	@Test
 	public void testPutAKey() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
 		try (GitStorage gs = new GitStorage(source, null);
-				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
+				InputStream test3 = getInputStream(1);
+				InputStream mtest3 = getUsers()) {
 			SourceInfo si = mock(SourceInfo.class);
-			JsonNode data = readData("{\"one\" : \"two\"}");
+			byte[] data = readData("{\"one\" : \"two\"}");
 			String message = "one message";
 			String userInfo = "test@test";
 			String key = "key3";
@@ -266,7 +264,7 @@ public class GitStorageTest {
 			when(si.getMetadataInputStream()).thenReturn(mtest3);
 			when(si.getSourceVersion()).thenReturn(SHA_1);
 			when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
-			when(source.modify(Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
+			when(source.modify(Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
 					Mockito.eq(key), Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2));
 			Future<StoreInfo> first = gs.get(key, null);
 			StoreInfo storeInfo = first.get();
@@ -283,10 +281,10 @@ public class GitStorageTest {
 	}
 
 	@Test
-	public void testPutKeyWithEmptyMessage() throws JsonProcessingException, IOException {
+	public void testPutKeyWithEmptyMessage() throws IOException {
 		ex.expect(IllegalArgumentException.class);
 		try (GitStorage gs = new GitStorage(source, null);) {
-			JsonNode data = readData("{\"one\" : \"two\"}");
+			byte[] data = readData("{\"one\" : \"two\"}");
 			String userInfo = "test@test";
 			String key = "key3";
 			gs.put(data, SHA_1, "", userInfo, null, key, null);
@@ -298,7 +296,7 @@ public class GitStorageTest {
 		ex.expect(WrappingAPIException.class);
 		ex.expectCause(Matchers.isA(RefNotFoundException.class));
 		try (GitStorage gs = new GitStorage(source, null);) {
-			JsonNode data = readData("{\"one\" : \"two\"}");
+			byte[] data = readData("{\"one\" : \"two\"}");
 			String message = "one message";
 			String userInfo = "test@test";
 			String key = "key3";
@@ -316,10 +314,10 @@ public class GitStorageTest {
 		ex.expect(WrappingAPIException.class);
 		ex.expectCause(Matchers.isA(UnsupportedOperationException.class));
 		try (GitStorage gs = new GitStorage(source, null);
-				InputStream test3 = GitStorageTest.class.getResourceAsStream("/test3.json");
-				InputStream mtest3 = GitStorageTest.class.getResourceAsStream("/test3.md.json")) {
+				InputStream test3 = getInputStream(1);
+				InputStream mtest3 = getUsers()) {
 			SourceInfo si = mock(SourceInfo.class);
-			JsonNode data = readData("{\"one\" : \"two\"}");
+			byte[] data = readData("{\"one\" : \"two\"}");
 			String message = "one message";
 			String userInfo = "test@test";
 			String key = "key3";
@@ -342,4 +340,11 @@ public class GitStorageTest {
 		}
 	}
 
+	private InputStream getInputStream(int c) throws UnsupportedEncodingException {
+		return new ByteArrayInputStream(("{\"data\":\"value" + c + "\"}").getBytes(UTF_8));
+	}
+
+	private InputStream getUsers() throws UnsupportedEncodingException {
+		return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}]}".getBytes(UTF_8));
+	}
 }

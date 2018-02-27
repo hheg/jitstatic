@@ -1,5 +1,7 @@
 package jitstatic;
 
+import static org.junit.Assert.assertArrayEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -26,6 +28,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -43,9 +46,13 @@ import java.util.stream.Collectors;
 
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.client.Client;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
 import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -87,6 +94,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
+import jitstatic.api.ModifyKeyData;
 import jitstatic.hosted.HostedFactory;
 
 public class HostOwnGitRepositoryTest {
@@ -252,9 +260,9 @@ public class HostOwnGitRepositoryTest {
 		Client client = buildClient("test4 client");
 		try {
 			Response response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
-			assertEquals(getData(2), response.readEntity(String.class));			
+			assertEquals(getData(2), response.readEntity(String.class));
 			response = callTarget(client, STORE, "");
-			assertEquals(getData(), response.readEntity(String.class));			
+			assertEquals(getData(), response.readEntity(String.class));
 		} finally {
 			client.close();
 		}
@@ -279,7 +287,7 @@ public class HostOwnGitRepositoryTest {
 			assertNotNull(refs.get(REFS_HEADS_NEWBRANCH));
 
 			Response response = callTarget(client, STORE, "?ref=" + REFS_HEADS_NEWBRANCH);
-			assertEquals(getData(1), response.readEntity(String.class));			
+			assertEquals(getData(1), response.readEntity(String.class));
 
 			git.checkout().setName("master").call();
 			List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
@@ -300,7 +308,7 @@ public class HostOwnGitRepositoryTest {
 
 	@Test
 	public void testRemoveKey() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		Client client = buildClient("test4 client");		
+		Client client = buildClient("test4 client");
 		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
 				.call()) {
 			createData(STORE, git);
@@ -347,10 +355,9 @@ public class HostOwnGitRepositoryTest {
 	@Test
 	public void testModifyKeySeveralTimes() throws NoFilepatternException, GitAPIException, IOException {
 		Client client = buildClient("test12 client");
-		String localFilePath = STORE;
 		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
 				.call()) {
-			Path path = createData(localFilePath, git);
+			Path path = createData(STORE, git);
 			git.tag().setName("tag").call();
 			verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(), "refs/tags/tag");
 
@@ -378,15 +385,14 @@ public class HostOwnGitRepositoryTest {
 	public void testModifyTwoKeySeparatly() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		Client client = buildClient("test12 client");
 		String other = "other";
-		String localFilePath = STORE;
 		try (Git git = Git.cloneRepository().setDirectory(TMP_FOLDER.newFolder()).setURI(gitAdress).setCredentialsProvider(provider)
 				.call()) {
-			createData(localFilePath, git);
+			createData(STORE, git);
 			git.tag().setName("tag").call();
 			verifyOkPush(git.push().setCredentialsProvider(provider).setPushTags().call(), "refs/tags/tag");
 
 			Response response = callTarget(client, STORE, "");
-			
+
 			assertEquals(getData(), response.readEntity(String.class));
 
 			Path otherPath = Paths.get(getRepopath(git), other);
@@ -403,7 +409,7 @@ public class HostOwnGitRepositoryTest {
 			assertEquals(getData(), response.readEntity(String.class));
 
 			response = callTarget(client, other, "");
-			assertEquals(getData(2), response.readEntity(String.class));			
+			assertEquals(getData(2), response.readEntity(String.class));
 
 			response = callTarget(client, STORE, "?ref=refs/tags/tag");
 
@@ -412,7 +418,36 @@ public class HostOwnGitRepositoryTest {
 		} finally {
 			client.close();
 		}
+	}
 
+	@Test
+	public void testFormattedJson() throws IOException, InvalidRemoteException, TransportException, GitAPIException {
+		Client client = buildClient("client");
+		File workingFolder = TMP_FOLDER.newFolder();
+		try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+			createData(STORE, git);
+			Response response = callTarget(client, STORE, "");
+			String tag = response.getEntityTag().getValue();
+			response.close();
+			WebTarget target = client.target(String.format(S_STORAGE + STORE, storageAdress));
+			ModifyKeyData mkd = new ModifyKeyData();
+			mkd.setData(getData(2).getBytes(UTF_8));
+			mkd.setMessage("Modified");
+			mkd.setUserMail("noone@none.org");
+			response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\"" + tag + "\"")
+					.buildPut(Entity.json(mkd)).invoke();
+			assertEquals(HttpStatus.OK_200, response.getStatus());
+			response.close();
+
+			git.pull().setCredentialsProvider(provider).call();
+
+			byte[] readAllBytes = Files.readAllBytes(workingFolder.toPath().resolve(STORE));
+
+			assertArrayEquals(MAPPER.writer().withDefaultPrettyPrinter().writeValueAsString(MAPPER.readTree(getData(2))).getBytes("UTF-8"),
+					readAllBytes);
+		} finally {
+			client.close();
+		}
 	}
 
 	private Response callTarget(Client client, String store2, String ref) {

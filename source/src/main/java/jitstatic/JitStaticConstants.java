@@ -25,5 +25,7 @@ import org.eclipse.jgit.lib.Constants;
 public interface JitStaticConstants {
 
 	public static final String REFS_JISTSTATIC = Constants.R_REFS + "jistatic/";
+	public static final String APPLICATION_JSON = "application/json";
+	public static final String METADATA = ".metadata";
 
 }

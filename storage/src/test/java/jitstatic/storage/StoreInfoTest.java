@@ -30,20 +30,16 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.StorageData;
 
 public class StoreInfoTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper();
-
 	@Test
 	public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-		StoreInfo si1 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class), new StorageData(new HashSet<>(), null), "1");
-		StoreInfo si2 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class), new StorageData(new HashSet<>(), null), "1");
-		StoreInfo si3 = new StoreInfo(MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class), new StorageData(new HashSet<>(), null), "2");
+		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "1");
+		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "1");
+		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "2");
 
 		assertEquals(si1, si1);
 		assertEquals(si1.hashCode(), si2.hashCode());

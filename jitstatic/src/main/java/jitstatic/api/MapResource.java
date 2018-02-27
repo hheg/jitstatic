@@ -28,11 +28,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.validation.Valid;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
@@ -64,6 +64,7 @@ import jitstatic.utils.WrappingAPIException;
 @Path("storage")
 public class MapResource {
 
+	private static final String UTF_8 = "utf-8";
 	private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
 	private final Storage storage;
 
@@ -96,7 +97,8 @@ public class MapResource {
 		final StorageData data = si.getStorageData();
 		final Set<User> allowedUsers = data.getUsers();
 		if (allowedUsers.isEmpty()) {
-			return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).tag(tag).build();
+			return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+					.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
 		}
 
 		if (!user.isPresent()) {
@@ -108,7 +110,8 @@ public class MapResource {
 			LOG.info("Resource " + key + "is denied for user " + user);
 			throw new WebApplicationException(Status.UNAUTHORIZED);
 		}
-		return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).tag(tag).build();
+		return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+				.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
 	}
 
 	@PUT
@@ -116,7 +119,7 @@ public class MapResource {
 	@Metered(name = "put_storage_counter")
 	@ExceptionMetered(name = "put_storage_exception")
 	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+	@Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
 	public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
 			final @Valid ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
 		// All resources without a user cannot be modified with this method. It has to
@@ -147,19 +150,19 @@ public class MapResource {
 		final String currentVersion = storeInfo.getVersion();
 		final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
 
-		// TODO check if version are correct
+		// TODO this should be idempotent. So if version is equals, answer 200.
 		if (response == null) {
 			final String newVersion = unwrapWithApi(
 					storage.put(data.getData(), currentVersion, data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
 			if (newVersion == null) {
 				throw new WebApplicationException(Status.NOT_FOUND);
 			}
-			return Response.ok().tag(new EntityTag(newVersion)).build();
+			return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
 		}
-		return response.build();
+		return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
 	}
 
-	private void checkHeaders(final HttpHeaders headers) {		
+	private void checkHeaders(final HttpHeaders headers) {
 		final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
 		if (header == null || header.isEmpty()) {
 			throw new WebApplicationException(Status.BAD_REQUEST);

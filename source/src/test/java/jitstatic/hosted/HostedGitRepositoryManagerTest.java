@@ -340,8 +340,8 @@ public class HostedGitRepositoryManagerTest {
 			assertNotNull(firstSourceInfo);
 			JsonNode firstValue = readJsonData(firstSourceInfo);
 			String firstVersion = firstSourceInfo.getSourceVersion();
-			JsonNode modified = MAPPER.readValue("{\"one\":\"two\"}", JsonNode.class);
-			String newVersion = grm.modify(modified, firstVersion, message, userInfo, null, STORE, null).get();
+			byte[] modified = "{\"one\":\"two\"}".getBytes(UTF_8);
+			String newVersion = grm.modify(modified, firstVersion, message, userInfo, "user@somewhere.org", STORE, null).get();
 			assertNotEquals(firstVersion, newVersion);
 			SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
 			JsonNode secondValue = readJsonData(secondSourceInfo);
@@ -360,9 +360,8 @@ public class HostedGitRepositoryManagerTest {
 		ex.expect(UnsupportedOperationException.class);
 		ex.expectMessage("Tags cannot be modified");
 		try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
-			grm.modify(null, "1", "m", "ui", "m", "key", "refs/tags/tag");
+			grm.modify(new byte[] {1,2,3,4}, "1", "m", "ui", "m", "key", "refs/tags/tag");
 		}
-
 	}
 
 	private void verifyOkPush(Iterable<PushResult> iterable) {
