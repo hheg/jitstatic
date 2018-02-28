@@ -1,10 +1,9 @@
 language: java
 env:
-  matrix:
-  - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
-  - USERNAME=hheg
   global:
   - secure: tMoDXYzAle9W78MfAgMFuVnHaFH54ogQoyndxq2NORMK/IEGcA7dm0cBK1VbwAeSLzjIljE0o1azJEB4OKNgW+xQ6NCAkqsybbTd4FGCndmHBiioJcr0jO2+9In5TbtDjWcRpigYilgkKcir13NjGCQO+Fk+vYvCU5hcRlB2mELtj/lLjhA0jKgfMOHNLuEU24h0EmeVTv7x/FRKuZv6AteexhQU0gXBR47sBF2Toyb9ge0ZqIU7fa3xYaTRwuZ/SVVF9iEXsYKuhiRA0pCqYgNPhikuy9mQiRircnjgsiSaxjFWrtWM64KMW2PdQ6GWAHwE+nTdbBH1i+66qs07MHeq4wpj1rVxtZDWXs2/eX4NX+cZWuo1ZLwr/P86xGHiuKe0tbi72MK89q97eK7PoGZN8plcbVHR/szr5y3/EC4txOFDUMzSWyypgPZSDwlxUve7cQxD1sZn5joq/gxu3o4aaF6qrhDdMr6yCc20nQzek8X+kmJu6ldc7O5dxba+VZd7GOw3ICi/pmw1GnkGoIhb5gO8Flxd1ngMlmZV+lNZ/4cs4obyiRv9uQi3DlZSoi08kAg7WP1dQUPvBm7a6UUJ3BXw1HeZdG6VqALcKzaRVyDZEvrv/7/rI9LhQDBJ+QzksChHULKZtiPI2Gg4xuVEPD1HEwomNMzRw0uoCt4=
+  - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
+  - USERNAME=hheg
 jdk:
 - oraclejdk8
 sudo: required
@@ -12,7 +11,7 @@ install: true
 script:
 - mvn clean install -B -V && cp jitstatic/target/binary/jitstatic.jar $FILE
 after_success:
-- mvn test jacoco:report coveralls:report && ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
+- mvn test jacoco:report coveralls:report && chmod +x docker_deploy.sh && ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
 deploy:
   provider: releases
   skip_cleanup: true
