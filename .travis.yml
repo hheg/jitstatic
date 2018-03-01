@@ -9,9 +9,12 @@ jdk:
 sudo: required
 install: true
 script:
-- mvn clean install -B -V && cp jitstatic/target/binary/jitstatic.jar $FILE
+- mvn clean install -B -V -DskipTests=true
+- cp jitstatic/target/binary/jitstatic.jar $FILE
+- mvn test jacoco:report coveralls:report
 after_success:
-- mvn test jacoco:report coveralls:report && chmod +x docker_deploy.sh && ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
+- chmod +x docker_deploy.sh && chmod +x docker_build.sh 
+- ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
 deploy:
   provider: releases
   skip_cleanup: true
