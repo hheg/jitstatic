@@ -150,8 +150,8 @@ public class LoadTesterTest {
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][]{{new String[]{"a"}, new String[]{MASTER}},
-                {new String[]{"a", "b", "c"}, new String[]{MASTER, "develop", "something"}}});
+        return Arrays.asList(new Object[][] { { new String[] { "a" }, new String[] { MASTER } },
+                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" } } });
     }
 
     public LoadTesterTest(String[] names, String[] branches) {
@@ -214,7 +214,8 @@ public class LoadTesterTest {
             try {
                 LOG.info(response.readEntity(String.class));
                 File workingFolder = TMP_FOLDER.newFolder();
-                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider)
+                        .call()) {
                     for (String branch : branches) {
                         checkoutBranch(branch, git);
                         LOG.info("##### {} #####", branch);
@@ -251,7 +252,6 @@ public class LoadTesterTest {
         } finally {
             statsClient.close();
             clients.stream().forEach(c -> c.close());
-            updaters.stream().forEach(c -> c.close());
         }
         LOG.info("Git updates: {}", GITUPDATES.get());
         LOG.info("Git failures: {}", GITFAILURES.get());
@@ -496,51 +496,47 @@ public class LoadTesterTest {
         }
     }
 
-    private class ClientUpdater implements AutoCloseable {
+    private class ClientUpdater {
 
         private final File workingFolder;
         private final UsernamePasswordCredentialsProvider provider;
-        private final Git git;
 
         public ClientUpdater(final String gitAdress, final UsernamePasswordCredentialsProvider provider)
                 throws InvalidRemoteException, TransportException, GitAPIException, IOException {
             this.workingFolder = TMP_FOLDER.newFolder();
-            this.git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call();
+            Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call().close();
             this.provider = provider;
         }
 
         public void updateClient(String name, String branch)
                 throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
-            Ref head = checkoutBranch(branch, git);
-            git.pull().setCredentialsProvider(provider).call();
-            Path filedata = Paths.get(workingFolder.toURI()).resolve(name);
-            int c = readData(filedata) + 1;
-            byte[] data = getData(c);
-            Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            DirCache dc = git.add().addFilepattern(".").call();
-            if (dc.getEntryCount() > 0) {
-                String message = "g:" + name + ":" + c;
-                git.commit().setMessage(message).call();
-                boolean ok = false;
-                try {
-                    ok = verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
-                } finally {
-                    if (!ok) {
-                        git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
-                        git.clean().setCleanDirectories(true).setForce(true).call();
+            try (Git git = Git.open(workingFolder)) {
+                Ref head = checkoutBranch(branch, git);
+                git.pull().setCredentialsProvider(provider).call();
+                Path filedata = Paths.get(workingFolder.toURI()).resolve(name);
+                int c = readData(filedata) + 1;
+                byte[] data = getData(c);
+                Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                DirCache dc = git.add().addFilepattern(".").call();
+                if (dc.getEntryCount() > 0) {
+                    String message = "g:" + name + ":" + c;
+                    git.commit().setMessage(message).call();
+                    boolean ok = false;
+                    try {
+                        ok = verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
+                    } finally {
+                        if (!ok) {
+                            git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
+                            git.clean().setCleanDirectories(true).setForce(true).call();
+                        }
+                    }
+                    if (ok) {
+                        String v = new String(data);
+                        LOG.info("OK push " + c + " " + name + ":" + branch + " from " + versions.get(branch).put(name, v) + " to " + v
+                                + " commit " + message);
                     }
                 }
-                if (ok) {
-                    String v = new String(data);
-                    LOG.info("OK push " + c + " " + name + ":" + branch + " from " + versions.get(branch).put(name, v) + " to " + v
-                            + " commit " + message);
-                }
             }
-        }
-
-        @Override
-        public void close() {
-            git.close();
         }
     }
 }
