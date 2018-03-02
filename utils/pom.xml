@@ -3,7 +3,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.7.4-remove-SNAPSHOT</version>
+		<version>0.7.4-SNAPSHOT</version>
 	</parent>
 	<artifactId>utils</artifactId>
 
