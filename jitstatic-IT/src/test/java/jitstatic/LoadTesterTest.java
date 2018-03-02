@@ -424,6 +424,7 @@ public class LoadTesterTest {
         byte[] newData = getData(c);
         data.setData(newData);
         data.setMessage("m:" + store + ":" + c);
+        data.setUserMail("mail");
         return client.target(String.format(S_STORAGE + store + ref, storageAdress)).request()
                 .header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
                 .buildPut(Entity.json(data)).invoke();

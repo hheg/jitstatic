@@ -28,6 +28,7 @@ import javax.servlet.ServletRegistration.Dynamic;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
@@ -37,6 +38,7 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,15 +47,26 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.setup.Environment;
 import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
-import jitstatic.storage.StorageInfo;
 
-public class HostedFactory extends StorageInfo {
+public class HostedFactory {
 	private static final Logger LOG = LoggerFactory.getLogger(HostedFactory.class);
 
 	public static final String SERVLET_NAME = "servlet-name";
 	public static final String BASE_PATH = "base-path";
 	public static final String EXPOSE_ALL = "expose-all";
 
+	@JsonProperty
+    @Pattern(regexp = "^" + Constants.R_HEADS + ".+$|^" + Constants.R_TAGS + ".+$")
+    private String branch = Constants.R_HEADS + Constants.MASTER;
+
+    public String getBranch() {
+        return branch;
+    }
+
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
+	
 	@NotNull
 	@JsonProperty
 	private String servletName = "jitstatic";

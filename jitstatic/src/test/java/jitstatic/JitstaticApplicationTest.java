@@ -46,7 +46,6 @@ import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
 import jitstatic.api.MapResource;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.remote.RemoteFactory;
 import jitstatic.source.Source;
 import jitstatic.storage.Storage;
 import jitstatic.storage.StorageFactory;
@@ -60,8 +59,6 @@ public class JitstaticApplicationTest {
 	private HealthCheckRegistry hcr;
 	@Mock
 	private LifecycleEnvironment lifecycle;
-	@Mock
-	private RemoteFactory remoteFactory;
 	@Mock
 	private StorageFactory storageFactory;
 	@Mock
@@ -121,40 +118,6 @@ public class JitstaticApplicationTest {
 	}
 
 	@Test
-	public void buildsAMapResourceWithRemote() throws Exception {
-		config.setRemoteFactory(remoteFactory);
-		config.setStorageFactory(storageFactory);
-		when(remoteFactory.build(any())).thenReturn(source);
-		app.run(config, environment);
-		verify(jersey).register(isA(MapResource.class));
-	}
-
-	@Test
-	public void buildsAstorageHealthCheckWithRemote() throws Exception {
-		config.setRemoteFactory(remoteFactory);
-		when(remoteFactory.build(any())).thenReturn(source);
-		app.run(config, environment);
-		verify(hcr).register(eq("storagechecker"), isA(HealthCheck.class));
-	}
-
-	@Test
-	public void testRemoteManagerLifeCycleManagerIsRegisteredWithRemote() throws Exception {
-		config.setRemoteFactory(remoteFactory);
-		when(remoteFactory.build(any())).thenReturn(source);
-		app.run(config, environment);
-		verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
-	}
-
-	@Test
-	public void testStorageLifeCycleManagerIsRegisterdWithRemote() throws Exception {
-		config.setRemoteFactory(remoteFactory);
-		config.setStorageFactory(storageFactory);
-		when(remoteFactory.build(any())).thenReturn(source);
-		app.run(config, environment);
-		verify(lifecycle, times(1)).manage(isA(AutoCloseableLifeCycleManager.class));
-	}
-
-	@Test
 	public void testResourcesAreGettingClosed() throws Exception {
 		ex.expect(RuntimeException.class);
 		config.setHostedFactory(hostedFactory);
@@ -167,13 +130,6 @@ public class JitstaticApplicationTest {
 			verify(storage).close();
 			throw e;
 		}
-	}
-	
-	@Test
-	public void testNoConfigSet() throws Exception {
-		ex.expect(IllegalStateException.class);
-		ex.expectMessage("Either hosted or remote must be chosen");
-		app.run(config, environment);
 	}
 	
 	@Test
@@ -190,7 +146,6 @@ public class JitstaticApplicationTest {
 	public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
 		config.setStorageFactory(storageFactory);
 		config.setHostedFactory(hostedFactory);
-		config.setRemoteFactory(remoteFactory);
 		when(hostedFactory.build(environment)).thenReturn(source);
 		when(storageFactory.build(source, environment)).thenReturn(storage);
 		app.run(config, environment);

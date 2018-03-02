@@ -25,8 +25,13 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
@@ -41,10 +46,18 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
@@ -64,135 +77,167 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import jitstatic.api.ModifyKeyData;
-import jitstatic.tools.TestRepositoryRule;
+import jitstatic.hosted.HostedFactory;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
-	private static final String ACCEPT_STORAGE = "accept/storage";
-	private static final String USER = "suser";
-	private static final String PASSWORD = "ssecret";
-	private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
-	private final HttpClientConfiguration HCC = new HttpClientConfiguration();
-	private DropwizardAppRule<JitstaticConfiguration> DW;
-	private TestRepositoryRule TEST_REPO;
-	private String adress;
-	private String basic;
+    private static final String ACCEPT_STORAGE = "accept/storage";
+    private static final String USER = "suser";
+    private static final String PASSWORD = "ssecret";
+    private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
+    private final HttpClientConfiguration HCC = new HttpClientConfiguration();
+    private DropwizardAppRule<JitstaticConfiguration> DW;
+    private String adress;
+    private String basic;
 
-	@Rule
-	public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((TEST_REPO = new TestRepositoryRule(getFolder(), ACCEPT_STORAGE)))
-			.around((DW = new DropwizardAppRule<>(JitstaticApplication.class, ResourceHelpers.resourceFilePath("simpleserver2.yaml"),
-					ConfigOverride.config("remote.basePath", getFolder()),
-					ConfigOverride.config("remote.remoteRepo", () -> "file://" + TEST_REPO.getBase.get()))));
+    @Rule
+    public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
+            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
 
-	@Before
-	public void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-		adress = String.format("http://localhost:%d/application", DW.getLocalPort());
-		basic = basicAuth();
-		HCC.setConnectionRequestTimeout(Duration.minutes(1));
-		HCC.setConnectionTimeout(Duration.minutes(1));
-		HCC.setTimeout(Duration.minutes(1));
-	}
+    @Before
+    public void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+        adress = String.format("http://localhost:%d/application", DW.getLocalPort());
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String servletName = hostedFactory.getServletName();
+        String endpoint = hostedFactory.getHostedEndpoint();
+        basic = basicAuth();
+        HCC.setConnectionRequestTimeout(Duration.minutes(1));
+        HCC.setConnectionTimeout(Duration.minutes(1));
+        HCC.setTimeout(Duration.minutes(1));
 
-	@After
-	public void after() {
-		SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-		List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-				.collect(Collectors.toList());
-		errors.stream().forEach(e -> e.printStackTrace());
-		assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
-	}
+        setupRepo(user, pass, servletName, endpoint);
+    }
 
-	@Test
-	public void testGetNotFoundKeyWithoutAuth() {
-		Client client = buildClient("test client");
-		try {
-			Response response = client.target(String.format("%s/storage/nokey", adress)).request().get();
-			assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
-		} finally {
-			client.close();
-		}
-	}
+    private void setupRepo(String user, String pass, String servletName, String endpoint) throws IOException, GitAPIException,
+            NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
+            WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+        File workingDirectory = TMP_FOLDER.newFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
+        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint)
+                .setCredentialsProvider(provider).call()) {
 
-	@Test
-	public void testGetNotFoundKeyWithAuth() {
-		Client client = buildClient("test3 client");
-		try {
-			Response response = client.target(String.format("%s/storage/nokey", adress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
-		} finally {
-			client.close();
-		}
-	}
+            writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
+            writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + ".metadata");
 
-	@Test
-	public void testGetAKeyValue() {
-		Client client = buildClient("test4 client");
-		try {
-			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
-					.header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(getData(), response.readEntity(String.class));
-			assertNotNull(response.getEntityTag().getValue());
-		} finally {
-			client.close();
-		}
-	}
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Initial commit").call();
+            git.push().setCredentialsProvider(provider).call();
+        }
+    }
 
-	@Test
-	public void testGetAKeyValueWithoutAuth() {
-		Client client = buildClient("test2 client");
-		try {
-			Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request().get();
-			assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-		} finally {
-			client.close();
-		}
-	}
+    @After
+    public void after() {
+        SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
+        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        errors.stream().forEach(e -> e.printStackTrace());
+        assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
+    }
 
-	@Test
-	public void testModifyAKey() throws IOException {
-		Client client = buildClient("testmodify client");
-		try {
-			WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
-			Response response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(getData(), response.readEntity(String.class));
-			String oldVersion = response.getEntityTag().getValue();
-			ModifyKeyData data = new ModifyKeyData();
-			byte[] newData = "{\"one\":\"two\"}".getBytes("UTF-8");
-			data.setData(newData);
-			data.setMessage("commit message");
-			String invoke = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic)
-					.header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"").buildPut(Entity.json(data)).invoke(String.class);
-			assertNotEquals(oldVersion, invoke);
-			response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).get();
-			assertEquals(new String(newData), response.readEntity(String.class));
-		} finally {
-			client.close();
-		}
-	}
+    @Test
+    public void testGetNotFoundKeyWithoutAuth() {
+        Client client = buildClient("test client");
+        try {
+            Response response = client.target(String.format("%s/storage/nokey", adress)).request().get();
+            assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        } finally {
+            client.close();
+        }
+    }
 
-	private static Supplier<String> getFolder() {
-		return () -> {
-			try {
-				return TMP_FOLDER.newFolder().toString();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		};
-	}
+    @Test
+    public void testGetNotFoundKeyWithAuth() {
+        Client client = buildClient("test3 client");
+        try {
+            Response response = client.target(String.format("%s/storage/nokey", adress)).request().header(HttpHeaders.AUTHORIZATION, basic)
+                    .get();
+            assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        } finally {
+            client.close();
+        }
+    }
 
-	private Client buildClient(final String name) {
-		Environment env = DW.getEnvironment();
-		JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(env);
-		jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(HCC));
-		return jerseyClientBuilder.build(name);
-	}
+    @Test
+    public void testGetAKeyValue() {
+        Client client = buildClient("test4 client");
+        try {
+            Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
+                    .header(HttpHeaders.AUTHORIZATION, basic).get();
+            assertEquals(getData(), response.readEntity(String.class));
+            assertNotNull(response.getEntityTag().getValue());
+        } finally {
+            client.close();
+        }
+    }
 
-	private static String basicAuth() throws UnsupportedEncodingException {
-		return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
-	}
+    @Test
+    public void testGetAKeyValueWithoutAuth() {
+        Client client = buildClient("test2 client");
+        try {
+            Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request().get();
+            assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        } finally {
+            client.close();
+        }
+    }
 
-	private static String getData() {
-		return "{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
-	}
+    @Test
+    public void testModifyAKey() throws IOException {
+        Client client = buildClient("testmodify client");
+        try {
+            WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
+            Response response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
+            assertEquals(getData(), response.readEntity(String.class));
+            String oldVersion = response.getEntityTag().getValue();
+            ModifyKeyData data = new ModifyKeyData();
+            byte[] newData = "{\"one\":\"two\"}".getBytes("UTF-8");
+            response.close();
+            data.setData(newData);
+            data.setMessage("commit message");
+            data.setUserMail("user@mail");
+            String invoke = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
+                    .buildPut(Entity.json(data)).invoke(String.class);
+            assertNotEquals(oldVersion, invoke);
+            response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
+            assertEquals(new String(newData), response.readEntity(String.class));
+            response.close();
+        } finally {
+            client.close();
+        }
+    }
+
+    private static Supplier<String> getFolder() {
+        return () -> {
+            try {
+                return TMP_FOLDER.newFolder().toString();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        };
+    }
+
+    private Client buildClient(final String name) {
+        Environment env = DW.getEnvironment();
+        JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(env);
+        jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(HCC));
+        return jerseyClientBuilder.build(name);
+    }
+
+    private void writeFile(Path workBase, String file) throws IOException {
+        final Path filePath = workBase.resolve(file);
+        Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
+        try (InputStream is = getClass().getResourceAsStream("/" + file)) {
+            Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private String basicAuth() throws UnsupportedEncodingException {
+        return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
+    }
+
+    private static String getData() {
+        return "{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
+    }
 }

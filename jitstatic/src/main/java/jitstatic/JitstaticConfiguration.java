@@ -1,8 +1,5 @@
 package jitstatic;
 
-import java.io.IOException;
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -23,32 +20,28 @@ import java.util.Objects;
  * #L%
  */
 
-import javax.validation.Valid;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.util.Objects;
+
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.remote.RemoteFactory;
 import jitstatic.reporting.ReportingFactory;
 import jitstatic.source.Source;
 import jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
 
-	private static final Logger LOG = LoggerFactory.getLogger(JitstaticConfiguration.class);
-
 	private StorageFactory storage = new StorageFactory();
-
+	
 	@Valid
-	@JsonProperty
-	private RemoteFactory remote;
-
-	@Valid
+	@NotNull
 	@JsonProperty
 	private HostedFactory hosted;
 	
@@ -71,14 +64,6 @@ public class JitstaticConfiguration extends Configuration {
 	public void setStorageFactory(final StorageFactory storage) {
 		this.storage = storage;
 	}
-
-	public RemoteFactory getRemoteFactory() {
-		return remote;
-	}
-
-	public void setRemoteFactory(RemoteFactory remote) {
-		this.remote = remote;
-	}
 	
 	public HostedFactory getHostedFactory() {
 		return hosted;
@@ -90,21 +75,8 @@ public class JitstaticConfiguration extends Configuration {
 
 	public Source build(final Environment env) throws CorruptedSourceException, IOException {
 		Objects.requireNonNull(env);
-		Source source;
 		final HostedFactory hostedFactory = getHostedFactory();
-		final RemoteFactory remoteFactory = getRemoteFactory();
-		if (hostedFactory != null) {
-			source = hostedFactory.build(env);
-			if (remoteFactory != null) {
-				LOG.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
-			}
-		} else {			
-			if (remoteFactory == null) {
-				throw new IllegalStateException("Either hosted or remote must be chosen");
-			}
-			source = remoteFactory.build(env);
-		}
-		getReportingFactory().build(env);		
-		return source;
+		getReportingFactory().build(env);
+		return hostedFactory.build(env);
 	}
 }
