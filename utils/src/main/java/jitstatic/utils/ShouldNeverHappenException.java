@@ -20,11 +20,11 @@ package jitstatic.utils;
  * #L%
  */
 
-public class ShouldNeverHappendException extends RuntimeException {
+public class ShouldNeverHappenException extends RuntimeException {
 	
 	private static final long serialVersionUID = -1254892071325637569L;
 
-	public ShouldNeverHappendException(final String message, final Throwable t) {
+	public ShouldNeverHappenException(final String message, final Throwable t) {
 		super(message,t);
 	}
 }

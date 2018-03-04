@@ -1,5 +1,7 @@
 package jitstatic;
 
+import static org.junit.Assert.assertArrayEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -33,6 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
@@ -67,6 +70,8 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
 import com.codahale.metrics.health.HealthCheck.Result;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
@@ -76,6 +81,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
+import jitstatic.api.AddKeyData;
 import jitstatic.api.ModifyKeyData;
 import jitstatic.hosted.HostedFactory;
 
@@ -85,11 +91,12 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private final HttpClientConfiguration HCC = new HttpClientConfiguration();
     private DropwizardAppRule<JitstaticConfiguration> DW;
     private String adress;
     private String basic;
-
+    private String addBasic;
     @Rule
     public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
@@ -102,7 +109,8 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         String pass = hostedFactory.getSecret();
         String servletName = hostedFactory.getServletName();
         String endpoint = hostedFactory.getHostedEndpoint();
-        basic = basicAuth();
+        basic = basicAuth(USER, PASSWORD);
+        addBasic = basicAuth(user, pass);
         HCC.setConnectionRequestTimeout(Duration.minutes(1));
         HCC.setConnectionTimeout(Duration.minutes(1));
         HCC.setTimeout(Duration.minutes(1));
@@ -208,6 +216,24 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         }
     }
 
+    @Test
+    public void testAddKey() throws JsonProcessingException, IOException {
+        Client client = buildClient("add key");
+        try {
+            Response response = client.target(String.format("%s/storage", adress)).request().header(HttpHeaders.AUTHORIZATION, addBasic)
+                    .post(Entity.json(new AddKeyData("test", "refs/heads/master", getData().getBytes("UTF-8"),
+                            new StorageData(new HashSet<>(), "application/json"), "testmessage", "user", "test@test.com")));
+            assertEquals(Status.OK.getStatusCode(), response.getStatus());
+            assertNotNull(response.getEntityTag().getValue());
+            byte[] readEntity = response.readEntity(byte[].class);
+            assertArrayEquals(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData())), readEntity);
+            assertEquals(response.getHeaderString(HttpHeaders.CONTENT_TYPE), "application/json");
+            response.close();
+        } finally {
+            client.close();
+        }
+    }
+
     private static Supplier<String> getFolder() {
         return () -> {
             try {
@@ -233,11 +259,16 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         }
     }
 
-    private String basicAuth() throws UnsupportedEncodingException {
-        return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes("UTF-8"));
+    private String basicAuth(String user, String pass) throws UnsupportedEncodingException {
+        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes("UTF-8"));
     }
 
     private static String getData() {
-        return "{\"key\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"key3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
+        return getData(0);
+    }
+
+    private static String getData(int c) {
+        return "{\"key" + c
+                + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
 }

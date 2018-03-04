@@ -30,51 +30,46 @@ import jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
-	public static void main(final String[] args) throws Exception {
-		new JitstaticApplication().run(args);
-	}
+    public static void main(final String[] args) throws Exception {
+        new JitstaticApplication().run(args);
+    }
 
-	@Override
-	public void initialize(final Bootstrap<JitstaticConfiguration> bootstrap) {
-		super.initialize(bootstrap);
-	}
+    @Override
+    public void initialize(final Bootstrap<JitstaticConfiguration> bootstrap) {
+        super.initialize(bootstrap);
+    }
 
-	@Override
-	public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
-		Exception guard = null;
-		Source source = null;
-		Storage storage = null;
-		try {
-			source = config.build(env);
-			storage = config.getStorageFactory().build(source, env);			
-			env.lifecycle().manage(new ManagedObject<>(source));
-			env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
-			env.healthChecks().register("storagechecker", new HealthChecker(storage));
-			env.healthChecks().register("sourcechecker", new HealthChecker(source));
-			env.jersey().register(new MapResource(storage));
-			env.jersey().register(new JitstaticInfoResource());		
-		} catch (final Exception e) {
-			guard = e;
-			throw e;
-		} finally {
-			cleanupIfFailed(guard, source, storage);
-		}
-	}
+    @Override
+    public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
+        Source source = null;
+        Storage storage = null;
+        try {
+            source = config.build(env);
+            storage = config.getStorageFactory().build(source, env);
+            env.lifecycle().manage(new ManagedObject<>(source));
+            env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
+            env.healthChecks().register("storagechecker", new HealthChecker(storage));
+            env.healthChecks().register("sourcechecker", new HealthChecker(source));
+            env.jersey().register(new MapResource(storage, config.getAddKeyAuthenticator()));
+            env.jersey().register(new JitstaticInfoResource());
+        } catch (final Exception e) {
+            cleanupIfFailed(source, storage);
+            throw e;
+        }
+    }
 
-	private void cleanupIfFailed(final Exception guard, final Source source, final Storage storage) {
-		if (guard != null) {
-			if (source != null) {
-				try {
-					source.close();
-				} catch (Exception ignore) {
-				}
-			}
-			if (storage != null) {
-				try {
-					storage.close();
-				} catch (Exception ignore) {
-				}
-			}
-		}
-	}
+    private void cleanupIfFailed(final Source source, final Storage storage) {
+        if (source != null) {
+            try {
+                source.close();
+            } catch (final Exception ignore) {
+            }
+        }
+        if (storage != null) {
+            try {
+                storage.close();
+            } catch (final Exception ignore) {
+            }
+        }
+    }
 }

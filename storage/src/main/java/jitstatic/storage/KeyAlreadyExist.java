@@ -4,7 +4,7 @@ package jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,16 @@ package jitstatic.storage;
  * #L%
  */
 
-import java.util.List;
-import java.util.concurrent.Future;
+public class KeyAlreadyExist extends RuntimeException {
 
-import jitstatic.StorageData;
-import jitstatic.utils.CheckHealth;
+    private static final long serialVersionUID = 3551414727296198256L;
 
-public interface Storage extends AutoCloseable, CheckHealth {
-	public Future<StoreInfo> get(String key, String ref);
-	public void reload(List<String> refsToReload);
-	public void close();
-	public Future<String> put(byte[] data, String version, String message, String userInfo, String userEmail, String key, String ref);
-    public Future<StoreInfo> add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
+    public KeyAlreadyExist(final String key, final String branch) {
+        super(key + " already exist in branch " + branch);
+    }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

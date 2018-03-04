@@ -22,6 +22,7 @@ package jitstatic.source;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
+import jitstatic.StorageData;
 import jitstatic.utils.CheckHealth;
 
 import java.util.concurrent.CompletableFuture;
@@ -33,4 +34,5 @@ public interface Source extends AutoCloseable, CheckHealth {
 	public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 	public String getDefaultRef();
 	public CompletableFuture<String> modify(byte[] data, String version, String message, String userInfo, String userMail, String key, String ref);
+    public CompletableFuture<String> addKey(String key, String finalRef, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
 }

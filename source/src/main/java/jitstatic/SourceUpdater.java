@@ -22,6 +22,9 @@ package jitstatic;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -44,107 +47,126 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
+import jitstatic.utils.Pair;
+
 public class SourceUpdater {
 
-	private final Repository repository;
+    private final Repository repository;
 
-	public SourceUpdater(final Repository repository) {
-		this.repository = repository;
-	}
+    public SourceUpdater(final Repository repository) {
+        this.repository = repository;
+    }
 
-	public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo,
-			final String userMail) throws IOException {
-		final DirCache inCoreIndex = DirCache.newInCore();
-		try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter();) {
-			final ObjectId headRef = ref.getObjectId();
-			final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
-			final ObjectId blob = addBlob(key, data, objectInserter, dirCacheBuilder);
-			
-			buildTreeIndex(key, rw, headRef, dirCacheBuilder);
-			
-			final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-			// TODO fix this
-			final PersonIdent commiter = new PersonIdent("JitStatic API put operation", "none@nowhere.org");
-			final ObjectId inserted = buildCommit(ref, message, userInfo, userMail, objectInserter, fullTree, commiter);
+    public String addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
+            final String userInfo, final String userMail) throws IOException {
+        Objects.requireNonNull(fileEntry);
+        Objects.requireNonNull(ref);
+        Objects.requireNonNull(message);
+        Objects.requireNonNull(userInfo);
+        Objects.requireNonNull(userMail);
 
-			insertCommit(ref, rw, commiter, inserted);
-			return blob.name();
-		}
-	}
+        final Pair<String, byte[]> file = fileEntry.getLeft();
+        final Pair<String, byte[]> fileMetadata = fileEntry.getRight();
+        final String keyName = file.getLeft();
+        final DirCache inCoreIndex = DirCache.newInCore();
+        final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
+        final ObjectId headRef = ref.getObjectId();
+        try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
+            final ObjectId blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder);
+            final List<String> filesAddedToTree = new ArrayList<>(2);
+            filesAddedToTree.add(keyName);
+            if (fileMetadata != null) {
+                final String keyMetaDataName = fileMetadata.getLeft();
+                addBlob(keyMetaDataName, fileMetadata.getRight(), objectInserter, dirCacheBuilder);
+                filesAddedToTree.add(keyMetaDataName);
+            }
+            buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
+            final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
+            final PersonIdent commiter = new PersonIdent("JitStatic API put operation", "none@nowhere.org");
+            final ObjectId inserted = buildCommit(ref, message, userInfo, userMail, objectInserter, fullTree, commiter);
+            insertCommit(ref, rw, commiter, inserted);
+            return blob.name();
+        }
+    }
 
-	private void insertCommit(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted)
-			throws MissingObjectException, IncorrectObjectTypeException, IOException {
-		final RevCommit newCommit = rw.parseCommit(inserted);
-		final RefUpdate ru = repository.updateRef(ref.getName());
-		ru.setRefLogIdent(commiter);
-		ru.setNewObjectId(newCommit);
-		ru.setForceRefLog(true);
-		ru.setRefLogMessage("jitstatic modify", false);
-		ru.setExpectedOldObjectId(ref.getObjectId());
-		checkResult(ru.update(rw));
-	}
+    public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo,
+            final String userMail) throws IOException {
+        return addKey(Pair.of(Pair.of(key, data), null), ref, message, userInfo, userMail);
+    }
 
-	private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail,
-			final ObjectInserter objectInserter, final ObjectId fullTree, final PersonIdent commiter) throws IOException {
-		final CommitBuilder commitBuilder = new CommitBuilder();
-		commitBuilder.setAuthor(new PersonIdent(userInfo, (userMail != null ? userMail : "")));
-		commitBuilder.setMessage(message);
-		commitBuilder.setCommitter(commiter);
-		commitBuilder.setTreeId(fullTree);
-		commitBuilder.setParentId(ref.getObjectId());
-		final ObjectId inserted = objectInserter.insert(commitBuilder);
-		objectInserter.flush();
-		return inserted;
-	}
+    private void insertCommit(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted)
+            throws MissingObjectException, IncorrectObjectTypeException, IOException {
+        final RevCommit newCommit = rw.parseCommit(inserted);
+        final RefUpdate ru = repository.updateRef(ref.getName());
+        ru.setRefLogIdent(commiter);
+        ru.setNewObjectId(newCommit);
+        ru.setForceRefLog(true);
+        ru.setRefLogMessage("jitstatic modify", true);
+        ru.setExpectedOldObjectId(ref.getObjectId());
+        checkResult(ru.update(rw));
+    }
 
-	private void buildTreeIndex(final String key, final RevWalk rw, final ObjectId headRef, final DirCacheBuilder dcBuilder)
-			throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
-		try (final TreeWalk treeWalk = new TreeWalk(repository);) {
-			final int hIdx = treeWalk.addTree(rw.parseTree(headRef));
-			treeWalk.setRecursive(true);	
-			while (treeWalk.next()) {
-				final String entryPath = treeWalk.getPathString();
-				final CanonicalTreeParser hTree = treeWalk.getTree(hIdx, CanonicalTreeParser.class);
-				if (!entryPath.equals(key)) {
-					final DirCacheEntry dcEntry = new DirCacheEntry(entryPath);
-					dcEntry.setObjectId(hTree.getEntryObjectId());
-					dcEntry.setFileMode(hTree.getEntryFileMode());
-					dcBuilder.add(dcEntry);
-				}
-			}
-		}
-		dcBuilder.finish();
-	}
+    private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail,
+            final ObjectInserter objectInserter, final ObjectId fullTree, final PersonIdent commiter) throws IOException {
+        final CommitBuilder commitBuilder = new CommitBuilder();
+        commitBuilder.setAuthor(new PersonIdent(userInfo, (userMail != null ? userMail : "")));
+        commitBuilder.setMessage(message);
+        commitBuilder.setCommitter(commiter);
+        commitBuilder.setTreeId(fullTree);
+        commitBuilder.setParentId(ref.getObjectId());
+        final ObjectId inserted = objectInserter.insert(commitBuilder);
+        objectInserter.flush();
+        return inserted;
+    }
 
-	private ObjectId addBlob(final String key, final byte[] data, final ObjectInserter objectInserter, final DirCacheBuilder dcBuilder)
-			throws IOException {
-		final DirCacheEntry changedFileEntry = new DirCacheEntry(key);
-		changedFileEntry.setLength(data.length);
-		changedFileEntry.setLastModified(Instant.now().getEpochSecond());
-		changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
-		changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data));
-		final ObjectId blob = changedFileEntry.getObjectId();
-		dcBuilder.add(changedFileEntry);
-		return blob;
-	}
+    private void buildTreeIndex(final List<String> list, final RevWalk rw, final ObjectId headRef, final DirCacheBuilder dcBuilder)
+            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
+        try (final TreeWalk treeWalk = new TreeWalk(repository)) {
+            final int hIdx = treeWalk.addTree(rw.parseTree(headRef));
+            treeWalk.setRecursive(true);
+            while (treeWalk.next()) {
+                final String entryPath = treeWalk.getPathString();
+                final CanonicalTreeParser hTree = treeWalk.getTree(hIdx, CanonicalTreeParser.class);
+                if (!list.contains(entryPath)) {
+                    final DirCacheEntry dcEntry = new DirCacheEntry(entryPath);
+                    dcEntry.setObjectId(hTree.getEntryObjectId());
+                    dcEntry.setFileMode(hTree.getEntryFileMode());
+                    dcBuilder.add(dcEntry);
+                }
+            }
+        }
+        dcBuilder.finish();
+    }
 
-	private void checkResult(Result update) {
-		switch (update) {
-		case FAST_FORWARD:
-		case FORCED:
-		case NEW:
-		case NO_CHANGE:
-			break;
-		case IO_FAILURE:
-		case LOCK_FAILURE:
-		case NOT_ATTEMPTED:
-		case REJECTED:
-		case REJECTED_CURRENT_BRANCH:
-		case REJECTED_MISSING_OBJECT:
-		case REJECTED_OTHER_REASON:
-		case RENAMED:
-		default:
-			throw new UpdateFailedException(update);
-		}
-	}
+    private ObjectId addBlob(final String fileEntry, final byte[] data, final ObjectInserter objectInserter,
+            final DirCacheBuilder dcBuilder) throws IOException {
+        final DirCacheEntry changedFileEntry = new DirCacheEntry(fileEntry);
+        changedFileEntry.setLength(data.length);
+        changedFileEntry.setLastModified(Instant.now().getEpochSecond());
+        changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
+        changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data));
+        final ObjectId blob = changedFileEntry.getObjectId();
+        dcBuilder.add(changedFileEntry);
+        return blob;
+    }
+
+    private void checkResult(Result update) {
+        switch (update) {
+        case FAST_FORWARD:
+        case FORCED:
+        case NEW:
+        case NO_CHANGE:
+            break;
+        case IO_FAILURE:
+        case LOCK_FAILURE:
+        case NOT_ATTEMPTED:
+        case REJECTED:
+        case REJECTED_CURRENT_BRANCH:
+        case REJECTED_MISSING_OBJECT:
+        case REJECTED_OTHER_REASON:
+        case RENAMED:
+        default:
+            throw new UpdateFailedException(update);
+        }
+    }
 }
