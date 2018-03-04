@@ -29,6 +29,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Rule;
@@ -149,5 +151,19 @@ public class JitstaticApplicationTest {
 		when(hostedFactory.build(environment)).thenReturn(source);
 		when(storageFactory.build(source, environment)).thenReturn(storage);
 		app.run(config, environment);
+	}
+	
+	@Test
+	public void testClosingSourceAndThrow() throws Exception {
+	    ex.expect(RuntimeException.class);
+	    ex.expectMessage("Test exception");
+	    doThrow(new RuntimeException("Test exception")).when(source).close();
+	    doThrow(new RuntimeException("Test exception")).when(storage).close();
+	    config.setStorageFactory(storageFactory);
+        config.setHostedFactory(hostedFactory);
+        when(config.getAddKeyAuthenticator()).thenThrow(new RuntimeException("Test exception"));
+        when(hostedFactory.build(environment)).thenReturn(source);
+        when(storageFactory.build(source, environment)).thenReturn(storage);        
+        app.run(config, environment);        
 	}
 }

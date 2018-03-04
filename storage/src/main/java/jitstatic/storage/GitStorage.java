@@ -54,7 +54,6 @@ import jitstatic.source.SourceInfo;
 import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.LinkedException;
 import jitstatic.utils.Pair;
-import jitstatic.utils.ShouldNeverHappenException;
 import jitstatic.utils.WrappingAPIException;
 
 public class GitStorage implements Storage {

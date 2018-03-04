@@ -47,6 +47,7 @@ import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jitstatic.CorruptedSourceException;
@@ -60,6 +61,7 @@ import jitstatic.source.SourceEventListener;
 import jitstatic.source.SourceInfo;
 import jitstatic.utils.ErrorConsumingThreadFactory;
 import jitstatic.utils.Pair;
+import jitstatic.utils.ShouldNeverHappenException;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
 
@@ -286,14 +288,20 @@ class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);
         final String finalRef = checkRef(ref);
-
+        final CompletableFuture<byte[]> metaDataConverter = CompletableFuture.supplyAsync(() -> {
+            try {
+                return MAPPER.writeValueAsBytes(metaData);
+            } catch (JsonProcessingException e1) {
+                throw new ShouldNeverHappenException("", e1);
+            }
+        });
         return CompletableFuture.supplyAsync(() -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                return this.updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + ".metadata", MAPPER.writeValueAsBytes(metaData))), actualRef,
+                return this.updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + ".metadata", metaDataConverter.join())), actualRef,
                         message, userInfo, userMail);
             } catch (final IOException e) {
                 throw new WrappingAPIException(e);
