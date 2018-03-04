@@ -22,12 +22,14 @@ package jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Set;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration.Dynamic;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
@@ -37,6 +39,7 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,204 +48,219 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.setup.Environment;
 import jitstatic.CorruptedSourceException;
 import jitstatic.source.Source;
-import jitstatic.storage.StorageInfo;
 
-public class HostedFactory extends StorageInfo {
-	private static final Logger LOG = LoggerFactory.getLogger(HostedFactory.class);
+public class HostedFactory {
+    private static final Logger LOG = LoggerFactory.getLogger(HostedFactory.class);
 
-	public static final String SERVLET_NAME = "servlet-name";
-	public static final String BASE_PATH = "base-path";
-	public static final String EXPOSE_ALL = "expose-all";
+    public static final String SERVLET_NAME = "servlet-name";
+    public static final String BASE_PATH = "base-path";
+    public static final String EXPOSE_ALL = "expose-all";
 
-	@NotNull
-	@JsonProperty
-	private String servletName = "jitstatic";
+    @JsonProperty
+    @Pattern(regexp = "^" + Constants.R_HEADS + ".+$|^" + Constants.R_TAGS + ".+$")
+    private String branch = Constants.R_HEADS + Constants.MASTER;
 
-	@NotNull
-	@JsonProperty
-	private String hostedEndpoint = "git";
+    public String getBranch() {
+        return branch;
+    }
 
-	@NotNull
-	@JsonProperty
-	private Path basePath;
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
 
-	@NotNull
-	@JsonProperty
-	private String userName;
+    @NotNull
+    @JsonProperty
+    private String servletName = "jitstatic";
 
-	@NotNull
-	@JsonProperty
-	private String secret;
+    @NotNull
+    @JsonProperty
+    private String hostedEndpoint = "git";
 
-	@JsonProperty
-	private boolean exposeAll;
+    @NotNull
+    @JsonProperty
+    private Path basePath;
 
-	public String getServletName() {
-		return servletName;
-	}
+    @NotNull
+    @JsonProperty
+    private String userName;
 
-	public void setServletName(String servletName) {
-		this.servletName = servletName;
-	}
+    @NotNull
+    @JsonProperty
+    private String secret;
 
-	public Path getBasePath() {
-		return basePath;
-	}
+    @JsonProperty
+    private boolean exposeAll;
 
-	public void setBasePath(Path basePath) {
-		this.basePath = basePath;
-	}
+    public String getServletName() {
+        return servletName;
+    }
 
-	public boolean isExposeAll() {
-		return exposeAll;
-	}
+    public void setServletName(String servletName) {
+        this.servletName = servletName;
+    }
 
-	public void setExposeAll(boolean exposeAll) {
-		this.exposeAll = exposeAll;
-	}
+    public Path getBasePath() {
+        return basePath;
+    }
 
-	public String getHostedEndpoint() {
-		return hostedEndpoint;
-	}
+    public void setBasePath(Path basePath) {
+        this.basePath = basePath;
+    }
 
-	public void setHostedEndpoint(String hostedEndpoint) {
-		this.hostedEndpoint = hostedEndpoint;
-	}
+    public boolean isExposeAll() {
+        return exposeAll;
+    }
 
-	public String getUserName() {
-		return userName;
-	}
+    public void setExposeAll(boolean exposeAll) {
+        this.exposeAll = exposeAll;
+    }
 
-	public void setUserName(String userName) {
-		this.userName = userName;
-	}
+    public String getHostedEndpoint() {
+        return hostedEndpoint;
+    }
 
-	public String getSecret() {
-		return secret;
-	}
+    public void setHostedEndpoint(String hostedEndpoint) {
+        this.hostedEndpoint = hostedEndpoint;
+    }
 
-	public void setSecret(String secret) {
-		this.secret = secret;
-	}
+    public String getUserName() {
+        return userName;
+    }
 
-	public Source build(final Environment env) throws CorruptedSourceException, IOException {
-		final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
-				getBranch());
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
 
-		final String baseServletPath = "/" + getServletName() + "/*";
-		LOG.info("Configuring hosted GIT environment on " + baseServletPath);
-		final GitServlet gs = new GitServlet();
+    public String getSecret() {
+        return secret;
+    }
 
-		gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
+    public void setSecret(String secret) {
+        this.secret = secret;
+    }
 
-		gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
+    public Source build(final Environment env) throws CorruptedSourceException, IOException {
+        final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
+                getBranch());
 
-		final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
-		servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());
-		servlet.setInitParameter(EXPOSE_ALL, Boolean.toString(isExposeAll()));
-		servlet.setInitParameter(SERVLET_NAME, getServletName());
-		servlet.addMapping(baseServletPath);
+        final String baseServletPath = "/" + getServletName() + "/*";
+        LOG.info("Configuring hosted GIT environment on " + baseServletPath);
+        final GitServlet gs = new GitServlet();
 
-		final ConstraintMapping cm = new ConstraintMapping();
-		cm.setConstraint(new Constraint());
-		cm.getConstraint().setAuthenticate(true);
-		cm.getConstraint().setDataConstraint(Constraint.DC_NONE);
-		cm.getConstraint().setRoles(new String[] { "gitrole" });
-		cm.setPathSpec(baseServletPath);
+        gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
-		final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
+        gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
 
-		sec.setRealmName("git");
-		sec.setAuthenticator(new BasicAuthenticator());
-		sec.setLoginService(new SimpleLoginService(getUserName(), getSecret(), sec.getRealmName()));
-		sec.setConstraintMappings(new ConstraintMapping[] { cm });
+        final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
+        servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());
+        servlet.setInitParameter(EXPOSE_ALL, Boolean.toString(isExposeAll()));
+        servlet.setInitParameter(SERVLET_NAME, getServletName());
+        servlet.addMapping(baseServletPath);
 
-		sec.setHandler(new DropWizardHandlerWrapper(env.getApplicationContext()));
-		sec.checkPathsWithUncoveredHttpMethods();
+        final ConstraintMapping cm = new ConstraintMapping();
+        cm.setConstraint(new Constraint());
+        cm.getConstraint().setAuthenticate(true);
+        cm.getConstraint().setDataConstraint(Constraint.DC_NONE);
+        cm.getConstraint().setRoles(new String[] { "gitrole" });
+        cm.setPathSpec(baseServletPath);
 
-		env.servlets().setSecurityHandler(sec);
+        final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
-		return hostedGitRepositoryManager;
-	}
+        sec.setRealmName("git");
+        sec.setAuthenticator(new BasicAuthenticator());
+        sec.setLoginService(new SimpleLoginService(getUserName(), getSecret(), sec.getRealmName()));
+        sec.setConstraintMappings(new ConstraintMapping[] { cm });
 
-	private static class DropWizardHandlerWrapper implements Handler {
+        sec.setHandler(new DropWizardHandlerWrapper(env.getApplicationContext()));
+        final Set<String> pathsWithUncoveredHttpMethods = sec.getPathsWithUncoveredHttpMethods();
 
-		private Handler handler;
+        if (!pathsWithUncoveredHttpMethods.isEmpty()) {
+            throw new RuntimeException("Following paths are uncovered " + pathsWithUncoveredHttpMethods);
+        }
 
-		public DropWizardHandlerWrapper(Handler handler) {
-			this.handler = handler;
-		}
+        env.servlets().setSecurityHandler(sec);
 
-		@Override
-		public void start() throws Exception {
-			handler.start();
-		}
+        return hostedGitRepositoryManager;
+    }
 
-		@Override
-		public void stop() throws Exception {
-			handler.stop();
-		}
+    private static class DropWizardHandlerWrapper implements Handler {
 
-		@Override
-		public boolean isRunning() {
-			return handler.isRunning();
-		}
+        private Handler handler;
 
-		@Override
-		public boolean isStarted() {
-			return handler.isStarted();
-		}
+        public DropWizardHandlerWrapper(Handler handler) {
+            this.handler = handler;
+        }
 
-		@Override
-		public boolean isStarting() {
-			return handler.isStarting();
-		}
+        @Override
+        public void start() throws Exception {
+            handler.start();
+        }
 
-		@Override
-		public boolean isStopping() {
-			return handler.isStopping();
-		}
+        @Override
+        public void stop() throws Exception {
+            handler.stop();
+        }
 
-		@Override
-		public boolean isStopped() {
-			return handler.isStopped();
-		}
+        @Override
+        public boolean isRunning() {
+            return handler.isRunning();
+        }
 
-		@Override
-		public boolean isFailed() {
-			return handler.isFailed();
-		}
+        @Override
+        public boolean isStarted() {
+            return handler.isStarted();
+        }
 
-		@Override
-		public void addLifeCycleListener(Listener listener) {
-			handler.addLifeCycleListener(listener);
-		}
+        @Override
+        public boolean isStarting() {
+            return handler.isStarting();
+        }
 
-		@Override
-		public void removeLifeCycleListener(Listener listener) {
-			handler.removeLifeCycleListener(listener);
-		}
+        @Override
+        public boolean isStopping() {
+            return handler.isStopping();
+        }
 
-		@Override
-		public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
-				throws IOException, ServletException {
-			handler.handle(target, baseRequest, request, response);
-		}
+        @Override
+        public boolean isStopped() {
+            return handler.isStopped();
+        }
 
-		@Override
-		public void setServer(Server server) {
-			handler.setServer(server);
-		}
+        @Override
+        public boolean isFailed() {
+            return handler.isFailed();
+        }
 
-		@Override
-		public Server getServer() {
-			return handler.getServer();
-		}
+        @Override
+        public void addLifeCycleListener(Listener listener) {
+            handler.addLifeCycleListener(listener);
+        }
 
-		@Override
-		public void destroy() {
-			handler.destroy();
-		}
+        @Override
+        public void removeLifeCycleListener(Listener listener) {
+            handler.removeLifeCycleListener(listener);
+        }
 
-	}
+        @Override
+        public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
+                throws IOException, ServletException {
+            handler.handle(target, baseRequest, request, response);
+        }
+
+        @Override
+        public void setServer(Server server) {
+            handler.setServer(server);
+        }
+
+        @Override
+        public Server getServer() {
+            return handler.getServer();
+        }
+
+        @Override
+        public void destroy() {
+            handler.destroy();
+        }
+
+    }
 }

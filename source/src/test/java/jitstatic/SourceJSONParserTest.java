@@ -38,7 +38,6 @@ public class SourceJSONParserTest {
 	private final SourceJSONParser p = new SourceJSONParser();
 
 	@Test
-//	@Ignore
 	public void testReadValidParser() throws IOException {
 		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test3.md.json")) {
 			p.parse(bc);
@@ -48,18 +47,8 @@ public class SourceJSONParserTest {
 	@Test
 	public void testReadJSONWithMissingUserField() throws IOException {
 		ex.expect(IOException.class);
-		ex.expectMessage("metadata");
+		ex.expectMessage("metadata is missing users field");
 		try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test5.json")) {
-			p.parse(bc);
-		}
-	}
-
-	@Test
-	public void testReadObjectWithNoUsers() throws UnsupportedEncodingException, IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("metadata is missing users node");
-		try (InputStream bc = new ByteArrayInputStream(
-				"{\"data\":\"value1\"}".getBytes(StandardCharsets.UTF_8.name()))) {
 			p.parse(bc);
 		}
 	}

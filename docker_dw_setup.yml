@@ -1,0 +1,31 @@
+server:
+  applicationContextPath: /app
+  type: simple
+  maxThreads: 1024
+  connector:
+    type: http
+    port: 8085
+  requestLog:
+    type: classic
+    appenders:
+       - type: file
+         threshold: INFO
+         currentLogFilename: /var/log/jitstatic-request.log
+         archivedLogFilenamePattern: /var/log/jitstatic-request-%d{yyyy-MM-dd}-%i.log.gz
+         archivedFileCount: 7
+         timeZone: UTC
+         maxFileSize: 10MB
+logging:
+  level: INFO
+  appenders:
+    - type: file
+      threshold: INFO
+      logFormat: "%-6level [%d{HH:mm:ss.SSS}] [%t] %logger{5} - %X{code} %msg %n"
+      currentLogFilename: /var/log/jitstatic.log
+      archivedLogFilenamePattern: /var/log/jitstatic-%d{yyyy-MM-dd}-%i.log.gz
+      archivedFileCount: 7
+      timeZone: UTC
+      maxFileSize: 10MB
+hosted:
+    servletName: jitstatic
+    hostedEndpoint: git

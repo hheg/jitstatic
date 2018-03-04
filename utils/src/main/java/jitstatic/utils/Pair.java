@@ -45,7 +45,7 @@ public class Pair<T, U> {
 	public boolean isPresent() {
 		return left != null && right != null;
 	}
-
+	
 	public static <T, U> Pair<T, U> of(T t, U u) {
 		return new Pair<>(t, u);
 	}

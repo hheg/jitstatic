@@ -1,4 +1,4 @@
-package jitstatic.remote;
+package jitstatic.auth;
 
 /*-
  * #%L
@@ -20,26 +20,6 @@ package jitstatic.remote;
  * #L%
  */
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-public class RemoteUpdateException extends Exception {
-
-	private static final long serialVersionUID = 1L;
-
-	private final List<String> errors;
-	
-	public RemoteUpdateException(final List<String> errors) {
-		this.errors = errors;
-	}
-	
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
-	}
-	
-	@Override
-	public String getMessage() {
-		return errors.stream().collect(Collectors.joining(System.lineSeparator()));
-	}
+public interface AddKeyAuthenticator {
+    boolean authenticate(User user);
 }

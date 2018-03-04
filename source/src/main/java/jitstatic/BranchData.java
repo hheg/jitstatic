@@ -58,6 +58,8 @@ class BranchData {
 	}
 	
 	public List<Pair<MetaFileData, SourceFileData>> pair() {
+		Objects.requireNonNull(sourceFiles);
+		Objects.requireNonNull(metaFiles);
 		final List<Pair<MetaFileData, SourceFileData>> filePairs = new ArrayList<>(sourceFiles.size());
 		final Set<String> keys = new HashSet<>();
 		final Iterator<Entry<String, MetaFileData>> metaDataIterator = metaFiles.entrySet().iterator();

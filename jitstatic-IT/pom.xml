@@ -3,7 +3,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.7.3</version>
+		<version>0.8.0</version>
 	</parent>
 	<artifactId>jitstatic-IT</artifactId>
 	<dependencies>
@@ -11,7 +11,7 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
-			<version>0.7.3</version>
+			<version>0.8.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -104,6 +104,13 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludedGroups>jitstatic.LoadTest</excludedGroups>
+				</configuration>
+			</plugin>
+			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
 				<configuration>
 					<skipIfEmpty>true</skipIfEmpty>
@@ -112,7 +119,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-install-plugin</artifactId>
-				<version>2.5.2</version>
 				<executions>
 					<execution>
 						<id>default-install</id>

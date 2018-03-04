@@ -1,5 +1,7 @@
 package jitstatic.api;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -28,11 +30,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.validation.Valid;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
@@ -54,9 +57,11 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import jitstatic.StorageData;
+import jitstatic.auth.AddKeyAuthenticator;
 import jitstatic.auth.User;
+import jitstatic.storage.KeyAlreadyExist;
 import jitstatic.storage.Storage;
-import jitstatic.storage.StorageData;
 import jitstatic.storage.StoreInfo;
 import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
@@ -64,163 +69,216 @@ import jitstatic.utils.WrappingAPIException;
 @Path("storage")
 public class MapResource {
 
-	private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
-	private final Storage storage;
+    private static final String UTF_8 = "utf-8";
+    private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
+    private final Storage storage;
+    private final AddKeyAuthenticator addKeyAuthenticator;
 
-	public MapResource(final Storage storage) {
-		this.storage = Objects.requireNonNull(storage);
-	}
+    public MapResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
+        this.storage = Objects.requireNonNull(storage);
+        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+    }
 
-	@GET
-	@Timed(name = "get_storage_time")
-	@Metered(name = "get_storage_counter")
-	@ExceptionMetered(name = "get_storage_exception")
-	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-			final @Context Request request) {
+    @GET
+    @Timed(name = "get_storage_time")
+    @Metered(name = "get_storage_counter")
+    @ExceptionMetered(name = "get_storage_exception")
+    @Path("/{key : .+}")
+    public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Context Request request) {
 
-		checkRef(ref);
+        checkRef(ref);
 
-		final Future<StoreInfo> future = storage.get(key, ref);
-		final StoreInfo si = unwrap(future);
-		if (si == null) {
-			throw new WebApplicationException(Status.NOT_FOUND);
-		}
-		final EntityTag tag = new EntityTag(si.getVersion());
-		final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
+        final Future<StoreInfo> future = storage.get(key, ref);
+        final StoreInfo si = unwrap(future);
+        if (si == null) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        final EntityTag tag = new EntityTag(si.getVersion());
+        final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
 
-		if (noChangeBuilder != null) {
-			return noChangeBuilder.tag(tag).build();
-		}
+        if (noChangeBuilder != null) {
+            return noChangeBuilder.tag(tag).build();
+        }
 
-		final StorageData data = si.getStorageData();
-		final Set<User> allowedUsers = data.getUsers();
-		if (allowedUsers.isEmpty()) {
-			return Response.ok(si.getData()).tag(tag).build();
-		}
+        final StorageData data = si.getStorageData();
+        final Set<User> allowedUsers = data.getUsers();
+        if (allowedUsers.isEmpty()) {
+            return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+                    .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+        }
 
-		if (!user.isPresent()) {
-			LOG.info("Resource " + key + " needs a user");
-			throw new WebApplicationException(Status.UNAUTHORIZED);
-		}
+        if (!user.isPresent()) {
+            LOG.info("Resource " + key + " needs a user");
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
 
-		if (!allowedUsers.contains(user.get())) {
-			LOG.info("Resource " + key + "is denied for user " + user);
-			throw new WebApplicationException(Status.UNAUTHORIZED);
-		}
-		return Response.ok(si.getData()).tag(tag).build();
-	}
+        if (!allowedUsers.contains(user.get())) {
+            LOG.info("Resource " + key + "is denied for user " + user);
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+        return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+                .tag(tag).build();
+    }
 
-	@PUT
-	@Timed(name = "put_storage_time")
-	@Metered(name = "put_storage_counter")
-	@ExceptionMetered(name = "put_storage_exception")
-	@Path("/{key : .+}")
-	@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-	public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-			final @Valid ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
-		// All resources without a user cannot be modified with this method. It has to
-		// be done through directly changing the file in the git repository.
-		if (!user.isPresent()) {
-			throw new WebApplicationException(Status.UNAUTHORIZED);
-		}
-		checkHeaders(headers);
+    @PUT
+    @Timed(name = "put_storage_time")
+    @Metered(name = "put_storage_counter")
+    @ExceptionMetered(name = "put_storage_exception")
+    @Path("/{key : .+}")
+    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Valid ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
+        // All resources without a user cannot be modified with this method. It has to
+        // be done through directly changing the file in the git repository.
+        if (!user.isPresent()) {
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+        checkHeaders(headers);
 
-		checkValidRef(ref);
+        checkValidRef(ref);
 
-		final StoreInfo storeInfo = unwrap(storage.get(key, ref));
+        final StoreInfo storeInfo = unwrap(storage.get(key, ref));
 
-		if (storeInfo == null) {
-			throw new WebApplicationException(Status.NOT_FOUND);
-		}
+        if (storeInfo == null) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
 
-		final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-		if (allowedUsers.isEmpty()) {
-			throw new WebApplicationException(Status.BAD_REQUEST);
-		}
+        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
+        if (allowedUsers.isEmpty()) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
 
-		if (!allowedUsers.contains(user.get())) {
-			LOG.info("Resource " + key + "is denied for user " + user);
-			throw new WebApplicationException(Status.UNAUTHORIZED);
-		}
+        if (!allowedUsers.contains(user.get())) {
+            LOG.info("Resource " + key + "is denied for user " + user);
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
 
-		final String currentVersion = storeInfo.getVersion();
-		final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
+        final String currentVersion = storeInfo.getVersion();
+        final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
 
-		// TODO check if version are correct
-		if (response == null) {
-			final String newVersion = unwrapWithApi(
-					storage.put(data.getData(), currentVersion, data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
-			if (newVersion == null) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-			return Response.ok().tag(new EntityTag(newVersion)).build();
-		}
-		return response.build();
-	}
+        // TODO this should be idempotent. So if version is equals, answer 200.
+        if (response == null) {
+            final String newVersion = unwrapWithPUTApi(
+                    storage.put(data.getData(), currentVersion, data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
+            if (newVersion == null) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+            return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+        }
+        return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+    }
 
-	private void checkHeaders(final HttpHeaders headers) {		
-		final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
-		if (header == null || header.isEmpty()) {
-			throw new WebApplicationException(Status.BAD_REQUEST);
-		}
-	}
+    @POST
+    @Timed(name = "post_storage_time")
+    @Metered(name = "post_storage_counter")
+    @ExceptionMetered(name = "post_storage_exception")
+    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    public Response addKey(@Valid final AddKeyData data, final @Auth Optional<User> user) {
+        if (!user.isPresent()) {
+            LOG.info("User wasnt present");
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+        if (!addKeyAuthenticator.authenticate(user.get())) {
+            LOG.info("AUTH NOT VALID " + user.get().getName() + " " + user.get().getPassword());
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+        final StoreInfo si = unwrap(storage.get(data.getKey(), data.getBranch()));
+        if (si != null) {
+            throw new WebApplicationException(Status.CONFLICT);
+        }
+        final StoreInfo result = unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
+                data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        return Response.ok().tag(new EntityTag(result.getVersion()))
+                .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+                .entity(result.getData()).build();
+    }
 
-	private void checkValidRef(final String ref) {
-		if (ref != null) {
-			checkRef(ref);
-			if (ref.startsWith(Constants.R_TAGS)) {
-				throw new WebApplicationException(Status.FORBIDDEN);
-			}
-		}
-	}
+    private StoreInfo unwrapWithPOSTApi(final Future<StoreInfo> add) {
+        try {
+            return add.get();
+        } catch (final InterruptedException e) {
+            LOG.error("Instruction was interrupted", e);
+            throw new WebApplicationException(Status.REQUEST_TIMEOUT);
+        } catch (final ExecutionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof WrappingAPIException) {
+                final Exception apiException = (Exception) cause.getCause();
+                if (apiException instanceof KeyAlreadyExist) {
+                    throw new WebApplicationException(Status.CONFLICT);
+                } else if (apiException instanceof RefNotFoundException) {
+                    // Error message here means that the branch is not found.
+                    throw new WebApplicationException(Status.NOT_FOUND);
+                } else if (apiException instanceof IOException) {
+                    throw new WebApplicationException("Data is malformed", 422);
+                }
+            }
+            LOG.error("Error while unwrapping future", e);
+            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+        }
+    }
 
-	private static <T> T unwrapWithApi(final Future<T> future) {
-		if (future == null) {
-			return null;
-		}
-		try {
-			return future.get();
-		} catch (final InterruptedException e) {
-			LOG.error("Instruction was interrupted", e);
-			throw new WebApplicationException(Status.REQUEST_TIMEOUT);
-		} catch (final ExecutionException e) {
-			final Throwable cause = e.getCause();
-			if (cause instanceof WrappingAPIException) {
-				final Exception apiException = (Exception) cause.getCause();
-				if (apiException instanceof UnsupportedOperationException) {
-					throw new WebApplicationException(Status.NOT_FOUND);
-				}
-				if (apiException instanceof RefNotFoundException) {
-					return null;
-				}
-				if (apiException instanceof VersionIsNotSameException) {
-					throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
-				}
-			}
-			LOG.error("Error while unwrapping future", e);
-			throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
-		}
-	}
+    private void checkHeaders(final HttpHeaders headers) {
+        final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
+        if (header == null || header.isEmpty()) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
+    }
 
-	private static <T> T unwrap(Future<T> future) {
-		if (future == null) {
-			return null;
-		}
-		try {
-			return future.get();
-		} catch (final InterruptedException | ExecutionException e) {
-			LOG.error("Error while unwrapping future", e);
-			return null;
-		}
-	}
+    private void checkValidRef(final String ref) {
+        if (ref != null) {
+            checkRef(ref);
+            if (ref.startsWith(Constants.R_TAGS)) {
+                throw new WebApplicationException(Status.FORBIDDEN);
+            }
+        }
+    }
 
-	private void checkRef(final String ref) {
-		if (ref != null) {
-			if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
-				throw new WebApplicationException(Status.NOT_FOUND);
-			}
-		}
-	}
+    private static <T> T unwrapWithPUTApi(final Future<T> future) {
+        if (future == null) {
+            return null;
+        }
+        try {
+            return future.get();
+        } catch (final InterruptedException e) {
+            LOG.error("Instruction was interrupted", e);
+            throw new WebApplicationException(Status.REQUEST_TIMEOUT);
+        } catch (final ExecutionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof WrappingAPIException) {
+                final Exception apiException = (Exception) cause.getCause();
+                if (apiException instanceof UnsupportedOperationException) {
+                    throw new WebApplicationException(Status.NOT_FOUND);
+                }
+                if (apiException instanceof RefNotFoundException) {
+                    return null;
+                }
+                if (apiException instanceof VersionIsNotSameException) {
+                    throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+                }
+            }
+            LOG.error("Error while unwrapping future", e);
+            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private static <T> T unwrap(Future<T> future) {
+        if (future == null) {
+            return null;
+        }
+        try {
+            return future.get();
+        } catch (final InterruptedException | ExecutionException e) {
+            LOG.error("Error while unwrapping future", e);
+            return null;
+        }
+    }
+
+    private void checkRef(final String ref) {
+        if (ref != null) {
+            if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+        }
+    }
 }

@@ -1,10 +1,10 @@
-package jitstatic.auth;
+package jitstatic;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,61 +20,52 @@ package jitstatic.auth;
  * #L%
  */
 
-
-import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import jitstatic.auth.User;
 
 @SuppressFBWarnings(justification="Equals used here is not dodgy code",value = {"EQ_UNUSUAL"})
-public final class User implements Principal {
-
-	private final String user;
-	private final String password;
-
+public class StorageData {
+	
+	private final Set<User> users;
+	private final String contentType;
+	
 	@JsonCreator
-	public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
-		this.user = user;
-		this.password = password;
+	public StorageData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType) {
+		this.users = Objects.requireNonNull(users,"metadata is missing users field");
+		this.contentType = contentType == null ? "application/json" : contentType;
 	}
 
-	@Override
-	@JsonGetter("user")
-	public String getName() {
-		return this.user;
+	public Set<User> getUsers() {
+		return users;
 	}
-
-	@JsonGetter("password")
-	public String getPassword() {
-		return password;
-	}
-
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((password == null) ? 0 : password.hashCode());
-		result = prime * result + ((user == null) ? 0 : user.hashCode());
+		result = prime * result + users.hashCode();
+		result = prime * result + getContentType().hashCode();
 		return result;
 	}
 
 	@Override
 	public boolean equals(final Object other) {
 		return Optional.ofNullable(other)
-				.filter(that -> that instanceof User)
-				.map(that -> (User) that)
-				.filter(that -> Objects.equals(this.user, that.user))
-				.filter(that -> Objects.equals(this.password, that.password))
+				.filter(that -> that instanceof StorageData)
+				.map(that -> (StorageData) that)
+				.filter(that -> Objects.equals(this.users, that.users))
+				.filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
 				.isPresent();
 	}
 
-	@Override
-	public String toString() {
-		return "User [user=" + user + "]";
+	public String getContentType() {
+		return contentType;
 	}
 }

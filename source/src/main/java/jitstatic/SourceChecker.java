@@ -36,6 +36,8 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 
+import com.spencerwi.either.Either;
+
 import jitstatic.hosted.InputStreamHolder;
 import jitstatic.utils.Pair;
 
@@ -75,7 +77,7 @@ public class SourceChecker implements AutoCloseable {
 		final Pair<AnyObjectId, Set<Ref>> revCommit = branchSource.getLeft();
 		final List<BranchData> branchData = branchSource.getRight();
 		final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData)
-				.flatMap(List::stream).filter(Pair::isPresent).sequential().collect(Collectors.toList());
+				.flatMap(List::stream).filter(Pair::isPresent).collect(Collectors.toList());
 
 		return Arrays.asList(Pair.of(revCommit.getRight(), branchErrors));
 	}
@@ -88,11 +90,9 @@ public class SourceChecker implements AutoCloseable {
 	public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
 		final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
 		return sources.entrySet().stream().parallel().map(e -> {
-			final Set<Ref> refs = e.getKey().getRight();
-			final List<Pair<FileObjectIdStore, Exception>> fileStores = e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream)
-					.filter(Pair::isPresent).collect(Collectors.toList());
-			return Pair.of(refs, fileStores);
-		}).filter(p -> !p.getRight().isEmpty()).sequential().collect(Collectors.toList());
+			return Pair.of(e.getKey().getRight(), e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream)
+					.filter(Pair::isPresent).collect(Collectors.toList()));
+		}).filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
 	}
 
 	private List<Pair<FileObjectIdStore, Exception>> readRepositoryData(final BranchData data) {
@@ -116,14 +116,21 @@ public class SourceChecker implements AutoCloseable {
 			final FileObjectIdStore fileInfo = metaFileData.getFileInfo();
 			return Stream.of(Pair.of(fileInfo, new MetaDataFileIsMissingSourceFile(fileInfo.getFileName())));
 		}
-		return Stream.of(readAndCheckMetaFileData(data.getLeft()), readAndCheckSourceFileData(sourceFileData));
+		final Pair<FileObjectIdStore, Either<String, Exception>> check = readAndCheckMetaFileData(data.getLeft());
+		final Either<String, Exception> fileMetaDataResult = check.getRight();
+		if (fileMetaDataResult.isLeft()) {
+			return Stream.of(Pair.ofNothing(), readAndCheckSourceFileData(sourceFileData, fileMetaDataResult.getLeft()));
+		}
+		return Stream.of(Pair.of(check.getLeft(), fileMetaDataResult.getRight()));
 	}
 
-	private Pair<FileObjectIdStore, Exception> readAndCheckSourceFileData(final SourceFileData data) {
+	private Pair<FileObjectIdStore, Exception> readAndCheckSourceFileData(final SourceFileData data, final String contentType) {
 		final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
 		if (inputStreamHolder.isPresent()) {
 			try (InputStream is = inputStreamHolder.inputStream()) {
-				// TODO What to check here?
+				if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
+					PARSER.parseJson(is);
+				}
 			} catch (final IOException e) {
 				return Pair.of(data.getFileInfo(), e);
 			}
@@ -134,7 +141,7 @@ public class SourceChecker implements AutoCloseable {
 		return Pair.of(data.getFileInfo(), inputStreamHolder.exception());
 	}
 
-	private Pair<FileObjectIdStore, Exception> readAndCheckMetaFileData(final MetaFileData data) {
+	private Pair<FileObjectIdStore, Either<String, Exception>> readAndCheckMetaFileData(final MetaFileData data) {
 		final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
 		final FileObjectIdStore fileObject = data.getFileInfo();
 		if (inputStreamHolder == null) {
@@ -143,16 +150,14 @@ public class SourceChecker implements AutoCloseable {
 		}
 		if (inputStreamHolder.isPresent()) {
 			try (final InputStream is = inputStreamHolder.inputStream()) {
-				PARSER.parse(is);
+				return Pair.of(fileObject, Either.left(PARSER.parse(is)));
 			} catch (final IOException e) {
 				// File had errors
-				return Pair.of(fileObject, e);
+				return Pair.of(fileObject, Either.right(e));
 			}
-			// File is OK
-			return Pair.ofNothing();
 		}
 		// File had an exception at repository level
-		return Pair.of(fileObject, inputStreamHolder.exception());
+		return Pair.of(fileObject, Either.right(inputStreamHolder.exception()));
 	}
 
 	public void checkIfDefaultBranchExists(final String defaultRef) throws IOException {

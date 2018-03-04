@@ -1,4 +1,4 @@
-package jitstatic.storage;
+package jitstatic.auth;
 
 /*-
  * #%L
@@ -20,47 +20,60 @@ package jitstatic.storage;
  * #L%
  */
 
-
-import java.util.LinkedHashSet;
+import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import jitstatic.auth.User;
 
 @SuppressFBWarnings(justification="Equals used here is not dodgy code",value = {"EQ_UNUSUAL"})
-public class StorageData {
+public final class User implements Principal {
 
-	private final Set<User> users;
+	private final String user;
+	private final String password;
 
 	@JsonCreator
-	public StorageData(final @JsonDeserialize(as=LinkedHashSet.class) @JsonProperty("users") Set<User> users) {
-		this.users = Objects.requireNonNull(users);
+	public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
+		this.user = user;
+		this.password = password;
 	}
 
-	public Set<User> getUsers() {
-		return users;
+	@Override
+	@JsonGetter("user")
+	public String getName() {
+		return this.user;
 	}
-	
+
+	@JsonGetter("password")
+	public String getPassword() {
+		return password;
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + users.hashCode();
+		result = prime * result + ((password == null) ? 0 : password.hashCode());
+		result = prime * result + ((user == null) ? 0 : user.hashCode());
 		return result;
 	}
 
 	@Override
 	public boolean equals(final Object other) {
 		return Optional.ofNullable(other)
-				.filter(that -> that instanceof StorageData)
-				.map(that -> (StorageData) that)
-				.filter(that -> Objects.equals(this.users, that.users))
+				.filter(that -> that instanceof User)
+				.map(that -> (User) that)
+				.filter(that -> Objects.equals(this.user, that.user))
+				.filter(that -> Objects.equals(this.password, that.password))
 				.isPresent();
+	}
+
+	@Override
+	public String toString() {
+		return "User [user=" + user + "]";
 	}
 }

@@ -33,6 +33,7 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import jitstatic.StorageData;
 import jitstatic.auth.User;
 
 public class StorageDataTest {
@@ -44,8 +45,8 @@ public class StorageDataTest {
 
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
-		StorageData sd2 = new StorageData(users2);
+		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd2 = new StorageData(users2, null);
 		assertEquals(sd1, sd2);
 	}
 
@@ -55,8 +56,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		StorageData sd1 = new StorageData(users1);
-		StorageData sd2 = new StorageData(users2);
+		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd2 = new StorageData(users2, null);
 		assertNotEquals(sd1, sd2);
 	}
 
@@ -66,8 +67,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
-		StorageData sd2 = new StorageData(users2);
+		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd2 = new StorageData(users2, null);
 		assertEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -77,8 +78,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		StorageData sd1 = new StorageData(users1);
-		StorageData sd2 = new StorageData(users2);
+		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd2 = new StorageData(users2, null);
 		assertNotEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -86,15 +87,15 @@ public class StorageDataTest {
 	public void testEqualsInstance() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
+		StorageData sd1 = new StorageData(users1, null);
 		assertTrue(sd1.equals(sd1));
 	}
-	
+
 	@Test
 	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
+		StorageData sd1 = new StorageData(users1, null);
 		assertFalse(sd1.equals(null));
 	}
 
@@ -102,18 +103,18 @@ public class StorageDataTest {
 	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
+		StorageData sd1 = new StorageData(users1, null);
 		assertFalse(sd1.equals(new Object()));
 	}
-	
+
 	@Test
 	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1);
+		StorageData sd1 = new StorageData(users1, null);
 		Set<User> users2 = new HashSet<>();
 		users1.add(new User("user2", "p"));
-		StorageData sd2 = new StorageData(users2);
+		StorageData sd2 = new StorageData(users2, null);
 		assertFalse(sd1.equals(sd2));
 	}
 }

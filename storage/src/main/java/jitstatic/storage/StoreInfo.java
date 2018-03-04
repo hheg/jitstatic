@@ -22,14 +22,16 @@ package jitstatic.storage;
 
 import java.util.Objects;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import jitstatic.StorageData;
 
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "It's exposed when exposed to client and it's serialized")
 public class StoreInfo {
 	private final StorageData metaData;
 	private final String version;
-	private final JsonNode data;
+	private final byte[] data;
 
-	public StoreInfo(final JsonNode data, final StorageData metaData, final String version) {
+	public StoreInfo(final byte[] data, final StorageData metaData, final String version) {
 		this.data = Objects.requireNonNull(data);
 		this.metaData = Objects.requireNonNull(metaData);
 		this.version = Objects.requireNonNull(version);
@@ -43,7 +45,7 @@ public class StoreInfo {
 		return version;
 	}
 
-	public JsonNode getData() {
+	public byte[] getData() {
 		return data;
 	}
 

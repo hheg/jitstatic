@@ -18,6 +18,3 @@ hosted:
     hostedEndpoint: jitstatic.git
     userName: huser
     secret: hseCr3t
-reporting:
-    console:
-        reportPeriods: 30s

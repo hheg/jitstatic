@@ -1,14 +1,10 @@
-package jitstatic.storage;
-
-import javax.validation.constraints.Pattern;
-
-import org.eclipse.jgit.lib.Constants;
+package jitstatic;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,19 +20,20 @@ import org.eclipse.jgit.lib.Constants;
  * #L%
  */
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import static org.junit.Assert.assertEquals;
 
-public abstract class StorageInfo {
+import org.eclipse.jgit.lib.RefUpdate.Result;
+import org.junit.Test;
 
-	@JsonProperty
-	@Pattern(regexp = "^" + Constants.R_HEADS + ".+$|^" + Constants.R_TAGS + ".+$")
-	private String branch = Constants.R_HEADS + Constants.MASTER;
+public class ExceptionTest {
 
-	public String getBranch() {
-		return branch;
+	@Test
+	public void testCoverageTests() {
+		String file = "file";
+		MetaDataFileIsMissingSourceFile md = new MetaDataFileIsMissingSourceFile(file);
+		assertEquals(file + " is missing matching source file", md.getMessage());
+		UpdateFailedException up = new UpdateFailedException(Result.REJECTED);
+		assertEquals(Result.REJECTED.name(), up.getMessage());
 	}
 
-	public void setBranch(String branch) {
-		this.branch = branch;
-	}
 }

@@ -1,8 +1,10 @@
+package jitstatic.storage;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +20,16 @@
  * #L%
  */
 
+public class KeyAlreadyExist extends RuntimeException {
 
+    private static final long serialVersionUID = 3551414727296198256L;
 
-{
-	"data": "value2"
+    public KeyAlreadyExist(final String key, final String branch) {
+        super(key + " already exist in branch " + branch);
+    }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

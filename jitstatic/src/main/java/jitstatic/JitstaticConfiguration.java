@@ -1,8 +1,5 @@
 package jitstatic;
 
-import java.io.IOException;
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -23,88 +20,70 @@ import java.util.Objects;
  * #L%
  */
 
-import javax.validation.Valid;
+import java.io.IOException;
+import java.util.Objects;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
+import jitstatic.auth.AddKeyAuthenticator;
+import jitstatic.auth.User;
 import jitstatic.hosted.HostedFactory;
-import jitstatic.remote.RemoteFactory;
 import jitstatic.reporting.ReportingFactory;
 import jitstatic.source.Source;
 import jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
 
-	private static final Logger LOG = LoggerFactory.getLogger(JitstaticConfiguration.class);
+    private StorageFactory storage = new StorageFactory();
 
-	private StorageFactory storage = new StorageFactory();
+    @Valid
+    @NotNull
+    @JsonProperty
+    private HostedFactory hosted;
 
-	@Valid
-	@JsonProperty
-	private RemoteFactory remote;
+    @Valid
+    @JsonProperty
+    private ReportingFactory reporting = new ReportingFactory();
 
-	@Valid
-	@JsonProperty
-	private HostedFactory hosted;
-	
-	@Valid
-	@JsonProperty
-	private ReportingFactory reporting = new ReportingFactory();
-	
-	public ReportingFactory getReportingFactory() {
-		return reporting;
-	}
-	
-	public void setReportingFactory(final ReportingFactory reporting) {
-		this.reporting = reporting;
-	}
-	
-	public StorageFactory getStorageFactory() {
-		return storage;
-	}
+    public ReportingFactory getReportingFactory() {
+        return reporting;
+    }
 
-	public void setStorageFactory(final StorageFactory storage) {
-		this.storage = storage;
-	}
+    public void setReportingFactory(final ReportingFactory reporting) {
+        this.reporting = reporting;
+    }
 
-	public RemoteFactory getRemoteFactory() {
-		return remote;
-	}
+    public StorageFactory getStorageFactory() {
+        return storage;
+    }
 
-	public void setRemoteFactory(RemoteFactory remote) {
-		this.remote = remote;
-	}
-	
-	public HostedFactory getHostedFactory() {
-		return hosted;
-	}
+    public void setStorageFactory(final StorageFactory storage) {
+        this.storage = storage;
+    }
 
-	public void setHostedFactory(HostedFactory hosted) {
-		this.hosted = hosted;
-	}
+    public HostedFactory getHostedFactory() {
+        return hosted;
+    }
 
-	public Source build(final Environment env) throws CorruptedSourceException, IOException {
-		Objects.requireNonNull(env);
-		Source source;
-		final HostedFactory hostedFactory = getHostedFactory();
-		final RemoteFactory remoteFactory = getRemoteFactory();
-		if (hostedFactory != null) {
-			source = hostedFactory.build(env);
-			if (remoteFactory != null) {
-				LOG.warn("When in a hosted configuration, any settings for a remote configuration is ignored");
-			}
-		} else {			
-			if (remoteFactory == null) {
-				throw new IllegalStateException("Either hosted or remote must be chosen");
-			}
-			source = remoteFactory.build(env);
-		}
-		getReportingFactory().build(env);		
-		return source;
-	}
+    public void setHostedFactory(HostedFactory hosted) {
+        this.hosted = hosted;
+    }
+
+    public Source build(final Environment env) throws CorruptedSourceException, IOException {
+        Objects.requireNonNull(env);
+        final HostedFactory hostedFactory = getHostedFactory();
+        getReportingFactory().build(env);
+        return hostedFactory.build(env);
+    }
+
+    public AddKeyAuthenticator getAddKeyAuthenticator() {
+        HostedFactory hf = getHostedFactory();
+        final User addUser = new User(hf.getUserName(), hf.getSecret());
+        return (user) -> addUser.equals(user);
+    }
 }

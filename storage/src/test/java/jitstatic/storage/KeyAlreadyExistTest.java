@@ -1,8 +1,10 @@
+package jitstatic.storage;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +20,15 @@
  * #L%
  */
 
-{
-	"data": "value1"
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+public class KeyAlreadyExistTest {
+
+    @Test
+    public void test() {
+        KeyAlreadyExist k = new KeyAlreadyExist("key", "branch");
+        assertEquals("key already exist in branch branch", k.getMessage());
+    }
 }

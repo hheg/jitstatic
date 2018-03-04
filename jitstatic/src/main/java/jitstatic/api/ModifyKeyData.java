@@ -25,43 +25,46 @@ import javax.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+@SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class ModifyKeyData {
-	
-	@JsonProperty
-	@NotNull
-	@NotEmpty
-	private String message;
-	
-	@JsonProperty
-	@NotNull
-	private JsonNode data;
-	
-	@JsonProperty
-	private String userMail;
 
-	public JsonNode getData() {
-		return data;
-	}
+    @JsonProperty
+    @NotNull
+    @NotEmpty
+    private String message;
 
-	public void setData(final JsonNode data) {
-		this.data = data;
-	}
+    @JsonProperty
+    @NotNull
+    private byte[] data;
 
-	public String getMessage() {		
-		return message;
-	}
-	
-	public void setMessage(final String message) {
-		this.message = message;
-	}
+    @JsonProperty
+    @NotNull
+    private String userMail;
 
-	public String getUserMail() {
-		return userMail;
-	}
+    public byte[] getData() {
+        return data;
+    }
 
-	public void setUserMail(String userMail) {
-		this.userMail = userMail;
-	}
+    public void setData(final byte[] data) {
+        this.data = data;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(final String message) {
+        this.message = message;
+    }
+
+    public String getUserMail() {
+        return userMail;
+    }
+
+    public void setUserMail(final String userMail) {
+        this.userMail = userMail;
+    }
 }

@@ -1,21 +1,26 @@
 language: java
-env: 
-    - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
+env:
+  global:
+  - secure: tMoDXYzAle9W78MfAgMFuVnHaFH54ogQoyndxq2NORMK/IEGcA7dm0cBK1VbwAeSLzjIljE0o1azJEB4OKNgW+xQ6NCAkqsybbTd4FGCndmHBiioJcr0jO2+9In5TbtDjWcRpigYilgkKcir13NjGCQO+Fk+vYvCU5hcRlB2mELtj/lLjhA0jKgfMOHNLuEU24h0EmeVTv7x/FRKuZv6AteexhQU0gXBR47sBF2Toyb9ge0ZqIU7fa3xYaTRwuZ/SVVF9iEXsYKuhiRA0pCqYgNPhikuy9mQiRircnjgsiSaxjFWrtWM64KMW2PdQ6GWAHwE+nTdbBH1i+66qs07MHeq4wpj1rVxtZDWXs2/eX4NX+cZWuo1ZLwr/P86xGHiuKe0tbi72MK89q97eK7PoGZN8plcbVHR/szr5y3/EC4txOFDUMzSWyypgPZSDwlxUve7cQxD1sZn5joq/gxu3o4aaF6qrhDdMr6yCc20nQzek8X+kmJu6ldc7O5dxba+VZd7GOw3ICi/pmw1GnkGoIhb5gO8Flxd1ngMlmZV+lNZ/4cs4obyiRv9uQi3DlZSoi08kAg7WP1dQUPvBm7a6UUJ3BXw1HeZdG6VqALcKzaRVyDZEvrv/7/rI9LhQDBJ+QzksChHULKZtiPI2Gg4xuVEPD1HEwomNMzRw0uoCt4=
+  - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
+  - USERNAME=hheg
 jdk:
-    - oraclejdk8
+- oraclejdk8
 sudo: required
 install: true
-script: 
-    - mvn clean install -B -V 
-    - cp jitstatic/target/binary/jitstatic.jar $FILE 
+script:
+- mvn clean install -B -V -DskipTests=true
+- cp jitstatic/target/binary/jitstatic.jar $FILE
+- mvn test jacoco:report coveralls:report
 after_success:
-    - mvn test jacoco:report coveralls:report
+- chmod +x docker_deploy.sh && chmod +x docker_build.sh 
+- ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
 deploy:
-    provider: releases
-    skip_cleanup: true
-    api_key:
-        secure: zLIpTeynElraJOc38h1ML3YiHhjrX8NdXwrgWw8t6rOaBphSNQ1/PzKRFuO8wLNVP5YXbrZbnBJt9krboIASGz7L8/UKRaDSrJiLAzHmIN23PTuzzyG78mJHqA815ZNXD8U3MwcPg0qV8iDAxbDaEQKd9kQPRnhscWjV/8/tUdYOr5wn0SoGlgpRFyg4BNzjYqtZfjX6ghcDEuuR6vfVNXGAeFGsGBW9JucOXleiRNImYvSMa3Y3wSPkSWer8LAkV6olXnH3naVkjz68lqqppenXXQeTaWdKPJhOzXc7GvhIlMoqQohBbjN2aLpJhY4XLq2ZAICAxQ4VfLgK2FjzaXqpQ+GiMdlsR3XBwCBykFHDgn2ZwC2zs8iHGennTy29ov7XPOqcXOjazzVbdTJaWaxW/HpEWcDDaeZsJQibtHoo4R9mMM9Nly+2ptUTmmGURkEXkJv2ip6zfQZymORdGBFJeX9Lzi+0MJfObktnMUfWTLySZKwss0Djtf3DMOiiXB2lEd8HAkxMcnH+Y+ix/Nhy9M8lIboAsdAlTte/D5cO4pFdMbGUMWkqdGIpTv75Sq8HJQcjo/cSbPifngZCqPiPV5E3LwTex5aopNaWf3qohx6V8xWxP/U+0x7Bj7wTr5dpa550GZX9FNbw2xgQAatS3SW6VMJIkhfCKlsBoK0=
-    file: $FILE
-    on:
-        tags: true
-        repo: hheg/jitstatic
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: zLIpTeynElraJOc38h1ML3YiHhjrX8NdXwrgWw8t6rOaBphSNQ1/PzKRFuO8wLNVP5YXbrZbnBJt9krboIASGz7L8/UKRaDSrJiLAzHmIN23PTuzzyG78mJHqA815ZNXD8U3MwcPg0qV8iDAxbDaEQKd9kQPRnhscWjV/8/tUdYOr5wn0SoGlgpRFyg4BNzjYqtZfjX6ghcDEuuR6vfVNXGAeFGsGBW9JucOXleiRNImYvSMa3Y3wSPkSWer8LAkV6olXnH3naVkjz68lqqppenXXQeTaWdKPJhOzXc7GvhIlMoqQohBbjN2aLpJhY4XLq2ZAICAxQ4VfLgK2FjzaXqpQ+GiMdlsR3XBwCBykFHDgn2ZwC2zs8iHGennTy29ov7XPOqcXOjazzVbdTJaWaxW/HpEWcDDaeZsJQibtHoo4R9mMM9Nly+2ptUTmmGURkEXkJv2ip6zfQZymORdGBFJeX9Lzi+0MJfObktnMUfWTLySZKwss0Djtf3DMOiiXB2lEd8HAkxMcnH+Y+ix/Nhy9M8lIboAsdAlTte/D5cO4pFdMbGUMWkqdGIpTv75Sq8HJQcjo/cSbPifngZCqPiPV5E3LwTex5aopNaWf3qohx6V8xWxP/U+0x7Bj7wTr5dpa550GZX9FNbw2xgQAatS3SW6VMJIkhfCKlsBoK0=
+  file: "$FILE"
+  on:
+    tags: true
+    repo: "$USERNAME/jitstatic"

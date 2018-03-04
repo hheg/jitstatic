@@ -20,16 +20,29 @@ package jitstatic;
  * #L%
  */
 
-public class FileIsMissingMetaData extends Exception {
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
-	private static final long serialVersionUID = 190867139018903657L;
+import java.util.HashSet;
+import java.util.Set;
 
-	public FileIsMissingMetaData(final String file) {
-		super(file + " is missing metadata file i.e '" + file + JitStaticConstants.METADATA + "'");
-	}
+import org.junit.Test;
 
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
+import jitstatic.auth.User;
+
+public class StorageDataTest {
+
+	@Test
+	public void testStorageData() {
+		Set<User> users = new HashSet<>();
+		users.add(new User("name", "pass"));
+		StorageData sd1 = new StorageData(users, null);
+		StorageData sd2 = new StorageData(users, null);
+		StorageData sd3 = new StorageData(users, "text/plain");
+
+		assertEquals(sd1, sd2);
+		assertNotEquals(sd1, sd3);
+		assertEquals(sd1.hashCode(), sd2.hashCode());
+		assertNotEquals(sd1.hashCode(), sd3.hashCode());
 	}
 }
