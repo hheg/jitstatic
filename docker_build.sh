@@ -20,7 +20,14 @@ BRANCH=`git rev-parse --abbrev-ref HEAD`
 TAG=`git describe --exact-match HEAD 2>/dev/null`
 ERR=$?
 MASTER="master"
-if [ "${BRANCH}" = "${MASTER}" ] && [ ${ERR} = 0 ] ; then
+if [ "${BRANCH}" = "${MASTER}" ] ; then
+	case ${VERSION} in
+     	*-SNAPSHOT) echo "Error Build is a snapshot in master branch" && exit 1;;
+     	*);;
+	esac
+	if [ ${ERR} != 0 ] ; then
+		echo "Building in master but there's no tag"
+	fi 
 	CMD="${CMD} -t ${REPO}:latest"
 fi
 CMD="${CMD} ."
