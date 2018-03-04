@@ -20,7 +20,6 @@ package jitstatic;
  * #L%
  */
 
-
 import java.io.IOException;
 import java.util.Objects;
 
@@ -31,6 +30,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
+import jitstatic.auth.AddKeyAuthenticator;
+import jitstatic.auth.User;
 import jitstatic.hosted.HostedFactory;
 import jitstatic.reporting.ReportingFactory;
 import jitstatic.source.Source;
@@ -38,45 +39,51 @@ import jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
 
-	private StorageFactory storage = new StorageFactory();
-	
-	@Valid
-	@NotNull
-	@JsonProperty
-	private HostedFactory hosted;
-	
-	@Valid
-	@JsonProperty
-	private ReportingFactory reporting = new ReportingFactory();
-	
-	public ReportingFactory getReportingFactory() {
-		return reporting;
-	}
-	
-	public void setReportingFactory(final ReportingFactory reporting) {
-		this.reporting = reporting;
-	}
-	
-	public StorageFactory getStorageFactory() {
-		return storage;
-	}
+    private StorageFactory storage = new StorageFactory();
 
-	public void setStorageFactory(final StorageFactory storage) {
-		this.storage = storage;
-	}
-	
-	public HostedFactory getHostedFactory() {
-		return hosted;
-	}
+    @Valid
+    @NotNull
+    @JsonProperty
+    private HostedFactory hosted;
 
-	public void setHostedFactory(HostedFactory hosted) {
-		this.hosted = hosted;
-	}
+    @Valid
+    @JsonProperty
+    private ReportingFactory reporting = new ReportingFactory();
 
-	public Source build(final Environment env) throws CorruptedSourceException, IOException {
-		Objects.requireNonNull(env);
-		final HostedFactory hostedFactory = getHostedFactory();
-		getReportingFactory().build(env);
-		return hostedFactory.build(env);
-	}
+    public ReportingFactory getReportingFactory() {
+        return reporting;
+    }
+
+    public void setReportingFactory(final ReportingFactory reporting) {
+        this.reporting = reporting;
+    }
+
+    public StorageFactory getStorageFactory() {
+        return storage;
+    }
+
+    public void setStorageFactory(final StorageFactory storage) {
+        this.storage = storage;
+    }
+
+    public HostedFactory getHostedFactory() {
+        return hosted;
+    }
+
+    public void setHostedFactory(HostedFactory hosted) {
+        this.hosted = hosted;
+    }
+
+    public Source build(final Environment env) throws CorruptedSourceException, IOException {
+        Objects.requireNonNull(env);
+        final HostedFactory hostedFactory = getHostedFactory();
+        getReportingFactory().build(env);
+        return hostedFactory.build(env);
+    }
+
+    public AddKeyAuthenticator getAddKeyAuthenticator() {
+        HostedFactory hf = getHostedFactory();
+        final User addUser = new User(hf.getUserName(), hf.getSecret());
+        return (user) -> addUser.equals(user);
+    }
 }

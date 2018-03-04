@@ -28,43 +28,43 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(value = { "EI_EXPOSE_REP",
-		"EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
+@SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class ModifyKeyData {
 
-	@JsonProperty
-	@NotNull
-	@NotEmpty
-	private String message;
+    @JsonProperty
+    @NotNull
+    @NotEmpty
+    private String message;
 
-	@JsonProperty
-	@NotNull
-	private byte[] data;
+    @JsonProperty
+    @NotNull
+    private byte[] data;
 
-	@JsonProperty
-	private String userMail;
+    @JsonProperty
+    @NotNull
+    private String userMail;
 
-	public byte[] getData() {
-		return data;
-	}
+    public byte[] getData() {
+        return data;
+    }
 
-	public void setData(final byte[] data) {
-		this.data = data;
-	}
+    public void setData(final byte[] data) {
+        this.data = data;
+    }
 
-	public String getMessage() {
-		return message;
-	}
+    public String getMessage() {
+        return message;
+    }
 
-	public void setMessage(final String message) {
-		this.message = message;
-	}
+    public void setMessage(final String message) {
+        this.message = message;
+    }
 
-	public String getUserMail() {
-		return userMail;
-	}
+    public String getUserMail() {
+        return userMail;
+    }
 
-	public void setUserMail(final String userMail) {
-		this.userMail = userMail;
-	}
+    public void setUserMail(final String userMail) {
+        this.userMail = userMail;
+    }
 }

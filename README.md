@@ -46,31 +46,33 @@ To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
-INFO  [2018-01-26 22:46:26,836] org.eclipse.jetty.util.log: Logging initialized @1686ms to org.eclipse.jetty.util.log.Slf4jLog
-INFO  [2018-01-26 22:46:26,929] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-01-26 22:46:26,930] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-01-26 22:46:27,103] jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
-INFO  [2018-01-26 22:46:27,152] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-01-26 22:46:27,152] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-01-26 22:46:27,154] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-01-26 22:46:27,277] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@1b6924cb{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
-INFO  [2018-01-26 22:46:27,279] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT
-INFO  [2018-01-26 22:46:27,919] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
+INFO  [2018-03-03 23:15:29,026] org.eclipse.jetty.util.log: Logging initialized @1374ms to org.eclipse.jetty.util.log.Slf4jLog
+INFO  [2018-03-03 23:15:29,090] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-03-03 23:15:29,091] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-03-03 23:15:29,098] jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
+INFO  [2018-03-03 23:15:29,237] jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
+INFO  [2018-03-03 23:15:29,271] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-03-03 23:15:29,272] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-03-03 23:15:29,273] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
+INFO  [2018-03-03 23:15:29,385] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
+INFO  [2018-03-03 23:15:29,387] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT
+INFO  [2018-03-03 23:15:29,994] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
     GET     /info/commitid (jitstatic.api.JitstaticInfoResource)
     GET     /info/version (jitstatic.api.JitstaticInfoResource)
+    POST    /storage (jitstatic.api.MapResource)
     GET     /storage/{key : .+} (jitstatic.api.MapResource)
     PUT     /storage/{key : .+} (jitstatic.api.MapResource)
 
-INFO  [2018-01-26 22:46:27,929] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@644a3add{/app,null,AVAILABLE}
-INFO  [2018-01-26 22:46:27,935] io.dropwizard.setup.AdminEnvironment: tasks = 
+INFO  [2018-03-03 23:15:30,004] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@db99785{/app,null,AVAILABLE}
+INFO  [2018-03-03 23:15:30,011] io.dropwizard.setup.AdminEnvironment: tasks = 
 
     POST    /tasks/log-level (io.dropwizard.servlets.tasks.LogConfigurationTask)
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
-INFO  [2018-01-26 22:46:27,941] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@153cb763{/admin,null,AVAILABLE}
-INFO  [2018-01-26 22:46:27,961] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@1b6924cb{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
-INFO  [2018-01-26 22:46:27,961] org.eclipse.jetty.server.Server: Started @2814ms
+INFO  [2018-03-03 23:15:30,023] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@49edcb30{/admin,null,AVAILABLE}
+INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
+INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.Server: Started @2391ms
 
 ```
 
@@ -92,11 +94,11 @@ git add .
 git commit -m "Initial commit"
 git push
 
-Counting objects: 8, done.
+Couting objects: 4, done.
 Delta compression using up to 4 threads.
-Compressing object: 100% (5/5), done.
-Writing objects: 100% (8/8), 634 bytes | 634.00 KiB/s, done.
-Total 8 (delta 0), reused 0 (delta 0)
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (4/4), 325 bytes | 325.00 KiB/s, done.
+Total 4 (delta 0), reused 0 (delta 0)
 remote:    __  _ _   __ _        _   _      
 remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___ 
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
@@ -114,13 +116,13 @@ Now you can do:
 curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
 
 HTTP/1.1 200 OK
-Date: Wed, 31 Jan 2018 22:20:02 GMT
-ETag: "264f8aec58118e2682091653017213ace0c04922"
+Date: Sat, 03 Mar 2018 23:22:38 GMT
 Content-Type: application/json
-Vary: Accept-Encoding
-Content-Length: 17
+Content-Encoding: utf-8
+ETag: "264f8aec58118e2682091653017213ace0c04922"
+Content-Length: 20
 
-{"hello":"world"}
+{"hello" : "world"}
 ```
 
 ## JitStatic (the long version)
@@ -173,25 +175,26 @@ First get the current version your `hello_world` is at.
 curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
 
 HTTP/1.1 200 OK
-Date: Wed, 31 Jan 2018 22:20:02 GMT
-ETag: "264f8aec58118e2682091653017213ace0c04922"
+Date: Sat, 03 Mar 2018 23:22:38 GMT
 Content-Type: application/json
-Vary: Accept-Encoding
-Content-Length: 17
+Content-Encoding: utf-8
+ETag: "264f8aec58118e2682091653017213ace0c04922"
+Content-Length: 20
 
-{"hello":"world"}
+{"hello" : "world"}
 ```
 Use that to be able to modify the `hello_world` by sending a PUT command to change it. You'll have to provide a commit message as well
 ```
 curl -i -H 'Content-Type: application/json' \
 -H 'If-Match: "264f8aec58118e2682091653017213ace0c04922"' \
 --user user1:1234 -X PUT \
--d '{"message":"commit message","data":{"one":"two"}}' \
+-d '{"message":"message","data":"eyJvbmUiOiJ0d28ifQ==","userMail":"mail"}' \
 http://localhost:8080/app/storage/hello_world
 
 HTTP/1.1 200 OK
-Date: Wed, 31 Jan 2018 22:20:20 GMT
+Date: Sat, 03 Mar 2018 23:33:53 GMT
 ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
+Content-Encoding: utf-8
 Content-Length: 0
 
 ```
@@ -201,10 +204,10 @@ Making a new GET will return:
 curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
 
 HTTP/1.1 200 OK
-Date: Wed, 31 Jan 2018 22:20:45 GMT
-ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
+Date: Sat, 03 Mar 2018 23:34:40 GMT
 Content-Type: application/json
-Vary: Accept-Encoding
+Content-Encoding: utf-8
+ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
 Content-Length: 13
 
 {"one":"two"}
@@ -220,4 +223,59 @@ The version number here is the files git blob version and not the git commit's v
 ### Modify tags
 
 You can't use the modify API on a tag since tags are immutable. You can still change them with Git as usual.
+
+### API for creating keys
+
+You can create a key by just POSTing the content to the server. Since there are no information about who can do what on the server, the user to do this is the same one for the git access point.
+
+```
+curl -i -H 'Content-Type: application/json' \
+--user huser:hseCr3t -X POST \
+-d '{"key":"test","branch":"refs/heads/master","data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
+http://localhost:8080/app/storage
+
+HTTP/1.1 200 OK
+Date: Sun, 04 Mar 2018 00:10:37 GMT
+ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
+Content-Type: application/json
+Content-Encoding: utf-8
+Content-Length: 19
+
+{
+  "one" : "two"
+}
+```
+You can now GET and PUT this endpoint with 
+```
+curl --user user1:1234 -i http://localhost:8080/app/storage/test
+HTTP/1.1 200 OK
+Date: Sun, 04 Mar 2018 00:12:47 GMT
+Content-Type: application/json
+Content-Encoding: utf-8
+ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
+Content-Length: 19
+
+{
+  "one" : "two"
+}
+```
+and the git log looks like:
+```
+git pull
+Updating 7cfbec2..d397e03
+Fast-forward
+ test          | 3 +++
+ test.metadata | 1 +
+ 2 files changed, 4 insertions(+)
+ create mode 100644 test
+ create mode 100644 test.metadata
+ 
+ git lg
+* d397e03 - (HEAD -> master, origin/master) testmessage (4 minutes ago) <user>
+* 7cfbec2 - message (4 minutes ago) <user1>
+* 3af867a - Initial commit (4 minutes ago) <hheg>
+```
+
+
+
 

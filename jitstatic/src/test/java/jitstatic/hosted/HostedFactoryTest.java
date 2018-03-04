@@ -4,7 +4,7 @@ package jitstatic.hosted;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package jitstatic.hosted;
  * #L%
  */
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,9 +29,12 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.Set;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletRegistration.Dynamic;
+import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 
@@ -126,5 +130,27 @@ public class HostedFactoryTest {
 		h.isStopping();
 		h.removeLifeCycleListener(mock(Listener.class));
 		h.setServer(mock(Server.class));
+	}
+	
+	@Test
+	public void testBranchName() {
+	    HostedFactory si = new HostedFactory();
+        si.setBasePath(Paths.get("."));
+        si.setSecret("ss");
+        si.setUserName("user");
+        si.setHostedEndpoint("ep");
+        si.setServletName("servlet");
+        si.setBranch("refs/tags/tag");
+        Set<ConstraintViolation<HostedFactory>> validate = validator.validate(si);
+        assertTrue(validate.isEmpty());
+        si.setBranch("refs/heads/branch");
+        validate = validator.validate(si);
+        assertTrue(validate.isEmpty());
+        si.setBranch("");
+        validate = validator.validate(si);
+        assertFalse(validate.isEmpty());
+        si.setBranch("garbage/blargh");
+        validate = validator.validate(si);
+        assertFalse(validate.isEmpty());
 	}
 }

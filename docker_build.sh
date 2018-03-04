@@ -5,7 +5,6 @@ if [ ! -f ${VERSION_FILE} ]; then
 	exit 1
 fi
 VERSION=`cat jitstatic/target/classes/version`
-export VERSION
 if [ -z ${VERSION} ]; then
 	echo "Build version is not defined"
 	exit 1
