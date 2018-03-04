@@ -3,7 +3,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.7.4-addkey-SNAPSHOT</version>
+		<version>0.7.4-SNAPSHOT</version>
 	</parent>
 	<artifactId>jitstatic</artifactId>
 	<dependencies>
@@ -131,22 +131,22 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.7.4-addkey-SNAPSHOT</version>
+			<version>0.7.4-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>storage</artifactId>
-			<version>0.7.4-addkey-SNAPSHOT</version>
+			<version>0.7.4-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>version</artifactId>
-			<version>0.7.4-addkey-SNAPSHOT</version>
+			<version>0.7.4-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.7.4-addkey-SNAPSHOT</version>
+			<version>0.7.4-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.glassfish.jersey.test-framework.providers</groupId>
