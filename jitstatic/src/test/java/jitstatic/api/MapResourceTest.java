@@ -73,6 +73,7 @@ import jitstatic.utils.VersionIsNotSameException;
 import jitstatic.utils.WrappingAPIException;
 
 public class MapResourceTest {
+    private static final String APPLICATION_JSON = "application/json";
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String UTF_8 = "UTF-8";
     private static final String USER = "user";
@@ -522,24 +523,24 @@ public class MapResourceTest {
 
     @Test
     public void testAddKey() throws JsonProcessingException {
-        StoreInfo si = new StoreInfo(new byte[] { 1 }, new StorageData(new HashSet<>(), "application/json"), "1");
+        StoreInfo si = new StoreInfo(new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON), "1");
         when(STORAGE.add(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
                 Mockito.any())).thenReturn(CompletableFuture.completedFuture(si));
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
-                new StorageData(new HashSet<>(), "application/json"), "testmessage", "user", "test@test.com");
+                new StorageData(new HashSet<>(), APPLICATION_JSON), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(addKeyData));
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         assertEquals("1", response.getEntityTag().getValue());
         assertArrayEquals(new byte[] { 1 }, si.getData());
-        assertEquals(response.getHeaderString(HttpHeaders.CONTENT_TYPE), "application/json");
+        assertEquals(response.getHeaderString(HttpHeaders.CONTENT_TYPE), APPLICATION_JSON);
         response.close();
     }
 
     @Test
     public void testAddKeyNoUser() {
         Response response = RESOURCES.target("/storage").request().post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER,
-                new byte[] { 1 }, new StorageData(new HashSet<>(), "application/json"), "testmessage", "user", "test@test.com")));
+                new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON), "testmessage", "user", "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
         response.close();
     }
@@ -550,7 +551,7 @@ public class MapResourceTest {
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(CompletableFuture.completedFuture(new StoreInfo(data, new StorageData(new HashSet<>(), null), "1")));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), "application/json"),
+                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), APPLICATION_JSON),
                         "test", "user", "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
         response.close();
@@ -560,7 +561,7 @@ public class MapResourceTest {
     public void testAddKeyNoBranch() throws JsonProcessingException {
         Response response = RESOURCES.target("/storage").request().accept(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST).post(Entity.json(new AddKeyData("test", "refs/tags/master",
-                        new byte[] { 1 }, new StorageData(new HashSet<>(), "application/json"), "test", "user", "test@test.com")));
+                        new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON), "test", "user", "test@test.com")));
         assertEquals(422, response.getStatus());
         response.close();
     }
@@ -574,7 +575,7 @@ public class MapResourceTest {
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), "application/json"),
+                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), APPLICATION_JSON),
                         "test", "user", "test@test.com")));
         assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
         response.close();
@@ -589,7 +590,7 @@ public class MapResourceTest {
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), "application/json"),
+                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), APPLICATION_JSON),
                         "test", "user", "test@test.com")));
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -604,10 +605,19 @@ public class MapResourceTest {
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), "application/json"),
+                .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data, new StorageData(new HashSet<>(), APPLICATION_JSON),
                         "test", "user", "test@test.com")));
         assertEquals(422, response.getStatus());
         response.close();
+    }
+
+    @Test
+    public void testAddKeyDataWithNodata() {
+        Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
+                .accept(MediaType.APPLICATION_JSON).post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, new byte[] {},
+                        new StorageData(new HashSet<>(), APPLICATION_JSON), "test", "user", "test@test.com")));
+        assertEquals(422, response.getStatus());
+        assertEquals("[\"data size must be between 1 and 2147483647\"]", response.readEntity(JsonNode.class).get("errors").toString());
     }
 
 }

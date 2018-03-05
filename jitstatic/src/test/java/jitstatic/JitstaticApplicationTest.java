@@ -29,8 +29,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Rule;
