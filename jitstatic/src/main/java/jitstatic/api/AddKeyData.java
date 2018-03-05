@@ -1,5 +1,7 @@
 package jitstatic.api;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -23,6 +25,7 @@ package jitstatic.api;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -47,6 +50,7 @@ public class AddKeyData {
     private final String branch;
 
     @NotNull
+    @Size(min=1)
     private final byte[] data;
 
     @NotNull
@@ -68,7 +72,7 @@ public class AddKeyData {
     @JsonCreator
     public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch,
             @JsonProperty("data") final byte[] data, @JsonProperty("metadata") final StorageData metaData,
-            @JsonProperty("message") final String message, @JsonProperty("uesrInfo") final String userInfo,
+            @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
         this.key = key;
         this.branch = (branch == null ? REFS_HEADS_MASTER : branch);

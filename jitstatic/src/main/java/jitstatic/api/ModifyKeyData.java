@@ -21,6 +21,7 @@ package jitstatic.api;
  */
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -38,6 +39,7 @@ public class ModifyKeyData {
 
     @JsonProperty
     @NotNull
+    @Size(min=1)
     private byte[] data;
 
     @JsonProperty
