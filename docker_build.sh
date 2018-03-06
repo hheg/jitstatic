@@ -18,18 +18,14 @@ esac
 CMD="docker build --build-arg version=${VERSION} -t ${REPO}:${VERSION}"
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 TAG=`git describe --exact-match HEAD 2>/dev/null`
-ERR=$?
-MASTER="master"
-if [ "${BRANCH}" = "${MASTER}" ] ; then
+
+if [ "${BRANCH}" = "HEAD" ] && [  "${TAG}" = "v${VERSION}" ]; then
 	case ${VERSION} in
-     	*-SNAPSHOT) echo "Error Build is a snapshot in master branch" && exit 1;;
+     	*-SNAPSHOT) echo "Error Build is a snapshot with tag" && exit 1;;
      	*);;
-	esac
-	if [ ${ERR} != 0 ] ; then
-		echo "Building in master but there's no tag"
-	fi 
+	esac 
 	CMD="${CMD} -t ${REPO}:latest"
 fi
 CMD="${CMD} ."
-$CMD
+echo $CMD
 echo ${VERSION}
