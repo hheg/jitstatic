@@ -261,9 +261,10 @@ public class GitStorage implements Storage {
             if (storeInfo == null) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String newVersion = source.modify(formatData(data, storeInfo.getStorageData().getContentType()), oldVersion, message,
+            final String contentType = storeInfo.getStorageData().getContentType();
+            final String newVersion = source.modify(formatData(data, contentType), oldVersion, message,
                     userInfo, userEmail, key, finalRef).join();
-            refreshKey(data, key, oldVersion, newVersion, refMap);
+            refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);
     }
@@ -280,11 +281,11 @@ public class GitStorage implements Storage {
     }
 
     private void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
-            final Map<String, StoreInfo> refMap) {
+            final Map<String, StoreInfo> refMap, final String contentType) {
         final StoreInfo si = refMap.get(key);
         if (si.getVersion().equals(oldversion)) {
             final StorageData sd = si.getStorageData();
-            refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(), null), newVersion));
+            refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(), contentType), newVersion));
         }
     }
 

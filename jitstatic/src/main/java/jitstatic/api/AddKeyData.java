@@ -1,7 +1,5 @@
 package jitstatic.api;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
