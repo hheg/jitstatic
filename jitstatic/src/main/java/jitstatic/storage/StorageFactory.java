@@ -39,7 +39,8 @@ public class StorageFactory {
 	public Storage build(final Source source, final Environment env) {
 		Objects.requireNonNull(source, "Source cannot be null");
 		env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-				.setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()));
+				.setAuthenticator(new ConfiguratedAuthenticator())
+				.setAuthorizer((User user, String role) -> true).setRealm("jitstatic").buildAuthFilter()));
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
 		final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());

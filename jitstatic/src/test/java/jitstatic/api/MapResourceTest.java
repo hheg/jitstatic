@@ -109,7 +109,8 @@ public class MapResourceTest {
     @Rule
     public ResourceTestRule RESOURCES = ResourceTestRule.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-                    .setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic").buildAuthFilter()))
+                    .setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic")
+                    .setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MapResource(STORAGE, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
