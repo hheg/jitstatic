@@ -176,11 +176,10 @@ public class MapResource {
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response addKey(@Valid final AddKeyData data, final @Auth Optional<User> user) {
         if (!user.isPresent()) {
-            LOG.info("User wasnt present");
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
         if (!addKeyAuthenticator.authenticate(user.get())) {
-            LOG.info("AUTH NOT VALID " + user.get().getName() + " " + user.get().getPassword());
+            LOG.info("Resource " + data.getKey() + "is denied for user " + user);
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
         final StoreInfo si = unwrap(storage.get(data.getKey(), data.getBranch()));

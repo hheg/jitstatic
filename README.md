@@ -37,7 +37,7 @@ hosted:
     userName: huser
     secret: hseCr3t
 ```
-storage is the key-value end point and hosted is the git end point. You can configure a remote repo too which is then polled for data in a configurable interval.
+storage is the key-value end point and hosted is the git end point.
 
 ## Hello world
 
@@ -183,7 +183,7 @@ Content-Length: 20
 
 {"hello" : "world"}
 ```
-Use that to be able to modify the `hello_world` by sending a PUT command to change it. You'll have to provide a commit message as well
+Use that to be able to modify the `hello_world` by sending a PUT command to change it. You'll have to provide a commit message as well. Since JitStatic is supporting any content, unfortunately the data has to be an base64 encoded array.
 ```
 curl -i -H 'Content-Type: application/json' \
 -H 'If-Match: "264f8aec58118e2682091653017213ace0c04922"' \
