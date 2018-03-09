@@ -3,7 +3,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.8.2</version>
+		<version>0.8.3-SNAPSHOT</version>
 	</parent>
 	<artifactId>jitstatic-IT</artifactId>
 	<dependencies>
@@ -11,7 +11,7 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
-			<version>0.8.2</version>
+			<version>0.8.3-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
