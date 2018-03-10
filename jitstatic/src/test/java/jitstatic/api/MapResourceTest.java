@@ -108,9 +108,9 @@ public class MapResourceTest {
 
     @Rule
     public ResourceTestRule RESOURCES = ResourceTestRule.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-                    .setAuthenticator(new ConfiguratedAuthenticator()).setRealm("jitstatic")
-                    .setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+            .addProvider(
+                    new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
+                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MapResource(STORAGE, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
@@ -238,6 +238,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
+        data.setUser("user");
         Response response = target.request().header(HttpHeaders.ETAG, "1").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
@@ -252,7 +253,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "1")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header(HttpHeaders.IF_MATCH, "1")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -272,7 +275,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("mail");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         EntityTag entityTag = response.getEntityTag();
@@ -293,7 +298,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
 
         assertEquals(Status.PRECONDITION_FAILED.getStatusCode(), response.getStatus());
@@ -313,8 +320,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
         response.close();
     }
@@ -327,7 +335,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -343,7 +353,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
         response.close();
@@ -359,6 +371,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
+        data.setUser("user");
         Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
@@ -377,7 +390,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -397,7 +412,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -417,7 +434,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -437,8 +456,10 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
-                .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.ACCEPT, "application/json").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"1\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
         response.close();
     }
@@ -457,7 +478,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
     }
@@ -470,7 +493,9 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
+        data.setUser("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
         response.close();
@@ -484,8 +509,9 @@ public class MapResourceTest {
         Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
         assertEquals(storeInfo.getVersion(), response.getEntityTag().getValue());
-        response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_NONE_MATCH, "\"" + storeInfo.getVersion() + "\"").get();
+        response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_NONE_MATCH, "\"" + storeInfo.getVersion() + "\"")
+                .get();
         assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
     }
 
@@ -515,7 +541,9 @@ public class MapResourceTest {
         byte[] byteData = new byte[] { 8, 7, 6, 5, 4, 3, 2, 1 };
         data.setData(byteData);
         data.setUserMail("u@m");
-        response = RESOURCES.target("/storage/book").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+        data.setUser("user");
+        response = RESOURCES.target("/storage/book").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_OCTET_STREAM).header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + entityTag.getValue() + "\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());

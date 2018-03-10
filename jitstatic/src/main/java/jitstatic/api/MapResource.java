@@ -1,7 +1,5 @@
 package jitstatic.api;
 
-import java.io.IOException;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import java.io.IOException;
  * #L%
  */
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -83,7 +82,7 @@ public class MapResource {
     @Timed(name = "get_storage_time")
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
-    @Path("/{key : .+}")
+    @Path("/{key : .+}")    
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request) {
 
@@ -160,7 +159,7 @@ public class MapResource {
         // TODO this should be idempotent. So if version is equals, answer 200.
         if (response == null) {
             final String newVersion = unwrapWithPUTApi(
-                    storage.put(data.getData(), currentVersion, data.getMessage(), user.get().getName(), data.getUserMail(), key, ref));
+                    storage.put(data.getData(), currentVersion, data.getMessage(), data.getUser(), data.getUserMail(), key, ref));
             if (newVersion == null) {
                 throw new WebApplicationException(Status.NOT_FOUND);
             }
