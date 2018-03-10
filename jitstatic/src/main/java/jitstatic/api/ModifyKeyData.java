@@ -44,7 +44,13 @@ public class ModifyKeyData {
 
     @JsonProperty
     @NotNull
+    @NotEmpty
     private String userMail;
+    
+    @JsonProperty
+    @NotNull
+    @NotEmpty
+    private String user;
 
     public byte[] getData() {
         return data;
@@ -68,5 +74,13 @@ public class ModifyKeyData {
 
     public void setUserMail(final String userMail) {
         this.userMail = userMail;
+    }
+
+    public String getUser() {
+        return user;
+    }
+
+    public void setUser(String user) {
+        this.user = user;
     }
 }

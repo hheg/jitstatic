@@ -56,7 +56,6 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
-import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
@@ -425,14 +424,15 @@ public class LoadTesterTest {
         data.setData(newData);
         data.setMessage("m:" + store + ":" + c);
         data.setUserMail("mail");
-        return client.target(String.format(S_STORAGE + store + ref, storageAdress)).request()
-                .header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
+        data.setUser("user's name");
+        return client.target(String.format(S_STORAGE + store + ref, storageAdress)).request().header(HttpHeaders.ACCEPT, "application/json")
+                .header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
                 .buildPut(Entity.json(data)).invoke();
     }
 
     private Response getTarget(Client client, String store2, String ref) {
         return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request()
-                .header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+                .header(HttpHeaders.AUTHORIZATION, basic).get();
     }
 
     private static boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) throws UnsupportedEncodingException {

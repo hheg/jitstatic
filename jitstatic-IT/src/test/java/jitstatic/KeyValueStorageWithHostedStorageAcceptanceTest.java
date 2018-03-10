@@ -205,6 +205,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             data.setData(newData);
             data.setMessage("commit message");
             data.setUserMail("user@mail");
+            data.setUser("user");
             String invoke = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
                     .buildPut(Entity.json(data)).invoke(String.class);
             assertNotEquals(oldVersion, invoke);

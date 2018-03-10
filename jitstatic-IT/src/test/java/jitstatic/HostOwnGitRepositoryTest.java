@@ -1,7 +1,5 @@
 package jitstatic;
 
-import static org.junit.Assert.assertArrayEquals;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import static org.junit.Assert.assertArrayEquals;
  * #L%
  */
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -52,7 +51,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -171,7 +169,7 @@ public class HostOwnGitRepositoryTest {
         ex.expect(NotFoundException.class);
         Client client = buildClient("test10 client");
         try {
-            client.target(String.format(S_STORAGE + "key1", storageAdress)).request().header(HttpHeader.AUTHORIZATION.asString(), basic)
+            client.target(String.format(S_STORAGE + "key1", storageAdress)).request().header(HttpHeaders.AUTHORIZATION, basic)
                     .get(JsonNode.class);
         } finally {
             client.close();
@@ -435,7 +433,8 @@ public class HostOwnGitRepositoryTest {
             mkd.setData(getData(2).getBytes(UTF_8));
             mkd.setMessage("Modified");
             mkd.setUserMail("noone@none.org");
-            response = target.request().header(HttpHeader.AUTHORIZATION.asString(), basic).header(HttpHeaders.IF_MATCH, "\"" + tag + "\"")
+            mkd.setUser("user");
+            response = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + tag + "\"")
                     .buildPut(Entity.json(mkd)).invoke();
             assertEquals(HttpStatus.OK_200, response.getStatus());
             response.close();
@@ -467,7 +466,7 @@ public class HostOwnGitRepositoryTest {
 
     private Response callTarget(Client client, String store2, String ref) {
         return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request()
-                .header(HttpHeader.AUTHORIZATION.asString(), basic).get();
+                .header(HttpHeaders.AUTHORIZATION, basic).get();
     }
 
     private void verifyOkPush(Iterable<PushResult> iterable) {
