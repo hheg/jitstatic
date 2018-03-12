@@ -346,10 +346,11 @@ public class GitStorageTest {
                 .thenReturn(CompletableFuture.completedFuture("1"));
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
-            Future<StoreInfo> future = gs.add("somekey", "refs/heads/master", data, new StorageData(new HashSet<>(), null), "msg", "user",
+            byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
+            Future<StoreInfo> future = gs.add("somekey", "refs/heads/master", pretty, new StorageData(new HashSet<>(), null), "msg", "user",
                     "mail");
             StoreInfo si = unwrap(future);
-            assertArrayEquals(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data)), si.getData());
+            assertArrayEquals(pretty, si.getData());
             assertEquals("1", si.getVersion());
         }
     }

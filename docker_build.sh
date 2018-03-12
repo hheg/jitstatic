@@ -27,5 +27,5 @@ if [ "${BRANCH}" = "HEAD" ] && [  "${TAG}" = "v${VERSION}" ]; then
 	CMD="${CMD} -t ${REPO}:latest"
 fi
 CMD="${CMD} ."
-echo $CMD
+$CMD
 echo ${VERSION}

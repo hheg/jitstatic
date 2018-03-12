@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -82,7 +83,7 @@ public class MapResource {
     @Timed(name = "get_storage_time")
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
-    @Path("/{key : .+}")    
+    @Path("/{key : .+}")
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request) {
 
@@ -127,7 +128,7 @@ public class MapResource {
     @Path("/{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-            final @Valid ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
+            final @Valid @NotNull ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the git repository.
         if (!user.isPresent()) {
@@ -173,7 +174,7 @@ public class MapResource {
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response addKey(@Valid final AddKeyData data, final @Auth Optional<User> user) {
+    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }

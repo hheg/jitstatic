@@ -87,6 +87,7 @@ import jitstatic.hosted.HostedFactory;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
+    private static final String UTF_8 = "UTF-8";
     private static final String ACCEPT_STORAGE = "accept/storage";
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
@@ -200,7 +201,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             assertEquals(getData(), response.readEntity(String.class));
             String oldVersion = response.getEntityTag().getValue();
             ModifyKeyData data = new ModifyKeyData();
-            byte[] newData = "{\"one\":\"two\"}".getBytes("UTF-8");
+            byte[] newData = "{\"one\":\"two\"}".getBytes(UTF_8);
             response.close();
             data.setData(newData);
             data.setMessage("commit message");
@@ -216,18 +217,44 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             client.close();
         }
     }
+    
+    @Test
+    public void testPrettifiedKey() throws JsonProcessingException, IOException {
+        Client client = buildClient("testmodify client");
+        try {
+            WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
+            Response response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
+            assertEquals(getData(), response.readEntity(String.class));
+            String oldVersion = response.getEntityTag().getValue();
+            ModifyKeyData data = new ModifyKeyData();
+            byte[] prettyData = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData()));            
+            response.close();
+            data.setData(prettyData);
+            data.setMessage("commit message");
+            data.setUserMail("user@mail");
+            data.setUser("user");
+            String invoke = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
+                    .buildPut(Entity.json(data)).invoke(String.class);
+            assertNotEquals(oldVersion, invoke);
+            response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
+            assertEquals(new String(prettyData), response.readEntity(String.class));
+            response.close();
+        } finally {
+            client.close();
+        }
+    }
 
     @Test
     public void testAddKey() throws JsonProcessingException, IOException {
         Client client = buildClient("add key");
         try {
             Response response = client.target(String.format("%s/storage", adress)).request().header(HttpHeaders.AUTHORIZATION, addBasic)
-                    .post(Entity.json(new AddKeyData("test", "refs/heads/master", getData().getBytes("UTF-8"),
+                    .post(Entity.json(new AddKeyData("test", "refs/heads/master", getData().getBytes(UTF_8),
                             new StorageData(new HashSet<>(), "application/json"), "testmessage", "user", "test@test.com")));
             assertEquals(Status.OK.getStatusCode(), response.getStatus());
             assertNotNull(response.getEntityTag().getValue());
             byte[] readEntity = response.readEntity(byte[].class);
-            assertArrayEquals(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData())), readEntity);
+            assertArrayEquals(getData().getBytes(UTF_8), readEntity);
             assertEquals(response.getHeaderString(HttpHeaders.CONTENT_TYPE), "application/json");
             response.close();
         } finally {
@@ -261,7 +288,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     }
 
     private String basicAuth(String user, String pass) throws UnsupportedEncodingException {
-        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes("UTF-8"));
+        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(UTF_8));
     }
 
     private static String getData() {

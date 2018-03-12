@@ -430,7 +430,8 @@ public class HostOwnGitRepositoryTest {
             response.close();
             WebTarget target = client.target(String.format(S_STORAGE + STORE, storageAdress));
             ModifyKeyData mkd = new ModifyKeyData();
-            mkd.setData(getData(2).getBytes(UTF_8));
+            byte[] bytes = MAPPER.writer().withDefaultPrettyPrinter().writeValueAsString(MAPPER.readTree(getData(2))).getBytes(UTF_8);
+            mkd.setData(bytes);
             mkd.setMessage("Modified");
             mkd.setUserMail("noone@none.org");
             mkd.setUser("user");
@@ -443,8 +444,7 @@ public class HostOwnGitRepositoryTest {
 
             byte[] readAllBytes = Files.readAllBytes(workingFolder.toPath().resolve(STORE));
 
-            assertArrayEquals(MAPPER.writer().withDefaultPrettyPrinter().writeValueAsString(MAPPER.readTree(getData(2))).getBytes("UTF-8"),
-                    readAllBytes);
+            assertArrayEquals(bytes, readAllBytes);
         } finally {
             client.close();
         }
@@ -465,8 +465,8 @@ public class HostOwnGitRepositoryTest {
     }
 
     private Response callTarget(Client client, String store2, String ref) {
-        return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request()
-                .header(HttpHeaders.AUTHORIZATION, basic).get();
+        return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request().header(HttpHeaders.AUTHORIZATION, basic)
+                .get();
     }
 
     private void verifyOkPush(Iterable<PushResult> iterable) {
