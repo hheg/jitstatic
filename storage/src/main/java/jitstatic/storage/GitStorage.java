@@ -47,7 +47,6 @@ import org.eclipse.jgit.lib.Constants;
 
 import com.spencerwi.either.Either;
 
-import jitstatic.JitStaticConstants;
 import jitstatic.StorageData;
 import jitstatic.source.Source;
 import jitstatic.source.SourceInfo;
@@ -262,22 +261,10 @@ public class GitStorage implements Storage {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = storeInfo.getStorageData().getContentType();
-            final String newVersion = source.modify(formatData(data, contentType), oldVersion, message,
-                    userInfo, userEmail, key, finalRef).join();
+            final String newVersion = source.modify(data, oldVersion, message, userInfo, userEmail, key, finalRef).join();
             refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);
-    }
-
-    private byte[] formatData(final byte[] data, final String contentType) {
-        if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
-            try {
-                return HANDLER.formatData(data, contentType);
-            } catch (final IOException e) {
-                throw new WrappingAPIException(e);
-            }
-        }
-        return data;
     }
 
     private void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
@@ -302,9 +289,7 @@ public class GitStorage implements Storage {
         branch = checkRef(branch);
 
         final String finalRef = branch;
-        final CompletableFuture<byte[]> formatData = CompletableFuture.supplyAsync(() -> {
-            return this.formatData(data, metaData.getContentType());
-        });
+
         return CompletableFuture.supplyAsync(() -> {
             final Map<String, StoreInfo> refStore = cache.get(finalRef);
             if (refStore != null) {
@@ -330,9 +315,8 @@ public class GitStorage implements Storage {
                 if (sourceInfo != null) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
                 }
-                final byte[] formatted = formatData.join();
-                final String version = source.addKey(key, finalRef, formatted, metaData, message, userInfo, userMail).join();
-                final StoreInfo storeInfo = new StoreInfo(formatted, metaData, version);
+                final String version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail).join();
+                final StoreInfo storeInfo = new StoreInfo(data, metaData, version);
                 map.put(key, storeInfo);
                 return storeInfo;
             } finally {

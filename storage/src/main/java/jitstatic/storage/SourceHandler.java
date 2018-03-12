@@ -30,15 +30,11 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
 
-import jitstatic.JitStaticConstants;
 import jitstatic.StorageData;
 
 class SourceHandler {
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
-	private static final ObjectWriter WRITER = MAPPER.writerWithDefaultPrettyPrinter().with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);	
 
 	public byte[] readStorageData(final InputStream is, final String type) throws JsonParseException, JsonMappingException, IOException {
 		Objects.requireNonNull(type);
@@ -54,7 +50,7 @@ class SourceHandler {
 
 	private byte[] readByteArray(final InputStream is) throws IOException {
 		Objects.requireNonNull(is);
-		final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		final ByteArrayOutputStream buffer = new ByteArrayOutputStream(4096);
 		int nRead;
 		byte[] data = new byte[4096];
 		while ((nRead = is.read(data, 0, data.length)) != -1) {
@@ -62,15 +58,5 @@ class SourceHandler {
 		}
 		buffer.flush();
 		return buffer.toByteArray();
-	}
-
-	// TODO Don't make this pass
-	public byte[] formatData(final byte[] data, final String contentType) throws IOException {
-		Objects.requireNonNull(data);
-		Objects.requireNonNull(contentType);
-		if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
-			return WRITER.writeValueAsString(MAPPER.readTree(data)).getBytes("UTF-8");
-		}
-		return data;
 	}
 }
