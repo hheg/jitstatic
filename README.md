@@ -41,7 +41,16 @@ storage is the key-value end point and hosted is the git end point.
 
 ## Hello world
 
+### Docker:
+```bash
+docker pull hheg/jitstatic:latest
+docker run -d hheg/jitstatic:latest -e USER=huser -e PASS=hseCr3t
+```
+Now the container is reachable on port 8085
+
+### Manually: 
 To setup an instance you download a jitstatic.jar and store the above example configuration in a file, lets say `config.yaml`
+ 
 To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
