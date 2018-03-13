@@ -50,7 +50,7 @@ public class ModifyKeyData {
     @JsonProperty
     @NotNull
     @NotEmpty
-    private String user;
+    private String userInfo;
 
     public byte[] getData() {
         return data;
@@ -76,11 +76,11 @@ public class ModifyKeyData {
         this.userMail = userMail;
     }
 
-    public String getUser() {
-        return user;
+    public String getUserInfo() {
+        return userInfo;
     }
 
-    public void setUser(String user) {
-        this.user = user;
+    public void setUserInfo(final String userInfo) {
+        this.userInfo = userInfo;
     }
 }

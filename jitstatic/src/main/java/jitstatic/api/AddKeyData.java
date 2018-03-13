@@ -69,7 +69,7 @@ public class AddKeyData {
 
     @JsonCreator
     public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch,
-            @JsonProperty("data") final byte[] data, @JsonProperty("metadata") final StorageData metaData,
+            @JsonProperty("data") final byte[] data, @JsonProperty("metaData") final StorageData metaData,
             @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
         this.key = key;

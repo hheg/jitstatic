@@ -31,55 +31,59 @@ import jitstatic.auth.User;
 
 public class SourceJSONParser {
 
-	private static final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
+    private static final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
 
-	public String parse(InputStream bc) throws IOException {
-		final StorageData metaData = parseStream(bc);
+    public String parse(final InputStream bc) throws IOException {
+        final StorageData metaData = parseStream(bc);
 
-		final Set<User> usersNode = metaData.getUsers();
-		if (usersNode == null) {
-			throw new StorageParseException("metadata is missing users node");
-		}
-		checkUsers(usersNode);
-		return metaData.getContentType();
-	}
+        final Set<User> usersNode = metaData.getUsers();
+        if (usersNode == null) {
+            throw new StorageParseException("metadata is missing users node");
+        }
+        checkUsers(usersNode);
+        return metaData.getContentType();
+    }
 
-	private StorageData parseStream(InputStream bc) throws StorageParseException {
-		try {
-			return mapper.readValue(bc, StorageData.class);
-		} catch (final IOException e) {
-			final Throwable cause = e.getCause();
-			throw new StorageParseException((cause != null ? cause.getMessage() : "Unknown error"), e);
-		}
-	}
+    private StorageData parseStream(final InputStream bc) throws StorageParseException {
+        try {
+            return mapper.readValue(bc, StorageData.class);
+        } catch (final IOException e) {
+            final Throwable cause = e.getCause();
+            throw new StorageParseException((cause != null ? cause.getMessage() : "Unknown error"), e);
+        }
+    }
 
-	private void checkUsers(final Set<User> usersNode) throws StorageParseException {
-		for (User userNode : usersNode) {
-			checkUser(userNode);
-		}
-	}
+    private void checkUsers(final Set<User> usersNode) throws StorageParseException {
+        for (User userNode : usersNode) {
+            checkUser(userNode);
+        }
+    }
 
-	private void checkUser(User userNode) throws StorageParseException {
-		final String userName = userNode.getName();
-		if (userName == null) {
-			throw new StorageParseException("metadata is missing user name");
-		}
-	}
+    private void checkUser(final User userNode) throws StorageParseException {
+        final String userName = userNode.getName();
+        if (userName == null) {
+            throw new StorageParseException("metadata is missing user name");
+        }
+        final String password = userNode.getPassword();
+        if (password == null) {
+            throw new StorageParseException("metadata user " + userName + " is missing password ");
+        }
+    }
 
-	private static class StorageParseException extends IOException {
+    private static class StorageParseException extends IOException {
 
-		private static final long serialVersionUID = 1774575933983877566L;
+        private static final long serialVersionUID = 1774575933983877566L;
 
-		public StorageParseException(final String message) {
-			super(message);
-		}
+        public StorageParseException(final String message) {
+            super(message);
+        }
 
-		public StorageParseException(final String message, final IOException e) {
-			super(message, e);
-		}
-	}
+        public StorageParseException(final String message, final IOException e) {
+            super(message, e);
+        }
+    }
 
-	public void parseJson(final InputStream is) throws IOException {
-		mapper.readTree(is);
-	}
+    public void parseJson(final InputStream is) throws IOException {
+        mapper.readTree(is);
+    }
 }

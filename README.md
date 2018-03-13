@@ -22,7 +22,7 @@ server:
   maxThreads: 1024
   connector:
     type: http
-    port: 8080
+    port: 8085
   requestLog:
     appenders:
       - type: console
@@ -63,7 +63,7 @@ INFO  [2018-03-03 23:15:29,237] jitstatic.hosted.HostedFactory: Configuring host
 INFO  [2018-03-03 23:15:29,271] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
 INFO  [2018-03-03 23:15:29,272] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
 INFO  [2018-03-03 23:15:29,273] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-03-03 23:15:29,385] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
+INFO  [2018-03-03 23:15:29,385] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
 INFO  [2018-03-03 23:15:29,387] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT
 INFO  [2018-03-03 23:15:29,994] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
@@ -80,16 +80,16 @@ INFO  [2018-03-03 23:15:30,011] io.dropwizard.setup.AdminEnvironment: tasks =
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
 INFO  [2018-03-03 23:15:30,023] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@49edcb30{/admin,null,AVAILABLE}
-INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
+INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
 INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.Server: Started @2391ms
 
 ```
 
-This should start JitStatic on port 8080.
+This should start JitStatic on port 8085.
 
 Now you can clone the git repository with:
 ```bash
-git clone http://localhost:8080/app/jitstatic/jitstatic.git
+git clone http://localhost:8085/app/jitstatic/jitstatic.git
 Warning: You seem to have cloned an empty repository
 ```
 In you target directory create a key store file:
@@ -116,13 +116,13 @@ remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
 remote:                                     
 remote: Checking refs/heads/master branch.
 remote: refs/heads/master OK!
-To http://localhost:8080/app/jitstatic/jitstatic.git
+To http://localhost:8085/app/jitstatic/jitstatic.git
  * [new branch]      master -> master
 ```
 
 Now you can do:
 ```bash
-curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
+curl --user user1:1234 -i http://localhost:8085/app/storage/hello_world
 
 HTTP/1.1 200 OK
 Date: Sat, 03 Mar 2018 23:22:38 GMT
@@ -150,7 +150,7 @@ There must be a file which contains metadata about the `hello_world` file and it
 To reach the `hello_world` data the address could look like the command below. The user and password for the endpoint will be what you have specified in the `key.metadata` file. Each key can be protected so only one or several users can access that particular key
  
 ```bash
-curl --user user1:1234 http://localhost:8080/app/storage/hello_world
+curl --user user1:1234 http://localhost:8085/app/storage/hello_world
 ```
 
 If you leave an metadata file with an empty 'users' entry anyone can access the key. If you there's no user restriction you can't modify the key through the modify API.
@@ -161,18 +161,18 @@ At the moment the application only allows basic authentication so be sure you se
 
 To clone the repo you just type (the username and password defined in the Dropwizard configuration file)
 ```bash
-git clone http://huser:hsecr3t@localhost:8080/app/jitstatic/jitstatic.git
+git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/jitstatic.git
 ```
 It's also possible to reach keys (files) through refs so if you make a call like:
 
 ```bash
-curl --user user1:1234 http://localhost:8080/app/storage/hello_world?ref=refs/heads/somebranch
+curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/heads/somebranch
 ``` 
 
 Or speficifying a tag it's possible to do this:
 
 ```bash
-curl --user user1:1234 http://localhost:8080/app/storage/hello_world?ref=refs/tags/sometag
+curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/tags/sometag
 ``` 
 
 ## API for modyfying a key
@@ -181,7 +181,7 @@ Now there's an API for modifying a `hello_world` from an application. You do it 
 
 First get the current version your `hello_world` is at.
 ```bash
-curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
+curl --user user1:1234 -i http://localhost:8085/app/storage/hello_world
 
 HTTP/1.1 200 OK
 Date: Sat, 03 Mar 2018 23:22:38 GMT
@@ -197,8 +197,8 @@ Use that to be able to modify the `hello_world` by sending a PUT command to chan
 curl -i -H 'Content-Type: application/json' \
 -H 'If-Match: "264f8aec58118e2682091653017213ace0c04922"' \
 --user user1:1234 -X PUT \
--d '{"message":"message","data":"eyJvbmUiOiJ0d28ifQ==","userMail":"mail"}' \
-http://localhost:8080/app/storage/hello_world
+-d '{"message":"message","data":"eyJvbmUiOiJ0d28ifQ==","userMail":"mail","userInfo":"user"}' \
+http://localhost:8085/app/storage/hello_world
 
 HTTP/1.1 200 OK
 Date: Sat, 03 Mar 2018 23:33:53 GMT
@@ -210,7 +210,7 @@ Content-Length: 0
 It will return the new version of the `hello_world`.
 Making a new GET will return:
 ```
-curl --user user1:1234 -i http://localhost:8080/app/storage/hello_world
+curl --user user1:1234 -i http://localhost:8085/app/storage/hello_world
 
 HTTP/1.1 200 OK
 Date: Sat, 03 Mar 2018 23:34:40 GMT
@@ -241,7 +241,7 @@ You can create a key by just POSTing the content to the server. Since there are 
 curl -i -H 'Content-Type: application/json' \
 --user huser:hseCr3t -X POST \
 -d '{"key":"test","branch":"refs/heads/master","data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
-http://localhost:8080/app/storage
+http://localhost:8085/app/storage
 
 HTTP/1.1 200 OK
 Date: Sun, 04 Mar 2018 00:10:37 GMT
@@ -250,13 +250,11 @@ Content-Type: application/json
 Content-Encoding: utf-8
 Content-Length: 19
 
-{
-  "one" : "two"
-}
+{"one" : "two"}
 ```
 You can now GET and PUT this endpoint with 
 ```
-curl --user user1:1234 -i http://localhost:8080/app/storage/test
+curl --user user1:1234 -i http://localhost:8085/app/storage/test
 HTTP/1.1 200 OK
 Date: Sun, 04 Mar 2018 00:12:47 GMT
 Content-Type: application/json
@@ -264,9 +262,7 @@ Content-Encoding: utf-8
 ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
 Content-Length: 19
 
-{
-  "one" : "two"
-}
+{"one" : "two"}
 ```
 and the git log looks like:
 ```
