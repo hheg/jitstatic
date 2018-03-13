@@ -4,19 +4,19 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.8.4</version>
+		<version>0.8.5</version>
 	</parent>
 	<artifactId>storage</artifactId>
 	<dependencies>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.8.4</version>
+			<version>0.8.5</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.8.4</version>
+			<version>0.8.5</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>

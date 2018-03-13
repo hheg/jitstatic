@@ -434,7 +434,7 @@ public class HostOwnGitRepositoryTest {
             mkd.setData(bytes);
             mkd.setMessage("Modified");
             mkd.setUserMail("noone@none.org");
-            mkd.setUser("user");
+            mkd.setUserInfo("user");
             response = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + tag + "\"")
                     .buildPut(Entity.json(mkd)).invoke();
             assertEquals(HttpStatus.OK_200, response.getStatus());

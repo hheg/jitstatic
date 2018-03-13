@@ -160,7 +160,7 @@ public class MapResource {
         // TODO this should be idempotent. So if version is equals, answer 200.
         if (response == null) {
             final String newVersion = unwrapWithPUTApi(
-                    storage.put(data.getData(), currentVersion, data.getMessage(), data.getUser(), data.getUserMail(), key, ref));
+                    storage.put(data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail(), key, ref));
             if (newVersion == null) {
                 throw new WebApplicationException(Status.NOT_FOUND);
             }

@@ -80,7 +80,7 @@ public class MapResourceTest {
     private static final String SECRET = "secret";
     private static final String PUSER = "puser";
     private static final String PSECRET = "psecret";
-
+    
     private static final String BASIC_AUTH_CRED;
     private static final String BASIC_AUTH_CRED_POST;
 
@@ -238,7 +238,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ETAG, "1").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
@@ -253,7 +253,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header(HttpHeaders.IF_MATCH, "1")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -275,7 +275,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("mail");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -298,7 +298,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -320,7 +320,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
@@ -335,7 +335,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -353,7 +353,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -371,7 +371,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
@@ -390,7 +390,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -412,7 +412,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -434,7 +434,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -456,7 +456,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, "application/json").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"1\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -478,7 +478,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -493,7 +493,7 @@ public class MapResourceTest {
         data.setMessage("message");
         data.setData(readTree);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -541,7 +541,7 @@ public class MapResourceTest {
         byte[] byteData = new byte[] { 8, 7, 6, 5, 4, 3, 2, 1 };
         data.setData(byteData);
         data.setUserMail("u@m");
-        data.setUser("user");
+        data.setUserInfo("user");
         response = RESOURCES.target("/storage/book").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_OCTET_STREAM).header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + entityTag.getValue() + "\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
