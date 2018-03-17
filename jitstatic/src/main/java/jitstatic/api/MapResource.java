@@ -219,7 +219,14 @@ public class MapResource {
 
     private void checkHeaders(final HttpHeaders headers) {
         final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
-        if (header == null || header.isEmpty()) {
+        if (header.isEmpty()) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
+        boolean isValid = false; 
+        for(String headerValue : header) {
+            isValid |= !headerValue.isEmpty();
+        }
+        if(!isValid) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
     }

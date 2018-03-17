@@ -648,5 +648,26 @@ public class MapResourceTest {
         assertEquals(422, response.getStatus());
         assertEquals("[\"data size must be between 1 and 2147483647\"]", response.readEntity(JsonNode.class).get("errors").toString());
     }
+    
+    @Test
+    public void testModifyKetWithoutIFMatchtag() throws UnsupportedEncodingException, InterruptedException, ExecutionException {
+        WebTarget target = RESOURCES.target("/storage/dog");
+        StoreInfo storeInfo = DATA.get("dog");
+        CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
+        when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+        when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
+                Mockito.eq(null))).thenReturn(expected);
+        ModifyKeyData data = new ModifyKeyData();
+        byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
+        data.setMessage("message");
+        data.setData(readTree);
+        data.setUserMail("mail");
+        data.setUserInfo("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "")
+                .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+        assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        response.close();
+    }
 
 }
