@@ -32,10 +32,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -59,7 +59,7 @@ public class GitStorage implements Storage {
 
     private static final Logger LOG = LogManager.getLogger(GitStorage.class);
     private static final SourceHandler HANDLER = new SourceHandler();
-    private final Map<String, Map<String, StoreInfo>> cache = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Optional<StoreInfo>>> cache = new ConcurrentHashMap<>();
     private final AtomicReference<Exception> fault = new AtomicReference<>();
 
     private final ExecutorService refExecutor;
@@ -79,7 +79,7 @@ public class GitStorage implements Storage {
         final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(ref -> {
             return CompletableFuture.supplyAsync(() -> {
                 LOG.info("Reloading " + ref);
-                final Map<String, StoreInfo> map = cache.get(ref);
+                final Map<String, Optional<StoreInfo>> map = cache.get(ref);
                 if (map != null) {
                     return new HashSet<>(map.keySet());
                 }
@@ -91,11 +91,12 @@ public class GitStorage implements Storage {
                         throw new LinkedException(faults);
                     }
                     return list.stream().filter(Either::isLeft).map(Either::getLeft).filter(Optional::isPresent).map(Optional::get)
-                            .filter(p -> p.getRight() != null).collect(Collectors.toConcurrentMap(Pair::getLeft, Pair::getRight));
+                            .filter(p -> p.getRight() != null)
+                            .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
                 });
             }).thenCompose(future -> future).thenAcceptAsync(map -> {
                 if (map.size() > 0) {
-                    final Map<String, StoreInfo> originalMap = cache.get(ref);
+                    final Map<String, Optional<StoreInfo>> originalMap = cache.get(ref);
                     originalMap.entrySet().stream().filter(e -> !map.containsKey(e.getKey()))
                             .forEach(e -> map.put(e.getKey(), e.getValue()));
                     cache.put(ref, map);
@@ -153,21 +154,21 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public Future<StoreInfo> get(final String key, String ref) {
+    public CompletableFuture<Optional<StoreInfo>> get(final String key, String ref) {
         Objects.requireNonNull(key);
         ref = checkRef(ref);
         final String finalRef = ref;
-        final Map<String, StoreInfo> refMap = cache.get(ref);
+        final Map<String, Optional<StoreInfo>> refMap = cache.get(ref);
         if (refMap == null) {
             return CompletableFuture.supplyAsync(() -> {
-                Map<String, StoreInfo> map = cache.get(finalRef);
+                Map<String, Optional<StoreInfo>> map = cache.get(finalRef);
                 if (map == null) {
                     map = new ConcurrentHashMap<>();
                     cache.put(finalRef, map);
                 }
                 return map;
             }, refExecutor).thenApplyAsync((map) -> {
-                final StoreInfo sd = this.loadAndStore(map, key, finalRef);
+                final Optional<StoreInfo> sd = this.loadAndStore(map, key, finalRef);
                 if (sd == null) {
                     removeCacheRef(finalRef, map);
                 }
@@ -175,7 +176,7 @@ public class GitStorage implements Storage {
             }, keyExecutor);
         }
 
-        final StoreInfo storeInfo = refMap.get(key);
+        final Optional<StoreInfo> storeInfo = refMap.get(key);
         if (storeInfo == null) {
             return CompletableFuture.supplyAsync(() -> {
                 return this.loadAndStore(refMap, key, finalRef);
@@ -184,21 +185,20 @@ public class GitStorage implements Storage {
         return CompletableFuture.completedFuture(storeInfo);
     }
 
-    private StoreInfo loadAndStore(final Map<String, StoreInfo> keyStorage, final String key, final String ref) {
-        StoreInfo storeInfo = keyStorage.get(key);
-        if (storeInfo == null) {
+    private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key, final String ref) {
+        Optional<StoreInfo> storeInfoContainer = keyStorage.get(key);
+        if (storeInfoContainer == null) {
             try {
-                storeInfo = load(key, ref);
-                if (storeInfo != null) {
-                    keyStorage.put(key, storeInfo);
-                }
+                StoreInfo storeInfo = load(key, ref);
+                storeInfoContainer = Optional.ofNullable(storeInfo);
+                keyStorage.put(key, storeInfoContainer);
             } catch (final RefNotFoundException e) {
                 return null;
             } catch (final Exception e) {
                 consumeError(e);
             }
         }
-        return storeInfo;
+        return storeInfoContainer;
     }
 
     private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
@@ -252,15 +252,15 @@ public class GitStorage implements Storage {
         }
         final String finalRef = ref;
         return CompletableFuture.supplyAsync(() -> {
-            final Map<String, StoreInfo> refMap = cache.get(finalRef);
+            final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
             if (refMap == null) {
                 throw new WrappingAPIException(new RefNotFoundException(finalRef));
             }
-            final StoreInfo storeInfo = refMap.get(key);
-            if (storeInfo == null) {
+            final Optional<StoreInfo> storeInfo = refMap.get(key);
+            if (storeInfo == null || !storeInfo.isPresent()) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String contentType = storeInfo.getStorageData().getContentType();
+            final String contentType = storeInfo.get().getStorageData().getContentType();
             final String newVersion = source.modify(data, oldVersion, message, userInfo, userEmail, key, finalRef).join();
             refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
             return newVersion;
@@ -268,17 +268,17 @@ public class GitStorage implements Storage {
     }
 
     private void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
-            final Map<String, StoreInfo> refMap, final String contentType) {
-        final StoreInfo si = refMap.get(key);
-        if (si.getVersion().equals(oldversion)) {
-            final StorageData sd = si.getStorageData();
-            refMap.put(key, new StoreInfo(data, new StorageData(sd.getUsers(), contentType), newVersion));
+            final Map<String, Optional<StoreInfo>> refMap, final String contentType) {
+        final Optional<StoreInfo> si = refMap.get(key);
+        if (si.get().getVersion().equals(oldversion)) {
+            final StorageData sd = si.get().getStorageData();
+            refMap.put(key, Optional.of(new StoreInfo(data, new StorageData(sd.getUsers(), contentType), newVersion)));
         }
     }
 
     @Override
-    public Future<StoreInfo> add(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
-            final String userInfo, final String userMail) {
+    public CompletableFuture<StoreInfo> add(final String key, String branch, final byte[] data, final StorageData metaData,
+            final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(data);
         Objects.requireNonNull(metaData);
@@ -291,19 +291,17 @@ public class GitStorage implements Storage {
         final String finalRef = branch;
 
         return CompletableFuture.supplyAsync(() -> {
-            final Map<String, StoreInfo> refStore = cache.get(finalRef);
+            Map<String, Optional<StoreInfo>> refStore = cache.get(finalRef);
             if (refStore != null) {
-                final StoreInfo storeInfo = refStore.get(key);
-                if (storeInfo != null) {
+                final Optional<StoreInfo> storeInfo = refStore.get(key);
+                if (storeInfo != null && storeInfo.isPresent()) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
                 }
+            } else {
+                refStore = new ConcurrentHashMap<>();
+                cache.put(finalRef, refStore);
             }
-            Map<String, StoreInfo> map = cache.get(finalRef);
-            if (map == null) {
-                map = new ConcurrentHashMap<>();
-                cache.put(finalRef, map);
-            }
-            return map;
+            return refStore;
         }, refExecutor).thenApplyAsync((map) -> {
             SourceInfo sourceInfo = null;
             try {
@@ -317,7 +315,7 @@ public class GitStorage implements Storage {
                 }
                 final String version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail).join();
                 final StoreInfo storeInfo = new StoreInfo(data, metaData, version);
-                map.put(key, storeInfo);
+                map.put(key, Optional.of(storeInfo));
                 return storeInfo;
             } finally {
                 if (sourceInfo == null) {
@@ -327,7 +325,7 @@ public class GitStorage implements Storage {
         }, keyExecutor);
     }
 
-    private void removeCacheRef(final String finalRef, final Map<String, StoreInfo> map) {
+    private void removeCacheRef(final String finalRef, final Map<String, Optional<StoreInfo>> map) {
         refExecutor.execute(() -> {
             keyExecutor.execute(() -> {
                 if (map.isEmpty()) {
@@ -339,15 +337,26 @@ public class GitStorage implements Storage {
 
     private StoreInfo readStoreInfo(final SourceInfo source) {
         try {
-            try (final InputStream metaDataStream = source.getMetadataInputStream();
-                    final InputStream sourceStream = source.getSourceInputStream()) {
-                final StorageData readStorage = HANDLER.readStorage(metaDataStream);
-                final StoreInfo storeInfo = new StoreInfo(HANDLER.readStorageData(sourceStream, readStorage.getContentType()), readStorage,
+            CompletableFuture<StorageData> supplyAsync = CompletableFuture.supplyAsync(() -> {
+                try (final InputStream metaDataStream = source.getMetadataInputStream()) {
+                    return HANDLER.readStorage(metaDataStream);
+                } catch (final IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            try (final InputStream sourceStream = source.getSourceInputStream()) {
+                final StoreInfo storeInfo = new StoreInfo(HANDLER.readStorageData(sourceStream), supplyAsync.join(),
                         source.getSourceVersion());
                 return storeInfo;
             }
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
+        } catch (final CompletionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof UncheckedIOException) {
+                throw ((UncheckedIOException) cause);
+            }
+            throw e;
         }
     }
 }

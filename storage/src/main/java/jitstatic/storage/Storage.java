@@ -21,15 +21,16 @@ package jitstatic.storage;
  */
 
 import java.util.List;
-import java.util.concurrent.Future;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import jitstatic.StorageData;
 import jitstatic.utils.CheckHealth;
 
 public interface Storage extends AutoCloseable, CheckHealth {
-	public Future<StoreInfo> get(String key, String ref);
+	public CompletableFuture<Optional<StoreInfo>> get(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
-	public Future<String> put(byte[] data, String version, String message, String userInfo, String userEmail, String key, String ref);
-    public Future<StoreInfo> add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
+	public CompletableFuture<String> put(byte[] data, String version, String message, String userInfo, String userEmail, String key, String ref);
+    public CompletableFuture<StoreInfo> add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
 }

@@ -33,10 +33,10 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
@@ -80,7 +80,7 @@ public class MapResourceTest {
     private static final String SECRET = "secret";
     private static final String PUSER = "puser";
     private static final String PSECRET = "psecret";
-    
+
     private static final String BASIC_AUTH_CRED;
     private static final String BASIC_AUTH_CRED_POST;
 
@@ -99,7 +99,7 @@ public class MapResourceTest {
         }
     }
     private Storage STORAGE = mock(Storage.class);
-    private static final Map<String, StoreInfo> DATA = new HashMap<>();
+    private static final Map<String, Optional<StoreInfo>> DATA = new HashMap<>();
     private static String returnedDog;
     private static String returnedHorse;
 
@@ -120,23 +120,23 @@ public class MapResourceTest {
         Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
         byte[] b = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
         StoreInfo bookData = new StoreInfo(b, new StorageData(users, "application/octet-stream"), "1");
-        DATA.put("book", bookData);
+        DATA.put("book", Optional.of(bookData));
         StoreInfo dogData = new StoreInfo(dog, new StorageData(users, null), "1");
         returnedDog = new String(dogData.getData());
-        DATA.put("dog", dogData);
+        DATA.put("dog", Optional.of(dogData));
         byte[] horse = "{\"food\":[\"wheat\",\"grass\"]}".getBytes(UTF_8);
         StoreInfo horseData = new StoreInfo(horse, new StorageData(new HashSet<>(), null), "1");
         returnedHorse = new String(horseData.getData());
-        DATA.put("horse", horseData);
+        DATA.put("horse", Optional.of(horseData));
         byte[] cat = "{\"food\":[\"fish\",\"bird\"]}".getBytes(UTF_8);
         users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
         StoreInfo catData = new StoreInfo(cat, new StorageData(users, null), "1");
-        DATA.put("cat", catData);
+        DATA.put("cat", Optional.of(catData));
     }
 
     @Test
     public void testGettingKeyFromResource() throws InterruptedException, ExecutionException {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("dog"));
         when(STORAGE.get("dog", null)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .get(JsonNode.class);
@@ -147,7 +147,7 @@ public class MapResourceTest {
     public void testGettingKeyFromResourceWithNoAuthentication() {
         ex.expect(WebApplicationException.class);
         ex.expectMessage(Status.UNAUTHORIZED.toString());
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("dog"));
         when(STORAGE.get("dog", null)).thenReturn(expected);
         RESOURCES.target("/storage/dog").request().get(JsonNode.class);
     }
@@ -162,7 +162,7 @@ public class MapResourceTest {
 
     @Test
     public void testNoAuthorizationOnPermittedResource() throws InterruptedException, ExecutionException {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("horse"));
         when(STORAGE.get("horse", null)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -172,7 +172,7 @@ public class MapResourceTest {
     public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
         ex.expect(WebApplicationException.class);
         ex.expectMessage(Status.UNAUTHORIZED.toString());
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("dog"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("dog"));
         when(STORAGE.get("dog", null)).thenReturn(expected);
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
         RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
@@ -180,7 +180,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyIsFoundWithBranch() throws InterruptedException, ExecutionException {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("horse"));
         when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -202,7 +202,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("horse"));
         when(STORAGE.get(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -210,7 +210,7 @@ public class MapResourceTest {
 
     @Test
     public void testDoubleKeyIsFoundWithTags() throws InterruptedException, ExecutionException {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("horse"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("horse"));
         when(STORAGE.get(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -265,7 +265,7 @@ public class MapResourceTest {
     @Test
     public void testPutAKey() throws IOException, RefNotFoundException, InterruptedException, ExecutionException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
@@ -288,7 +288,7 @@ public class MapResourceTest {
     @Test
     public void testPutAKeyOtherVersion() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
@@ -310,7 +310,7 @@ public class MapResourceTest {
     @Test
     public void testPutAKeyOtherVersionMissingHeader() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
@@ -346,7 +346,7 @@ public class MapResourceTest {
     @Test
     public void testPutAKeyWithNoUsers() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
-        StoreInfo storeInfo = DATA.get("horse");
+        Optional<StoreInfo> storeInfo = DATA.get("horse");
         when(STORAGE.get(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
@@ -364,7 +364,7 @@ public class MapResourceTest {
     @Test
     public void testPutAKeyWithWrongUser() throws IOException {
         WebTarget target = RESOURCES.target("/storage/cat");
-        StoreInfo storeInfo = DATA.get("cat");
+        Optional<StoreInfo> storeInfo = DATA.get("cat");
         when(STORAGE.get(Mockito.eq("cat"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
@@ -381,7 +381,7 @@ public class MapResourceTest {
     @Test
     public void testPutKeyIsFoundButNotFoundWhenModifying() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
                 Mockito.eq(null))).thenReturn(null);
@@ -401,7 +401,7 @@ public class MapResourceTest {
     @Test
     public void testPutKeyButRefIsDeletedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
                 Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
@@ -423,7 +423,7 @@ public class MapResourceTest {
     @Test
     public void testPutKeyButKeyIsDeletedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
                 Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
@@ -445,7 +445,7 @@ public class MapResourceTest {
     @Test
     public void testPutKeyButVersionIsChangedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
                 Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
@@ -467,7 +467,7 @@ public class MapResourceTest {
     @Test
     public void testPutKeyGeneralError() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
                 Mockito.eq(null))).thenReturn(CompletableFuture.supplyAsync(() -> {
@@ -503,21 +503,21 @@ public class MapResourceTest {
 
     @Test
     public void testNotModified() {
-        StoreInfo storeInfo = DATA.get("dog");
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(storeInfo);
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(storeInfo);
         when(STORAGE.get("dog", null)).thenReturn(expected);
         Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
-        assertEquals(storeInfo.getVersion(), response.getEntityTag().getValue());
+        assertEquals(storeInfo.get().getVersion(), response.getEntityTag().getValue());
         response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_NONE_MATCH, "\"" + storeInfo.getVersion() + "\"")
-                .get();
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_NONE_MATCH, "\"" + storeInfo.get().getVersion() + "\"").get();
         assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
     }
 
     @Test
     public void testGetapplicatiOnoctetstream() {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("book"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("book"));
         when(STORAGE.get("book", null)).thenReturn(expected);
         Response response = RESOURCES.target("/storage/book").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
@@ -527,7 +527,7 @@ public class MapResourceTest {
 
     @Test
     public void testModifyApplicatiOnoctetStream() {
-        Future<StoreInfo> expected = CompletableFuture.completedFuture(DATA.get("book"));
+        CompletableFuture<Optional<StoreInfo>> expected = CompletableFuture.completedFuture(DATA.get("book"));
         when(STORAGE.get("book", null)).thenReturn(expected);
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("book"),
                 Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture("2"));
@@ -648,11 +648,11 @@ public class MapResourceTest {
         assertEquals(422, response.getStatus());
         assertEquals("[\"data size must be between 1 and 2147483647\"]", response.readEntity(JsonNode.class).get("errors").toString());
     }
-    
+
     @Test
     public void testModifyKetWithoutIFMatchtag() throws UnsupportedEncodingException, InterruptedException, ExecutionException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        StoreInfo storeInfo = DATA.get("dog");
+        Optional<StoreInfo> storeInfo = DATA.get("dog");
         CompletableFuture<String> expected = CompletableFuture.completedFuture("2");
         when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),

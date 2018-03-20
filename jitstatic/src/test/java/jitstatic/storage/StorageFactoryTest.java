@@ -20,7 +20,7 @@ package jitstatic.storage;
  * #L%
  */
 
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import org.eclipse.jgit.lib.Constants;
@@ -47,56 +48,56 @@ import jitstatic.source.SourceEventListener;
 
 public class StorageFactoryTest {
 
-	private Environment env = mock(Environment.class);
-	private JerseyEnvironment jersey = mock(JerseyEnvironment.class);
-	private Source source = mock(Source.class);
+    private Environment env = mock(Environment.class);
+    private JerseyEnvironment jersey = mock(JerseyEnvironment.class);
+    private Source source = mock(Source.class);
 
-	@Rule
-	public final ExpectedException ex = ExpectedException.none();
+    @Rule
+    public final ExpectedException ex = ExpectedException.none();
 
-	@Rule
-	public final TemporaryFolder tempFolder = new TemporaryFolder();
+    @Rule
+    public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-	private StorageFactory sf = new StorageFactory();
+    private StorageFactory sf = new StorageFactory();
 
-	@Test
-	public void testBuild() throws InterruptedException, ExecutionException {
-		when(env.jersey()).thenReturn(jersey);
-		try (Storage storage = sf.build(source, env);) {
-			storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
-			assertNull(storage.get("key", null).get());
-		}
-		verify(jersey).register(isA(AuthDynamicFeature.class));
-		verify(jersey).register(RolesAllowedDynamicFeature.class);
-		verify(jersey).register(isA(AuthValueFactoryProvider.Binder.class));
-	}
+    @Test
+    public void testBuild() throws InterruptedException, ExecutionException {
+        when(env.jersey()).thenReturn(jersey);
+        try (Storage storage = sf.build(source, env);) {
+            storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
+            assertEquals(Optional.empty(), storage.get("key", null).get());
+        }
+        verify(jersey).register(isA(AuthDynamicFeature.class));
+        verify(jersey).register(RolesAllowedDynamicFeature.class);
+        verify(jersey).register(isA(AuthValueFactoryProvider.Binder.class));
+    }
 
-	@Test
-	public void testEmptyStoragePath() {
-		when(env.jersey()).thenReturn(jersey);
-		ex.expect(NullPointerException.class);
-		ex.expectMessage("Source cannot be null");
-		try (Storage storage = sf.build(null, env);) {
-		}
-	}
+    @Test
+    public void testEmptyStoragePath() {
+        when(env.jersey()).thenReturn(jersey);
+        ex.expect(NullPointerException.class);
+        ex.expectMessage("Source cannot be null");
+        try (Storage storage = sf.build(null, env);) {
+        }
+    }
 
-	@Test
-	public void testListener() {
-		when(env.jersey()).thenReturn(jersey);
-		try (Storage build = sf.build(source, env);) {
-			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
-			verify(source).addListener(c.capture());
-			c.getValue().onEvent(Collections.emptyList());			
-		}
-	}
-	
-	@Test
-	public void testListenerWithNullArgument() {
-		when(env.jersey()).thenReturn(jersey);
-		try (Storage build = sf.build(source, env);) {
-			ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
-			verify(source).addListener(c.capture());
-			c.getValue().onEvent(null);			
-		}
-	}
+    @Test
+    public void testListener() {
+        when(env.jersey()).thenReturn(jersey);
+        try (Storage build = sf.build(source, env);) {
+            ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+            verify(source).addListener(c.capture());
+            c.getValue().onEvent(Collections.emptyList());
+        }
+    }
+
+    @Test
+    public void testListenerWithNullArgument() {
+        when(env.jersey()).thenReturn(jersey);
+        try (Storage build = sf.build(source, env);) {
+            ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+            verify(source).addListener(c.capture());
+            c.getValue().onEvent(null);
+        }
+    }
 }

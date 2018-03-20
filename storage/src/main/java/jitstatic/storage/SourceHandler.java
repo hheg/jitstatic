@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
@@ -34,29 +35,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jitstatic.StorageData;
 
 class SourceHandler {
-	private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);	
+    private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
 
-	public byte[] readStorageData(final InputStream is, final String type) throws JsonParseException, JsonMappingException, IOException {
-		Objects.requireNonNull(type);
-		return readByteArray(is);
-	}
+    public byte[] readStorageData(final InputStream is) throws JsonParseException, JsonMappingException, IOException {
+        return readByteArray(is);
+    }
 
-	public StorageData readStorage(final InputStream storageStream) throws IOException {
-		Objects.requireNonNull(storageStream);
-		try (final JsonParser parser = MAPPER.getFactory().createParser(storageStream);) {
-			return parser.readValueAs(StorageData.class);
-		}
-	}
+    public StorageData readStorage(final InputStream storageStream) throws IOException {
+        Objects.requireNonNull(storageStream);
+        try (final JsonParser parser = MAPPER.createParser(storageStream);) {
+            return parser.readValueAs(StorageData.class);
+        }
+    }
 
-	private byte[] readByteArray(final InputStream is) throws IOException {
-		Objects.requireNonNull(is);
-		final ByteArrayOutputStream buffer = new ByteArrayOutputStream(4096);
-		int nRead;
-		byte[] data = new byte[4096];
-		while ((nRead = is.read(data, 0, data.length)) != -1) {
-			buffer.write(data, 0, nRead);
-		}
-		buffer.flush();
-		return buffer.toByteArray();
-	}
+    private byte[] readByteArray(final InputStream is) throws IOException {
+        Objects.requireNonNull(is);
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream(4096);
+        int nRead;
+        byte[] data = new byte[4096];
+        while ((nRead = is.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
+        }
+        buffer.flush();
+        return buffer.toByteArray();
+    }
 }

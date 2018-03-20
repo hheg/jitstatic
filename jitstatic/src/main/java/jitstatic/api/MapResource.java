@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -89,22 +90,23 @@ public class MapResource {
 
         checkRef(ref);
 
-        final Future<StoreInfo> future = storage.get(key, ref);
-        final StoreInfo si = unwrap(future);
-        if (si == null) {
+        final CompletableFuture<Optional<StoreInfo>> future = storage.get(key, ref);
+        final Optional<StoreInfo> si = unwrap(future);
+        if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        final EntityTag tag = new EntityTag(si.getVersion());
+        final StoreInfo storeInfo = si.get();
+        final EntityTag tag = new EntityTag(storeInfo.getVersion());
         final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
 
         if (noChangeBuilder != null) {
             return noChangeBuilder.tag(tag).build();
         }
 
-        final StorageData data = si.getStorageData();
+        final StorageData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
         if (allowedUsers.isEmpty()) {
-            return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+            return Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                     .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
         }
 
@@ -117,7 +119,7 @@ public class MapResource {
             LOG.info("Resource " + key + "is denied for user " + user);
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        return Response.ok(si.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+        return Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
                 .tag(tag).build();
     }
 
@@ -138,12 +140,12 @@ public class MapResource {
 
         checkValidRef(ref);
 
-        final StoreInfo storeInfo = unwrap(storage.get(key, ref));
+        final Optional<StoreInfo> si = unwrap(storage.get(key, ref));
 
-        if (storeInfo == null) {
+        if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-
+        final StoreInfo storeInfo = si.get();
         final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
         if (allowedUsers.isEmpty()) {
             throw new WebApplicationException(Status.BAD_REQUEST);
@@ -182,8 +184,8 @@ public class MapResource {
             LOG.info("Resource " + data.getKey() + "is denied for user " + user);
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        final StoreInfo si = unwrap(storage.get(data.getKey(), data.getBranch()));
-        if (si != null) {
+        final Optional<StoreInfo> si = unwrap(storage.get(data.getKey(), data.getBranch()));
+        if (si != null && si.isPresent()) {
             throw new WebApplicationException(Status.CONFLICT);
         }
         final StoreInfo result = unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
@@ -219,7 +221,7 @@ public class MapResource {
 
     private void checkHeaders(final HttpHeaders headers) {
         final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
-        if (header.isEmpty()) {
+        if (header == null || header.isEmpty()) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
         boolean isValid = false; 
@@ -272,7 +274,7 @@ public class MapResource {
         if (future == null) {
             return null;
         }
-        try {
+        try {            
             return future.get();
         } catch (final InterruptedException | ExecutionException e) {
             LOG.error("Error while unwrapping future", e);
