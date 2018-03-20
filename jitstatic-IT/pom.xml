@@ -8,6 +8,18 @@
 	</parent>
 	<artifactId>jitstatic-IT</artifactId>
 	<dependencies>
+		<dependency>
+			<groupId>io.jitstatic</groupId>
+			<artifactId>jitstatic-client</artifactId>
+			<version>0.1.1</version>
+			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>commons-logging</groupId>
+					<artifactId>commons-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
 		<!-- Should only depend on the shaded jar, but eclipse isn't smart enough to understand that it is one. Fix this -->
 		<dependency>
 			<groupId>io.jitstatic</groupId>

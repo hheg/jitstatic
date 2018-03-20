@@ -20,18 +20,20 @@ package jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -52,11 +54,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
-import org.eclipse.jetty.http.HttpStatus;
+import org.apache.http.impl.client.cache.CacheConfig;
+import org.apache.http.impl.client.cache.CachingHttpClients;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
@@ -102,23 +103,14 @@ import io.dropwizard.setup.Environment;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
-import jitstatic.api.ModifyKeyData;
+import io.jitstatic.client.APIException;
+import io.jitstatic.client.CommitData;
+import io.jitstatic.client.JitStaticUpdaterClient;
+import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import jitstatic.hosted.HostedFactory;
 
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
- * Below is a composition of seen errors that might occur.
- *
- * Following errors might show:
- *
- * "Socket closed"
- * Sometimes when JGit is pushing or pulling it could end with a "Socket closed" exception. This seems to be a bug in JGit. However
- * I suspect it might have to do with an commit which doesn't contain any "changed" file, but still is a commit and this causes the
- * stream to "close". It's fairly common, but I don't have an air tight test case for it.
- *
- * "Cannot delete file ..."
- * Rarely JGit seems to want to delete a file on disk, but it can't somehow.
- *
  */
 @RunWith(Parameterized.class)
 @Category(LoadTest.class)
@@ -130,7 +122,6 @@ public class LoadTesterTest {
     private static final Logger LOG = LoggerFactory.getLogger(LoadTesterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final String S_STORAGE = "%s/storage/";
     private static final String UTF_8 = "UTF-8";
     private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -142,18 +133,22 @@ public class LoadTesterTest {
     private static final int A_UPDTRS = 10;
 
     private final DropwizardAppRule<JitstaticConfiguration> DW;
-    private final BlockingQueue<Client> clients = new LinkedBlockingDeque<>(A_CLIENTS);
+    private final BlockingQueue<JitStaticUpdaterClient> clients = new LinkedBlockingDeque<>(A_CLIENTS);
     private final BlockingQueue<ClientUpdater> updaters = new LinkedBlockingQueue<>(A_UPDTRS);
     private final String[] names;
     private final String[] branches;
+    private final boolean cache;
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][] { { new String[] { "a" }, new String[] { MASTER } },
-                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" } } });
+        return Arrays.asList(new Object[][] { { new String[] { "a" }, new String[] { MASTER }, false },
+                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" }, false },
+                { new String[] { "a" }, new String[] { MASTER }, true },
+                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" }, true } });
     }
 
-    public LoadTesterTest(String[] names, String[] branches) {
+    public LoadTesterTest(String[] names, String[] branches, boolean cache) {
+        this.cache = cache;
         this.names = names;
         this.branches = branches;
         this.versions = new ConcurrentHashMap<>();
@@ -172,23 +167,20 @@ public class LoadTesterTest {
 
     private final Map<String, Map<String, String>> versions;
     private UsernamePasswordCredentialsProvider provider;
-    private String basic;
 
     private String gitAdress;
-    private String storageAdress;
     private String adminAdress;
 
     @Before
-    public synchronized void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException {
+    public synchronized void setup()
+            throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
-        basic = getBasicAuth();
         int localPort = DW.getLocalPort();
         gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
-        storageAdress = String.format("http://localhost:%d/application", localPort);
         adminAdress = String.format("http://localhost:%d/admin", localPort);
         for (int i = 0; i < A_CLIENTS; i++) {
-            clients.add(buildClient("c " + i));
+            clients.add(buildKeyClient());
         }
         initRepo();
         for (int i = 0; i < A_UPDTRS; i++) {
@@ -250,7 +242,12 @@ public class LoadTesterTest {
             }
         } finally {
             statsClient.close();
-            clients.stream().forEach(c -> c.close());
+            clients.stream().forEach(c -> {
+                try {
+                    c.close();
+                } catch (Exception e1) {
+                }
+            });
         }
         LOG.info("Git updates: {}", GITUPDATES.get());
         LOG.info("Git failures: {}", GITFAILURES.get());
@@ -371,68 +368,55 @@ public class LoadTesterTest {
         String s = "{\"data\":\"" + c + "\"}";
         return s.getBytes(UTF_8);
     }
+    
+    private static Entity read(InputStream is, String tag, String contentType) {
+        try {
+            return new Entity(tag, MAPPER.readValue(is, JsonNode.class));
+        } catch (IOException e) {
+            LOG.error("ERROR READING ENTITY");
+            throw new UncheckedIOException(e);
+        }
+    }
 
     private void clientCode() throws InterruptedException, JsonParseException, JsonMappingException, IOException {
-        Client client = clients.take();
+        JitStaticUpdaterClient client = clients.take();
         try {
             for (String branch : branches) {
                 for (String name : names) {
-                    String ref = "?ref=refs/heads/" + branch;
-                    Response callTarget = getTarget(client, name, ref);
+                    String ref = "refs/heads/" + branch;
                     try {
-                        if (callTarget.getStatus() == HttpStatus.OK_200) {
-                            JsonNode entity = callTarget.readEntity(JsonNode.class);
-                            String v = versions.get(branch).get(name);
-                            if (!v.equals(entity.toString())) {
-                                LOG.error("TestSuiteError: Version comparison " + name + ":" + branch + " failed version=" + v + " actual="
-                                        + entity.toString());
-                            } else {
-                                if (Math.random() < 0.1) {
-                                    int c = entity.get("data").asInt() + 1;
-                                    Response modify = modifyTarget(client, name, ref, callTarget.getEntityTag().getValue(), c);
-                                    try {
-                                        if (modify.getStatus() != HttpStatus.OK_200) {
-                                            LOG.error("TestSuiteError: Failed to modify " + c + " " + modify);
-                                            PUTFAILURES.incrementAndGet();
-                                        } else {
-                                            PUTUPDATES.incrementAndGet();
-                                            versions.get(branch).put(name, new String(getData(c)));
-                                            LOG.info("Ok modified " + name + ":" + branch + " with " + c);
-                                        }
-                                    } finally {
-                                        modify.close();
-                                    }
+                        Entity entity = client.getKey(name, ref, LoadTesterTest::read);
+                        String v = versions.get(branch).get(name);
+                        if (!v.equals(entity.getValue().toString())) {
+                            LOG.error("TestSuiteError: Version comparison " + name + ":" + branch + " failed version=" + v + " actual="
+                                    + entity.getValue().toString());
+                        } else {
+                            if (Math.random() < 0.5) {
+                                int c = entity.getValue().get("data").asInt() + 1;
+                                try {
+                                    byte[] data = getData(c);
+                                    client.modifyKey(data, new CommitData(ref, name, "m:" + name + ":" + c, "user's name", "mail"),
+                                            entity.getTag());
+                                    PUTUPDATES.incrementAndGet();
+                                    versions.get(branch).put(name, new String(data));
+                                    LOG.info("Ok modified " + name + ":" + branch + " with " + c);
+                                } catch (APIException e) {
+                                    LOG.error("TestSuiteError: Failed to modify " + c + " " + e.getMessage());
+                                    PUTFAILURES.incrementAndGet();
+                                } catch (Exception e) {
+                                    PUTFAILURES.incrementAndGet();
+                                    LOG.error("TestSuiteError: General error " + c, e);
                                 }
                             }
-                        } else {
-                            LOG.error("TestSuiteError: Failed with " + callTarget);
                         }
-                    } finally {
-                        callTarget.close();
+                    } catch (Exception e) {
+                        LOG.error("TestSuiteError: Failed with ", e);
                     }
                 }
             }
         } finally {
             clients.put(client);
         }
-    }
-
-    private Response modifyTarget(Client client, String store, String ref, String oldVersion, int c)
-            throws JsonParseException, JsonMappingException, IOException {
-        ModifyKeyData data = new ModifyKeyData();
-        byte[] newData = getData(c);
-        data.setData(newData);
-        data.setMessage("m:" + store + ":" + c);
-        data.setUserMail("mail");
-        data.setUserInfo("user's name");
-        return client.target(String.format(S_STORAGE + store + ref, storageAdress)).request().header(HttpHeaders.ACCEPT, "application/json")
-                .header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
-                .buildPut(Entity.json(data)).invoke();
-    }
-
-    private Response getTarget(Client client, String store2, String ref) {
-        return client.target(String.format(S_STORAGE + store2 + ref, storageAdress)).request()
-                .header(HttpHeaders.AUTHORIZATION, basic).get();
     }
 
     private static boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) throws UnsupportedEncodingException {
@@ -448,8 +432,14 @@ public class LoadTesterTest {
         return false;
     }
 
-    private static String getBasicAuth() throws UnsupportedEncodingException {
-        return "Basic " + Base64.getEncoder().encodeToString((USER + ":" + PASSWORD).getBytes(UTF_8));
+    private JitStaticUpdaterClient buildKeyClient() throws URISyntaxException {
+        JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort())
+                .setAppContext("/application/storage/").setUser(USER).setPassword(PASSWORD);
+        if (cache) {
+            builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())
+                    .setHttpClientBuilder(CachingHttpClients.custom());
+        }
+        return builder.build();
     }
 
     private Client buildClient(final String name) {
@@ -539,5 +529,25 @@ public class LoadTesterTest {
                 }
             }
         }
+    }
+
+    private static class Entity {
+
+        private final JsonNode value;
+        private final String tag;
+
+        public Entity(String tag, final JsonNode value2) {
+            this.tag = tag;
+            this.value = value2;
+        }
+
+        public JsonNode getValue() {
+            return value;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
     }
 }

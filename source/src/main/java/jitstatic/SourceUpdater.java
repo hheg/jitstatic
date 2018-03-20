@@ -59,6 +59,11 @@ public class SourceUpdater {
 
     public String addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
             final String userInfo, final String userMail) throws IOException {
+        return addKey(fileEntry, ref, message, userInfo, userMail, "add");
+    }
+
+    private String addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
+            final String userInfo, final String userMail, final String method) throws IOException {
         Objects.requireNonNull(fileEntry);
         Objects.requireNonNull(ref);
         Objects.requireNonNull(message);
@@ -82,7 +87,7 @@ public class SourceUpdater {
             }
             buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-            final PersonIdent commiter = new PersonIdent("JitStatic API put operation", "none@nowhere.org");
+            final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
             final ObjectId inserted = buildCommit(ref, message, userInfo, userMail, objectInserter, fullTree, commiter);
             insertCommit(ref, rw, commiter, inserted);
             return blob.name();
@@ -91,7 +96,7 @@ public class SourceUpdater {
 
     public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo,
             final String userMail) throws IOException {
-        return addKey(Pair.of(Pair.of(key, data), null), ref, message, userInfo, userMail);
+        return addKey(Pair.of(Pair.of(key, data), null), ref, message, userInfo, userMail, "put");
     }
 
     private void insertCommit(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted)

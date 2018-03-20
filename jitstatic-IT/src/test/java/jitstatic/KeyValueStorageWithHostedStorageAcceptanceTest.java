@@ -1,7 +1,5 @@
 package jitstatic;
 
-import static org.junit.Assert.assertArrayEquals;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import static org.junit.Assert.assertArrayEquals;
  * #L%
  */
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
@@ -30,24 +29,17 @@ import static org.junit.Assert.assertThat;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Scanner;
 import java.util.SortedMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -66,23 +58,25 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
 import com.codahale.metrics.health.HealthCheck.Result;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.dropwizard.client.HttpClientBuilder;
-import io.dropwizard.client.HttpClientConfiguration;
-import io.dropwizard.client.JerseyClientBuilder;
-import io.dropwizard.setup.Environment;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
-import io.dropwizard.util.Duration;
-import jitstatic.api.AddKeyData;
-import jitstatic.api.ModifyKeyData;
+import io.jitstatic.client.APIException;
+import io.jitstatic.client.CommitData;
+import io.jitstatic.client.JitStaticCreatorClient;
+import io.jitstatic.client.JitStaticCreatorClientBuilder;
+import io.jitstatic.client.JitStaticUpdaterClient;
+import io.jitstatic.client.JitStaticUpdaterClientBuilder;
+import io.jitstatic.client.MetaData;
+import io.jitstatic.client.TriFunction;
 import jitstatic.hosted.HostedFactory;
 
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
@@ -93,14 +87,14 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     private static final String PASSWORD = "ssecret";
     private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private final HttpClientConfiguration HCC = new HttpClientConfiguration();
     private DropwizardAppRule<JitstaticConfiguration> DW;
     private String adress;
-    private String basic;
-    private String addBasic;
     @Rule
     public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
+
+    @Rule
+    public ExpectedException ex = ExpectedException.none();
 
     @Before
     public void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
@@ -110,11 +104,6 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         String pass = hostedFactory.getSecret();
         String servletName = hostedFactory.getServletName();
         String endpoint = hostedFactory.getHostedEndpoint();
-        basic = basicAuth(USER, PASSWORD);
-        addBasic = basicAuth(user, pass);
-        HCC.setConnectionRequestTimeout(Duration.minutes(1));
-        HCC.setConnectionTimeout(Duration.minutes(1));
-        HCC.setTimeout(Duration.minutes(1));
 
         setupRepo(user, pass, servletName, endpoint);
     }
@@ -146,119 +135,88 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     }
 
     @Test
-    public void testGetNotFoundKeyWithoutAuth() {
-        Client client = buildClient("test client");
-        try {
-            Response response = client.target(String.format("%s/storage/nokey", adress)).request().get();
-            assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
-        } finally {
-            client.close();
+    public void testGetNotFoundKeyWithoutAuth() throws Exception {
+        ex.expect(APIException.class);
+        ex.expectMessage("/application/storage/nokey failed with: 404 Not Found");
+        try (JitStaticUpdaterClient client = buildClient().build();) {
+            client.getKey("nokey", null, tf);
         }
     }
 
     @Test
-    public void testGetNotFoundKeyWithAuth() {
-        Client client = buildClient("test3 client");
-        try {
-            Response response = client.target(String.format("%s/storage/nokey", adress)).request().header(HttpHeaders.AUTHORIZATION, basic)
-                    .get();
-            assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
-        } finally {
-            client.close();
+    public void testGetNotFoundKeyWithAuth() throws Exception {
+        ex.expect(APIException.class);
+        ex.expectMessage("application/storage/nokey failed with: 404 Not Found");
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            client.getKey("nokey", null, tf);
         }
     }
 
     @Test
-    public void testGetAKeyValue() {
-        Client client = buildClient("test4 client");
-        try {
-            Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request()
-                    .header(HttpHeaders.AUTHORIZATION, basic).get();
-            assertEquals(getData(), response.readEntity(String.class));
-            assertNotNull(response.getEntityTag().getValue());
-        } finally {
-            client.close();
+    public void testGetAKeyValue() throws Exception {
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
+            assertEquals(getData(), key.data.toString());
+            assertNotNull(key.getTag());
         }
     }
 
     @Test
-    public void testGetAKeyValueWithoutAuth() {
-        Client client = buildClient("test2 client");
-        try {
-            Response response = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress)).request().get();
-            assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-        } finally {
-            client.close();
+    public void testGetAKeyValueWithoutAuth() throws Exception {
+        ex.expect(APIException.class);
+        ex.expectMessage("/application/storage/accept/storage failed with: 401 Unauthorized");
+        try (JitStaticUpdaterClient client = buildClient().build();) {
+            client.getKey(ACCEPT_STORAGE, null, tf);
         }
     }
 
     @Test
-    public void testModifyAKey() throws IOException {
-        Client client = buildClient("testmodify client");
-        try {
-            WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
-            Response response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
-            assertEquals(getData(), response.readEntity(String.class));
-            String oldVersion = response.getEntityTag().getValue();
-            ModifyKeyData data = new ModifyKeyData();
+    public void testModifyAKey() throws Exception {
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
+            assertEquals(getData(), key.data.toString());
+            String oldVersion = key.getTag();
             byte[] newData = "{\"one\":\"two\"}".getBytes(UTF_8);
-            response.close();
-            data.setData(newData);
-            data.setMessage("commit message");
-            data.setUserMail("user@mail");
-            data.setUserInfo("user");
-            String invoke = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
-                    .buildPut(Entity.json(data)).invoke(String.class);
-            assertNotEquals(oldVersion, invoke);
-            response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
-            assertEquals(new String(newData), response.readEntity(String.class));
-            response.close();
-        } finally {
-            client.close();
-        }
-    }
-    
-    @Test
-    public void testPrettifiedKey() throws JsonProcessingException, IOException {
-        Client client = buildClient("testmodify client");
-        try {
-            WebTarget target = client.target(String.format("%s/storage/" + ACCEPT_STORAGE, adress));
-            Response response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
-            assertEquals(getData(), response.readEntity(String.class));
-            String oldVersion = response.getEntityTag().getValue();
-            ModifyKeyData data = new ModifyKeyData();
-            byte[] prettyData = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData()));            
-            response.close();
-            data.setData(prettyData);
-            data.setMessage("commit message");
-            data.setUserMail("user@mail");
-            data.setUserInfo("user");
-            String invoke = target.request().header(HttpHeaders.AUTHORIZATION, basic).header(HttpHeaders.IF_MATCH, "\"" + oldVersion + "\"")
-                    .buildPut(Entity.json(data)).invoke(String.class);
-            assertNotEquals(oldVersion, invoke);
-            response = target.request().header(HttpHeaders.AUTHORIZATION, basic).get();
-            assertEquals(new String(prettyData), response.readEntity(String.class));
-            response.close();
-        } finally {
-            client.close();
+            String modifyKey = client.modifyKey(newData, new CommitData("master", ACCEPT_STORAGE, "commit message", "user1", "user@mail"),
+                    key.getTag());
+            assertNotEquals(oldVersion, modifyKey);
+            key = client.getKey(ACCEPT_STORAGE, null, tf);
+            assertEquals(new String(newData), key.data.toString());
         }
     }
 
     @Test
-    public void testAddKey() throws JsonProcessingException, IOException {
-        Client client = buildClient("add key");
-        try {
-            Response response = client.target(String.format("%s/storage", adress)).request().header(HttpHeaders.AUTHORIZATION, addBasic)
-                    .post(Entity.json(new AddKeyData("test", "refs/heads/master", getData().getBytes(UTF_8),
-                            new StorageData(new HashSet<>(), "application/json"), "testmessage", "user", "test@test.com")));
-            assertEquals(Status.OK.getStatusCode(), response.getStatus());
-            assertNotNull(response.getEntityTag().getValue());
-            byte[] readEntity = response.readEntity(byte[].class);
-            assertArrayEquals(getData().getBytes(UTF_8), readEntity);
-            assertEquals(response.getHeaderString(HttpHeaders.CONTENT_TYPE), "application/json");
-            response.close();
-        } finally {
-            client.close();
+    public void testPrettifiedKey() throws Exception {
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<String> key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
+            assertEquals(getData(), key.data.toString());
+            String oldVersion = key.getTag();
+            byte[] prettyData = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData()));
+            String modifyKey = client.modifyKey(prettyData,
+                    new CommitData("master", ACCEPT_STORAGE, "commit message", "user1", "user@mail"), key.getTag());
+            assertNotEquals(oldVersion, modifyKey);
+            key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
+            assertEquals(new String(prettyData), key.data);
+        }
+    }
+
+    @Test
+    public void testAddKey() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort())
+                .setAppContext("/application/").setUser(user).setPassword(pass);
+
+        try (JitStaticCreatorClient client = builder.build(); JitStaticUpdaterClient getter = buildClient().build()) {
+            Entity<String> createKey = client.createKey(getData().getBytes(UTF_8),
+                    new CommitData("master", "newkey", "commit message", "user1", "user@mail"),
+                    new MetaData(new HashSet<>(), "application/json"), stringFactory);
+            assertNotNull(createKey.getTag());
+            assertArrayEquals(getData().getBytes(UTF_8), createKey.data.getBytes(UTF_8));
+            Entity<String> key = getter.getKey("newkey", stringFactory);
+            assertArrayEquals(getData().getBytes(UTF_8), key.data.getBytes(UTF_8));
+            assertEquals(createKey.getTag(), key.getTag());
         }
     }
 
@@ -272,11 +230,9 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         };
     }
 
-    private Client buildClient(final String name) {
-        Environment env = DW.getEnvironment();
-        JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(env);
-        jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(env).using(HCC));
-        return jerseyClientBuilder.build(name);
+    private JitStaticUpdaterClientBuilder buildClient() {
+        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort())
+                .setAppContext("/application/storage/");
     }
 
     private void writeFile(Path workBase, String file) throws IOException {
@@ -287,10 +243,6 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         }
     }
 
-    private String basicAuth(String user, String pass) throws UnsupportedEncodingException {
-        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(UTF_8));
-    }
-
     private static String getData() {
         return getData(0);
     }
@@ -299,4 +251,40 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         return "{\"key" + c
                 + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
+
+    private TriFunction<InputStream, String, String, Entity<String>> stringFactory = (is, v, t) -> {
+        try (Scanner s = new Scanner(is).useDelimiter("\\A")) {
+            String result = s.hasNext() ? s.next() : "";
+            return new Entity<String>(v, t, result);
+        }
+    };
+
+    static class Entity<T> {
+
+        final T data;
+        private final String tag;
+        private final String contentType;
+
+        public Entity(String tag, String contentType, T data) {
+            this.tag = tag;
+            this.contentType = contentType;
+            this.data = data;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
+        public String getContentType() {
+            return contentType;
+        }
+    }
+
+    private TriFunction<InputStream, String, String, Entity<JsonNode>> tf = (is, v, t) -> {
+        try {
+            return new Entity<>(v, t, MAPPER.readValue(is, JsonNode.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    };
 }
