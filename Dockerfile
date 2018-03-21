@@ -8,6 +8,7 @@ ENV WORK_DIR /home/jitstatic
 ENV VOL ${WORK_DIR}/db
 ENV JITSTATIC_FILE jitstatic-${JITSTATIC_VERSION}.jar
 ENV JITSTATIC_CONF config.yml
+ENV JAVA_OPTS=
 
 WORKDIR ${WORK_DIR}
 
@@ -20,6 +21,7 @@ VOLUME ${VOL}
 EXPOSE 8085
 
 ENTRYPOINT exec java \
+	${JAVA_OPTS} \
 	-Ddw.hosted.basePath=${VOL} \
 	-Ddw.hosted.userName=${USER} \
 	-Ddw.hosted.secret=${PASS} \
