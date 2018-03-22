@@ -1,4 +1,4 @@
-FROM frolvlad/alpine-oraclejre8:full
+FROM frolvlad/alpine-oraclejre9:full
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 

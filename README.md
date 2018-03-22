@@ -44,7 +44,7 @@ storage is the key-value end point and hosted is the git end point.
 ### Docker:
 ```bash
 docker pull hheg/jitstatic:latest
-docker run -d hheg/jitstatic:latest -e USER=huser -e PASS=hseCr3t
+docker run -d -p 8085:8085 hheg/jitstatic:latest -e USER=huser -e PASS=hseCr3t
 ```
 Now the container is reachable on port 8085
 

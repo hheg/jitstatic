@@ -167,25 +167,30 @@ public class GitStorage implements Storage {
                     cache.put(finalRef, map);
                 }
                 return map;
-            }, refExecutor).thenApplyAsync((map) -> {
-                final Optional<StoreInfo> sd = this.loadAndStore(map, key, finalRef);
-                if (sd == null) {
+            }, refExecutor).thenApplyAsync((map) -> {               
+                try {
+                    return loadAndStore(map, key, finalRef);
+                } catch (final RefNotFoundException e) {
                     removeCacheRef(finalRef, map);
+                    return Optional.empty();
                 }
-                return sd;
             }, keyExecutor);
         }
 
         final Optional<StoreInfo> storeInfo = refMap.get(key);
         if (storeInfo == null) {
             return CompletableFuture.supplyAsync(() -> {
-                return this.loadAndStore(refMap, key, finalRef);
+                try {
+                    return loadAndStore(refMap, key, finalRef);
+                } catch (final RefNotFoundException e) {
+                    return Optional.empty();
+                }
             }, keyExecutor);
         }
         return CompletableFuture.completedFuture(storeInfo);
     }
 
-    private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key, final String ref) {
+    private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key, final String ref) throws RefNotFoundException {
         Optional<StoreInfo> storeInfoContainer = keyStorage.get(key);
         if (storeInfoContainer == null) {
             try {
@@ -193,7 +198,7 @@ public class GitStorage implements Storage {
                 storeInfoContainer = Optional.ofNullable(storeInfo);
                 keyStorage.put(key, storeInfoContainer);
             } catch (final RefNotFoundException e) {
-                return null;
+                throw e;
             } catch (final Exception e) {
                 consumeError(e);
             }
@@ -240,7 +245,7 @@ public class GitStorage implements Storage {
 
     @Override
     public CompletableFuture<String> put(final byte[] data, final String oldVersion, final String message, final String userInfo,
-            String userEmail, final String key, String ref) {
+            final String userEmail, final String key, String ref) {
         ref = checkRef(ref);
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");

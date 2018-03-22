@@ -22,7 +22,6 @@ package jitstatic.api;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +60,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
+import io.dropwizard.auth.Authorizer;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit.ResourceTestRule;
 import jitstatic.StorageData;
@@ -88,14 +88,14 @@ public class MapResourceTest {
         try {
             BASIC_AUTH_CRED = "Basic " + Base64.getEncoder().encodeToString((USER + ":" + SECRET).getBytes(UTF_8));
         } catch (UnsupportedEncodingException e) {
-            throw new Error(e);
+            throw new RuntimeException(e);
         }
     }
     static {
         try {
             BASIC_AUTH_CRED_POST = "Basic " + Base64.getEncoder().encodeToString((PUSER + ":" + PSECRET).getBytes(UTF_8));
         } catch (UnsupportedEncodingException e) {
-            throw new Error(e);
+            throw new RuntimeException(e);
         }
     }
     private Storage STORAGE = mock(Storage.class);
@@ -110,7 +110,12 @@ public class MapResourceTest {
     public ResourceTestRule RESOURCES = ResourceTestRule.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm("jitstatic").setAuthorizer(new Authorizer<User>() {
+                                @Override
+                                public boolean authorize(User u, String r) {
+                                    return true;
+                                }
+                            }).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MapResource(STORAGE, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
@@ -156,7 +161,7 @@ public class MapResourceTest {
     public void testKeyNotFound() {
         ex.expect(WebApplicationException.class);
         ex.expectMessage(Status.NOT_FOUND.toString());
-        when(STORAGE.get(any(), Mockito.anyString())).thenReturn(null);
+        when(STORAGE.get(Mockito.eq("cat"), Mockito.any())).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         RESOURCES.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(StorageData.class);
     }
 
@@ -249,6 +254,7 @@ public class MapResourceTest {
     public void testPutADeletedKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         ModifyKeyData data = new ModifyKeyData();
+        when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         byte[] readTree = "{\"food\" : [\"treats\",\"meat\"]}".getBytes(UTF_8);
         data.setMessage("message");
         data.setData(readTree);
@@ -330,6 +336,7 @@ public class MapResourceTest {
     @Test
     public void testPutAMissingKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
+        when(STORAGE.get(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -382,9 +389,9 @@ public class MapResourceTest {
     public void testPutKeyIsFoundButNotFoundWhenModifying() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(STORAGE.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
+        when(STORAGE.get(Mockito.eq("dog"), Mockito.any())).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(STORAGE.put(Mockito.any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any(), Mockito.eq("dog"),
-                Mockito.eq(null))).thenReturn(null);
+                Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -553,6 +560,7 @@ public class MapResourceTest {
     @Test
     public void testAddKey() throws JsonProcessingException {
         StoreInfo si = new StoreInfo(new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON), "1");
+        when(STORAGE.get(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(STORAGE.add(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
                 Mockito.any())).thenReturn(CompletableFuture.completedFuture(si));
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
@@ -601,6 +609,7 @@ public class MapResourceTest {
         CompletableFuture<StoreInfo> runAsync = CompletableFuture.supplyAsync(() -> {
             throw new WrappingAPIException(new KeyAlreadyExist("test", REFS_HEADS_MASTER));
         });
+        when(STORAGE.get(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
@@ -616,6 +625,7 @@ public class MapResourceTest {
         CompletableFuture<StoreInfo> runAsync = CompletableFuture.supplyAsync(() -> {
             throw new WrappingAPIException(new RefNotFoundException(REFS_HEADS_MASTER));
         });
+        when(STORAGE.get(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
@@ -631,6 +641,7 @@ public class MapResourceTest {
         CompletableFuture<StoreInfo> runAsync = CompletableFuture.supplyAsync(() -> {
             throw new WrappingAPIException(new IOException("Data is malformed"));
         });
+        when(STORAGE.get(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(STORAGE.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(runAsync);
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
