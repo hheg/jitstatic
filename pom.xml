@@ -23,7 +23,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.build.fileEncoding>UTF-8</project.build.fileEncoding>
 		<jackson.version>2.9.4</jackson.version>
-		<jetty.version>9.4.7.v20170914</jetty.version>
+		<jetty.version>9.4.8.v20171121</jetty.version>
 		<log4j.version>2.11.0</log4j.version>
 		<metrics.version>4.0.2</metrics.version>
 	</properties>
@@ -203,6 +203,13 @@
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-dependency-plugin</artifactId>
 					<version>3.0.2</version>
+					<dependencies>
+						<dependency>
+							<groupId>org.ow2.asm</groupId>
+							<artifactId>asm</artifactId>
+							<version>6.1</version>
+						</dependency>
+					</dependencies>
 				</plugin>
 				<plugin>
 					<groupId>com.github.spotbugs</groupId>
@@ -232,7 +239,7 @@
 				<plugin>
 					<groupId>org.jacoco</groupId>
 					<artifactId>jacoco-maven-plugin</artifactId>
-					<version>0.8.0</version>
+					<version>0.8.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.codehaus.mojo</groupId>

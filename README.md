@@ -44,7 +44,7 @@ storage is the key-value end point and hosted is the git end point.
 ### Docker:
 ```bash
 docker pull hheg/jitstatic:latest
-docker run -d -p 8085:8085 hheg/jitstatic:latest -e USER=huser -e PASS=hseCr3t
+docker run -e USER=huser -e PASS=hseCr3t -d -p 8085:8085 hheg/jitstatic:latest
 ```
 Now the container is reachable on port 8085
 
@@ -89,7 +89,7 @@ This should start JitStatic on port 8085.
 
 Now you can clone the git repository with:
 ```bash
-git clone http://localhost:8085/app/jitstatic/jitstatic.git
+git clone http://localhost:8085/app/jitstatic/git
 Warning: You seem to have cloned an empty repository
 ```
 In you target directory create a key store file:

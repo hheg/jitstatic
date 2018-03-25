@@ -60,7 +60,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
-import io.dropwizard.auth.Authorizer;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit.ResourceTestRule;
 import jitstatic.StorageData;
@@ -110,12 +109,7 @@ public class MapResourceTest {
     public ResourceTestRule RESOURCES = ResourceTestRule.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer(new Authorizer<User>() {
-                                @Override
-                                public boolean authorize(User u, String r) {
-                                    return true;
-                                }
-                            }).buildAuthFilter()))
+                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MapResource(STORAGE, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 

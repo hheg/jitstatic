@@ -1,4 +1,4 @@
-FROM frolvlad/alpine-oraclejre9:full
+FROM openjdk:9.0.4-12-jre-slim-sid
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 
