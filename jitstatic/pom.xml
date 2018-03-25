@@ -242,7 +242,7 @@
 										<Implementation-Version>${git.commit.id}</Implementation-Version>
 										<Specification-Version>${project.version}</Specification-Version>
 									</manifestEntries>
-									<mainClass>jitstatic.JitstaticApplication</mainClass>
+									<mainClass>io.jitstatic.JitstaticApplication</mainClass>
 								</transformer>
 							</transformers>
 						</configuration>
