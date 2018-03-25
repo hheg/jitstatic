@@ -5,7 +5,7 @@ env:
   - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
   - USERNAME=hheg
 jdk:
-- oraclejdk8
+- oraclejdk9
 sudo: required
 install: true
 script:

@@ -15,6 +15,6 @@ logging:
 hosted:
     basePath: file:/tmp/jitstatic/remote
     servletName: jitstatic
-    hostedEndpoint: jitstatic.git
+    hostedEndpoint: git
     userName: huser
     secret: hseCr3t

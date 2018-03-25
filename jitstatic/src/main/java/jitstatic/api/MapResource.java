@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -89,10 +88,9 @@ public class MapResource {
             final @Context Request request) {
 
         checkRef(ref);
-
-        final CompletableFuture<Optional<StoreInfo>> future = storage.get(key, ref);
-        final Optional<StoreInfo> si = unwrap(future);
-        if (si == null || !si.isPresent()) {
+        
+        final Optional<StoreInfo> si = unwrap(storage.get(key, ref));
+        if (!si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         final StoreInfo storeInfo = si.get();
@@ -142,7 +140,7 @@ public class MapResource {
 
         final Optional<StoreInfo> si = unwrap(storage.get(key, ref));
 
-        if (si == null || !si.isPresent()) {
+        if (!si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         final StoreInfo storeInfo = si.get();
@@ -185,7 +183,7 @@ public class MapResource {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
         final Optional<StoreInfo> si = unwrap(storage.get(data.getKey(), data.getBranch()));
-        if (si != null && si.isPresent()) {
+        if (si.isPresent()) {
             throw new WebApplicationException(Status.CONFLICT);
         }
         final StoreInfo result = unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
@@ -243,9 +241,6 @@ public class MapResource {
     }
 
     private static <T> T unwrapWithPUTApi(final Future<T> future) {
-        if (future == null) {
-            return null;
-        }
         try {
             return future.get();
         } catch (final InterruptedException e) {
@@ -270,15 +265,12 @@ public class MapResource {
         }
     }
 
-    private static <T> T unwrap(Future<T> future) {
-        if (future == null) {
-            return null;
-        }
+    private static <T> Optional<T> unwrap(final Future<Optional<T>> future) {        
         try {            
             return future.get();
         } catch (final InterruptedException | ExecutionException e) {
             LOG.error("Error while unwrapping future", e);
-            return null;
+            return Optional.empty();
         }
     }
 
