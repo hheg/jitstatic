@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -121,11 +122,11 @@ public class GitStorageTest {
 
             gs.reload(Arrays.asList(REF_HEADS_MASTER));
             StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null), SHA_1);
-            assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().getData()));
+            assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().get().getData()));
             when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
             gs.reload(Arrays.asList(REF_HEADS_MASTER));
             storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users, null), SHA_2);
-            assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().getData()));
+            assertTrue(Arrays.equals(storage.getData(), gs.get("key", null).get().get().getData()));
             gs.checkHealth();
         }
     }
@@ -152,10 +153,10 @@ public class GitStorageTest {
             when(si2.getSourceVersion()).thenReturn(SHA_2);
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
             when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
-            Future<StoreInfo> key3Data = gs.get("key3", null);
-            Future<StoreInfo> key4Data = gs.get("key4", null);
-            assertNotNull(key3Data.get());
-            assertNotNull(key4Data.get());
+            Future<Optional<StoreInfo>> key3Data = gs.get("key3", null);
+            Future<Optional<StoreInfo>> key4Data = gs.get("key4", null);
+            assertNotNull(key3Data.get().get());
+            assertNotNull(key4Data.get().get());
             gs.checkHealth();
         }
     }
@@ -243,12 +244,12 @@ public class GitStorageTest {
             when(si2.getSourceVersion()).thenReturn(SHA_2);
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si1);
             when(source.getSourceInfo(Mockito.eq("key4"), Mockito.anyString())).thenReturn(si2);
-            Future<StoreInfo> key3Data = gs.get("key3", null);
+            Future<Optional<StoreInfo>> key3Data = gs.get("key3", null);
             assertNotNull(key3Data.get());
-            Future<StoreInfo> key4Data = gs.get("key4", null);
+            Future<Optional<StoreInfo>> key4Data = gs.get("key4", null);
             assertNotNull(key4Data.get());
             key4Data = gs.get("key4", REF_HEADS_MASTER);
-            assertNotNull(key4Data.get());
+            assertNotNull(key4Data.get().get());
             gs.checkHealth();
         }
 
@@ -268,15 +269,15 @@ public class GitStorageTest {
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
             when(source.modify(Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
                     Mockito.eq(key), Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2));
-            Future<StoreInfo> first = gs.get(key, null);
-            StoreInfo storeInfo = first.get();
+            Future<Optional<StoreInfo>> first = gs.get(key, null);
+            StoreInfo storeInfo = first.get().get();
             assertNotNull(storeInfo);
             assertNotEquals(data, storeInfo.getData());
             CompletableFuture<String> put = gs.put(data, SHA_1, message, userInfo, "", key, null);
             String newVersion = put.get();
             assertEquals(SHA_2, newVersion);
             first = gs.get(key, null);
-            storeInfo = first.get();
+            storeInfo = first.get().get();
             assertNotNull(storeInfo);
             assertEquals(data, storeInfo.getData());
         }
@@ -327,8 +328,8 @@ public class GitStorageTest {
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
             when(source.modify(Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo), Mockito.anyString(),
                     Mockito.eq(key), Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2));
-            Future<StoreInfo> first = gs.get(key, null);
-            StoreInfo storeInfo = first.get();
+            Future<Optional<StoreInfo>> first = gs.get(key, null);
+            StoreInfo storeInfo = first.get().get();
             assertNotNull(storeInfo);
             assertNotEquals(data, storeInfo.getData());
             CompletableFuture<String> put = gs.put(data, SHA_1, message, userInfo, null, "other", null);
