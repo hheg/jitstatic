@@ -4,6 +4,7 @@ env:
   - secure: tMoDXYzAle9W78MfAgMFuVnHaFH54ogQoyndxq2NORMK/IEGcA7dm0cBK1VbwAeSLzjIljE0o1azJEB4OKNgW+xQ6NCAkqsybbTd4FGCndmHBiioJcr0jO2+9In5TbtDjWcRpigYilgkKcir13NjGCQO+Fk+vYvCU5hcRlB2mELtj/lLjhA0jKgfMOHNLuEU24h0EmeVTv7x/FRKuZv6AteexhQU0gXBR47sBF2Toyb9ge0ZqIU7fa3xYaTRwuZ/SVVF9iEXsYKuhiRA0pCqYgNPhikuy9mQiRircnjgsiSaxjFWrtWM64KMW2PdQ6GWAHwE+nTdbBH1i+66qs07MHeq4wpj1rVxtZDWXs2/eX4NX+cZWuo1ZLwr/P86xGHiuKe0tbi72MK89q97eK7PoGZN8plcbVHR/szr5y3/EC4txOFDUMzSWyypgPZSDwlxUve7cQxD1sZn5joq/gxu3o4aaF6qrhDdMr6yCc20nQzek8X+kmJu6ldc7O5dxba+VZd7GOw3ICi/pmw1GnkGoIhb5gO8Flxd1ngMlmZV+lNZ/4cs4obyiRv9uQi3DlZSoi08kAg7WP1dQUPvBm7a6UUJ3BXw1HeZdG6VqALcKzaRVyDZEvrv/7/rI9LhQDBJ+QzksChHULKZtiPI2Gg4xuVEPD1HEwomNMzRw0uoCt4=
   - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
   - USERNAME=hheg
+  - secure: E04BqPnJGz+DP5lNUL/KKdx5TGIMRE3vBhUd5e9ARQxUtNiiL5LuYHdTZyg3uTvk1DbeE+dqKSimQ4Qy9p1BtOVyJ9ltfgJlGjbfi1i7f98vt4z48gU9SPgJCB848DJODVg1Wv7qjt0UfQZyQrkxv61yaGWta2LtK26arD62ztLS59QUV3wwnpujuoipSEDCDcYzWuRIsVJoHRlrx+I96qdVA6GE4XomyrVbJ2zBQQd035iwCu64cVY2s7e52YS29rgT6qKMbNug9loFwPSSs4SJPpCxxKiSMtoiqd8/Ug+OamvUE+pMYpTSsSauU1YK2x9HzZmWOkqNmegfnFYMtOD0aM8VmsOrmfI28kJHZR6ZYXa9wFT47rCuPRnX+AZBKryi073KUF1oqSj8DbufHlO0Mm293ARou1sgfVxqFyrTYRvP6UVG5iiIrm/lP/bcTmSxRk1oSWIH8CS/fXd3RriBNsq6tLOk7uj7Iz2sFQuwcT/p/k04qtVN0s5hSxuob8XVil7x0sBz0mLn/3npE+gH/dsUAG2i8vaAYTb8LkK1N6wXiOJUwl5yfvja/Qwz66AJH8OpiIbmGsOeha91m1UyfKLo8ImcGvAS8gYHjCSJ4HBKWZFegG79OV+Q5de9GL0jDm1w8FcYa0UjkxhYZ5uwAkRaX8PXErwcSBZiNSI=
 jdk:
 - oraclejdk9
 sudo: required
@@ -13,8 +14,8 @@ script:
 - cp jitstatic/target/binary/jitstatic.jar $FILE
 - mvn test jacoco:report coveralls:report
 after_success:
-- chmod +x docker_deploy.sh && chmod +x docker_build.sh 
-- ./docker_deploy.sh $USERNAME $DOCKER_PASSWORD
+- chmod +x docker_deploy.sh && chmod +x docker_build.sh
+- "./docker_deploy.sh $USERNAME $DOCKER_PASSWORD"
 deploy:
   provider: releases
   skip_cleanup: true
