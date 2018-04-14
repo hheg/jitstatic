@@ -55,33 +55,38 @@ To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
-INFO  [2018-03-03 23:15:29,026] org.eclipse.jetty.util.log: Logging initialized @1374ms to org.eclipse.jetty.util.log.Slf4jLog
-INFO  [2018-03-03 23:15:29,090] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-03-03 23:15:29,091] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-03-03 23:15:29,098] jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
-INFO  [2018-03-03 23:15:29,237] jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
-INFO  [2018-03-03 23:15:29,271] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-03-03 23:15:29,272] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-03-03 23:15:29,273] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-03-03 23:15:29,385] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-03-03 23:15:29,387] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT
-INFO  [2018-03-03 23:15:29,994] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
+INFO  [2018-04-14 17:58:29,514] org.eclipse.jetty.util.log: Logging initialized @1751ms to org.eclipse.jetty.util.log.Slf4jLog
+INFO  [2018-04-14 17:58:29,596] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-04-14 17:58:29,597] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-04-14 17:58:29,603] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
+INFO  [2018-04-14 17:58:29,743] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
+INFO  [2018-04-14 17:58:29,776] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-04-14 17:58:29,776] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-04-14 17:58:29,778] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
+INFO  [2018-04-14 17:58:29,878] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@3009eed7{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
+INFO  [2018-04-14 17:58:29,880] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT, build timestamp: 2017-11-21T22:27:37+01:00, git hash: 82b8fb23f757335bb3329d540ce37a2a2615f0a8
+INFO  [2018-04-14 17:58:30,546] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
-    GET     /info/commitid (jitstatic.api.JitstaticInfoResource)
-    GET     /info/version (jitstatic.api.JitstaticInfoResource)
-    POST    /storage (jitstatic.api.MapResource)
-    GET     /storage/{key : .+} (jitstatic.api.MapResource)
-    PUT     /storage/{key : .+} (jitstatic.api.MapResource)
+    GET     /info/commitid (io.jitstatic.api.JitstaticInfoResource)
+    GET     /info/version (io.jitstatic.api.JitstaticInfoResource)
+    GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
+    PUT     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
+    POST    /storage (io.jitstatic.api.MapResource)
+    GET     /storage/{key : .+} (io.jitstatic.api.MapResource)
+    PUT     /storage/{key : .+} (io.jitstatic.api.MapResource)
 
-INFO  [2018-03-03 23:15:30,004] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@db99785{/app,null,AVAILABLE}
-INFO  [2018-03-03 23:15:30,011] io.dropwizard.setup.AdminEnvironment: tasks = 
+WARN  [2018-04-14 17:58:30,549] org.glassfish.jersey.internal.Errors: The following warnings have been detected: WARNING: Parameter authFilterClass of type java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> from private final java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> io.dropwizard.auth.AuthDynamicFeature.authFilterClass is not resolvable to a concrete type.
+WARNING: Parameter authFilterClass of type java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> from private final java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> io.dropwizard.auth.AuthDynamicFeature.authFilterClass is not resolvable to a concrete type.
+
+INFO  [2018-04-14 17:58:30,556] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@598778cc{/app,null,AVAILABLE}
+INFO  [2018-04-14 17:58:30,561] io.dropwizard.setup.AdminEnvironment: tasks = 
 
     POST    /tasks/log-level (io.dropwizard.servlets.tasks.LogConfigurationTask)
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
-INFO  [2018-03-03 23:15:30,023] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@49edcb30{/admin,null,AVAILABLE}
-INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@76464795{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-03-03 23:15:30,042] org.eclipse.jetty.server.Server: Started @2391ms
+INFO  [2018-04-14 17:58:30,567] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@120411ec{/admin,null,AVAILABLE}
+INFO  [2018-04-14 17:58:30,573] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@3009eed7{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-04-14 17:58:30,574] org.eclipse.jetty.server.Server: Started @2812ms
 
 ```
 
@@ -235,7 +240,7 @@ You can't use the modify API on a tag since tags are immutable. You can still ch
 
 ### API for creating keys
 
-You can create a key by just POSTing the content to the server. Since there are no information about who can do what on the server, the user to do this is the same one for the git access point.
+You can create a key by just POSTing the content to the server. Since there are no information about who can do what on the server, the user to do this is the same one for the git access point, ie the master password.
 
 ```
 curl -i -H 'Content-Type: application/json' \
@@ -282,10 +287,45 @@ Fast-forward
 ```
 
 
-### API for modifying 
+### API for modifying a key's metadata
 
-There's also an API for remotley change a key metadata file.
+There's also an API for remotely change a key's metadata file using the master password.
+```bash
+curl --user huser:hseCr3t -i http://localhost:8085/app/metakey/hello_world
+
+HTTP/1.1 200 OK
+Date: Sat, 14 Apr 2018 18:08:51 GMT
+Content-Encoding: utf-8
+ETag: "9eaea0b295e8daa399924a2961cd25958381aa59"
+Content-Type: application/json
+Content-Length: 79
+
+{"users":[{"user":"user1","password":"1234"}],"contentType":"application/json"}
+```
+Then you'd take that tag information and use that in the PUT operation.
+```bash
+curl -i -H 'Content-Type: application/json' \
+-H 'If-Match: "9eaea0b295e8daa399924a2961cd25958381aa59"' \
+--user huser:hseCr3t -X PUT \
+-d '{"message":"msg","userInfo":"ui","userMail":"mail","metaData":{"users":[{"user":"user1","password":"1234"}],"contentType":"plain/text"}}' \
+http://localhost:8085/app/metakey/hello_world
+
+HTTP/1.1 200 OK
+Date: Sat, 14 Apr 2018 18:11:52 GMT
+ETag: "bc42a0f75a4850525194b28fc8e419efbfec334a"
+Content-Encoding: utf-8
+Content-Length: 0
 ```
 
+## Java client
+
+You can find a Java client for jitstatic at 
+
+```xml
+<dependency>
+    <groupId>io.jitstatic</groupId>
+    <artifactId>jitstatic-client</artifactId>
+    <version>0.2.2</version>
+</dependency>
 ```
 
