@@ -31,7 +31,7 @@ import io.jitstatic.auth.User;
 
 public class SourceJSONParser {
 
-    private static final ObjectMapper mapper = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
+    private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
 
     public String parse(final InputStream bc) throws IOException {
         final StorageData metaData = parseStream(bc);
@@ -46,7 +46,7 @@ public class SourceJSONParser {
 
     private StorageData parseStream(final InputStream bc) throws StorageParseException {
         try {
-            return mapper.readValue(bc, StorageData.class);
+            return MAPPER.readValue(bc, StorageData.class);
         } catch (final IOException e) {
             final Throwable cause = e.getCause();
             throw new StorageParseException((cause != null ? cause.getMessage() : "Unknown error"), e);
@@ -84,6 +84,6 @@ public class SourceJSONParser {
     }
 
     public void parseJson(final InputStream is) throws IOException {
-        mapper.readTree(is);
+        MAPPER.readTree(is);
     }
 }

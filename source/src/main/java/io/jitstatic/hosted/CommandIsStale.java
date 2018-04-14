@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,12 +20,14 @@ package io.jitstatic.storage;
  * #L%
  */
 
-public class KeyAlreadyExist extends RuntimeException {
+import org.eclipse.jgit.lib.ObjectId;
 
-    private static final long serialVersionUID = 3551414727296198256L;
+class CommandIsStale extends Exception {
 
-    public KeyAlreadyExist(final String key, final String branch) {
-        super(key + " already exist in branch " + branch);
+    private static final long serialVersionUID = 1L;
+
+    public CommandIsStale(final String refName, final ObjectId oldId, final ObjectId newRefId) {
+        super(String.format("%s %s is now %s", refName, oldId.name(), newRefId.name()));
     }
 
     @Override

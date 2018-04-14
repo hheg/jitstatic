@@ -21,6 +21,7 @@ package io.jitstatic.source;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,66 +35,95 @@ import org.mockito.Mockito;
 
 import io.jitstatic.FileObjectIdStore;
 import io.jitstatic.MetaFileData;
+import io.jitstatic.RepositoryDataError;
 import io.jitstatic.SourceFileData;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.source.SourceInfo;
 
 public class SourceInfoTest {
 
-	@Rule
-	public ExpectedException ex = ExpectedException.none();
+    @Rule
+    public ExpectedException ex = ExpectedException.none();
 
-	private static final String SHA_1 = "5f12e3846fef8c259efede1a55e12667effcc461";
+    private static final String SHA_1 = "5f12e3846fef8c259efede1a55e12667effcc461";
 
-	@Test
-	public void testSourceInfo() throws IOException {
-		InputStream is = Mockito.mock(InputStream.class);
-		
-		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
-		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
-		
-		Mockito.when(ish.inputStream()).thenReturn(is);
-		Mockito.when(fois.getObjectId()).thenReturn(ObjectId.fromString(SHA_1));
-		Mockito.when(ish.isPresent()).thenReturn(true);
-		SourceFileData sdf = new SourceFileData(fois, ish);
-		MetaFileData mfd = new MetaFileData(fois2, ish2);
-		SourceInfo si = new SourceInfo(mfd,sdf,null);
-		assertEquals(is, si.getSourceInputStream());
-		assertEquals(SHA_1, si.getSourceVersion());
-	}
+    @Test
+    public void testSourceInfo() throws IOException {
+        InputStream is = Mockito.mock(InputStream.class);
 
-	@Test
-	public void testSourceInfoWithNoInputStream() throws IOException {
-		ex.expect(RuntimeException.class);
-		ex.expectCause(Matchers.isA(IOException.class));
-		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
-		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
-		Mockito.when(ish.exception()).thenReturn(new IOException("Fake IO"));
-		Mockito.when(ish.isPresent()).thenReturn(false);
-		SourceFileData sdf = new SourceFileData(fois, ish);
-		MetaFileData mfd = new MetaFileData(fois2, ish2);
-		SourceInfo si = new SourceInfo(mfd,sdf,null);		
-		si.getSourceInputStream();
-	}
-	
-	@Test
-	public void testSourceInfoWithFailingReadingInputstream() throws IOException {
-		ex.expect(IOException.class);
-		ex.expectMessage("Error reading null");
-		FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
-		FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
-		InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
 
-		Mockito.when(ish.inputStream()).thenThrow(new IOException("Fake IO"));
-		Mockito.when(ish.isPresent()).thenReturn(true);
-		SourceFileData sdf = new SourceFileData(fois, ish);
-		MetaFileData mfd = new MetaFileData(fois2, ish2);
-		SourceInfo si = new SourceInfo(mfd,sdf,null);		
-		si.getSourceInputStream();
-	}
+        Mockito.when(ish.inputStream()).thenReturn(is);
+        Mockito.when(fois.getObjectId()).thenReturn(ObjectId.fromString(SHA_1));
+        Mockito.when(ish.isPresent()).thenReturn(true);
+        SourceFileData sdf = new SourceFileData(fois, ish);
+        MetaFileData mfd = new MetaFileData(fois2, ish2);
+        SourceInfo si = new SourceInfo(mfd, sdf, null);
+        assertEquals(is, si.getSourceInputStream());
+        assertEquals(SHA_1, si.getSourceVersion());
+    }
+
+    @Test
+    public void testSourceInfoWithNoInputStream() throws IOException {
+        ex.expect(RuntimeException.class);
+        ex.expectCause(Matchers.isA(IOException.class));
+        FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+        Mockito.when(ish.exception()).thenReturn(new IOException("Fake IO"));
+        Mockito.when(ish.isPresent()).thenReturn(false);
+        SourceFileData sdf = new SourceFileData(fois, ish);
+        MetaFileData mfd = new MetaFileData(fois2, ish2);
+        SourceInfo si = new SourceInfo(mfd, sdf, null);
+        si.getSourceInputStream();
+    }
+
+    @Test
+    public void testSourceInfoWithFailingReadingInputstream() throws IOException {
+        ex.expect(IOException.class);
+        ex.expectMessage("Error reading null");
+        FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+
+        Mockito.when(ish.inputStream()).thenThrow(new IOException("Fake IO"));
+        Mockito.when(ish.isPresent()).thenReturn(true);
+        SourceFileData sdf = new SourceFileData(fois, ish);
+        MetaFileData mfd = new MetaFileData(fois2, ish2);
+        SourceInfo si = new SourceInfo(mfd, sdf, null);
+        si.getSourceInputStream();
+    }
+
+    @Test
+    public void testSourceInfoHasFailed() throws IOException {
+        FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+
+        Mockito.when(ish.exception()).thenReturn(new IOException("Fake IO"));
+        SourceFileData sdf = new SourceFileData(fois, ish);
+        MetaFileData mfd = new MetaFileData(fois2, ish2);
+        SourceInfo si = new SourceInfo(mfd, sdf, new RepositoryDataError(fois, ish));
+        assertTrue(si.hasFailed());
+    }
+
+    @Test
+    public void testSourceInfoHasException() throws IOException {
+        FileObjectIdStore fois = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish = Mockito.mock(InputStreamHolder.class);
+        FileObjectIdStore fois2 = Mockito.mock(FileObjectIdStore.class);
+        InputStreamHolder ish2 = Mockito.mock(InputStreamHolder.class);
+        IOException ioException = new IOException("Fake IO");
+        Mockito.when(ish.exception()).thenReturn(ioException);
+        SourceFileData sdf = new SourceFileData(fois, ish);
+        MetaFileData mfd = new MetaFileData(fois2, ish2);
+        SourceInfo si = new SourceInfo(mfd, sdf, new RepositoryDataError(fois, ish));
+        assertEquals(ioException, si.getFailiure());
+    }
 }

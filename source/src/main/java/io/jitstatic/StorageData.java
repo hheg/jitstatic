@@ -32,7 +32,7 @@ import io.jitstatic.auth.User;
 
 @SuppressFBWarnings(justification="Equals used here is not dodgy code",value = {"EQ_UNUSUAL"})
 public class StorageData {
-	
+
 	private final Set<User> users;
 	private final String contentType;
 	

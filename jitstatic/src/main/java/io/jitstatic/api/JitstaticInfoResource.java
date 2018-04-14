@@ -32,7 +32,7 @@ import com.codahale.metrics.annotation.Timed;
 import io.jitstatic.version.ProjectVersion;
 
 @Path("info")
-@Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+@Produces({ MediaType.TEXT_PLAIN })
 public class JitstaticInfoResource {
 
 	@GET

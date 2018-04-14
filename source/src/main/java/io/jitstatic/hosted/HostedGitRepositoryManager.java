@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +53,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.CorruptedSourceException;
 import io.jitstatic.FileObjectIdStore;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.SourceChecker;
 import io.jitstatic.SourceExtractor;
 import io.jitstatic.SourceUpdater;
@@ -79,7 +81,8 @@ public class HostedGitRepositoryManager implements Source {
     private final SourceUpdater updater;
 
     HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
-            final ExecutorService repoExecutor, final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
+            final ExecutorService repoExecutor, final ErrorReporter errorReporter)
+            throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
                 throw new IllegalArgumentException(String.format("Path %s is a file", workingDirectory));
@@ -102,7 +105,8 @@ public class HostedGitRepositoryManager implements Source {
             throw new RuntimeException(e);
         }
 
-        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(this.bareRepository);
+        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(
+                this.bareRepository);
 
         if (!errors.isEmpty()) {
             throw new CorruptedSourceException(errors);
@@ -111,8 +115,9 @@ public class HostedGitRepositoryManager implements Source {
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(this.bareRepository);
         this.repositoryBus = new RepositoryBus(errorReporter);
-        this.receivePackFactory = new JitStaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
-                errorReporter, defaultRef, repositoryBus);
+        this.receivePackFactory = new JitStaticReceivePackFactory(
+                Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"), errorReporter, defaultRef,
+                repositoryBus);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
         this.repoExecutor = repoExecutor;
@@ -121,7 +126,8 @@ public class HostedGitRepositoryManager implements Source {
     private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
             final ErrorReporter reporter) throws CorruptedSourceException, IOException {
         this(workingDirectory, endPointName, defaultRef,
-                Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("repo", reporter::setFault)), reporter);
+                Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("repo", reporter::setFault)),
+                reporter);
     }
 
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
@@ -139,13 +145,15 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(final Repository bareRepository) {
+    private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(
+            final Repository bareRepository) {
         try (final SourceChecker sc = new SourceChecker(bareRepository)) {
             return sc.check();
         }
     }
 
-    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
+    private static Repository setUpBareRepository(final Path repositoryBase)
+            throws IOException, IllegalStateException, GitAPIException {
         LOG.info("Mounting repository on " + repositoryBase);
         Repository repo = getRepository(repositoryBase);
         if (repo == null) {
@@ -235,31 +243,30 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public CompletableFuture<String> modify(final byte[] data, final String version, final String message, final String userInfo,
-            String userMail, final String key, String ref) {
+    public CompletableFuture<String> modify(final String key, String ref, final byte[] data, final String version,
+            final String message, final String userInfo, String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
         Objects.requireNonNull(userMail);
         Objects.requireNonNull(key);
-        ref = checkRef(ref);
-        if (ref.startsWith(Constants.R_TAGS)) {
+        final String finalRef = checkRef(ref);
+        if (finalRef.startsWith(Constants.R_TAGS)) {
             throw new UnsupportedOperationException("Tags cannot be modified");
         }
-        final String finalRef = ref;
         return CompletableFuture.supplyAsync(() -> {
             try {
-                if (!checkVersion(version, key, finalRef)) {
-                    throw new WrappingAPIException(new VersionIsNotSameException());
-                }
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                return this.updater.updateKey(key, actualRef, data, message, userInfo, userMail);
-            } catch (final IOException | RefNotFoundException e) {
-                throw new WrappingAPIException(e);
+                if (!checkVersion(version, key, finalRef)) {
+                    throw new WrappingAPIException(new VersionIsNotSameException());
+                }
+                return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
+            } catch (final IOException e) {
+                throw new UncheckedIOException(e);
             }
         }, repoExecutor);
     }
@@ -271,41 +278,116 @@ public class HostedGitRepositoryManager implements Source {
         return ref;
     }
 
-    private boolean checkVersion(final String version, final String key, final String ref) throws RefNotFoundException {
-        final SourceInfo sourceInfo = getSourceInfo(key, ref);
-        if (sourceInfo == null) {
-            return false;
+    private boolean checkVersion(final String version, final String key, final String ref) {
+        try {
+            final SourceInfo sourceInfo = getSourceInfo(key, ref);
+            if (sourceInfo == null) {
+                return false;
+            }
+            return version.equals(sourceInfo.getSourceVersion());
+        } catch (final RefNotFoundException e) {
+            throw new WrappingAPIException(e);
         }
-        return version.equals(sourceInfo.getSourceVersion());
+    }
+
+    private boolean checkMetaDataVersion(final String version, final String key, final String ref) {
+        try {
+            final SourceInfo sourceInfo = getSourceInfo(key, ref);
+            if (sourceInfo == null) {
+                return false;
+            }
+            return version.equals(sourceInfo.getMetaDataVersion());
+        } catch (final RefNotFoundException e) {
+            throw new WrappingAPIException(e);
+        }
     }
 
     @Override
-    public CompletableFuture<String> addKey(final String key, String ref, final byte[] data, final StorageData metaData, final String message, final String userInfo, final String userMail) {
+    public CompletableFuture<Pair<String, String>> addKey(final String key, String ref, final byte[] data,
+            final StorageData metaData, final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
         Objects.requireNonNull(userMail);
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);
+        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
         final String finalRef = checkRef(ref);
-        final CompletableFuture<byte[]> metaDataConverter = CompletableFuture.supplyAsync(() -> {
-            try {
-                return MAPPER.writeValueAsBytes(metaData);
-            } catch (JsonProcessingException e1) {
-                throw new ShouldNeverHappenException("", e1);
-            }
-        });
         return CompletableFuture.supplyAsync(() -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                return this.updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + ".metadata", metaDataConverter.join())), actualRef,
-                        message, userInfo, userMail);
+                try {
+                    final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
+                    if (sourceInfo != null) {
+                        throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+                    }
+                } catch (final RefNotFoundException e) {
+                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
+                }
+                return updater.addKey(
+                        Pair.of(Pair.of(key, data),
+                                Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
+                        actualRef, message, userInfo, userMail);
             } catch (final IOException e) {
-                throw new WrappingAPIException(e);
+                throw new UncheckedIOException(e);
             }
         }, repoExecutor);
+    }
+
+    @Override
+    public CompletableFuture<String> modify(final StorageData metaData, final String metaDataVersion,
+            final String message, final String userInfo, final String userMail, final String key, String ref) {
+        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
+        Objects.requireNonNull(message);
+        Objects.requireNonNull(userInfo);
+        Objects.requireNonNull(userMail);
+        Objects.requireNonNull(key);
+        final String finalRef = checkRef(ref);
+        if (finalRef.startsWith(Constants.R_TAGS)) {
+            throw new UnsupportedOperationException("Tags cannot be modified");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                final Ref actualRef = bareRepository.findRef(finalRef);
+                if (actualRef == null) {
+                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
+                }
+                if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
+                    throw new WrappingAPIException(new VersionIsNotSameException());
+                }
+                return updater.updateMetaData(key + JitStaticConstants.METADATA, actualRef, unwrap(metaDataConverter),
+                        message, userInfo, userMail);
+            } catch (final IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, repoExecutor);
+    }
+
+    private static <T> T unwrap(final CompletableFuture<T> f) {
+        try {
+            return f.join();
+        } catch (final CompletionException ce) {
+            final Throwable cause = ce.getCause();
+            if (cause instanceof WrappingAPIException) {
+                throw (WrappingAPIException) cause;
+            }
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw ce;
+        }
+    }
+
+    private CompletableFuture<byte[]> convertMetaData(final StorageData metaData) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return MAPPER.writeValueAsBytes(metaData);
+            } catch (final JsonProcessingException e1) {
+                throw new ShouldNeverHappenException("", e1);
+            }
+        });
     }
 }

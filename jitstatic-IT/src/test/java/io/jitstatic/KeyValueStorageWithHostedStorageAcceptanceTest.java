@@ -25,6 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,10 +38,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -71,6 +74,7 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.jitstatic.JitstaticApplication;
 import io.jitstatic.JitstaticConfiguration;
+import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticCreatorClient;
@@ -78,6 +82,7 @@ import io.jitstatic.client.JitStaticCreatorClientBuilder;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.client.MetaData;
+import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 
@@ -110,13 +115,13 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         setupRepo(user, pass, servletName, endpoint);
     }
 
-    private void setupRepo(String user, String pass, String servletName, String endpoint) throws IOException, GitAPIException,
-            NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+    private void setupRepo(String user, String pass, String servletName, String endpoint)
+            throws IOException, GitAPIException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException,
+            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
         File workingDirectory = TMP_FOLDER.newFolder();
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
-        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint)
-                .setCredentialsProvider(provider).call()) {
+        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint).setCredentialsProvider(provider)
+                .call()) {
 
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + ".metadata");
@@ -130,8 +135,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     @After
     public void after() {
         SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull).collect(Collectors.toList());
         errors.stream().forEach(e -> e.printStackTrace());
         assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
@@ -164,6 +168,17 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     }
 
     @Test
+    public void testGetAKeyValueWithEtag() throws Exception {
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
+            assertEquals(getData(), key.data.toString());
+            assertNotNull(key.getTag());
+            Entity<JsonNode> key2 = client.getKey(ACCEPT_STORAGE, tf, key.getTag());
+            assertEquals(key.tag, key2.tag);
+        }
+    }
+
+    @Test
     public void testGetAKeyValueWithoutAuth() throws Exception {
         ex.expect(APIException.class);
         ex.expectMessage("/application/storage/accept/storage failed with: 401 Unauthorized");
@@ -179,8 +194,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             assertEquals(getData(), key.data.toString());
             String oldVersion = key.getTag();
             byte[] newData = "{\"one\":\"two\"}".getBytes(UTF_8);
-            String modifyKey = client.modifyKey(newData, new CommitData("master", ACCEPT_STORAGE, "commit message", "user1", "user@mail"),
-                    key.getTag());
+            String modifyKey = client.modifyKey(newData, new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, tf);
             assertEquals(new String(newData), key.data.toString());
@@ -194,8 +208,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             assertEquals(getData(), key.data.toString());
             String oldVersion = key.getTag();
             byte[] prettyData = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData()));
-            String modifyKey = client.modifyKey(prettyData,
-                    new CommitData("master", ACCEPT_STORAGE, "commit message", "user1", "user@mail"), key.getTag());
+            String modifyKey = client.modifyKey(prettyData, new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
             assertEquals(new String(prettyData), key.data);
@@ -207,18 +220,51 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         String user = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
-        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/").setUser(user).setPassword(pass);
+        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/")
+                .setUser(user).setPassword(pass);
 
         try (JitStaticCreatorClient client = builder.build(); JitStaticUpdaterClient getter = buildClient().build()) {
-            Entity<String> createKey = client.createKey(getData().getBytes(UTF_8),
-                    new CommitData("master", "newkey", "commit message", "user1", "user@mail"),
+            Entity<String> createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("newkey", "master", "commit message", "user1", "user@mail"),
                     new MetaData(new HashSet<>(), "application/json"), stringFactory);
             assertNotNull(createKey.getTag());
             assertArrayEquals(getData().getBytes(UTF_8), createKey.data.getBytes(UTF_8));
             Entity<String> key = getter.getKey("newkey", stringFactory);
             assertArrayEquals(getData().getBytes(UTF_8), key.data.getBytes(UTF_8));
             assertEquals(createKey.getTag(), key.getTag());
+        }
+    }
+
+    @Test
+    public void testModifyUserKey() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient firstUpdater = buildClient().setUser(USER).setPassword(PASSWORD).build();
+                JitStaticUpdaterClient secondUpdater = buildClient().setUser(user).setPassword(pass).build()) {
+            Entity<JsonNode> key = firstUpdater.getKey(ACCEPT_STORAGE, tf);
+            assertNotNull(key);
+            try {
+                secondUpdater.getKey(ACCEPT_STORAGE, tf);
+                fail();
+            } catch (APIException e) {
+                assertEquals(HttpStatus.UNAUTHORIZED_401, e.getStatusCode());
+            }
+            Entity<JsonNode> metaKey = client.getMetaKey(ACCEPT_STORAGE, null, tf);
+            String oldVersion = metaKey.getTag();
+            String modifyKey = client.modifyMetaKey(ACCEPT_STORAGE, null, metaKey.getTag(),
+                    new ModifyUserKeyData(new MetaData(Set.of(new User(user, pass)), "plain/text"), "msg", "mail", "info"));
+            assertNotEquals(oldVersion, modifyKey);
+            metaKey = client.getMetaKey(ACCEPT_STORAGE, null, tf);
+            assertEquals("plain/text", metaKey.data.get("contentType").asText());
+            key = secondUpdater.getKey(ACCEPT_STORAGE, tf);
+            assertNotNull(key);
+            try {
+                firstUpdater.getKey(ACCEPT_STORAGE, tf);
+                fail();
+            } catch (APIException e) {
+                assertEquals(HttpStatus.UNAUTHORIZED_401, e.getStatusCode());
+            }
         }
     }
 
@@ -233,8 +279,11 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     }
 
     private JitStaticUpdaterClientBuilder buildClient() {
-        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/storage/");
+        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
+    }
+
+    private JitStaticCreatorClientBuilder buildCreatorClient() {
+        return JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
     }
 
     private void writeFile(Path workBase, String file) throws IOException {
@@ -283,10 +332,13 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     }
 
     private TriFunction<InputStream, String, String, Entity<JsonNode>> tf = (is, v, t) -> {
-        try {
-            return new Entity<>(v, t, MAPPER.readValue(is, JsonNode.class));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        if (is != null) {
+            try {
+                return new Entity<>(v, t, MAPPER.readValue(is, JsonNode.class));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
+        return new Entity<>(v, t, null);
     };
 }
