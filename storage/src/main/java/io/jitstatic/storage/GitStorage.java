@@ -48,6 +48,7 @@ import org.eclipse.jgit.lib.Constants;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.StorageData;
+import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.ErrorConsumingThreadFactory;
@@ -69,8 +70,10 @@ public class GitStorage implements Storage {
 
     public GitStorage(final Source source, final String defaultRef) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
-        this.refExecutor = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("ref", this::consumeError));
-        this.keyExecutor = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("key", this::consumeError));
+        this.refExecutor = Executors
+                .newSingleThreadExecutor(new ErrorConsumingThreadFactory("ref", this::consumeError));
+        this.keyExecutor = Executors
+                .newSingleThreadExecutor(new ErrorConsumingThreadFactory("key", this::consumeError));
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
     }
 
@@ -86,12 +89,13 @@ public class GitStorage implements Storage {
                 return Collections.<String>emptySet();
             }, refExecutor).thenApplyAsync(files -> {
                 return waitForTasks(refresh(ref, files)).thenApply(list -> {
-                    final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
+                    final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight)
+                            .collect(Collectors.toList());
                     if (!faults.isEmpty()) {
                         throw new LinkedException(faults);
                     }
-                    return list.stream().filter(Either::isLeft).map(Either::getLeft).filter(Optional::isPresent).map(Optional::get)
-                            .filter(p -> p.getRight() != null)
+                    return list.stream().filter(Either::isLeft).map(Either::getLeft).filter(Optional::isPresent)
+                            .map(Optional::get).filter(p -> p.getRight() != null)
                             .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
                 });
             }).thenCompose(future -> future).thenAcceptAsync(map -> {
@@ -114,7 +118,8 @@ public class GitStorage implements Storage {
         }).join();
     }
 
-    private static <T> CompletableFuture<List<Either<T, Exception>>> waitForTasks(final List<CompletableFuture<T>> tasks) {
+    private static <T> CompletableFuture<List<Either<T, Exception>>> waitForTasks(
+            final List<CompletableFuture<T>> tasks) {
         CompletableFuture<Void> all = CompletableFuture.allOf(tasks.toArray(new CompletableFuture[tasks.size()]));
         return all.thenApply(v -> tasks.stream().map(future -> {
             try {
@@ -125,7 +130,8 @@ public class GitStorage implements Storage {
         }).collect(Collectors.toList()));
     }
 
-    private List<CompletableFuture<Optional<Pair<String, StoreInfo>>>> refresh(final String ref, final Set<String> map) {
+    private List<CompletableFuture<Optional<Pair<String, StoreInfo>>>> refresh(final String ref,
+            final Set<String> map) {
         return map.stream().map(key -> {
             return CompletableFuture.supplyAsync(() -> {
                 try {
@@ -167,7 +173,7 @@ public class GitStorage implements Storage {
                     cache.put(finalRef, map);
                 }
                 return map;
-            }, refExecutor).thenApplyAsync((map) -> {               
+            }, refExecutor).thenApplyAsync((map) -> {
                 try {
                     return loadAndStore(map, key, finalRef);
                 } catch (final RefNotFoundException e) {
@@ -190,11 +196,12 @@ public class GitStorage implements Storage {
         return CompletableFuture.completedFuture(storeInfo);
     }
 
-    private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key, final String ref) throws RefNotFoundException {
+    private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key,
+            final String ref) throws RefNotFoundException {
         Optional<StoreInfo> storeInfoContainer = keyStorage.get(key);
         if (storeInfoContainer == null) {
             try {
-                StoreInfo storeInfo = load(key, ref);
+                final StoreInfo storeInfo = load(key, ref);
                 storeInfoContainer = Optional.ofNullable(storeInfo);
                 keyStorage.put(key, storeInfoContainer);
             } catch (final RefNotFoundException e) {
@@ -244,8 +251,8 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public CompletableFuture<String> put(final byte[] data, final String oldVersion, final String message, final String userInfo,
-            final String userEmail, final String key, String ref) {
+    public CompletableFuture<String> put(final String key, String ref, final byte[] data, final String oldVersion,
+            final String message, final String userInfo, final String userEmail) {
         ref = checkRef(ref);
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
@@ -266,7 +273,8 @@ public class GitStorage implements Storage {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = storeInfo.get().getStorageData().getContentType();
-            final String newVersion = source.modify(data, oldVersion, message, userInfo, userEmail, key, finalRef).join();
+            final String newVersion = source.modify(key, finalRef, data, oldVersion, message, userInfo, userEmail)
+                    .join();
             refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);
@@ -275,15 +283,26 @@ public class GitStorage implements Storage {
     private void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
             final Map<String, Optional<StoreInfo>> refMap, final String contentType) {
         final Optional<StoreInfo> si = refMap.get(key);
-        if (si.get().getVersion().equals(oldversion)) {
-            final StorageData sd = si.get().getStorageData();
-            refMap.put(key, Optional.of(new StoreInfo(data, new StorageData(sd.getUsers(), contentType), newVersion)));
+        final StoreInfo storeInfo = si.get();
+        if (storeInfo.getVersion().equals(oldversion)) {
+            refMap.put(key, Optional
+                    .of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion())));
+        }
+    }
+
+    private void refreshKey(final StorageData metaData, final String key, final String metaDataVersion,
+            final String newVersion, final Map<String, Optional<StoreInfo>> refMap, String contentType) {
+        final Optional<StoreInfo> si = refMap.get(key);
+        final StoreInfo storeInfo = si.get();
+        if (storeInfo.getMetaDataVersion().equals(metaDataVersion)) {
+            refMap.put(key,
+                    Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
         }
     }
 
     @Override
-    public CompletableFuture<StoreInfo> add(final String key, String branch, final byte[] data, final StorageData metaData,
-            final String message, final String userInfo, final String userMail) {
+    public CompletableFuture<StoreInfo> add(final String key, String branch, final byte[] data,
+            final StorageData metaData, final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(data);
         Objects.requireNonNull(metaData);
@@ -318,8 +337,8 @@ public class GitStorage implements Storage {
                 if (sourceInfo != null) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
                 }
-                final String version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail).join();
-                final StoreInfo storeInfo = new StoreInfo(data, metaData, version);
+                final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail).join();
+                final StoreInfo storeInfo = new StoreInfo(data, metaData, version.getLeft(), version.getRight());
                 map.put(key, Optional.of(storeInfo));
                 return storeInfo;
             } finally {
@@ -342,7 +361,7 @@ public class GitStorage implements Storage {
 
     private StoreInfo readStoreInfo(final SourceInfo source) {
         try {
-            CompletableFuture<StorageData> supplyAsync = CompletableFuture.supplyAsync(() -> {
+            final CompletableFuture<StorageData> supplyAsync = CompletableFuture.supplyAsync(() -> {
                 try (final InputStream metaDataStream = source.getMetadataInputStream()) {
                     return HANDLER.readStorage(metaDataStream);
                 } catch (final IOException e) {
@@ -351,7 +370,7 @@ public class GitStorage implements Storage {
             });
             try (final InputStream sourceStream = source.getSourceInputStream()) {
                 final StoreInfo storeInfo = new StoreInfo(HANDLER.readStorageData(sourceStream), supplyAsync.join(),
-                        source.getSourceVersion());
+                        source.getSourceVersion(), source.getMetaDataVersion());
                 return storeInfo;
             }
         } catch (final IOException e) {
@@ -364,4 +383,34 @@ public class GitStorage implements Storage {
             throw e;
         }
     }
+
+    @Override
+    public CompletableFuture<String> putMetaData(final String key, String ref, final StorageData metaData,
+            final String metaDataVersion, final String message, final String userInfo, final String userMail) {
+        Objects.requireNonNull(metaData);
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(metaDataVersion);
+        Objects.requireNonNull(message);
+        Objects.requireNonNull(userInfo);
+        Objects.requireNonNull(userMail);
+        ref = checkRef(ref);
+
+        final String finalRef = ref;
+        return CompletableFuture.supplyAsync(() -> {
+            final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
+            if (refMap == null) {
+                throw new WrappingAPIException(new RefNotFoundException(finalRef));
+            }
+            final Optional<StoreInfo> storeInfo = refMap.get(key);
+            if (storeInfo == null || !storeInfo.isPresent()) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+            final String contentType = metaData.getContentType();
+            final String newVersion = source
+                    .modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef).join();
+            refreshKey(metaData, key, metaDataVersion, newVersion, refMap, contentType);
+            return newVersion;
+        }, keyExecutor);
+    }
+
 }

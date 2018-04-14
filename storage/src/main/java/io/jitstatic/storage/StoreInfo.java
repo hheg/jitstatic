@@ -30,11 +30,13 @@ public class StoreInfo {
 	private final StorageData metaData;
 	private final String version;
 	private final byte[] data;
+    private final String metaDataVersion;
 
-	public StoreInfo(final byte[] data, final StorageData metaData, final String version) {
+	public StoreInfo(final byte[] data, final StorageData metaData, final String version, final String metaDataVersion) {
 		this.data = Objects.requireNonNull(data);
 		this.metaData = Objects.requireNonNull(metaData);
 		this.version = Objects.requireNonNull(version);
+		this.metaDataVersion = Objects.requireNonNull(metaDataVersion);
 	}
 
 	public StorageData getStorageData() {
@@ -50,23 +52,38 @@ public class StoreInfo {
 	}
 
 	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + version.hashCode();
-		return result;
-	}
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((metaDataVersion == null) ? 0 : metaDataVersion.hashCode());
+        result = prime * result + ((version == null) ? 0 : version.hashCode());
+        return result;
+    }
 
 	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		StoreInfo other = (StoreInfo) obj;
-		return version.equals(other.version);
-	}
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        StoreInfo other = (StoreInfo) obj;
+        if (metaDataVersion == null) {
+            if (other.metaDataVersion != null)
+                return false;
+        } else if (!metaDataVersion.equals(other.metaDataVersion))
+            return false;
+        if (version == null) {
+            if (other.version != null)
+                return false;
+        } else if (!version.equals(other.version))
+            return false;
+        return true;
+    }
+
+    public String getMetaDataVersion() {
+        return metaDataVersion;
+    }
 
 }

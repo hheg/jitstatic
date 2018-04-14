@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,25 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Objects;
+public class KeyAlreadyExist extends RuntimeException {
 
-import io.jitstatic.hosted.InputStreamHolder;
+    private static final long serialVersionUID = 3551414727296198256L;
 
-public class RepositoryDataError extends FileData {
+    public KeyAlreadyExist(final String key, final String branch) {
+        super(key + " already exist in branch " + branch);
+    }
 
-	public RepositoryDataError(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-		super(fileInfo, inputStreamHolder);
-		Objects.requireNonNull(inputStreamHolder.exception());
-	}
-
-	@Override
-	public InputStream getInputStream() throws IOException {
-		throw new RuntimeException(getInputStreamHolder().exception());
-	}
-
-	public FileObjectIdStore getFileObjectIdStore() {
-		return getFileInfo();
-	}
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

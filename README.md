@@ -44,7 +44,7 @@ storage is the key-value end point and hosted is the git end point.
 ### Docker:
 ```bash
 docker pull hheg/jitstatic:latest
-docker run -e USER=huser -e PASS=hseCr3t -d -p 8085:8085 hheg/jitstatic:latest
+docker run -e USER=huser -e PASS=hseCr3t -v $PWD:/home/jitstatic/db -d -p 8085:8085 hheg/jitstatic:latest
 ```
 Now the container is reachable on port 8085
 
@@ -221,7 +221,7 @@ Content-Length: 13
 
 {"one":"two"}
 ```
-and the git log will look like:
+and the git log will look something like:
 ```git
 * c7952e2 - (HEAD -> master, origin/master) commit message (1 minutes ago) <usr>
 * 0abb47d - Added key (2 minutes ago) <usr>
@@ -275,12 +275,17 @@ Fast-forward
  create mode 100644 test
  create mode 100644 test.metadata
  
- git lg
+ git log git log --graph --pretty=format:'%h %d %s %cr <%an>' --abbrev-commit --date=relative
 * d397e03 - (HEAD -> master, origin/master) testmessage (4 minutes ago) <user>
 * 7cfbec2 - message (4 minutes ago) <user1>
 * 3af867a - Initial commit (4 minutes ago) <hheg>
 ```
 
 
+### API for modifying 
 
+There's also an API for remotley change a key metadata file.
+```
+
+```
 
