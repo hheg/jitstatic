@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -297,6 +298,24 @@ public class GitStorageTest {
             storeInfo = first.get().get();
             assertNotNull(storeInfo);
             assertArrayEquals(data, storeInfo.getData());
+        }
+    }
+    
+    @Test
+    public void testGetADotKey() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getUsers()) {            
+            String key = ".key3";            
+            Future<Optional<StoreInfo>> first = gs.get(key, null);
+            assertFalse(first.get().isPresent());
+        }
+    }
+    
+    @Test
+    public void testGetATrainDotKey() throws IOException, InterruptedException, ExecutionException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getUsers()) {            
+            String key = "key/key/.key3";            
+            Future<Optional<StoreInfo>> first = gs.get(key, null);
+            assertFalse(first.get().isPresent());
         }
     }
 

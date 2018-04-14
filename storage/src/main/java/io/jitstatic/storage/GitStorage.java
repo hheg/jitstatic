@@ -23,6 +23,7 @@ package io.jitstatic.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -162,6 +163,7 @@ public class GitStorage implements Storage {
     @Override
     public CompletableFuture<Optional<StoreInfo>> get(final String key, String ref) {
         Objects.requireNonNull(key);
+       
         ref = checkRef(ref);
         final String finalRef = ref;
         final Map<String, Optional<StoreInfo>> refMap = cache.get(ref);
@@ -198,6 +200,9 @@ public class GitStorage implements Storage {
 
     private Optional<StoreInfo> loadAndStore(final Map<String, Optional<StoreInfo>> keyStorage, final String key,
             final String ref) throws RefNotFoundException {
+        if(checkKeyIsDotFile(key)) {
+            return Optional.empty();
+        }
         Optional<StoreInfo> storeInfoContainer = keyStorage.get(key);
         if (storeInfoContainer == null) {
             try {
@@ -211,6 +216,10 @@ public class GitStorage implements Storage {
             }
         }
         return storeInfoContainer;
+    }
+
+    private boolean checkKeyIsDotFile(final String key) {
+        return Paths.get(key).toFile().getName().startsWith(".");       
     }
 
     private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
@@ -257,7 +266,7 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
-        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(userInfo, "userInfo cannot be null");        
 
         if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
             throw new IllegalArgumentException("message cannot be empty");
@@ -309,7 +318,7 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
         Objects.requireNonNull(userMail);
-
+        
         branch = checkRef(branch);
 
         final String finalRef = branch;
