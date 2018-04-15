@@ -58,8 +58,7 @@ public class SourceJSONParserTest {
     @Test
     public void testReadObjectWithUserWithNoUser() throws UnsupportedEncodingException, IOException {
         ex.expect(IOException.class);
-        ex.expectMessage("Property=users[].user, message=may not be null, invalidValue=null\n" + 
-                "Property=users[].user, message=may not be empty, invalidValue=null");
+        ex.expectMessage("Property=");
         try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
             p.parseMetaData(bc);
         }
