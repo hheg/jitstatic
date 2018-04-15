@@ -30,41 +30,44 @@ import io.jitstatic.SourceFileData;
 
 public class SourceInfo {
 
-	private final MetaFileData metaFileData;
-	private final SourceFileData sourceFileData;
-	// TODO Deal with this error
-	private final RepositoryDataError fileDataError;
+    private final MetaFileData metaFileData;
+    private final SourceFileData sourceFileData;
+    private final RepositoryDataError fileDataError;
 
-	public SourceInfo(MetaFileData metaFileData, SourceFileData sourceFileData, RepositoryDataError fileDataError) {
-		this.metaFileData = Objects.requireNonNull(metaFileData);
-		this.sourceFileData = Objects.requireNonNull(sourceFileData);
-		this.fileDataError = fileDataError;
-	}
-	
-	public boolean hasFailed() {
-		if(fileDataError == null) {
-			return false;
-		}
-		return !fileDataError.getInputStreamHolder().isPresent();
-	}
-	
-	public Exception getFailiure() {
-		if(fileDataError != null) {
-		return fileDataError.getInputStreamHolder().exception();
-		}
-		return null;
-	}
+    public SourceInfo(final MetaFileData metaFileData, final SourceFileData sourceFileData, final RepositoryDataError fileDataError) {
+        this.metaFileData = Objects.requireNonNull(metaFileData);
+        this.sourceFileData = Objects.requireNonNull(sourceFileData);
+        this.fileDataError = fileDataError;
+    }
 
-	public InputStream getSourceInputStream() throws IOException {
-		return sourceFileData.getInputStream();
-	}
+    public boolean hasFailed() {
+        if (fileDataError == null) {
+            return false;
+        }
+        return !fileDataError.getInputStreamHolder().isPresent();
+    }
 
-	public String getSourceVersion() {
-		return sourceFileData.getVersion();
-	}
-	
-	public InputStream getMetadataInputStream() throws IOException {
-		return metaFileData.getInputStream();
-	}
+    public Exception getFailiure() {
+        if (fileDataError != null) {
+            return fileDataError.getInputStreamHolder().exception();
+        }
+        return null;
+    }
+
+    public InputStream getSourceInputStream() throws IOException {
+        return sourceFileData.getInputStream();
+    }
+
+    public String getSourceVersion() {
+        return sourceFileData.getVersion();
+    }
+
+    public String getMetaDataVersion() {
+        return metaFileData.getVersion();
+    }
+
+    public InputStream getMetadataInputStream() throws IOException {
+        return metaFileData.getInputStream();
+    }
 
 }

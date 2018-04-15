@@ -27,6 +27,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.junit.Test;
@@ -45,8 +46,8 @@ public class StorageDataTest {
 
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
-		StorageData sd2 = new StorageData(users2, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
+		StorageData sd2 = new StorageData(users2, null, false, false, List.of());
 		assertEquals(sd1, sd2);
 	}
 
@@ -56,8 +57,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		StorageData sd1 = new StorageData(users1, null);
-		StorageData sd2 = new StorageData(users2, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
+		StorageData sd2 = new StorageData(users2, null, false, false, List.of());
 		assertNotEquals(sd1, sd2);
 	}
 
@@ -67,8 +68,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
-		StorageData sd2 = new StorageData(users2, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
+		StorageData sd2 = new StorageData(users2, null, false, false, List.of());
 		assertEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -78,8 +79,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		StorageData sd1 = new StorageData(users1, null);
-		StorageData sd2 = new StorageData(users2, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
+		StorageData sd2 = new StorageData(users2, null, false, false, List.of());
 		assertNotEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -87,7 +88,7 @@ public class StorageDataTest {
 	public void testEqualsInstance() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
 		assertTrue(sd1.equals(sd1));
 	}
 
@@ -95,7 +96,7 @@ public class StorageDataTest {
 	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
 		assertFalse(sd1.equals(null));
 	}
 
@@ -103,7 +104,7 @@ public class StorageDataTest {
 	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
 		assertFalse(sd1.equals(new Object()));
 	}
 
@@ -111,10 +112,10 @@ public class StorageDataTest {
 	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		StorageData sd1 = new StorageData(users1, null);
+		StorageData sd1 = new StorageData(users1, null, false, false, List.of());
 		Set<User> users2 = new HashSet<>();
 		users1.add(new User("user2", "p"));
-		StorageData sd2 = new StorageData(users2, null);
+		StorageData sd2 = new StorageData(users2, null, false, false, List.of());
 		assertFalse(sd1.equals(sd2));
 	}
 }

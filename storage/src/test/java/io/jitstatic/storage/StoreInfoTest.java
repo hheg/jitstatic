@@ -25,6 +25,7 @@ import static org.junit.Assert.assertNotEquals;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -38,9 +39,9 @@ public class StoreInfoTest {
 
 	@Test
 	public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "1");
-		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "1");
-		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null), "2");
+		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1");
+		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1");
+		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "2", "2");
 
 		assertEquals(si1, si1);
 		assertEquals(si1.hashCode(), si2.hashCode());

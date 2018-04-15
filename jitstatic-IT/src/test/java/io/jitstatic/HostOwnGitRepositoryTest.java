@@ -382,7 +382,7 @@ public class HostOwnGitRepositoryTest {
 
             byte[] bytes = MAPPER.writer().withDefaultPrettyPrinter().writeValueAsString(MAPPER.readTree(getData(2))).getBytes(UTF_8);
 
-            client.modifyKey(bytes, new CommitData("master", STORE, "Modified", "user", "noone@none.org"), key.getTag());
+            client.modifyKey(bytes, new CommitData(STORE, "master", "Modified", "user", "noone@none.org"), key.getTag());
 
             git.pull().setCredentialsProvider(provider).call();
 
@@ -438,7 +438,7 @@ public class HostOwnGitRepositoryTest {
 
     private JitStaticUpdaterClient buildClient() throws URISyntaxException {
         return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setScheme("http").setUser(USER)
-                .setPassword(PASSWORD).setAppContext("/application/storage/").build();
+                .setPassword(PASSWORD).setAppContext("/application/").build();
     }
 
     private static String getRepopath(Git git) {

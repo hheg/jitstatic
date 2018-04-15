@@ -57,46 +57,61 @@ public class SourceUpdater {
         this.repository = repository;
     }
 
-    public String addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
+    public Pair<String, String> addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
             final String userInfo, final String userMail) throws IOException {
-        return addKey(fileEntry, ref, message, userInfo, userMail, "add");
+        return addEntry(fileEntry, ref, message, userInfo, userMail, "add key");
     }
 
-    private String addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry, final Ref ref, final String message,
+    public String updateMetaData(final String key, final Ref ref, final byte[] data, final String message, final String userInfo, final String userMail)
+            throws IOException {
+        return addEntry(Pair.of(Pair.ofNothing(), Pair.of(key, data)), ref, message, userInfo, userMail, "update metadata").getRight();
+    }
+
+    public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo, final String userMail)
+            throws IOException {
+        return addEntry(Pair.of(Pair.of(key, data), Pair.ofNothing()), ref, message, userInfo, userMail, "update key").getLeft();
+    }
+
+    private Pair<String, String> addEntry(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> keyEntry, final Ref ref, final String message,
             final String userInfo, final String userMail, final String method) throws IOException {
-        Objects.requireNonNull(fileEntry);
+        Objects.requireNonNull(keyEntry);
         Objects.requireNonNull(ref);
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
         Objects.requireNonNull(userMail);
 
-        final Pair<String, byte[]> file = fileEntry.getLeft();
-        final Pair<String, byte[]> fileMetadata = fileEntry.getRight();
-        final String keyName = file.getLeft();
+        final Pair<String, byte[]> file = Objects.requireNonNull(keyEntry.getLeft());
+        final Pair<String, byte[]> fileMetadata = Objects.requireNonNull(keyEntry.getRight());
+        if (!file.isPresent() && !fileMetadata.isPresent()) {
+            throw new IllegalArgumentException("No entry data");
+        }
         final DirCache inCoreIndex = DirCache.newInCore();
         final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
         final ObjectId headRef = ref.getObjectId();
-        try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
-            final ObjectId blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder);
+        try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {            
             final List<String> filesAddedToTree = new ArrayList<>(2);
-            filesAddedToTree.add(keyName);
-            if (fileMetadata != null) {
-                final String keyMetaDataName = fileMetadata.getLeft();
-                addBlob(keyMetaDataName, fileMetadata.getRight(), objectInserter, dirCacheBuilder);
-                filesAddedToTree.add(keyMetaDataName);
-            }
+            final String blob = createBlob(file, dirCacheBuilder, objectInserter, filesAddedToTree);
+            final String metaBlob = createBlob(fileMetadata, dirCacheBuilder, objectInserter, filesAddedToTree);
             buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
             final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
             final ObjectId inserted = buildCommit(ref, message, userInfo, userMail, objectInserter, fullTree, commiter);
             insertCommit(ref, rw, commiter, inserted);
-            return blob.name();
+            return Pair.of(blob, metaBlob);
         }
     }
 
-    public String updateKey(final String key, final Ref ref, final byte[] data, final String message, final String userInfo,
-            final String userMail) throws IOException {
-        return addKey(Pair.of(Pair.of(key, data), null), ref, message, userInfo, userMail, "put");
+    private String createBlob(final Pair<String, byte[]> file, final DirCacheBuilder dirCacheBuilder, final ObjectInserter objectInserter,
+            final List<String> filesAddedToTree) throws IOException {
+        final String blob;
+        if (file.isPresent()) {
+            final String keyName = file.getLeft();
+            blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder).name();
+            filesAddedToTree.add(keyName);
+        } else {
+            blob = null;
+        }
+        return blob;
     }
 
     private void insertCommit(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted)
@@ -111,8 +126,8 @@ public class SourceUpdater {
         checkResult(ru.update(rw));
     }
 
-    private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail,
-            final ObjectInserter objectInserter, final ObjectId fullTree, final PersonIdent commiter) throws IOException {
+    private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail, final ObjectInserter objectInserter,
+            final ObjectId fullTree, final PersonIdent commiter) throws IOException {
         final CommitBuilder commitBuilder = new CommitBuilder();
         commitBuilder.setAuthor(new PersonIdent(userInfo, (userMail != null ? userMail : "")));
         commitBuilder.setMessage(message);
@@ -143,8 +158,8 @@ public class SourceUpdater {
         dcBuilder.finish();
     }
 
-    private ObjectId addBlob(final String fileEntry, final byte[] data, final ObjectInserter objectInserter,
-            final DirCacheBuilder dcBuilder) throws IOException {
+    private ObjectId addBlob(final String fileEntry, final byte[] data, final ObjectInserter objectInserter, final DirCacheBuilder dcBuilder)
+            throws IOException {
         final DirCacheEntry changedFileEntry = new DirCacheEntry(fileEntry);
         changedFileEntry.setLength(data.length);
         changedFileEntry.setLastModified(Instant.now().getEpochSecond());
@@ -155,7 +170,7 @@ public class SourceUpdater {
         return blob;
     }
 
-    private void checkResult(Result update) {
+    private void checkResult(final Result update) {
         switch (update) {
         case FAST_FORWARD:
         case FORCED:

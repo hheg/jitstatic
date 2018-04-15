@@ -175,8 +175,7 @@ public class LoadTesterTest {
     private String adminAdress;
 
     @Before
-    public synchronized void setup()
-            throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
+    public synchronized void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
         int localPort = DW.getLocalPort();
@@ -198,8 +197,7 @@ public class LoadTesterTest {
     @After
     public void after() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
         SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull).collect(Collectors.toList());
         errors.stream().forEach(e -> e.printStackTrace());
         assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
         Client statsClient = buildClient("stats");
@@ -208,8 +206,7 @@ public class LoadTesterTest {
             try {
                 LOG.info(response.readEntity(String.class));
                 File workingFolder = TMP_FOLDER.newFolder();
-                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider)
-                        .call()) {
+                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
                     for (String branch : branches) {
                         checkoutBranch(branch, git);
                         LOG.info("##### {} #####", branch);
@@ -342,8 +339,7 @@ public class LoadTesterTest {
             byte[] data = getData(c);
             String v = new String(data);
             for (String name : names) {
-                Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, StandardOpenOption.CREATE_NEW,
-                        StandardOpenOption.TRUNCATE_EXISTING);
+                Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
                 Files.write(Paths.get(workingFolder.toURI()).resolve(name + METADATA), getMetaData(), StandardOpenOption.CREATE_NEW,
                         StandardOpenOption.TRUNCATE_EXISTING);
             }
@@ -371,14 +367,17 @@ public class LoadTesterTest {
         String s = "{\"data\":\"" + c + "\"}";
         return s.getBytes(UTF_8);
     }
-    
+
     private static Entity read(InputStream is, String tag, String contentType) {
-        try {
-            return new Entity(tag, MAPPER.readValue(is, JsonNode.class));
-        } catch (IOException e) {
-            LOG.error("ERROR READING ENTITY");
-            throw new UncheckedIOException(e);
+        if (is != null) {
+            try {
+                return new Entity(tag, MAPPER.readValue(is, JsonNode.class));
+            } catch (IOException e) {
+                LOG.error("ERROR READING ENTITY");
+                throw new UncheckedIOException(e);
+            }
         }
+        return new Entity(tag, null);
     }
 
     private void clientCode() throws InterruptedException, JsonParseException, JsonMappingException, IOException {
@@ -398,11 +397,14 @@ public class LoadTesterTest {
                                 int c = entity.getValue().get("data").asInt() + 1;
                                 try {
                                     byte[] data = getData(c);
-                                    client.modifyKey(data, new CommitData(ref, name, "m:" + name + ":" + c, "user's name", "mail"),
+                                    String newTag = client.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
                                             entity.getTag());
                                     PUTUPDATES.incrementAndGet();
                                     versions.get(branch).put(name, new String(data));
                                     LOG.info("Ok modified " + name + ":" + branch + " with " + c);
+                                    if (Math.random() < 0.5) {
+                                        client.getKey(name, branch, newTag, LoadTesterTest::read);
+                                    }
                                 } catch (APIException e) {
                                     LOG.error("TestSuiteError: Failed to modify " + c + " " + e.getMessage());
                                     PUTFAILURES.incrementAndGet();
@@ -437,7 +439,7 @@ public class LoadTesterTest {
 
     private JitStaticUpdaterClient buildKeyClient() throws URISyntaxException {
         JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/storage/").setUser(USER).setPassword(PASSWORD);
+                .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
         if (cache) {
             builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())
                     .setHttpClientBuilder(CachingHttpClients.custom());
@@ -462,16 +464,15 @@ public class LoadTesterTest {
         };
     }
 
-    private Ref checkoutBranch(String branch, Git git) throws IOException, GitAPIException, RefAlreadyExistsException, RefNotFoundException,
-            InvalidRefNameException, CheckoutConflictException {
+    private Ref checkoutBranch(String branch, Git git)
+            throws IOException, GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException {
         git.checkout().setAllPaths(true).call();
         Ref head = git.getRepository().findRef(branch);
         if (git.getRepository().getRepositoryState() != RepositoryState.SAFE) {
             git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
             git.clean().setCleanDirectories(true).setForce(true).call();
         }
-        CheckoutCommand checkout = git.checkout().setName(branch).setUpstreamMode(SetupUpstreamMode.TRACK)
-                .setStartPoint("origin/" + branch);
+        CheckoutCommand checkout = git.checkout().setName(branch).setUpstreamMode(SetupUpstreamMode.TRACK).setStartPoint("origin/" + branch);
         if (head == null) {
             checkout.setCreateBranch(true);
         }
@@ -502,8 +503,7 @@ public class LoadTesterTest {
             this.provider = provider;
         }
 
-        public void updateClient(String name, String branch)
-                throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+        public void updateClient(String name, String branch) throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
             try (Git git = Git.open(workingFolder)) {
                 Ref head = checkoutBranch(branch, git);
                 git.pull().setCredentialsProvider(provider).call();
@@ -526,8 +526,7 @@ public class LoadTesterTest {
                     }
                     if (ok) {
                         String v = new String(data);
-                        LOG.info("OK push " + c + " " + name + ":" + branch + " from " + versions.get(branch).put(name, v) + " to " + v
-                                + " commit " + message);
+                        LOG.info("OK push " + c + " " + name + ":" + branch + " from " + versions.get(branch).put(name, v) + " to " + v + " commit " + message);
                     }
                 }
             }

@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -74,342 +75,477 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
+import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
-import io.jitstatic.hosted.ErrorReporter;
-import io.jitstatic.hosted.JitStaticReceivePack;
-import io.jitstatic.hosted.RepositoryBus;
+import io.jitstatic.SourceChecker;
 import io.jitstatic.utils.ErrorConsumingThreadFactory;
+import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePackTest {
 
-	private static final String METADATA = ".metadata";
-	private static final String REF_HEADS_MASTER = "refs/heads/master";
-	private static final String STORE = "store";
-	private final Object o = new Object();
+    private static final String METADATA = ".metadata";
+    private static final String REF_HEADS_MASTER = "refs/heads/master";
+    private static final String STORE = "store";
+    private static final String SHA_1 = "5f12e3846fef8c259efede1a55e12667effcc461";
+    private final Object o = new Object();
 
-	private static final byte[] data;
-	static {
-		try {
-			data = "{}".getBytes("UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			throw new Error(e);
-		}
-	}
+    private static final byte[] data = brackets();
 
-	@Rule
-	public TemporaryFolder folder = new TemporaryFolder();
+    @Rule
+    public ExpectedException ex = ExpectedException.none();
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
 
-	private Git remoteBareGit;
-	private Git clientGit;
-	private Path storePath;
-	private Path storeMetaPath;
-	private TestProtocol<Object> protocol;
-	private URIish uri;
-	private ExecutorService service;
-	private ErrorReporter errorReporter;
-	private RepositoryBus bus;
+    private Git remoteBareGit;
+    private Git clientGit;
+    private Path storePath;
+    private Path storeMetaPath;
+    private TestProtocol<Object> protocol;
+    private URIish uri;
+    private ExecutorService service;
+    private ErrorReporter errorReporter;
+    private RepositoryBus bus;
 
-	@Before
-	public void setup() throws IllegalStateException, GitAPIException, IOException {
-		remoteBareGit = Git.init().setDirectory(folder.newFolder()).setBare(true).call();
-		File workingFolder = folder.newFolder();
-		clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder)
-				.call();
-		storePath = workingFolder.toPath().resolve(STORE);
-		storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
-		Files.write(storePath, data, StandardOpenOption.CREATE);
-		Files.write(storeMetaPath, data, StandardOpenOption.CREATE);
-		clientGit.add().addFilepattern(STORE).call();
-		clientGit.commit().setMessage("Initial commit").call();
-		clientGit.push().call();
+    @Before
+    public void setup() throws IllegalStateException, GitAPIException, IOException {
+        remoteBareGit = Git.init().setDirectory(folder.newFolder()).setBare(true).call();
+        File workingFolder = folder.newFolder();
+        clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder).call();
+        storePath = workingFolder.toPath().resolve(STORE);
+        storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
+        Files.write(storePath, data, StandardOpenOption.CREATE);
+        Files.write(storeMetaPath, data, StandardOpenOption.CREATE);
+        clientGit.add().addFilepattern(STORE).call();
+        clientGit.commit().setMessage("Initial commit").call();
+        clientGit.push().call();
 
-		errorReporter = new ErrorReporter();
-		bus = new RepositoryBus(errorReporter);
-		service = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("testRepo", errorReporter::setFault));
+        errorReporter = new ErrorReporter();
+        bus = new RepositoryBus(errorReporter);
+        service = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("testRepo", errorReporter::setFault));
 
-		protocol = new TestProtocol<Object>(null, (req, db) -> {
-			final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
-			return receivePack;
+        protocol = new TestProtocol<Object>(null, (req, db) -> {
+            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
+            return receivePack;
 
-		});
-		uri = protocol.register(o, remoteBareGit.getRepository());
-	}
+        });
+        uri = protocol.register(o, remoteBareGit.getRepository());
+    }
 
-	@After
-	public void tearDown() throws InterruptedException {
-		remoteBareGit.close();
-		clientGit.close();
-		Transport.unregister(protocol);
-		service.shutdown();
-		service.awaitTermination(1, TimeUnit.SECONDS);
-		assertEquals(null, errorReporter.getFault());
-	}
+    @After
+    public void tearDown() throws InterruptedException {
+        remoteBareGit.close();
+        clientGit.close();
+        Transport.unregister(protocol);
+        service.shutdown();
+        service.awaitTermination(1, TimeUnit.SECONDS);
+        assertEquals(null, errorReporter.getFault());
+    }
 
-	@Test
-	public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException,
-			RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-		Repository localRepository = clientGit.getRepository();
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		clientGit.commit().setMessage("New commit").call();
-		clientGit.push().call();
+    @Test
+    public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, RevisionSyntaxException,
+            AmbiguousObjectException, IncorrectObjectTypeException, IOException {
+        Repository localRepository = clientGit.getRepository();
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        clientGit.commit().setMessage("New commit").call();
+        clientGit.push().call();
 
-		clientGit.branchCreate().setName("newbranch").call();
+        clientGit.branchCreate().setName("newbranch").call();
 
-		clientGit.checkout().setName("newbranch").call();
-		RemoteTestUtils.copy("/test4.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		clientGit.commit().setMessage("Newer commit").call();
+        clientGit.checkout().setName("newbranch").call();
+        RemoteTestUtils.copy("/test4.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        clientGit.commit().setMessage("Newer commit").call();
 
-		Ref head = localRepository.exactRef(Constants.HEAD);
-		List<RefSpec> refSpecs = new ArrayList<>();
-		final RefSpec refSpec = new RefSpec(head.getLeaf().getName());
-		refSpecs.add(refSpec);
+        Ref head = localRepository.exactRef(Constants.HEAD);
+        List<RefSpec> refSpecs = new ArrayList<>();
+        final RefSpec refSpec = new RefSpec(head.getLeaf().getName());
+        refSpecs.add(refSpec);
 
-		try (Transport tn = protocol.open(uri, localRepository, "server");) {
-			final Collection<RemoteRefUpdate> toPush = tn.findRemoteRefUpdatesFor(refSpecs);
-			tn.push(NullProgressMonitor.INSTANCE, toPush);
-			for (RemoteRefUpdate rru : toPush) {
-				assertEquals("" + rru.getMessage(), Status.REJECTED_OTHER_REASON, rru.getStatus());
-				assertEquals("Error in branch refs/heads/newbranch", rru.getMessage());
-			}
-		}
-	}
+        try (Transport tn = protocol.open(uri, localRepository, "server");) {
+            final Collection<RemoteRefUpdate> toPush = tn.findRemoteRefUpdatesFor(refSpecs);
+            tn.push(NullProgressMonitor.INSTANCE, toPush);
+            for (RemoteRefUpdate rru : toPush) {
+                assertEquals("" + rru.getMessage(), Status.REJECTED_OTHER_REASON, rru.getStatus());
+                assertEquals("Error in branch refs/heads/newbranch", rru.getMessage());
+            }
+        }
+    }
 
-	@Test
-	public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, GitAPIException {
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		clientGit.commit().setMessage("New commit").call();
-		clientGit.push().call();
+    @Test
+    public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
+            WrongRepositoryStateException, AbortedByHookException, GitAPIException {
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        clientGit.commit().setMessage("New commit").call();
+        clientGit.push().call();
 
-		clientGit.branchCreate().setName("newbranch").call();
+        clientGit.branchCreate().setName("newbranch").call();
 
-		clientGit.checkout().setName("newbranch").call();
-		RemoteTestUtils.copy("/test4.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		clientGit.commit().setMessage("Newer commit").call();
-		Iterable<PushResult> pushCall = clientGit.push().call();
-		int cntr = 0;
-		for (@SuppressWarnings("unused")
-		PushResult pr : pushCall) {
-			cntr++;
-		}
-		assertTrue(cntr == 1);
-	}
+        clientGit.checkout().setName("newbranch").call();
+        RemoteTestUtils.copy("/test4.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        clientGit.commit().setMessage("Newer commit").call();
+        Iterable<PushResult> pushCall = clientGit.push().call();
+        int cntr = 0;
+        for (@SuppressWarnings("unused")
+        PushResult pr : pushCall) {
+            cntr++;
+        }
+        assertTrue(cntr == 1);
+    }
 
-	@Test
-	public void testOnPreReceiveNewCommitValidJSON() throws Exception {
-		final Repository localRepository = clientGit.getRepository();
-		final ObjectId oldId = localRepository.resolve(Constants.HEAD);
-		RemoteTestUtils.copy("/test3.json", storePath);
-		RemoteTestUtils.copy("/test3.md.json", storeMetaPath);
-		clientGit.add().addFilepattern(".").call();
-		RevCommit c = clientGit.commit().setMessage("New commit").call();
-		assertFalse(oldId.equals(c));
-		Ref ref = localRepository.findRef(REF_HEADS_MASTER);
+    @Test
+    public void testOnPreReceiveNewCommitValidJSON() throws Exception {
+        final Repository localRepository = clientGit.getRepository();
+        final ObjectId oldId = localRepository.resolve(Constants.HEAD);
+        RemoteTestUtils.copy("/test3.json", storePath);
+        RemoteTestUtils.copy("/test3.md.json", storeMetaPath);
+        clientGit.add().addFilepattern(".").call();
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+        assertFalse(oldId.equals(c));
+        Ref ref = localRepository.findRef(REF_HEADS_MASTER);
 
-		RemoteRefUpdate rru = new RemoteRefUpdate(localRepository, ref, REF_HEADS_MASTER, true, null, oldId);
-		Map<String, RemoteRefUpdate> updates = new HashMap<>();
-		updates.put(rru.getRemoteName(), rru);
+        RemoteRefUpdate rru = new RemoteRefUpdate(localRepository, ref, REF_HEADS_MASTER, true, null, oldId);
+        Map<String, RemoteRefUpdate> updates = new HashMap<>();
+        updates.put(rru.getRemoteName(), rru);
 
-		try (Transport tn = protocol.open(uri, localRepository, "server"); PushConnection connection = tn.openPush()) {
-			connection.push(NullProgressMonitor.INSTANCE, updates);
-			String messages = connection.getMessages();
-			System.out.println(messages);
-		}
-		assertEquals(Status.OK, rru.getStatus());
-	}
+        try (Transport tn = protocol.open(uri, localRepository, "server"); PushConnection connection = tn.openPush()) {
+            connection.push(NullProgressMonitor.INSTANCE, updates);
+            String messages = connection.getMessages();
+            System.out.println(messages);
+        }
+        assertEquals(Status.OK, rru.getStatus());
+    }
 
-	@Test
-	public void testOnPreReceiveFaultyJSONShouldDenyCommit() throws Exception {
-		final Repository localRepository = clientGit.getRepository();
-		final ObjectId oldId = localRepository.resolve(Constants.HEAD);
-		RemoteTestUtils.copy("/test4.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		final RevCommit c = clientGit.commit().setMessage("New commit").call();
-		assertFalse(oldId.equals(c));
-		final Ref ref = localRepository.findRef(REF_HEADS_MASTER);
+    @Test
+    public void testOnPreReceiveFaultyJSONShouldDenyCommit() throws Exception {
+        final Repository localRepository = clientGit.getRepository();
+        final ObjectId oldId = localRepository.resolve(Constants.HEAD);
+        RemoteTestUtils.copy("/test4.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        final RevCommit c = clientGit.commit().setMessage("New commit").call();
+        assertFalse(oldId.equals(c));
+        final Ref ref = localRepository.findRef(REF_HEADS_MASTER);
 
-		final RemoteRefUpdate rru = new RemoteRefUpdate(localRepository, ref, REF_HEADS_MASTER, true, null, oldId);
-		final Map<String, RemoteRefUpdate> updates = new HashMap<>();
-		updates.put(rru.getRemoteName(), rru);
+        final RemoteRefUpdate rru = new RemoteRefUpdate(localRepository, ref, REF_HEADS_MASTER, true, null, oldId);
+        final Map<String, RemoteRefUpdate> updates = new HashMap<>();
+        updates.put(rru.getRemoteName(), rru);
 
-		try (Transport tn = protocol.open(uri, localRepository, "server"); PushConnection connection = tn.openPush()) {
-			connection.push(NullProgressMonitor.INSTANCE, updates);
-			String messages = connection.getMessages();
-			System.out.println(messages);
-		}
-		assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
-		assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
-		final File newFolder = folder.newFolder();
-		try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
-				.call()) {
-			byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
-			assertArrayEquals(data, readAllBytes);
-		}
-	}
+        try (Transport tn = protocol.open(uri, localRepository, "server"); PushConnection connection = tn.openPush()) {
+            connection.push(NullProgressMonitor.INSTANCE, updates);
+            String messages = connection.getMessages();
+            System.out.println(messages);
+        }
+        assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
+        assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
+        final File newFolder = folder.newFolder();
+        try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
+            byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
+            assertArrayEquals(data, readAllBytes);
+        }
+    }
 
-	@Test
-	public void testRepositoryFailsIOException() throws Exception {
-		Repository remoteRepository = Mockito.spy(remoteBareGit.getRepository());
-		final String errormsg = "Triggered fault";
-		Mockito.doThrow(new IOException(errormsg)).when(remoteRepository).findRef(Mockito.any());
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
-		RevCommit c = clientGit.commit().setMessage("New commit").call();
+    @Test
+    public void testRepositoryFailsIOException() throws Exception {
+        Repository remoteRepository = Mockito.spy(remoteBareGit.getRepository());
+        final String errormsg = "Triggered fault";
+        Mockito.doThrow(new IOException(errormsg)).when(remoteRepository).findRef(Mockito.any());
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
 
-		ReceiveCommand rc = new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE);
+        ReceiveCommand rc = new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE);
 
-		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
-			@Override
-			protected List<ReceiveCommand> filterCommands(Result want) {
-				return Arrays.asList(rc);
-			}
-		};
-		rp.executeCommands();
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        };
+        rp.executeCommands();
 
-		assertEquals(Result.REJECTED_NOCREATE, rc.getResult());
-		assertEquals("Couldn't create test branch for " + REF_HEADS_MASTER + " because " + errormsg, rc.getMessage());
-		assertEquals(null, rp.getFault());
-	}
+        assertEquals(Result.REJECTED_NOCREATE, rc.getResult());
+        assertEquals("Couldn't create test branch for " + REF_HEADS_MASTER + " because " + errormsg, rc.getMessage());
+        assertEquals(null, rp.getFault());
+    }
 
-	@Test
-	public void testRepositoryFailsIOExceptionWhenGettingRef() throws Exception {
-		Repository remoteRepository = Mockito.mock(Repository.class);
-		RefUpdate ru = Mockito.mock(RefUpdate.class);
+    @Test
+    public void testRepositoryFailsIOExceptionWhenGettingRef() throws Exception {
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
 
-		final String errormsg = "Triggered fault";
+        final String errormsg = "Triggered fault";
 
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
-		RevCommit c = clientGit.commit().setMessage("New commit").call();
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
 
-		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
-		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
 
-		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
-		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
-		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
-		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
-		Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
+        Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
-			@Override
-			protected List<ReceiveCommand> filterCommands(Result want) {
-				return Arrays.asList(rc);
-			}
-		};
-		rp.executeCommands();
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        };
+        rp.executeCommands();
 
-		assertEquals(errormsg, rc.getMessage());
-		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-		assertEquals(errormsg, rp.getFault().getMessage());
-	}
+        assertEquals(errormsg, rc.getMessage());
+        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+        assertEquals(errormsg, rp.getFault().getMessage());
+    }
 
-	@Test
-	public void testRepositoryFailsIOExceptionWhenDeletingTemporaryBranch() throws Exception {
-		Repository remoteRepository = Mockito.mock(Repository.class);
-		RefUpdate ru = Mockito.mock(RefUpdate.class);
+    @Test
+    public void testRepositoryFailsIOExceptionWhenDeletingTemporaryBranch() throws Exception {
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
 
-		final String errormsg = "Test Triggered fault";
+        final String errormsg = "Test Triggered fault";
 
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
-		RevCommit c = clientGit.commit().setMessage("New commit").call();
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
 
-		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
-		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-		
-		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
-		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
-		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.delete()).thenThrow(new RuntimeException(errormsg));
-		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
-		Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
 
-		JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
-			@Override
-			protected List<ReceiveCommand> filterCommands(Result want) {
-				return Arrays.asList(rc);
-			}
-		};
+        Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.delete()).thenThrow(new RuntimeException(errormsg));
+        Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
+        Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-		rp.executeCommands();
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        };
 
-		assertEquals(errormsg, rc.getMessage());
-		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-		assertEquals("General error while deleting branches " + errormsg, rp.getFault().getMessage());
-	}
+        rp.executeCommands();
 
-	@Test
-	public void testRepositoryFailsGeneralError() throws Exception {
-		Repository remoteRepository = Mockito.mock(Repository.class);
-		RefUpdate ru = Mockito.mock(RefUpdate.class);
+        assertEquals(errormsg, rc.getMessage());
+        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+        assertEquals("General error while deleting branches " + errormsg, rp.getFault().getMessage());
+    }
 
-		final String errormsg = "Triggered error";
+    @Test
+    public void testRepositoryFailsGeneralError() throws Exception {
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
 
-		RemoteTestUtils.copy("/test3.json", storePath);
-		clientGit.add().addFilepattern(STORE).call();
-		ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
-		RevCommit c = clientGit.commit().setMessage("New commit").call();
+        final String errormsg = "Triggered error";
 
-		Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
 
-		ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-		JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
-			@Override
-			protected List<ReceiveCommand> filterCommands(Result want) {
-				return Arrays.asList(rc);
-			}
-		});
-		Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
-		Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
-		Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
-		Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
-		Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
-		Mockito.doThrow(new RuntimeException(errormsg)).doCallRealMethod().when(rp).sendMessage(Mockito.any());
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
-		rp.executeCommands();
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        });
+        Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+        Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
+        Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
+        Mockito.doThrow(new RuntimeException(errormsg)).doCallRealMethod().when(rp).sendMessage(Mockito.any());
 
-		assertEquals("General error " + errormsg, rc.getMessage());
-		assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-		assertEquals("General error " + errormsg, rp.getFault().getMessage());
-	}
+        rp.executeCommands();
 
-	@Test
-	public void testDeleteDefaultBranch()
-			throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
-		clientGit.branchCreate().setName("other").call();
-		Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
-		clientGit.checkout().setName("other").call();
-		clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
-		ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
-		JitStaticReceivePack rp = Mockito
-				.spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
-					@Override
-					protected List<ReceiveCommand> filterCommands(Result want) {
-						return Arrays.asList(rc);
-					}
-				});
-		rp.executeCommands();
-		assertEquals(Result.REJECTED_NODELETE, rc.getResult());
-		assertEquals(null, rp.getFault());
-	}
+        assertEquals("General error " + errormsg, rc.getMessage());
+        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+        assertEquals("General error " + errormsg, rp.getFault().getMessage());
+    }
+
+    @Test
+    public void testDeleteDefaultBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
+        clientGit.branchCreate().setName("other").call();
+        Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        clientGit.checkout().setName("other").call();
+        clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
+        ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        });
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_NODELETE, rc.getResult());
+        assertEquals(null, rp.getFault());
+    }
+
+    @Test
+    public void testBranchIsTestBranchIsMissingAfterCreation() throws Exception {
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
+
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+        });
+        Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
+        Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+    }
+
+    @Test
+    public void testBranchIsMissingWhenCommitting() throws Exception {
+        RemoteTestUtils.copy("/test3.json", storePath);
+        clientGit.add().addFilepattern(STORE).call();
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+        Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(c.getId(), ObjectId.fromString(SHA_1), REF_HEADS_MASTER, Type.UPDATE));
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
+        RefUpdate testUpdate = Mockito.mock(RefUpdate.class);
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        SourceChecker sc = Mockito.mock(SourceChecker.class);
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+
+            @Override
+            SourceChecker getSourceChecker() {
+                return sc;
+            }
+        });
+
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(null);
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
+        Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_MISSING_OBJECT, rc.getResult());
+    }
+
+    @Test
+    public void testBranchIsStaleWhenCommitting() throws Exception {
+        RemoteTestUtils.copy("/test3.json", storePath);
+        Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        clientGit.add().addFilepattern(STORE).call();
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(c.getId(), ObjectId.fromString(SHA_1), REF_HEADS_MASTER, Type.UPDATE));
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
+        RefUpdate testUpdate = Mockito.mock(RefUpdate.class);
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        SourceChecker sc = Mockito.mock(SourceChecker.class);
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+
+            @Override
+            SourceChecker getSourceChecker() {
+                return sc;
+            }
+        });
+
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
+        Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(master);
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_NONFASTFORWARD, rc.getResult());
+    }
+
+    @Test
+    public void testIOExceptionWhenCommitting() throws Exception {
+        IOException e = new IOException("Test");
+        ex.expect(RepositoryException.class);
+        ex.expectCause(Matchers.is(e));
+        RemoteTestUtils.copy("/test3.json", storePath);
+        Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        clientGit.add().addFilepattern(STORE).call();
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(c.getId(), ObjectId.fromString(SHA_1), REF_HEADS_MASTER, Type.UPDATE));
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
+        RefUpdate testUpdate = Mockito.mock(RefUpdate.class);
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        SourceChecker sc = Mockito.mock(SourceChecker.class);
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+
+            @Override
+            SourceChecker getSourceChecker() {
+                return sc;
+            }
+        });
+
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
+        Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenThrow(e);
+        Mockito.when(testUpdate.delete()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+        throw rp.getFault();
+    }
+
+    private static byte[] brackets() {
+        try {
+            return "{}".getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new Error(e);
+        }
+    }
 }

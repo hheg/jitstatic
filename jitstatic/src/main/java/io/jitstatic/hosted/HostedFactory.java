@@ -147,7 +147,7 @@ public class HostedFactory {
         final String baseServletPath = "/" + getServletName() + "/*";
         LOG.info("Configuring hosted GIT environment on " + baseServletPath);
         final GitServlet gs = new GitServlet();
-
+        
         gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
         gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());

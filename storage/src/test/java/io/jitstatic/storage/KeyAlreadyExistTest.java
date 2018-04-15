@@ -24,7 +24,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import io.jitstatic.storage.KeyAlreadyExist;
+import io.jitstatic.hosted.KeyAlreadyExist;
 
 public class KeyAlreadyExistTest {
 

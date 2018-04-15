@@ -36,7 +36,7 @@ public class LogoPoster implements PreReceiveHook {
 	private static final String line6 = "                                    ";
 
 	@Override
-	public void onPreReceive(ReceivePack rp, Collection<ReceiveCommand> commands) {
+	public void onPreReceive(final ReceivePack rp, final Collection<ReceiveCommand> commands) {
 		rp.sendMessage(line1);
 		rp.sendMessage(line2);
 		rp.sendMessage(line3);
