@@ -20,6 +20,7 @@ package io.jitstatic.api;
  * #L%
  */
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -51,6 +52,7 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import io.jitstatic.HeaderPair;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
@@ -77,8 +79,8 @@ public class MapResource {
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
     @Path("/{key : .+}")
-    public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            final @Auth Optional<User> user, final @Context Request request, final @Context HttpHeaders headers) {
+    public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Context Request request, final @Context HttpHeaders headers) {
 
         helper.checkRef(ref);
 
@@ -88,17 +90,16 @@ public class MapResource {
         }
         final StoreInfo storeInfo = si.get();
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
-        
+
         final Response noChange = helper.checkETag(headers, tag);
-        if(noChange != null) {
+        if (noChange != null) {
             return noChange;
         }
-        
+
         final StorageData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
         if (allowedUsers.isEmpty()) {
-            return Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
-                    .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+            return buildResponse(storeInfo, tag, data);
         }
 
         if (!user.isPresent()) {
@@ -110,8 +111,19 @@ public class MapResource {
             LOG.info("Resource " + key + "is denied for user " + user.get());
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        return Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
-                .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+        return buildResponse(storeInfo, tag, data);
+    }
+
+    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final StorageData data) {
+        final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+                .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
+        final List<HeaderPair> headers = data.getHeaders();
+        if (headers != null) {
+            for (HeaderPair headerPair : headers) {
+                responseBuilder.header(headerPair.getHeader(), headerPair.getValue());
+            }
+        }
+        return responseBuilder.build();
     }
 
     @PUT
@@ -120,9 +132,8 @@ public class MapResource {
     @ExceptionMetered(name = "put_storage_exception")
     @Path("/{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            final @Auth Optional<User> user, final @Valid @NotNull ModifyKeyData data, final @Context Request request,
-            final @Context HttpHeaders headers) {
+    public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Valid @NotNull ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the git repository.
         if (!user.isPresent()) {
@@ -154,9 +165,9 @@ public class MapResource {
         if (response != null) {
             return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
         }
-        // TODO this should be idempotent. So if version is equals, answer 200.
-        final String newVersion = helper.unwrapWithPUTApi(storage.put(key, ref, data.getData(), currentVersion,
-                data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        
+        final String newVersion = helper
+                .unwrapWithPUTApi(storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -181,10 +192,9 @@ public class MapResource {
         if (si.isPresent()) {
             throw new WebApplicationException(Status.CONFLICT);
         }
-        final StoreInfo result = helper.unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(),
-                data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
-        return Response.ok().tag(new EntityTag(result.getVersion()))
-                .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType())
+        final StoreInfo result = helper.unwrapWithPOSTApi(
+                storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        return Response.ok().tag(new EntityTag(result.getVersion())).header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).entity(result.getData()).build();
     }
 }

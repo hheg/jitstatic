@@ -23,24 +23,33 @@ package io.jitstatic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
 
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.auth.User;
-
 public class SourceJSONParser {
 
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).enable(Feature.STRICT_DUPLICATE_DETECTION);
+    private static final ValidatorFactory VALIDATIONFACTORY = Validation.buildDefaultValidatorFactory();
+    private final Validator validator;
 
-    public String parse(final InputStream bc) throws IOException {
+    public SourceJSONParser() {
+        this.validator = VALIDATIONFACTORY.getValidator();
+    }
+
+    public String parseMetaData(final InputStream bc) throws IOException {
         final StorageData metaData = parseStream(bc);
 
-        final Set<User> usersNode = metaData.getUsers();
-        if (usersNode == null) {
-            throw new StorageParseException("metadata is missing users node");
+        final Set<ConstraintViolation<StorageData>> violations = validator.validate(metaData);
+        if (violations.size() > 0) {
+            throw new StorageParseException(violations);
         }
-        checkUsers(usersNode);
         return metaData.getContentType();
     }
 
@@ -53,33 +62,28 @@ public class SourceJSONParser {
         }
     }
 
-    private void checkUsers(final Set<User> usersNode) throws StorageParseException {
-        for (User userNode : usersNode) {
-            checkUser(userNode);
-        }
-    }
-
-    private void checkUser(final User userNode) throws StorageParseException {
-        final String userName = userNode.getName();
-        if (userName == null) {
-            throw new StorageParseException("metadata is missing user name");
-        }
-        final String password = userNode.getPassword();
-        if (password == null) {
-            throw new StorageParseException("metadata user " + userName + " is missing password ");
-        }
-    }
-
     private static class StorageParseException extends IOException {
 
         private static final long serialVersionUID = 1774575933983877566L;
 
-        public StorageParseException(final String message) {
-            super(message);
-        }
-
         public StorageParseException(final String message, final IOException e) {
             super(message, e);
+        }
+
+        public StorageParseException(Set<ConstraintViolation<StorageData>> violations) {
+            super(compile(violations));
+        }
+
+        private static String compile(Set<ConstraintViolation<StorageData>> violations) {
+            return violations.stream()
+                    .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
+                    .collect(Collectors.joining(System.lineSeparator()));
+
+        }
+
+        @Override
+        public Throwable fillInStackTrace() {
+            return this;
         }
     }
 

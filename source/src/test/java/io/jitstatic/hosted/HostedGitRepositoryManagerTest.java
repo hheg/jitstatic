@@ -39,6 +39,7 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -390,7 +391,7 @@ public class HostedGitRepositoryManagerTest {
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call()) {
             addFilesAndPush(localGitDir, git);
             CompletableFuture<Pair<String, String>> addKey = grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 },
-                    new StorageData(new HashSet<>(), null), "message", "userinfo", "mail");
+                    new StorageData(new HashSet<>(), null, false, false, List.of()), "message", "userinfo", "mail");
             String version = addKey.join().getLeft();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -410,7 +411,7 @@ public class HostedGitRepositoryManagerTest {
         ex.expectCause(isA(RefNotFoundException.class));
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
             try {
-                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new StorageData(new HashSet<>(), null), "message",
+                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new StorageData(new HashSet<>(), null, false, false, List.of()), "message",
                         "userinfo", "mail").get();
             } catch (InterruptedException | ExecutionException e) {
                 throw e.getCause();
@@ -434,7 +435,7 @@ public class HostedGitRepositoryManagerTest {
             }
 
             String firstVersion = firstSourceInfo.getMetaDataVersion();
-            StorageData newData = new StorageData(new HashSet<>(), "newcontent");
+            StorageData newData = new StorageData(new HashSet<>(), "newcontent", false, false, List.of());
             String newVersion = grm
                     .modify(newData, firstVersion, message, userInfo, "user@somewhere.org", STORE, null).get();
             assertNotEquals(firstVersion, newVersion);

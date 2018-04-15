@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -112,7 +113,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testGetAKey() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
         Mockito.when(storage.get("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Response response = RESOURCES.target("/metakey/dog").request()
@@ -126,7 +127,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithoutuser() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -139,7 +140,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -153,7 +154,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongVersion() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -169,7 +170,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKey() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -189,7 +190,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithMalformedKeyData() {
-        StorageData storageData = new StorageData(new HashSet<>(), null);
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");

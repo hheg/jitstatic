@@ -150,7 +150,7 @@ public class SourceChecker implements AutoCloseable {
 		}
 		if (inputStreamHolder.isPresent()) {
 			try (final InputStream is = inputStreamHolder.inputStream()) {
-				return Pair.of(fileObject, Either.left(PARSER.parse(is)));
+				return Pair.of(fileObject, Either.left(PARSER.parseMetaData(is)));
 			} catch (final IOException e) {
 				// File had errors
 				return Pair.of(fileObject, Either.right(e));
