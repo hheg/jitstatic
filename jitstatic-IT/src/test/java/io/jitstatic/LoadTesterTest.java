@@ -38,11 +38,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -213,7 +216,6 @@ public class LoadTesterTest {
         LOG.info("Put failures: {}", PUTFAILURES.get());
     }
 
-    // @ParameterizedTest
     @RepeatedTest(4)
     public void testLoad(TestData data)
             throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
@@ -232,8 +234,8 @@ public class LoadTesterTest {
         }
         ExecutorService clientPool = Executors.newFixedThreadPool(A_CLIENTS);
         ExecutorService updaterPool = Executors.newFixedThreadPool(A_UPDTRS);
-        Future<?>[] clientJobs = new Future[A_CLIENTS];
-        Future<?>[] updaterJobs = new Future[A_UPDTRS];
+        CompletableFuture<?>[] clientJobs = new CompletableFuture[A_CLIENTS];
+        CompletableFuture<?>[] updaterJobs = new CompletableFuture[A_UPDTRS];
         long start = System.currentTimeMillis();
         do {
             execClientJobs(clientPool, clientJobs);
@@ -244,30 +246,26 @@ public class LoadTesterTest {
         clientPool.shutdown();
     }
 
-    private void waitForJobstoFinish(Future<?>[] clientJobs, Future<?>[] updaterJobs) {
-        int idx = clientJobs.length + updaterJobs.length;
-        while (idx > 0) {
-            idx = completeJobs(clientJobs, idx);
-            idx = completeJobs(updaterJobs, idx);
+    private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs) {
+        CompletableFuture<Void> allClientJobs = CompletableFuture.allOf(clientJobs);
+        CompletableFuture<Void> allUpdaterJobs = CompletableFuture.allOf(updaterJobs);
+        try {
+            allClientJobs.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            e.printStackTrace();
+        }        
+        try {
+            allUpdaterJobs.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {         
+            e.printStackTrace();
         }
     }
 
-    private int completeJobs(Future<?>[] jobs, int idx) {
-        for (int i = 0; i < jobs.length; i++) {
-            Future<?> f = jobs[i];
-            if (f != null && f.isDone()) {
-                jobs[i] = null;
-                idx--;
-            }
-        }
-        return idx;
-    }
-
-    private void execUpdatersJobs(ExecutorService updaterPool, Future<?>[] updaterJobs) {
+    private void execUpdatersJobs(ExecutorService updaterPool, CompletableFuture<?>[] updaterJobs) {
         for (int i = 0; i < updaterJobs.length; i++) {
-            Future<?> f = updaterJobs[i];
+            CompletableFuture<?> f = updaterJobs[i];
             if (f == null || f.isDone()) {
-                updaterJobs[i] = updaterPool.submit(() -> {
+                updaterJobs[i] = CompletableFuture.runAsync(() -> {
                     ClientUpdater cu;
                     try {
                         cu = updaters.take();
@@ -285,7 +283,7 @@ public class LoadTesterTest {
                     } catch (InterruptedException e1) {
                         LOG.error("TestSuiteError: Updater interrupted and killed", e1);
                     }
-                });
+                }, updaterPool);
             }
         }
     }
@@ -294,17 +292,17 @@ public class LoadTesterTest {
         return Files.createTempDirectory("junit").toFile();
     }
 
-    private void execClientJobs(ExecutorService clientPool, Future<?>[] clientJobs) {
+    private void execClientJobs(ExecutorService clientPool, CompletableFuture<?>[] clientJobs) {
         for (int i = 0; i < clientJobs.length; i++) {
-            Future<?> f = clientJobs[i];
+            CompletableFuture<?> f = clientJobs[i];
             if (f == null || f.isDone()) {
-                clientJobs[i] = clientPool.submit(() -> {
+                clientJobs[i] = CompletableFuture.runAsync(() -> {
                     try {
                         clientCode();
                     } catch (InterruptedException | IOException e) {
                         LOG.error("TestSuiteError: Interrupted ", e);
                     }
-                });
+                }, clientPool);
             }
         }
     }
