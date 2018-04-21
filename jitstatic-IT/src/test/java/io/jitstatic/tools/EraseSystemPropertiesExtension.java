@@ -20,9 +20,11 @@ package io.jitstatic.tools;
  * #L%
  */
 
-import org.junit.rules.ExternalResource;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
-public class EraseSystemProperties extends ExternalResource {
+
+public class EraseSystemPropertiesExtension implements BeforeEachCallback {
 	private final String[] strings;
 
 	/**
@@ -31,16 +33,15 @@ public class EraseSystemProperties extends ExternalResource {
 	 * 
 	 * @param strings
 	 */
-	public EraseSystemProperties(final String... strings) {
+	public EraseSystemPropertiesExtension(final String... strings) {
 		this.strings = strings;
 	}
 
-	@Override
-	protected void before() throws Throwable {
-		final String prefix = "dw.";
-		for (String s : strings) {
-			System.clearProperty(prefix + s);
-		}
-		super.before();
-	}
+    @Override
+    public void beforeEach(ExtensionContext context) throws Exception {
+        final String prefix = "dw.";
+        for (String s : strings) {
+            System.clearProperty(prefix + s);
+        }        
+    }
 }

@@ -1,5 +1,7 @@
 package io.jitstatic.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -20,12 +22,11 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.utils.ErrorConsumingThreadFactory;
 

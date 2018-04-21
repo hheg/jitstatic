@@ -20,9 +20,9 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.hosted.KeyAlreadyExist;
 
@@ -31,6 +31,6 @@ public class KeyAlreadyExistTest {
     @Test
     public void test() {
         KeyAlreadyExist k = new KeyAlreadyExist("key", "branch");
-        assertEquals("key already exist in branch branch", k.getMessage());
+        assertEquals("key already exist in branch branch", k.getLocalizedMessage());
     }
 }

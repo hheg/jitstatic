@@ -20,10 +20,11 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,13 +76,9 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import io.jitstatic.SourceChecker;
@@ -98,11 +95,6 @@ public class JitStaticReceivePackTest {
 
     private static final byte[] data = brackets();
 
-    @Rule
-    public ExpectedException ex = ExpectedException.none();
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
-
     private Git remoteBareGit;
     private Git clientGit;
     private Path storePath;
@@ -113,10 +105,10 @@ public class JitStaticReceivePackTest {
     private ErrorReporter errorReporter;
     private RepositoryBus bus;
 
-    @Before
+    @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
-        remoteBareGit = Git.init().setDirectory(folder.newFolder()).setBare(true).call();
-        File workingFolder = folder.newFolder();
+        remoteBareGit = Git.init().setDirectory(getFolder().toFile()).setBare(true).call();
+        File workingFolder = getFolder().toFile();
         clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder).call();
         storePath = workingFolder.toPath().resolve(STORE);
         storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
@@ -138,7 +130,7 @@ public class JitStaticReceivePackTest {
         uri = protocol.register(o, remoteBareGit.getRepository());
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws InterruptedException {
         remoteBareGit.close();
         clientGit.close();
@@ -173,7 +165,7 @@ public class JitStaticReceivePackTest {
             final Collection<RemoteRefUpdate> toPush = tn.findRemoteRefUpdatesFor(refSpecs);
             tn.push(NullProgressMonitor.INSTANCE, toPush);
             for (RemoteRefUpdate rru : toPush) {
-                assertEquals("" + rru.getMessage(), Status.REJECTED_OTHER_REASON, rru.getStatus());
+                assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
                 assertEquals("Error in branch refs/heads/newbranch", rru.getMessage());
             }
         }
@@ -246,7 +238,7 @@ public class JitStaticReceivePackTest {
         }
         assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
         assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
-        final File newFolder = folder.newFolder();
+        final File newFolder = getFolder().toFile();
         try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
             byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
             assertArrayEquals(data, readAllBytes);
@@ -505,8 +497,6 @@ public class JitStaticReceivePackTest {
     @Test
     public void testIOExceptionWhenCommitting() throws Exception {
         IOException e = new IOException("Test");
-        ex.expect(RepositoryException.class);
-        ex.expectCause(Matchers.is(e));
         RemoteTestUtils.copy("/test3.json", storePath);
         Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.add().addFilepattern(STORE).call();
@@ -538,7 +528,13 @@ public class JitStaticReceivePackTest {
         Mockito.when(testUpdate.delete()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        throw rp.getFault();
+        Exception fault = rp.getFault();
+        assertTrue(fault instanceof RepositoryException);
+        assertSame(e, fault.getCause());
+    }
+
+    Path getFolder() throws IOException {
+        return Files.createTempDirectory("junit");
     }
 
     private static byte[] brackets() {

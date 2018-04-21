@@ -113,7 +113,7 @@ class APIHelper {
                     return null;
                 }
                 if (apiException instanceof VersionIsNotSameException) {
-                    throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
             }
             log.error("Error while unwrapping future", e);

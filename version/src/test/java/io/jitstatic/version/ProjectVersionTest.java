@@ -20,16 +20,16 @@ package io.jitstatic.version;
  * #L%
  */
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 
-import org.junit.Test;
-
 import io.jitstatic.version.ProjectVersion;
+import org.junit.jupiter.api.Test;
 
 public class ProjectVersionTest {
-	@Test
+	
+    @Test
 	public void testProjectVersionTest() throws IOException {
 		ProjectVersion pv = ProjectVersion.INSTANCE;
 		System.out.println(pv.getBuildVersion());

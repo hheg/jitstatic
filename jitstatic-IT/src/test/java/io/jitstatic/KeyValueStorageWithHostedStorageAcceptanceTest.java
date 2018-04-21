@@ -20,12 +20,13 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,14 +57,12 @@ import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.RuleChain;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -71,7 +70,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
-import io.dropwizard.testing.junit.DropwizardAppRule;
+import io.dropwizard.testing.junit5.DropwizardAppExtension;
+import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.JitstaticApplication;
 import io.jitstatic.JitstaticConfiguration;
 import io.jitstatic.client.MetaData.User;
@@ -86,24 +86,20 @@ import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 
+@ExtendWith(DropwizardExtensionsSupport.class)
 public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
     private static final String UTF_8 = "UTF-8";
     private static final String ACCEPT_STORAGE = "accept/storage";
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private DropwizardAppRule<JitstaticConfiguration> DW;
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
+            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+
     private String adress;
-    @Rule
-    public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
 
-    @Rule
-    public ExpectedException ex = ExpectedException.none();
-
-    @Before
+    @BeforeEach
     public void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
         adress = String.format("http://localhost:%d/application", DW.getLocalPort());
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
@@ -118,11 +114,10 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     private void setupRepo(String user, String pass, String servletName, String endpoint)
             throws IOException, GitAPIException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException,
             ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
-        File workingDirectory = TMP_FOLDER.newFolder();
+        File workingDirectory = getFolderFile();
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
         try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint).setCredentialsProvider(provider)
                 .call()) {
-
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + ".metadata");
 
@@ -132,7 +127,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         }
     }
 
-    @After
+    @AfterEach
     public void after() {
         SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
         List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull).collect(Collectors.toList());
@@ -140,22 +135,22 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     public void testGetNotFoundKeyWithoutAuth() throws Exception {
-        ex.expect(APIException.class);
-        ex.expectMessage("/application/storage/nokey failed with: 404 Not Found");
-        try (JitStaticUpdaterClient client = buildClient().build();) {
-            client.getKey("nokey", null, tf);
-        }
+        assertThat(assertThrows(APIException.class, () -> {
+            try (JitStaticUpdaterClient client = buildClient().build();) {
+                client.getKey("nokey", null, tf);
+            }
+        }).getMessage(), CoreMatchers.containsString("/application/storage/nokey failed with: 404 Not Found"));
     }
 
     @Test
     public void testGetNotFoundKeyWithAuth() throws Exception {
-        ex.expect(APIException.class);
-        ex.expectMessage("application/storage/nokey failed with: 404 Not Found");
-        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
-            client.getKey("nokey", null, tf);
-        }
+        assertThat(assertThrows(APIException.class, () -> {
+            try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+                client.getKey("nokey", null, tf);
+            }
+        }).getMessage(), CoreMatchers.containsString("application/storage/nokey failed with: 404 Not Found"));
     }
 
     @Test
@@ -180,11 +175,11 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
 
     @Test
     public void testGetAKeyValueWithoutAuth() throws Exception {
-        ex.expect(APIException.class);
-        ex.expectMessage("/application/storage/accept/storage failed with: 401 Unauthorized");
-        try (JitStaticUpdaterClient client = buildClient().build();) {
-            client.getKey(ACCEPT_STORAGE, null, tf);
-        }
+        assertThat(assertThrows(APIException.class, () -> {
+            try (JitStaticUpdaterClient client = buildClient().build();) {
+                client.getKey(ACCEPT_STORAGE, null, tf);
+            }
+        }).getMessage(), CoreMatchers.containsString("/application/storage/accept/storage failed with: 401 Unauthorized"));
     }
 
     @Test
@@ -271,11 +266,15 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
     private static Supplier<String> getFolder() {
         return () -> {
             try {
-                return TMP_FOLDER.newFolder().toString();
+                return getFolderFile().getAbsolutePath();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         };
+    }
+
+    private static File getFolderFile() throws IOException {
+        return Files.createTempDirectory("junit").toFile();
     }
 
     private JitStaticUpdaterClientBuilder buildClient() {
