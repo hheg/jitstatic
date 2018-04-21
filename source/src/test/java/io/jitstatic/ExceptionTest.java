@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -20,10 +22,8 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
-
 import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaDataFileIsMissingSourceFile;
 import io.jitstatic.UpdateFailedException;
@@ -36,7 +36,7 @@ public class ExceptionTest {
 		MetaDataFileIsMissingSourceFile md = new MetaDataFileIsMissingSourceFile(file);
 		assertEquals(file + " is missing matching source file", md.getMessage());
 		UpdateFailedException up = new UpdateFailedException(Result.REJECTED);
-		assertEquals(Result.REJECTED.name(), up.getMessage());
+		assertEquals(Result.REJECTED.name(), up.getLocalizedMessage());
 	}
 
 }

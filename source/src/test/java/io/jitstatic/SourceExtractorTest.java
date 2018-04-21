@@ -20,12 +20,14 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -65,12 +67,10 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
+import org.hamcrest.CoreMatchers;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import io.jitstatic.BranchData;
@@ -87,30 +87,30 @@ public class SourceExtractorTest {
 
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String METADATA = ".metadata";
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
-    @Rule
-    public ExpectedException ex = ExpectedException.none();
     private Git git;
 
     private File workingFolder;
 
-    @Before
+    @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
-        workingFolder = folder.newFolder();
+        workingFolder = getFolder();
         git = Git.init().setBare(true).setDirectory(workingFolder).call();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         if (git != null) {
             git.close();
         }
     }
 
+    File getFolder() throws IOException {
+        return Files.createTempDirectory("junit").toFile();
+    }
+
     @Test
     public void testCheckRepositoryUniqueBlobs() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
-        File tempGitFolder = folder.newFolder();
+        File tempGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
             for (int i = 0; i < 4; i++) {
@@ -155,7 +155,7 @@ public class SourceExtractorTest {
 
     @Test
     public void testCheckRepositorySameBlobs() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
-        File tempGitFolder = folder.newFolder();
+        File tempGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
             for (int i = 0; i < 4; i++) {
@@ -193,7 +193,7 @@ public class SourceExtractorTest {
     @Test
     public void testCheckBranchWithRemovedObjects() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
         final String key = "file";
-        final File tempGitFolder = folder.newFolder();
+        final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             addFilesAndPush(key, tempGitFolder, local);
             final SourceExtractor se = new SourceExtractor(git.getRepository());
@@ -226,7 +226,7 @@ public class SourceExtractorTest {
     @Test
     public void testReadASingleFileFromMaster() throws Exception {
         final String key = "file";
-        File temporaryGitFolder = folder.newFolder();
+        File temporaryGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
             addFilesAndPush(key, temporaryGitFolder, local);
         }
@@ -242,22 +242,24 @@ public class SourceExtractorTest {
 
     @Test
     public void testExtractNullTag() throws Exception {
-        ex.expect(NullPointerException.class);
-        SourceExtractor se = new SourceExtractor(git.getRepository());
-        se.openTag(null, "file");
+        assertThrows(NullPointerException.class, () -> {
+            SourceExtractor se = new SourceExtractor(git.getRepository());
+            se.openTag(null, "file");
+        });
     }
 
     @Test
     public void testExtractNoTag() throws Exception {
-        ex.expect(RefNotFoundException.class);
-        SourceExtractor se = new SourceExtractor(git.getRepository());
-        se.openTag("tag", "file");
+        assertThrows(RefNotFoundException.class, () -> {
+            SourceExtractor se = new SourceExtractor(git.getRepository());
+            se.openTag("tag", "file");
+        });
     }
 
     @Test
     public void testExtractTag() throws Exception {
         final String key = "file";
-        File temporaryGitFolder = folder.newFolder();
+        File temporaryGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
             addFilesAndPush(key, temporaryGitFolder, local);
             local.tag().setName("tag").call();
@@ -273,31 +275,32 @@ public class SourceExtractorTest {
     }
 
     @Test
-    public void testRefNotPresent() throws Exception {
-        ex.expect(RefNotFoundException.class);
-        final String key = "file";
-        File temporaryGitFolder = folder.newFolder();
-        try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
-            final Path file = temporaryGitFolder.toPath().resolve(key);
-            Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
-            local.add().addFilepattern(key).call();
-            local.commit().setMessage("Commit " + file.toString()).call();
-            local.push().call();
-        }
-        SourceExtractor se = new SourceExtractor(git.getRepository());
-        SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
-        try (final InputStream is = branch.getSourceInputStream();) {
-            assertNotNull(is);
-            String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
-            assertEquals(getData(), parsed);
-        }
+    public void testRefNotPresent() {
+        assertThrows(RefNotFoundException.class, () -> {
+            final String key = "file";
+            File temporaryGitFolder = getFolder();
+            try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
+                final Path file = temporaryGitFolder.toPath().resolve(key);
+                Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+                local.add().addFilepattern(key).call();
+                local.commit().setMessage("Commit " + file.toString()).call();
+                local.push().call();
+            }
+            SourceExtractor se = new SourceExtractor(git.getRepository());
+            SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
+            try (final InputStream is = branch.getSourceInputStream();) {
+                assertNotNull(is);
+                String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
+                assertEquals(getData(), parsed);
+            }
+        });
     }
 
     @Test
     public void testOpeningRepositoryFails() throws Exception {
         IOException exception = new IOException("Error opening");
         final String key = "file";
-        File temporaryGitFolder = folder.newFolder();
+        File temporaryGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
             addFilesAndPush(key, temporaryGitFolder, local);
             local.tag().setName("tag").call();
@@ -318,38 +321,38 @@ public class SourceExtractorTest {
 
     @Test
     public void testSourceTestBranchExtractorNullBranch() throws RefNotFoundException, IOException {
-        ex.expect(NullPointerException.class);
-        Repository repository = Mockito.mock(Repository.class);
-        SourceExtractor se = new SourceExtractor(repository);
-        se.sourceTestBranchExtractor(null);
+        assertThrows(NullPointerException.class, () -> {
+            Repository repository = Mockito.mock(Repository.class);
+            SourceExtractor se = new SourceExtractor(repository);
+            se.sourceTestBranchExtractor(null);
+        });
     }
 
     @Test
     public void testSourceTestBranchExtractorBranchNotFound() throws RefNotFoundException, IOException {
-        ex.expect(RefNotFoundException.class);
-        Repository repository = Mockito.mock(Repository.class);
-        SourceExtractor se = new SourceExtractor(repository);
-        se.sourceTestBranchExtractor("notfound");
+        assertThrows(RefNotFoundException.class, () -> {
+            Repository repository = Mockito.mock(Repository.class);
+            SourceExtractor se = new SourceExtractor(repository);
+            se.sourceTestBranchExtractor("notfound");
+        });
     }
 
     @Test
-    public void testSourceTestBranchExtractorWrongRefName() throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, GitAPIException, IOException {
+    public void testSourceTestBranchExtractorWrongRefName() {
         final String branch = JitStaticConstants.REFS_JISTSTATIC + "something";
-        ex.expect(RefNotFoundException.class);
-        ex.expectMessage(branch);
-        final String key = "file";
-        File temporaryGitFolder = folder.newFolder();
-        try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
-            addFilesAndPush(key, temporaryGitFolder, local);
-            SourceExtractor se = new SourceExtractor(local.getRepository());
-            se.sourceTestBranchExtractor(branch);
-        }
+        assertThat(assertThrows(RefNotFoundException.class, () -> {
+            final String key = "file";
+            File temporaryGitFolder = getFolder();
+            try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
+                addFilesAndPush(key, temporaryGitFolder, local);
+                SourceExtractor se = new SourceExtractor(local.getRepository());
+                se.sourceTestBranchExtractor(branch);
+            }
+        }).getLocalizedMessage(), CoreMatchers.containsString(branch));
     }
 
-    private void addFilesAndPush(final String key, File temporaryGitFolder, Git local) throws IOException, UnsupportedEncodingException, GitAPIException,
-            NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException, WrongRepositoryStateException,
-            AbortedByHookException, InvalidRemoteException, TransportException {
+    private void addFilesAndPush(final String key, File temporaryGitFolder, Git local)
+            throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
         final Path file = temporaryGitFolder.toPath().resolve(key);
         final Path mfile = temporaryGitFolder.toPath().resolve(key + METADATA);
         Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
@@ -361,38 +364,42 @@ public class SourceExtractorTest {
 
     @Test
     public void testSourceBranchExtractorNullBranch() throws RefNotFoundException, IOException {
-        ex.expect(NullPointerException.class);
-        Repository repository = Mockito.mock(Repository.class);
-        SourceExtractor se = new SourceExtractor(repository);
-        se.sourceBranchExtractor(null);
+        assertThrows(NullPointerException.class, () -> {
+            Repository repository = Mockito.mock(Repository.class);
+            SourceExtractor se = new SourceExtractor(repository);
+            se.sourceBranchExtractor(null);
+        });
     }
 
     @Test
     public void testSourceBranchExtractorBranchNotFound() throws RefNotFoundException, IOException {
-        ex.expect(RefNotFoundException.class);
-        Repository repository = Mockito.mock(Repository.class);
-        SourceExtractor se = new SourceExtractor(repository);
-        se.sourceBranchExtractor("notfound");
+        assertThrows(RefNotFoundException.class, () -> {
+            Repository repository = Mockito.mock(Repository.class);
+            SourceExtractor se = new SourceExtractor(repository);
+            se.sourceBranchExtractor("notfound");
+        });
     }
 
     @Test
-    public void testExtractNullBranch() throws Exception {
-        ex.expect(NullPointerException.class);
-        SourceExtractor se = new SourceExtractor(git.getRepository());
-        se.openBranch(null, null);
+    public void testExtractNullBranch() {
+        assertThrows(NullPointerException.class, () -> {
+            SourceExtractor se = new SourceExtractor(git.getRepository());
+            se.openBranch(null, null);
+        });
     }
 
     @Test
-    public void testExtractNoBranch() throws Exception {
-        ex.expect(RefNotFoundException.class);
-        SourceExtractor se = new SourceExtractor(git.getRepository());
-        se.openBranch("branch", null);
+    public void testExtractNoBranch() {
+        assertThrows(RefNotFoundException.class, () -> {
+            SourceExtractor se = new SourceExtractor(git.getRepository());
+            se.openBranch("branch", null);
+        });
     }
 
     @Test
     public void testCheckNotExistingFile() throws IOException, InvalidRemoteException, TransportException, GitAPIException {
         final String key = "file";
-        final File tempGitFolder = folder.newFolder();
+        final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final Path file = tempGitFolder.toPath().resolve(key);
             Files.write(file, getData().getBytes("UTF-8"), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);

@@ -20,7 +20,7 @@ package io.jitstatic.reporting;
  * #L%
  */
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -31,21 +31,21 @@ import io.jitstatic.reporting.ConsoleReporting;
 import io.jitstatic.reporting.ReportingFactory;
 
 public class ReportingFactoryTest {
-	
-	private Environment environment = Mockito.mock(Environment.class);
-	private LifecycleEnvironment lenv = Mockito.mock(LifecycleEnvironment.class);
-	
-	@Test
-	public void testReportingFactory() throws Exception {
-		ReportingFactory rf = new ReportingFactory();
-		rf.setConsole(new ConsoleReporting());
-		Mockito.when(environment.lifecycle()).thenReturn(lenv);
-		ArgumentCaptor<Managed> manageCaptor = ArgumentCaptor.forClass(Managed.class);
-		rf.build(environment);
-		Mockito.verify(lenv).manage(manageCaptor.capture());
-		Mockito.verify(environment).metrics();		
-		Managed managed = manageCaptor.getValue();
-		managed.start();
-		managed.stop();
-	}
+
+    private Environment environment = Mockito.mock(Environment.class);
+    private LifecycleEnvironment lenv = Mockito.mock(LifecycleEnvironment.class);
+
+    @Test
+    public void testReportingFactory() throws Exception {
+        ReportingFactory rf = new ReportingFactory();
+        rf.setConsole(new ConsoleReporting());
+        Mockito.when(environment.lifecycle()).thenReturn(lenv);
+        ArgumentCaptor<Managed> manageCaptor = ArgumentCaptor.forClass(Managed.class);
+        rf.build(environment);
+        Mockito.verify(lenv).manage(manageCaptor.capture());
+        Mockito.verify(environment).metrics();
+        Managed managed = manageCaptor.getValue();
+        managed.start();
+        managed.stop();
+    }
 }
