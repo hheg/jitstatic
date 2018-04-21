@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -32,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -43,7 +45,9 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
+import org.apache.http.client.ClientProtocolException;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -56,6 +60,8 @@ import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
+import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matchers;
@@ -87,7 +93,7 @@ import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
-public class KeyValueStorageWithHostedStorageAcceptanceTest {
+public class KeyValueStorageWithHostedStorageTest {
 
     private static final String UTF_8 = "UTF-8";
     private static final String ACCEPT_STORAGE = "accept/storage";
@@ -121,9 +127,17 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + ".metadata");
 
+            final Path filePath = workingDirectory.toPath().resolve("accept/.metadata");
+            Files.createDirectories(Objects.requireNonNull(filePath.getParent()));
+            try (InputStream is = getClass().getResourceAsStream("/accept/metadata")) {
+                Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            writeFile(workingDirectory.toPath(), "accept/genkey");
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
-            git.push().setCredentialsProvider(provider).call();
+            Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
+            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
         }
     }
 
@@ -135,7 +149,7 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
         assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     public void testGetNotFoundKeyWithoutAuth() throws Exception {
         assertThat(assertThrows(APIException.class, () -> {
             try (JitStaticUpdaterClient client = buildClient().build();) {
@@ -260,6 +274,31 @@ public class KeyValueStorageWithHostedStorageAcceptanceTest {
             } catch (APIException e) {
                 assertEquals(HttpStatus.UNAUTHORIZED_401, e.getStatusCode());
             }
+        }
+    }
+
+    @Test
+    public void testModifyMasterMetaData() throws URISyntaxException, ClientProtocolException, IOException {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient firstUpdater = buildClient().setUser(USER).setPassword(PASSWORD).build();
+                JitStaticUpdaterClient secondUpdater = buildClient().setUser(user).setPassword(pass).build()) {
+            Entity<JsonNode> key = firstUpdater.getKey("accept/genkey", tf);
+            assertNotNull(key);
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> firstUpdater.getKey("accept/", tf)).getStatusCode());
+            Entity<JsonNode> metaKey = client.getMetaKey("accept/", null, tf);
+
+            String modifyMetaKey = client.modifyMetaKey("accept/", null, metaKey.tag,
+                    new ModifyUserKeyData(new MetaData(Set.of(new User(user, pass)), "application/json", true, false, List.of()), "msg", "mail", "info"));
+            assertNotEquals(metaKey.tag, modifyMetaKey);
+            System.out.println("new tag " + modifyMetaKey + " old tag=" + metaKey.tag);
+            // assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, ()
+            // -> firstUpdater.getKey("accept/genkey", tf)).getStatusCode());
+            Entity<JsonNode> key2 = secondUpdater.getKey("accept/genkey", tf);
+            assertNotNull(key2);
         }
     }
 

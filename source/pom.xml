@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.9.1-SNAPSHOT</version>
+		<version>0.9.1-mastermetadata-SNAPSHOT</version>
 	</parent>
 	<artifactId>source</artifactId>
 
@@ -13,13 +13,13 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.9.1-SNAPSHOT</version>
+			<version>0.9.1-mastermetadata-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>version</artifactId>
-			<version>0.9.1-SNAPSHOT</version>
-		</dependency>		
+			<version>0.9.1-mastermetadata-SNAPSHOT</version>
+		</dependency>
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-validator</artifactId>
@@ -96,6 +96,12 @@
 		<dependency>
 			<groupId>org.junit.platform</groupId>
 			<artifactId>junit-platform-launcher</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId> org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-params</artifactId>
+			<version>${junit.jupiter.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

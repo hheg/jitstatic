@@ -192,6 +192,38 @@ public class MetaKeyResourceTest {
         assertThat(put.getStatus(), Matchers.is(422));
         put.close();
     }
+    
+    @Test
+    public void testGetMasterMetaData() {
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
+        Mockito.when(storage.get("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Response response = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
+        assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
+        assertThat(MediaType.APPLICATION_JSON_TYPE, Matchers.is(response.getMediaType()));
+        assertThat(storageData, Matchers.is(response.readEntity(StorageData.class)));
+        response.close();        
+    }
+    
+    @Test
+    public void testModifyAMasterMetaData() {        
+        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        ModifyMetaKeyData mukd = new ModifyMetaKeyData();
+        mukd.setMessage("message");
+        mukd.setUserInfo("userinfo");
+        mukd.setUserMail("usermail");
+        mukd.setMetaData(storageData);
+        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
+        Mockito.when(storage.get("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(StorageData.class), Mockito.eq("2"), Mockito.eq("message"),
+                Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(CompletableFuture.completedFuture("3"));
+        Response put = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+                .put(Entity.json(mukd));
+        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_OK));
+        assertThat(put.getEntityTag().getValue(), Matchers.equalTo("3"));
+        put.close();
+    }
 
     private static String createCreds(String user, String secret) {
         try {

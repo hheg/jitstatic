@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
-	<version>0.9.1-SNAPSHOT</version>
+	<version>0.9.1-mastermetadata-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<modules>
 		<module>jitstatic</module>
@@ -456,16 +456,12 @@
 					</gitFlowConfig>
 
 					<commitMessages>
-						<featureStartMessage>update versions for feature branch
-							@{featureName}</featureStartMessage>
-						<featureFinishMessage>update versions for development branch
-							@{featureName}</featureFinishMessage>
+						<featureStartMessage>update versions for feature branch @{featureName}</featureStartMessage>
+						<featureFinishMessage>update versions for development branch @{featureName}</featureFinishMessage>
 						<hotfixStartMessage>@{version} update versions for hotfix</hotfixStartMessage>
-						<hotfixFinishMessage>@{version} update for next development
-							version</hotfixFinishMessage>
+						<hotfixFinishMessage>@{version} update for next development version</hotfixFinishMessage>
 						<releaseStartMessage>@{version} update versions for release</releaseStartMessage>
-						<releaseFinishMessage>@{version} update for next development
-							version</releaseFinishMessage>
+						<releaseFinishMessage>@{version} update for next development version</releaseFinishMessage>
 						<tagHotfixMessage>tag hotfix</tagHotfixMessage>
 						<tagReleaseMessage>tag release</tagReleaseMessage>
 					</commitMessages>

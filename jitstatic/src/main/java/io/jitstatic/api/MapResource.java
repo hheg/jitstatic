@@ -82,6 +82,8 @@ public class MapResource {
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request, final @Context HttpHeaders headers) {
 
+        checkKey(key);
+        
         helper.checkRef(ref);
 
         final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
@@ -107,11 +109,14 @@ public class MapResource {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
 
-        if (!allowedUsers.contains(user.get())) {
-            LOG.info("Resource " + key + "is denied for user " + user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
-        }
+        checkIfAllowed(key, user, allowedUsers);
         return buildResponse(storeInfo, tag, data);
+    }
+
+    private void checkKey(final String key) {
+        if(key.endsWith("/")) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
     }
 
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final StorageData data) {
@@ -139,6 +144,9 @@ public class MapResource {
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
+        
+        checkKey(key);
+        
         helper.checkHeaders(headers);
 
         helper.checkValidRef(ref);
@@ -154,10 +162,7 @@ public class MapResource {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
 
-        if (!allowedUsers.contains(user.get())) {
-            LOG.info("Resource " + key + "is denied for user " + user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
-        }
+        checkIfAllowed(key, user, allowedUsers);
 
         final String currentVersion = storeInfo.getVersion();
         final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
@@ -175,19 +180,32 @@ public class MapResource {
 
     }
 
+    private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
+        if (!allowedUsers.contains(user.get())) {
+            LOG.info("Resource " + key + " is denied for user " + user.get());
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+    }
+
     @POST
     @Timed(name = "post_storage_time")
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
+    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {               
+        
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
         if (!addKeyAuthenticator.authenticate(user.get())) {
-            LOG.info("Resource " + data.getKey() + "is denied for user " + user.get());
+            LOG.info("Resource " + data.getKey() + " is denied for user " + user.get());
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
+        
+        if(data.getKey().endsWith("/")) {
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
+        
         final Optional<StoreInfo> si = helper.unwrap(storage.get(data.getKey(), data.getBranch()));
         if (si.isPresent()) {
             throw new WebApplicationException(Status.CONFLICT);

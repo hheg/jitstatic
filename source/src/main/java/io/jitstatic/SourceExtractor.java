@@ -21,7 +21,6 @@ package io.jitstatic;
  */
 
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,46 +41,54 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.OrTreeFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.Path;
 
 public class SourceExtractor {
 
+    private static final int METADATA_LENGTH = JitStaticConstants.METADATA.length();
     private final Repository repository;
 
     public SourceExtractor(final Repository repository) {
         this.repository = repository;
     }
 
-    public SourceInfo openTag(final String tagName, final String file) throws RefNotFoundException, IOException {
+    public SourceInfo openTag(final String tagName, final String key) throws RefNotFoundException, IOException {
         if (!Objects.requireNonNull(tagName).startsWith(Constants.R_TAGS)) {
             throw new RefNotFoundException(tagName);
         }
-        return sourceExtractor(tagName, file);
+        return sourceExtractor(tagName, key);
     }
 
-    public SourceInfo openBranch(final String branchName, final String file) throws RefNotFoundException, IOException {
+    public SourceInfo openBranch(final String branchName, final String key) throws RefNotFoundException, IOException {
         if (!Objects.requireNonNull(branchName).startsWith(Constants.R_HEADS)) {
             throw new RefNotFoundException(branchName);
         }
-        return sourceExtractor(branchName, file);
+        return sourceExtractor(branchName, key);
     }
 
-    private SourceInfo sourceExtractor(final String refName, final String file) throws RefNotFoundException, IOException {
+    private SourceInfo sourceExtractor(final String refName, final String key) throws RefNotFoundException, IOException {
         final Ref branchRef = findBranch(refName);
         if (ObjectId.zeroId().equals(branchRef.getObjectId())) {
             return null;
         }
-        final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> source = fileLoader(Pair.of(branchRef.getObjectId(), Collections.singleton(branchRef)), file);
+        final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> source = fileLoader(Pair.of(branchRef.getObjectId(), Collections.singleton(branchRef)), key);
         final List<BranchData> sourceInfo = source.getRight();
         final BranchData repositoryData = sourceInfo.get(0);
-        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair();
+        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair(key);
+        if (repositoryData.getFileDataError() != null) {
+            throw new RuntimeException(repositoryData.getFileDataError().getInputStreamHolder().exception());
+        }
         if (pair.isPresent()) {
-            return new SourceInfo(pair.getLeft(), pair.getRight(), repositoryData.getFileDataError());
+            return new SourceInfo(pair.getLeft(), pair.getRight());
+        }
+        if (pair.getLeft() != null && pair.getLeft().isMasterMetaData()) {
+            return new SourceInfo(pair.getLeft(), null);
         }
         return null;
     }
@@ -136,7 +143,14 @@ public class SourceExtractor {
             treeWalker.setRecursive(false);
             treeWalker.setPostOrderTraversal(false);
             if (key != null) {
-                treeWalker.setFilter(OrTreeFilter.create(PathFilter.create(key), PathFilter.create(key + JitStaticConstants.METADATA)));
+                final Path path = Path.of(key);
+                final TreeFilter pfg;
+                if (path.isDirectory()) {
+                    pfg = PathFilterGroup.createFromStrings(key + JitStaticConstants.METADATA);
+                } else {
+                    pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA, path.getParentElements() + JitStaticConstants.METADATA);
+                }
+                treeWalker.setFilter(pfg);
             }
             while (treeWalker.next()) {
                 if (!treeWalker.isSubtree()) {
@@ -146,10 +160,14 @@ public class SourceExtractor {
                         final String path = treeWalker.getPathString();
                         final InputStreamHolder inputStreamHolder = getInputStreamFor(objectId);
                         final FileObjectIdStore fileObjectIdStore = new FileObjectIdStore(path, objectId);
-                        if (!Paths.get(path).toFile().getName().startsWith(".")) {
+                        final Path p = Path.of(path);
+                        if (p.getLastElement().equals(JitStaticConstants.METADATA) || !p.getLastElement().startsWith(".")) {
                             if (path.endsWith(JitStaticConstants.METADATA)) {
-                                metaFiles.put(path.substring(0, path.length() - JitStaticConstants.METADATA.length()),
-                                        new MetaFileData(fileObjectIdStore, inputStreamHolder));
+                                if (p.getLastElement().equals(JitStaticConstants.METADATA)) {
+                                    metaFiles.put(path, new MetaFileData(fileObjectIdStore, inputStreamHolder));
+                                } else {
+                                    metaFiles.put(path.substring(0, path.length() - METADATA_LENGTH), new MetaFileData(fileObjectIdStore, inputStreamHolder));
+                                }
                             } else {
                                 dataFiles.put(path, new SourceFileData(fileObjectIdStore, inputStreamHolder));
                             }

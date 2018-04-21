@@ -22,43 +22,34 @@ package io.jitstatic.source;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Objects;
 
 import io.jitstatic.MetaFileData;
-import io.jitstatic.RepositoryDataError;
 import io.jitstatic.SourceFileData;
 
 public class SourceInfo {
 
     private final MetaFileData metaFileData;
     private final SourceFileData sourceFileData;
-    private final RepositoryDataError fileDataError;
 
-    public SourceInfo(final MetaFileData metaFileData, final SourceFileData sourceFileData, final RepositoryDataError fileDataError) {
-        this.metaFileData = Objects.requireNonNull(metaFileData);
-        this.sourceFileData = Objects.requireNonNull(sourceFileData);
-        this.fileDataError = fileDataError;
-    }
-
-    public boolean hasFailed() {
-        if (fileDataError == null) {
-            return false;
+    public SourceInfo(final MetaFileData metaFileData, final SourceFileData sourceFileData) {
+        this.metaFileData = metaFileData;
+        if(sourceFileData == null && !metaFileData.isMasterMetaData()) {
+            throw new IllegalArgumentException(String.format("sourceFileData cannot be null if metaFileData %s is not a masterMetaData file",metaFileData.getFileName()));
         }
-        return !fileDataError.getInputStreamHolder().isPresent();
-    }
-
-    public Exception getFailiure() {
-        if (fileDataError != null) {
-            return fileDataError.getInputStreamHolder().exception();
-        }
-        return null;
+        this.sourceFileData = sourceFileData;
     }
 
     public InputStream getSourceInputStream() throws IOException {
+        if (sourceFileData == null) {
+            return null;
+        }
         return sourceFileData.getInputStream();
     }
 
     public String getSourceVersion() {
+        if (sourceFileData == null) {
+            return null;
+        }
         return sourceFileData.getVersion();
     }
 
@@ -69,5 +60,4 @@ public class SourceInfo {
     public InputStream getMetadataInputStream() throws IOException {
         return metaFileData.getInputStream();
     }
-
 }
