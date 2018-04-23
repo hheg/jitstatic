@@ -27,31 +27,45 @@ import io.jitstatic.StorageData;
 
 @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "It's exposed when exposed to client and it's serialized")
 public class StoreInfo {
-	private final StorageData metaData;
-	private final String version;
-	private final byte[] data;
+    private final StorageData metaData;
+    private final String version;
+    private final byte[] data;
     private final String metaDataVersion;
 
-	public StoreInfo(final byte[] data, final StorageData metaData, final String version, final String metaDataVersion) {
-		this.data = Objects.requireNonNull(data);
-		this.metaData = Objects.requireNonNull(metaData);
-		this.version = Objects.requireNonNull(version);
-		this.metaDataVersion = Objects.requireNonNull(metaDataVersion);
-	}
+    public StoreInfo(final byte[] data, final StorageData metaData, final String version, final String metaDataVersion) {
+        this.data = data;
+        this.metaData = Objects.requireNonNull(metaData);
+        this.version = version;
+        this.metaDataVersion = Objects.requireNonNull(metaDataVersion);
+    }
 
-	public StorageData getStorageData() {
-		return metaData;
-	}
+    public StoreInfo(final StorageData metaData, final String metaDataVersion) {
+        this(null, metaData, null, metaDataVersion);
+    }
 
-	public String getVersion() {
-		return version;
-	}
+    public StorageData getStorageData() {
+        return metaData;
+    }
 
-	public byte[] getData() {
-		return data;
-	}
+    public String getVersion() {
+        if (version == null) {
+            throw new IllegalStateException("This is a metaData storeInfo");
+        }
+        return version;
+    }
 
-	@Override
+    public byte[] getData() {
+        if (data == null) {
+            throw new IllegalStateException("This is a metaData storeInfo");
+        }
+        return data;
+    }
+
+    public boolean isMasterMetaData() {
+        return data == null && version == null;
+    }
+
+    @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
@@ -60,7 +74,7 @@ public class StoreInfo {
         return result;
     }
 
-	@Override
+    @Override
     public boolean equals(Object obj) {
         if (this == obj)
             return true;

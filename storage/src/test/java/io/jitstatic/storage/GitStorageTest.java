@@ -1,7 +1,5 @@
 package io.jitstatic.storage;
 
-
-
 /*-
  * #%L
  * jitstatic
@@ -93,6 +91,66 @@ public class GitStorageTest {
     public void tearDown() throws IOException {
         Mockito.reset(source);
         Files.delete(tempFile);
+    }
+
+    @Test
+    public void testGetAKey() throws IOException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test1 = getInputStream(1); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(test1);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(SHA_1);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("key"), Mockito.anyString())).thenReturn(si1);
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("key", null);
+            assertNotNull(completableFuture.join().get());
+        }
+    }
+
+    @Test
+    public void testGetARootKey() throws Exception {
+        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(null);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(null);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("root/", null);
+            gs.checkHealth();
+            StoreInfo storeInfo = completableFuture.join().get();
+            assertNotNull(storeInfo);
+            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
+            assertNotNull(storeInfo.getStorageData());
+        }
+    }
+
+    @Test
+    public void testPutARootKey() throws UnsupportedEncodingException, IOException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(null);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(null);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
+            when(source.modify(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                    .thenReturn(CompletableFuture.completedFuture(SHA_2_MD));
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("root/", null);
+            StoreInfo storeInfo = completableFuture.join().get();
+            assertNotNull(storeInfo);
+            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
+            assertNotNull(storeInfo.getStorageData());
+
+            StorageData sd = new StorageData(Set.of(new User("u", "p")), "text/plain", false, false, List.of());
+            CompletableFuture<String> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, "msg", "info", "mail");
+            assertEquals(SHA_2_MD, putMetaData.join());
+            CompletableFuture<Optional<StoreInfo>> completableFuture2 = gs.get("root/", null);
+            assertEquals(completableFuture2.join().get().getMetaDataVersion(), SHA_2_MD);
+        }
     }
 
     @Test

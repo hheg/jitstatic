@@ -22,10 +22,14 @@ package io.jitstatic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.eclipse.jgit.api.Git;
@@ -34,12 +38,14 @@ import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.SourceChecker;
 import io.jitstatic.hosted.RemoteTestUtils;
+import io.jitstatic.utils.Pair;
 
 public class SourceCheckerTest {
 
@@ -72,15 +78,31 @@ public class SourceCheckerTest {
     public void testCheckSourceFileOnBareRepo()
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
         try (SourceChecker sc = new SourceChecker(bareGit.getRepository())) {
-            sc.checkBranchForErrors(REF_HEAD_MASTER);
+            List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+            Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
+            Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
+            assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
+            List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
+            assertTrue(exceptions.size() == 1);
+            Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
+            assertEquals(store, fileExPair.getLeft().getFileName());
+            assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
         }
     }
 
     @Test
     public void testCheckSourceFileOnNormalRepo()
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
-        try (SourceChecker sc = new SourceChecker(bareGit.getRepository())) {
-            sc.checkBranchForErrors(REF_HEAD_MASTER);
+        try (SourceChecker sc = new SourceChecker(workingGit.getRepository())) {
+            List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+            Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
+            Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
+            assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
+            List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
+            assertTrue(exceptions.size() == 1);
+            Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
+            assertEquals(store, fileExPair.getLeft().getFileName());
+            assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
         }
     }
 

@@ -20,73 +20,75 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import io.jitstatic.utils.Pair;
-
-import java.util.Objects;
-import java.util.Set;
+import io.jitstatic.utils.Path;
 
 class BranchData {
 
-	private final Map<String, MetaFileData> metaFiles;
-	private final Map<String, SourceFileData> sourceFiles;
-	private final RepositoryDataError error;
+    private final Map<String, MetaFileData> metaFiles;
+    private final Map<String, SourceFileData> sourceFiles;
+    private final RepositoryDataError error;
 
-	public BranchData(final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> sourceFiles,
-			final RepositoryDataError error) {
-		this(error, Objects.requireNonNull(metaFiles), Objects.requireNonNull(sourceFiles));
-	}
+    public BranchData(final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> sourceFiles, final RepositoryDataError error) {
+        this(error, Objects.requireNonNull(metaFiles), Objects.requireNonNull(sourceFiles));
+    }
 
-	public BranchData(final RepositoryDataError fileDataError) {
-		this(fileDataError, null, null);
-	}
+    public BranchData(final RepositoryDataError fileDataError) {
+        this(fileDataError, null, null);
+    }
 
-	private BranchData(final RepositoryDataError error, final Map<String, MetaFileData> metaFiles,
-			final Map<String, SourceFileData> sourceFiles) {
-		this.metaFiles = metaFiles;
-		this.sourceFiles = sourceFiles;
-		this.error = error;
-	}
+    private BranchData(final RepositoryDataError error, final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> sourceFiles) {
+        this.metaFiles = metaFiles;
+        this.sourceFiles = sourceFiles;
+        this.error = error;
+    }
 
-	public RepositoryDataError getFileDataError() {
-		return error;
-	}
-	
-	public List<Pair<MetaFileData, SourceFileData>> pair() {
-		Objects.requireNonNull(sourceFiles);
-		Objects.requireNonNull(metaFiles);
-		final List<Pair<MetaFileData, SourceFileData>> filePairs = new ArrayList<>(sourceFiles.size());
-		final Set<String> keys = new HashSet<>();
-		final Iterator<Entry<String, MetaFileData>> metaDataIterator = metaFiles.entrySet().iterator();
-		while (metaDataIterator.hasNext()) {
-			final Entry<String, MetaFileData> metaData = metaDataIterator.next();
-			final String key = metaData.getKey();
-			final MetaFileData value = metaData.getValue();
-			filePairs.add(Pair.of(value, sourceFiles.get(key)));
-			keys.add(key);
-		}
-		final Iterator<Entry<String, SourceFileData>> sourceDataIterator = sourceFiles.entrySet().iterator();
-		while (sourceDataIterator.hasNext()) {
-			final Entry<String, SourceFileData> sourceDataEntries = sourceDataIterator.next();
-			if(!keys.contains(sourceDataEntries.getKey())) {
-				filePairs.add(Pair.of(null, sourceDataEntries.getValue()));
-			}			
-		}
-		return filePairs;
-	}
+    public RepositoryDataError getFileDataError() {
+        return error;
+    }
 
-	public Pair<MetaFileData, SourceFileData> getFirstPair() {
-		final List<Pair<MetaFileData, SourceFileData>> data = pair();
-		if(data.size() == 1) {
-			return data.get(0);
-		}
-		return Pair.ofNothing();
-	}
+    public List<Pair<MetaFileData, SourceFileData>> pair() {
+        Objects.requireNonNull(sourceFiles);
+        Objects.requireNonNull(metaFiles);
+
+        return Stream.concat(sourceFiles.entrySet().stream().map(e -> {
+            final String key = e.getKey();
+            MetaFileData metaFileData = metaFiles.get(key);
+            if (metaFileData == null) {
+                final Path path = Path.of(key);
+                metaFileData = metaFiles.get(path.getParentElements() + JitStaticConstants.METADATA);
+            }
+            return Pair.of(metaFileData, e.getValue());
+        }), metaFiles.entrySet().stream().filter(e -> {
+            final String key = e.getKey();
+            if (e.getValue().isMasterMetaData()) {
+                return true;
+            }
+            return !sourceFiles.containsKey(key);
+        }).map(e -> Pair.of(e.getValue(), (SourceFileData) null))).collect(Collectors.toList());
+    }
+
+    public Pair<MetaFileData, SourceFileData> getFirstPair(final String key) {
+        final List<Pair<MetaFileData, SourceFileData>> data = pair();//.stream().filter(predicate);
+        if (data.size() == 0) {
+            return Pair.ofNothing();
+        }
+        Optional<Pair<MetaFileData, SourceFileData>> firstPair = data.stream().filter(Pair::isPresent).findFirst();
+        if (firstPair.isPresent()) {
+            return firstPair.get();
+        }
+        firstPair = data.stream().filter(p -> p.getLeft().isMasterMetaData()).findFirst();
+        if (firstPair.isPresent()) {
+            return firstPair.get();
+        }
+        return Pair.ofNothing();
+    }
 
 }

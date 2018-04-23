@@ -21,36 +21,44 @@ package io.jitstatic.utils;
  */
 
 public class Pair<T, U> {
-	private final T left;
-	private final U right;
+    private static final Pair<?, ?> PAIR_OF_NOTHING = new Pair<>();
+    private final T left;
+    private final U right;
 
-	public Pair() {
-		this.left = null;
-		this.right = null;
-	}
+    public Pair() {
+        this.left = null;
+        this.right = null;
+    }
 
-	public Pair(final T t, final U u) {
-		this.left = t;
-		this.right = u;
-	}
+    public Pair(final T t, final U u) {
+        this.left = t;
+        this.right = u;
+    }
 
-	public T getLeft() {
-		return left;
-	}
+    public T getLeft() {
+        return left;
+    }
 
-	public U getRight() {
-		return right;
-	}
+    public U getRight() {
+        return right;
+    }
 
-	public boolean isPresent() {
-		return left != null && right != null;
-	}
-	
-	public static <T, U> Pair<T, U> of(T t, U u) {
-		return new Pair<>(t, u);
-	}
-	
-	public static <T,U> Pair<T,U> ofNothing(){
-		return new Pair<>();
-	}
+    public boolean isPresent() {
+        return left != null && right != null;
+    }
+
+    public static <T, U> Pair<T, U> of(T t, U u) {
+        return new Pair<>(t, u);
+    }
+
+    public static <T, U> Pair<T, U> ofNothing() {
+        @SuppressWarnings("unchecked")
+        Pair<T, U> p = (Pair<T, U>) PAIR_OF_NOTHING;
+        return p;
+    }
+
+    @Override
+    public String toString() {
+        return "Pair [left=" + left + ", right=" + right + "]";
+    }
 }

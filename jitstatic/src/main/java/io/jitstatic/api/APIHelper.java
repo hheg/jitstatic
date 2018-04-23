@@ -115,6 +115,9 @@ class APIHelper {
                 if (apiException instanceof VersionIsNotSameException) {
                     throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
+                if(apiException instanceof KeyAlreadyExist) {
+                    throw new WebApplicationException(Status.CONFLICT);
+                }
             }
             log.error("Error while unwrapping future", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);

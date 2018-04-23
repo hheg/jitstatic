@@ -559,6 +559,15 @@ public class MapResourceTest {
     }
 
     @Test
+    public void testAddRootKey() {
+        AddKeyData addKeyData = new AddKeyData("test/", REFS_HEADS_MASTER, new byte[] { 1 },
+                new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "testmessage", "user", "test@test.com");
+        Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST).post(Entity.json(addKeyData));
+        assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
+        response.close();
+    }
+
+    @Test
     public void testAddKeyNoUser() {
         Response response = RESOURCES.target("/storage").request().post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
                 new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "testmessage", "user", "test@test.com")));
@@ -657,6 +666,29 @@ public class MapResourceTest {
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        response.close();
+    }
+
+    @Test
+    public void testGetMasterMetaKeyShouldFail() {
+        Response response = RESOURCES.target("/storage/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        response.close();
+    }
+
+    @Test
+    public void testPutOnMasterMetaKeyShouldFail() throws UnsupportedEncodingException, InterruptedException, ExecutionException {
+        WebTarget target = RESOURCES.target("/storage/dog/");
+
+        ModifyKeyData data = new ModifyKeyData();
+        byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
+        data.setMessage("message");
+        data.setData(readTree);
+        data.setUserMail("mail");
+        data.setUserInfo("user");
+        Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"1\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
+        assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
     }
 

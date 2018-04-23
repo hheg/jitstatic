@@ -24,8 +24,8 @@ import io.jitstatic.hosted.InputStreamHolder;
 
 public class MetaFileData extends FileData {
 
-	public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-		super(fileInfo, inputStreamHolder);
-	}
+    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+        super(fileInfo, inputStreamHolder);
+    }
 
 }

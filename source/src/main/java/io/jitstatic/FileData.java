@@ -25,39 +25,54 @@ import java.io.InputStream;
 import java.util.Objects;
 
 import io.jitstatic.hosted.InputStreamHolder;
+import io.jitstatic.utils.Path;
 
 public class FileData {
 
-	private final FileObjectIdStore fileInfo;
-	private final InputStreamHolder inputStreamHolder;
+    private final FileObjectIdStore fileInfo;
+    private final InputStreamHolder inputStreamHolder;
 
-	public FileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-		this.fileInfo = Objects.requireNonNull(fileInfo);
-		this.inputStreamHolder = Objects.requireNonNull(inputStreamHolder);
-	}
+    public FileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+        this.fileInfo = Objects.requireNonNull(fileInfo);
+        this.inputStreamHolder = Objects.requireNonNull(inputStreamHolder);
+    }
 
-	public InputStream getInputStream() throws IOException {
-		if (getInputStreamHolder().isPresent()) {
-			try {
-				return getInputStreamHolder().inputStream();
-			} catch (final IOException e) {
-				throw new IOException("Error reading " + getFileInfo().getFileName(), e);
-			}
-		} else {
-			throw new RuntimeException(getInputStreamHolder().exception());
-		}
-	}
+    public InputStream getInputStream() throws IOException {
+        if (getInputStreamHolder().isPresent()) {
+            try {
+                return getInputStreamHolder().inputStream();
+            } catch (final IOException e) {
+                throw new IOException("Error reading " + getFileInfo().getFileName(), e);
+            }
+        } else {
+            throw new RuntimeException(getInputStreamHolder().exception());
+        }
+    }
 
-	public String getVersion() {
-		return getFileInfo().getObjectId().name();
-	}
+    public String getVersion() {
+        return getFileInfo().getObjectId().name();
+    }
 
-	public InputStreamHolder getInputStreamHolder() {
-		return inputStreamHolder;
-	}
+    public InputStreamHolder getInputStreamHolder() {
+        return inputStreamHolder;
+    }
 
-	protected FileObjectIdStore getFileInfo() {
-		return fileInfo;
-	}
+    protected FileObjectIdStore getFileInfo() {
+        return fileInfo;
+    }
+    
+    public String getFileName() {
+        return fileInfo.getFileName();
+    }
+
+    public boolean isMasterMetaData() {
+        final Path meta = Path.of(fileInfo.getFileName());
+        return meta.getLastElement().equals(JitStaticConstants.METADATA);
+    }
+
+    @Override
+    public String toString() {
+        return "FileData [fileInfo=" + fileInfo + "]";
+    }
 
 }

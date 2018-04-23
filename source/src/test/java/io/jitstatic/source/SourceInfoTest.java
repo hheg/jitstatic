@@ -1,5 +1,7 @@
 package io.jitstatic.source;
 
+
+
 /*-
  * #%L
  * jitstatic
@@ -20,10 +22,9 @@ package io.jitstatic.source;
  * #L%
  */
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,10 +36,8 @@ import org.mockito.Mockito;
 
 import io.jitstatic.FileObjectIdStore;
 import io.jitstatic.MetaFileData;
-import io.jitstatic.RepositoryDataError;
 import io.jitstatic.SourceFileData;
 import io.jitstatic.hosted.InputStreamHolder;
-import io.jitstatic.source.SourceInfo;
 
 public class SourceInfoTest {
 
@@ -58,7 +57,7 @@ public class SourceInfoTest {
         Mockito.when(ish.isPresent()).thenReturn(true);
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
-        SourceInfo si = new SourceInfo(mfd, sdf, null);
+        SourceInfo si = new SourceInfo(mfd, sdf);
         assertEquals(is, si.getSourceInputStream());
         assertEquals(SHA_1, si.getSourceVersion());
     }
@@ -74,7 +73,7 @@ public class SourceInfoTest {
             Mockito.when(ish.isPresent()).thenReturn(false);
             SourceFileData sdf = new SourceFileData(fois, ish);
             MetaFileData mfd = new MetaFileData(fois2, ish2);
-            SourceInfo si = new SourceInfo(mfd, sdf, null);
+            SourceInfo si = new SourceInfo(mfd, sdf);
             si.getSourceInputStream();
         }).getCause(), CoreMatchers.isA(IOException.class));
     }
@@ -92,7 +91,7 @@ public class SourceInfoTest {
             Mockito.when(ish.isPresent()).thenReturn(true);
             SourceFileData sdf = new SourceFileData(fois, ish);
             MetaFileData mfd = new MetaFileData(fois2, ish2);
-            SourceInfo si = new SourceInfo(mfd, sdf, null);
+            SourceInfo si = new SourceInfo(mfd, sdf);
             si.getSourceInputStream();
         }).getLocalizedMessage(), CoreMatchers.containsString("Error reading null"));
     }
@@ -107,8 +106,8 @@ public class SourceInfoTest {
         Mockito.when(ish.exception()).thenReturn(new IOException("Fake IO"));
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
-        SourceInfo si = new SourceInfo(mfd, sdf, new RepositoryDataError(fois, ish));
-        assertTrue(si.hasFailed());
+        SourceInfo si = new SourceInfo(mfd, sdf);
+        assertThrows(RuntimeException.class, () -> si.getSourceInputStream());
     }
 
     @Test
@@ -121,7 +120,7 @@ public class SourceInfoTest {
         Mockito.when(ish.exception()).thenReturn(ioException);
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
-        SourceInfo si = new SourceInfo(mfd, sdf, new RepositoryDataError(fois, ish));
-        assertEquals(ioException, si.getFailiure());
+        SourceInfo si = new SourceInfo(mfd, sdf);
+        assertThrows(RuntimeException.class, () -> si.getSourceInputStream());
     }
 }
