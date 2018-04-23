@@ -20,60 +20,53 @@ package io.jitstatic.reporting;
  * #L%
  */
 
-import java.util.Arrays;
-import java.util.Collection;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.reporting.ConsoleReporting;
 
-@RunWith(Parameterized.class)
 public class ConsoleReportingTest {
 
-	private ConsoleReporting cr;
-	private Exception error;
+    public static Stream<Arguments> data() {
+        return Stream.of(Arguments.of("s", (Exception) null), Arguments.of("m", (Exception) null), Arguments.of("h", (Exception) null),
+                Arguments.of("k", new IllegalArgumentException("k")));
+    }
 
-	public ConsoleReportingTest(String c, Exception e) {
-		this.error = e;
-		cr = new ConsoleReporting();
-		cr.setRates(c);
-		cr.setDurations(cr.getDurations());
-		cr.setReportPeriods(cr.getReportPeriods());
-	}
+    @ParameterizedTest
+    @MethodSource("data")
+    public void testConsoleReportingTest(String c, Exception error) throws Throwable {
+        ConsoleReporting cr = new ConsoleReporting();
+        cr.setRates(c);
+        cr.setDurations(cr.getDurations());
+        cr.setReportPeriods(cr.getReportPeriods());
+        Executable e = () -> {
+            Environment environment = Mockito.mock(Environment.class);
+            LifecycleEnvironment lenv = Mockito.mock(LifecycleEnvironment.class);
+            Mockito.when(environment.lifecycle()).thenReturn(lenv);
+            cr.build(environment);
+            ArgumentCaptor<Managed> manageCaptor = ArgumentCaptor.forClass(Managed.class);
+            Mockito.verify(lenv).manage(manageCaptor.capture());
+            Mockito.verify(environment).metrics();
+            Managed managed = manageCaptor.getValue();
+            managed.start();
+            managed.stop();
+        };
 
-	@Parameterized.Parameters
-	public static Collection<Object[]> data() {
-		return Arrays.asList(new Object[][] { { "s", null }, { "m", null }, { "h", null },
-				{ "k", new IllegalArgumentException("k") }, });
-	}
-
-	@Rule
-	public ExpectedException ex = ExpectedException.none();
-
-	@Test
-	public void testConsoleReportingTest() throws Exception {
-		if (error != null) {
-			ex.expect(error.getClass());
-			ex.expectMessage(error.getMessage());
-		}		
-		Environment environment = Mockito.mock(Environment.class);
-		LifecycleEnvironment lenv = Mockito.mock(LifecycleEnvironment.class);
-		Mockito.when(environment.lifecycle()).thenReturn(lenv);
-		cr.build(environment);
-		ArgumentCaptor<Managed> manageCaptor = ArgumentCaptor.forClass(Managed.class);
-		Mockito.verify(lenv).manage(manageCaptor.capture());
-		Mockito.verify(environment).metrics();
-		Managed managed = manageCaptor.getValue();
-		managed.start();
-		managed.stop();
-	}
+        if (error != null) {
+            assertEquals(assertThrows(error.getClass(), e).getLocalizedMessage(), error.getLocalizedMessage());
+        } else {
+            e.execute();
+        }
+    }
 }

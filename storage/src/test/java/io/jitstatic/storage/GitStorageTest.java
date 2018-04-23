@@ -19,16 +19,17 @@ package io.jitstatic.storage;
  * limitations under the License.
  * #L%
  */
+import static org.hamcrest.MatcherAssert.assertThat;
 
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -44,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -51,12 +53,9 @@ import java.util.concurrent.Future;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -66,8 +65,6 @@ import io.jitstatic.StorageData;
 import io.jitstatic.auth.User;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.storage.GitStorage;
-import io.jitstatic.storage.StoreInfo;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -80,33 +77,88 @@ public class GitStorageTest {
     private static final String SHA_1_MD = "67adef5dab64f8f4cb50712ab24bda6605befa81";
     private static final String SHA_2_MD = "67adef5dab64f8f4cb50712ab24bda6605befa82";
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    @Rule
-    public ExpectedException ex = ExpectedException.none();
-
-    @Rule
-    public final TemporaryFolder tempFolder = new TemporaryFolder();
 
     public Source source = mock(Source.class);
 
     private Path tempFile;
 
-    @Before
+    @BeforeEach
     public void setup() throws Exception {
-        tempFile = tempFolder.newFile().toPath();
+        tempFile = Files.createTempFile("junit", UUID.randomUUID().toString());
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws IOException {
         Mockito.reset(source);
         Files.delete(tempFile);
     }
 
-    @Test()
-    public void testInitGitStorageWithNullSource() {
-        ex.expectMessage("Source cannot be null");
-        ex.expect(NullPointerException.class);
-        try (GitStorage gs = new GitStorage(null, null);) {
+    @Test
+    public void testGetAKey() throws IOException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test1 = getInputStream(1); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(test1);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(SHA_1);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("key"), Mockito.anyString())).thenReturn(si1);
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("key", null);
+            assertNotNull(completableFuture.join().get());
         }
+    }
+
+    @Test
+    public void testGetARootKey() throws Exception {
+        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(null);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(null);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("root/", null);
+            gs.checkHealth();
+            StoreInfo storeInfo = completableFuture.join().get();
+            assertNotNull(storeInfo);
+            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
+            assertNotNull(storeInfo.getStorageData());
+        }
+    }
+
+    @Test
+    public void testPutARootKey() throws UnsupportedEncodingException, IOException, RefNotFoundException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getUsers();) {
+            SourceInfo si1 = mock(SourceInfo.class);
+            when(si1.getSourceInputStream()).thenReturn(null);
+            when(si1.getMetadataInputStream()).thenReturn(mtest1);
+            when(si1.getSourceVersion()).thenReturn(null);
+            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
+            when(source.modify(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                    .thenReturn(CompletableFuture.completedFuture(SHA_2_MD));
+
+            CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("root/", null);
+            StoreInfo storeInfo = completableFuture.join().get();
+            assertNotNull(storeInfo);
+            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
+            assertNotNull(storeInfo.getStorageData());
+
+            StorageData sd = new StorageData(Set.of(new User("u", "p")), "text/plain", false, false, List.of());
+            CompletableFuture<String> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, "msg", "info", "mail");
+            assertEquals(SHA_2_MD, putMetaData.join());
+            CompletableFuture<Optional<StoreInfo>> completableFuture2 = gs.get("root/", null);
+            assertEquals(completableFuture2.join().get().getMetaDataVersion(), SHA_2_MD);
+        }
+    }
+
+    @Test
+    public void testInitGitStorageWithNullSource() {
+        assertEquals("Source cannot be null", assertThrows(NullPointerException.class, () -> {
+            try (GitStorage gs = new GitStorage(null, null);) {
+            }
+        }).getLocalizedMessage());
     }
 
     @Test
@@ -178,15 +230,16 @@ public class GitStorageTest {
     @Test
     public void testCheckHealth() throws Exception {
         NullPointerException npe = new NullPointerException();
-        ex.expect(is(npe));
         when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenThrow(npe);
-        try (GitStorage gs = new GitStorage(source, null);) {
-            try {
-                gs.get("", null).get();
-            } catch (Exception ignore) {
+        assertSame(assertThrows(NullPointerException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null);) {
+                try {
+                    gs.get("", null).get();
+                } catch (Exception ignore) {
+                }
+                gs.checkHealth();
             }
-            gs.checkHealth();
-        }
+        }), npe);
     }
 
     @Test
@@ -202,7 +255,7 @@ public class GitStorageTest {
                 gs.checkHealth();
             } catch (Exception e) {
                 assertTrue(e instanceof RuntimeException);
-                assertEquals(cause.getMessage(), e.getMessage());
+                assertEquals(cause.getLocalizedMessage(), e.getLocalizedMessage());
             }
             Mockito.reset(source);
             SourceInfo info = mock(SourceInfo.class);
@@ -216,21 +269,21 @@ public class GitStorageTest {
     @Test
     public void testCheckHealthWithOldFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
-        ex.expect(is(equalTo(cause)));
         doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
-
-        try (GitStorage gs = new GitStorage(source, null);) {
-            gs.reload(Arrays.asList(REF_HEADS_MASTER));
-            assertNull(gs.get("key", null).get());
-            try {
+        assertSame(assertThrows(RuntimeException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null);) {
+                gs.reload(Arrays.asList(REF_HEADS_MASTER));
+                assertNull(gs.get("key", null).get());
+                try {
+                    gs.checkHealth();
+                } catch (Exception e) {
+                    assertTrue(e instanceof RuntimeException);
+                    assertEquals(cause.getLocalizedMessage(), e.getLocalizedMessage());
+                }
+                gs.get("key", null).get();
                 gs.checkHealth();
-            } catch (Exception e) {
-                assertTrue(e instanceof RuntimeException);
-                assertEquals(cause.getMessage(), e.getMessage());
             }
-            gs.get("key", null).get();
-            gs.checkHealth();
-        }
+        }), cause);
     }
 
     @Test
@@ -304,33 +357,33 @@ public class GitStorageTest {
 
     @Test
     public void testPutAOnANonWritableKey() throws Throwable {
-        ex.expect(WrappingAPIException.class);
-        ex.expectCause(Matchers.isA(UnsupportedOperationException.class));
-        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaDataProtectedInputStream()) {
-            SourceInfo si = mock(SourceInfo.class);
-            byte[] data = readData("{\"one\" : \"two\"}");
-            String message = "one message";
-            String userInfo = "test@test";
-            String key = "key3";
-            when(si.getSourceInputStream()).thenReturn(test3);
-            when(si.getMetadataInputStream()).thenReturn(mtest3);
-            when(si.getSourceVersion()).thenReturn(SHA_1);
-            when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+        assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaDataProtectedInputStream()) {
+                SourceInfo si = mock(SourceInfo.class);
+                byte[] data = readData("{\"one\" : \"two\"}");
+                String message = "one message";
+                String userInfo = "test@test";
+                String key = "key3";
+                when(si.getSourceInputStream()).thenReturn(test3);
+                when(si.getMetadataInputStream()).thenReturn(mtest3);
+                when(si.getSourceVersion()).thenReturn(SHA_1);
+                when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
 
-            when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
-            when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo),
-                    Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
-            Future<Optional<StoreInfo>> first = gs.get(key, null);
-            StoreInfo storeInfo = first.get().get();
-            assertNotNull(storeInfo);
-            assertNotEquals(data, storeInfo.getData());
-            CompletableFuture<String> put = gs.put(key, null, data, SHA_1, message, userInfo, "");
-            try {
-                put.get();
-            } catch (ExecutionException e) {
-                throw e.getCause();
+                when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
+                when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo),
+                        Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
+                Future<Optional<StoreInfo>> first = gs.get(key, null);
+                StoreInfo storeInfo = first.get().get();
+                assertNotNull(storeInfo);
+                assertNotEquals(data, storeInfo.getData());
+                CompletableFuture<String> put = gs.put(key, null, data, SHA_1, message, userInfo, "");
+                try {
+                    put.get();
+                } catch (ExecutionException e) {
+                    throw e.getCause();
+                }
             }
-        }
+        }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
 
     @Test
@@ -364,62 +417,63 @@ public class GitStorageTest {
 
     @Test
     public void testPutKeyWithEmptyMessage() throws IOException {
-        ex.expect(IllegalArgumentException.class);
-        try (GitStorage gs = new GitStorage(source, null);) {
-            byte[] data = readData("{\"one\" : \"two\"}");
-            String userInfo = "test@test";
-            String key = "key3";
-            gs.put(key, null, data, SHA_1, "", userInfo, null);
-        }
+        assertThrows(IllegalArgumentException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null);) {
+                byte[] data = readData("{\"one\" : \"two\"}");
+                String userInfo = "test@test";
+                String key = "key3";
+                gs.put(key, null, data, SHA_1, "", userInfo, null);
+            }
+        });
     }
 
     @Test
-    public void testPutKeyWithNoRef() throws Throwable {
-        ex.expect(WrappingAPIException.class);
-        ex.expectCause(Matchers.isA(RefNotFoundException.class));
-        try (GitStorage gs = new GitStorage(source, null);) {
-            byte[] data = readData("{\"one\" : \"two\"}");
-            String message = "one message";
-            String userInfo = "test@test";
-            String key = "key3";
-            CompletableFuture<String> put = gs.put(key, null, data, SHA_1, message, userInfo, null);
-            try {
-                put.get();
-            } catch (Exception e) {
-                throw e.getCause();
+    public void testPutKeyWithNoRef() {
+        assertThat((RefNotFoundException) assertThrows(WrappingAPIException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null);) {
+                byte[] data = readData("{\"one\" : \"two\"}");
+                String message = "one message";
+                String userInfo = "test@test";
+                String key = "key3";
+                CompletableFuture<String> put = gs.put(key, null, data, SHA_1, message, userInfo, null);
+                try {
+                    put.get();
+                } catch (Exception e) {
+                    throw e.getCause();
+                }
             }
-        }
+        }).getCause(), Matchers.isA(RefNotFoundException.class));
     }
 
     @Test
     public void testPutKeyWithNoKey() throws Throwable {
-        ex.expect(WrappingAPIException.class);
-        ex.expectCause(Matchers.isA(UnsupportedOperationException.class));
-        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getUsers()) {
-            SourceInfo si = mock(SourceInfo.class);
-            byte[] data = readData("{\"one\" : \"two\"}");
-            String message = "one message";
-            String userInfo = "test@test";
-            String key = "key3";
-            when(si.getSourceInputStream()).thenReturn(test3);
-            when(si.getMetadataInputStream()).thenReturn(mtest3);
-            when(si.getSourceVersion()).thenReturn(SHA_1);
-            when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+        assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
+            try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getUsers()) {
+                SourceInfo si = mock(SourceInfo.class);
+                byte[] data = readData("{\"one\" : \"two\"}");
+                String message = "one message";
+                String userInfo = "test@test";
+                String key = "key3";
+                when(si.getSourceInputStream()).thenReturn(test3);
+                when(si.getMetadataInputStream()).thenReturn(mtest3);
+                when(si.getSourceVersion()).thenReturn(SHA_1);
+                when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
 
-            when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
-            when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo),
-                    Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
-            Future<Optional<StoreInfo>> first = gs.get(key, null);
-            StoreInfo storeInfo = first.get().get();
-            assertNotNull(storeInfo);
-            assertNotEquals(data, storeInfo.getData());
-            CompletableFuture<String> put = gs.put("other", null, data, SHA_1, message, userInfo, null);
-            try {
-                put.get();
-            } catch (Exception e) {
-                throw e.getCause();
+                when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
+                when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo),
+                        Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
+                Future<Optional<StoreInfo>> first = gs.get(key, null);
+                StoreInfo storeInfo = first.get().get();
+                assertNotNull(storeInfo);
+                assertNotEquals(data, storeInfo.getData());
+                CompletableFuture<String> put = gs.put("other", null, data, SHA_1, message, userInfo, null);
+                try {
+                    put.get();
+                } catch (Exception e) {
+                    throw e.getCause();
+                }
             }
-        }
+        }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
 
     @Test

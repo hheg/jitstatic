@@ -21,29 +21,40 @@ package io.jitstatic.utils;
  */
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.utils.Pair;
+public class PathTest {
 
-public class PairTest {
-	
-	@Test
-	public void testPair() {
-		Object l = new Object();
-		Object r = new Object();
-		Pair<Object, Object> p = Pair.of(l, r);
-		assertEquals(l,p.getLeft());
-		assertEquals(r,p.getRight());
-		Pair<Object,Object> ofNothing = Pair.ofNothing();
-		assertNull(ofNothing.getLeft());
-		assertNull(ofNothing.getRight());
-		assertFalse(ofNothing.isPresent());
-		assertTrue(p.isPresent());
-		assertFalse(Pair.of(l, null).isPresent());
-		assertFalse(Pair.of(null,r).isPresent());
-	}
+    @Test
+    public void testPath() {
+        Path p = Path.of("base");
+        assertEquals("base", p.getLastElement());
+    }
+
+    @Test
+    public void testPathAsDirectory() {
+        Path p = Path.of("base/");
+        assertEquals("", p.getLastElement());
+    }
+
+    @Test
+    public void testPathAsKey() {
+        Path p = Path.of("base/key");
+        assertEquals("key", p.getLastElement());
+    }
+
+    @Test
+    public void testDoubleSeparator() {
+        Path p = Path.of("//");
+        assertEquals("", p.getLastElement());
+        assertTrue(p.isDirectory());
+    }
+
+    @Test
+    public void testParentElement() {
+        Path p = Path.of("base/element1/element2/key");
+        assertEquals("base/element1/element2/", p.getParentElements());
+    }
 }

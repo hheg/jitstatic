@@ -27,7 +27,7 @@ import static org.mockito.Mockito.mock;
 import java.util.Arrays;
 
 import org.eclipse.jgit.transport.ReceivePack;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.hosted.LogoPoster;
 

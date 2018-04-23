@@ -58,7 +58,7 @@ public class SourceJSONParser {
             return MAPPER.readValue(bc, StorageData.class);
         } catch (final IOException e) {
             final Throwable cause = e.getCause();
-            throw new StorageParseException((cause != null ? cause.getMessage() : "Unknown error"), e);
+            throw new StorageParseException((cause != null ? cause.getLocalizedMessage() : "Unknown error"), e);
         }
     }
 

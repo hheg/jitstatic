@@ -101,7 +101,7 @@ public class JitStaticReceivePack extends ReceivePack {
                 sendMessage(branch + " failed with " + rc.getResult() + " " + rc.getMessage());
             }
         } catch (final IOException e) {
-            rc.setResult(Result.REJECTED_NOCREATE, "Couldn't create test branch for " + branch + " because " + e.getMessage());
+            rc.setResult(Result.REJECTED_NOCREATE, "Couldn't create test branch for " + branch + " because " + e.getLocalizedMessage());
         }
     }
 
@@ -122,7 +122,7 @@ public class JitStaticReceivePack extends ReceivePack {
                 sendMessage(branch + " OK!");
             }
         } catch (final IOException storageIsCorrupt) {
-            sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getMessage());
+            sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
             final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT : Result.REJECTED_OTHER_REASON);
             testRc.setResult(result, storageIsCorrupt.getMessage());
             setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
@@ -186,20 +186,20 @@ public class JitStaticReceivePack extends ReceivePack {
                     }
                     return Either.<Exception, Void>right(null);
                 } catch (final CommandIsStale e1) {
-                    orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getMessage());
+                    orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getLocalizedMessage());
                     return Either.<Exception, Void>left(e1);
                 } catch (final RefNotFoundException e1) {
-                    orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getMessage());
+                    orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
                     return Either.<Exception, Void>left(e1);
                 } catch (final IOException e) {
-                    orig.setResult(Result.REJECTED_OTHER_REASON, e.getMessage());
+                    orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
                     final String msg = "Error while writing commit, repo is in an unknown state ";
                     final RepositoryException repoException = new RepositoryException(msg, e);
                     setFault(repoException);
                     return Either.<Exception, Void>left(repoException);
                 }
             }).filter(Either::isLeft).collect(Collectors.toList());
-        }).get().stream().forEach(e -> sendError(e.getLeft().getMessage()));
+        }).get().stream().forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
     }
 
     private boolean ifAllOk(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
@@ -263,7 +263,7 @@ public class JitStaticReceivePack extends ReceivePack {
             ru.setForceUpdate(true);
             checkResult(rc.getRefName(), ru.delete());
         } catch (final Exception e) {
-            final String msg = "General error while deleting branches " + e.getMessage();
+            final String msg = "General error while deleting branches " + e.getLocalizedMessage();
             setFault(new RepositoryException(msg, e));
             sendError(msg);
             sendError("Please clean up repository manually");

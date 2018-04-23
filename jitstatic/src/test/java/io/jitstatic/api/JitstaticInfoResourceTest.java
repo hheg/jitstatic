@@ -20,28 +20,28 @@ package io.jitstatic.api;
  * #L%
  */
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-import io.dropwizard.testing.junit.ResourceTestRule;
+import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import io.dropwizard.testing.junit5.ResourceExtension;
 import io.jitstatic.api.JitstaticInfoResource;
 
+@ExtendWith(DropwizardExtensionsSupport.class)
 public class JitstaticInfoResourceTest {
 
-	@ClassRule
-	public static final ResourceTestRule resources = ResourceTestRule.builder().addResource(new JitstaticInfoResource())
-			.build();
+    public static final ResourceExtension resources = ResourceExtension.builder().addResource(new JitstaticInfoResource()).build();
 
-	@Test
-	public void testCommitId() {
-		assertNotNull(resources.target("/info/commitid").request().get(String.class));
-	}
+    @Test
+    public void testCommitId() {
+        assertNotNull(resources.target("/info/commitid").request().get(String.class));
+    }
 
-	@Test
-	public void testVersion() {
-		assertNotNull(resources.target("/info/version").request().get(String.class));
-	}
+    @Test
+    public void testVersion() {
+        assertNotNull(resources.target("/info/version").request().get(String.class));
+    }
 
 }

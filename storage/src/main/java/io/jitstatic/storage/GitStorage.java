@@ -217,9 +217,6 @@ public class GitStorage implements Storage {
     private StoreInfo load(final String key, final String ref) throws RefNotFoundException, IOException {
         final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
         if (sourceInfo != null) {
-            if (sourceInfo.hasFailed()) {
-                throw new RuntimeException(sourceInfo.getFailiure());
-            }
             return readStoreInfo(sourceInfo);
         }
         return null;
@@ -270,7 +267,7 @@ public class GitStorage implements Storage {
                 throw new WrappingAPIException(new RefNotFoundException(finalRef));
             }
             final Optional<StoreInfo> storeInfo = refMap.get(key);
-            if (storageExist(storeInfo)) {
+            if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = storeInfo.get().getStorageData().getContentType();
@@ -289,12 +286,17 @@ public class GitStorage implements Storage {
         }
     }
 
-    private void refreshKey(final StorageData metaData, final String key, final String metaDataVersion, final String newVersion,
+    private void refreshMetaData(final StorageData metaData, final String key, final String metaDataVersion, final String newVersion,
             final Map<String, Optional<StoreInfo>> refMap, String contentType) {
         final Optional<StoreInfo> si = refMap.get(key);
         final StoreInfo storeInfo = si.get();
         if (storeInfo.getMetaDataVersion().equals(metaDataVersion)) {
-            refMap.put(key, Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
+            if (storeInfo.isMasterMetaData()) {
+                refMap.clear(); // TODO
+                refMap.put(key, Optional.of(new StoreInfo(metaData, newVersion)));
+            } else {
+                refMap.put(key, Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
+            }
         }
     }
 
@@ -360,11 +362,13 @@ public class GitStorage implements Storage {
     private StoreInfo readStoreInfo(final SourceInfo source) {
         try {
             final StorageData metaData = readMetaData(source);
-            if (!metaData.isHidden()) {
-                try (final InputStream sourceStream = source.getSourceInputStream()) {
-                    final StoreInfo storeInfo = new StoreInfo(HANDLER.readStorageData(sourceStream), metaData, source.getSourceVersion(),
-                            source.getMetaDataVersion());
-                    return storeInfo;
+            try (final InputStream sourceStream = source.getSourceInputStream()) {
+                if (!metaData.isHidden()) {
+                    if (sourceStream != null) {
+                        return new StoreInfo(HANDLER.readStorageData(sourceStream), metaData, source.getSourceVersion(), source.getMetaDataVersion());
+                    } else {
+                        return new StoreInfo(metaData, source.getMetaDataVersion());
+                    }
                 }
             }
             return null;
@@ -404,18 +408,25 @@ public class GitStorage implements Storage {
             if (refMap == null) {
                 throw new WrappingAPIException(new RefNotFoundException(finalRef));
             }
+            if (key.endsWith("/")) {
+                final String plainKey = key.substring(0, key.length() - 1);
+                Optional<StoreInfo> optional = refMap.get(plainKey);
+                if (optional != null) {
+                    throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+                }
+            }
             final Optional<StoreInfo> storeInfo = refMap.get(key);
-            if (storageExist(storeInfo)) {
+            if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = metaData.getContentType();
             final String newVersion = source.modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef).join();
-            refreshKey(metaData, key, metaDataVersion, newVersion, refMap, contentType);
+            refreshMetaData(metaData, key, metaDataVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);
     }
 
-    private boolean storageExist(final Optional<StoreInfo> storeInfo) {
+    private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
         return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getStorageData().isProtected();
     }
 

@@ -19,12 +19,11 @@ package io.jitstatic.hosted;
  * limitations under the License.
  * #L%
  */
-
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import io.jitstatic.hosted.ErrorReporter;

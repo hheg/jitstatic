@@ -26,6 +26,8 @@ import org.eclipse.jgit.transport.PreReceiveHook;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceivePack;
 
+import io.jitstatic.version.ProjectVersion;
+
 public class LogoPoster implements PreReceiveHook {
 	
 	private static final String line1 =	"   __  _ _   __ _        _   _      "; 
@@ -33,7 +35,7 @@ public class LogoPoster implements PreReceiveHook {
 	private static final String line3 =	"    \\ \\ | __\\ \\| __/ _` | __| |/ __|"; 
 	private static final String line4 =	" /\\_/ / | |__\\ \\ || (_| | |_| | (__ "; 
 	private static final String line5 =	" \\___/|_|\\__\\__/\\__\\__,_|\\__|_|\\___|"; 
-	private static final String line6 = "                                    ";
+	private static final String line6 = "                                    "+ ProjectVersion.INSTANCE.getBuildVersion();
 
 	@Override
 	public void onPreReceive(final ReceivePack rp, final Collection<ReceiveCommand> commands) {

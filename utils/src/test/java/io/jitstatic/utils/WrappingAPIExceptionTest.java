@@ -20,9 +20,9 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.utils.VersionIsNotSameException;
 import io.jitstatic.utils.WrappingAPIException;

@@ -20,22 +20,22 @@ package io.jitstatic;
  * #L%
  */
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.hamcrest.CoreMatchers;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.SourceJSONParser;
 
 public class SourceJSONParserTest {
-
-    @Rule
-    public final ExpectedException ex = ExpectedException.none();
 
     private final SourceJSONParser p = new SourceJSONParser();
 
@@ -48,19 +48,19 @@ public class SourceJSONParserTest {
 
     @Test
     public void testReadJSONWithMissingUserField() throws IOException {
-        ex.expect(IOException.class);
-        ex.expectMessage("metadata is missing users field");
-        try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test5.json")) {
-            p.parseMetaData(bc);
-        }
+        assertThat(assertThrows(IOException.class, () -> {
+            try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test5.json")) {
+                p.parseMetaData(bc);
+            }
+        }).getLocalizedMessage(), CoreMatchers.containsString("metadata is missing users field"));
     }
 
     @Test
     public void testReadObjectWithUserWithNoUser() throws UnsupportedEncodingException, IOException {
-        ex.expect(IOException.class);
-        ex.expectMessage("Property=");
-        try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
-            p.parseMetaData(bc);
-        }
+        assertThat(assertThrows(IOException.class, () -> {
+            try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
+                p.parseMetaData(bc);
+            }
+        }).getLocalizedMessage(), CoreMatchers.containsString("Property="));
     }
 }

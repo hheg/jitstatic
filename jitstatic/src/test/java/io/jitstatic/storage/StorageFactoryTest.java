@@ -1,5 +1,8 @@
 package io.jitstatic.storage;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 /*-
  * #%L
  * jitstatic
@@ -20,7 +23,6 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -33,10 +35,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.eclipse.jgit.lib.Constants;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import io.dropwizard.auth.AuthDynamicFeature;
@@ -53,12 +52,6 @@ public class StorageFactoryTest {
     private Environment env = mock(Environment.class);
     private JerseyEnvironment jersey = mock(JerseyEnvironment.class);
     private Source source = mock(Source.class);
-
-    @Rule
-    public final ExpectedException ex = ExpectedException.none();
-
-    @Rule
-    public final TemporaryFolder tempFolder = new TemporaryFolder();
 
     private StorageFactory sf = new StorageFactory();
 
@@ -77,10 +70,10 @@ public class StorageFactoryTest {
     @Test
     public void testEmptyStoragePath() {
         when(env.jersey()).thenReturn(jersey);
-        ex.expect(NullPointerException.class);
-        ex.expectMessage("Source cannot be null");
-        try (Storage storage = sf.build(null, env);) {
-        }
+        assertEquals(assertThrows(NullPointerException.class, () -> {
+            try (Storage storage = sf.build(null, env);) {
+            }
+        }).getLocalizedMessage(), "Source cannot be null");
     }
 
     @Test

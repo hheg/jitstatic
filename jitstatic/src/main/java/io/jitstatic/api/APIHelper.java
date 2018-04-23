@@ -113,7 +113,10 @@ class APIHelper {
                     return null;
                 }
                 if (apiException instanceof VersionIsNotSameException) {
-                    throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
+                }
+                if(apiException instanceof KeyAlreadyExist) {
+                    throw new WebApplicationException(Status.CONFLICT);
                 }
             }
             log.error("Error while unwrapping future", e);

@@ -1,5 +1,9 @@
 package io.jitstatic;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
 /*-
  * #%L
  * jitstatic
@@ -20,10 +24,6 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.junit.Assert.assertEquals;
-
-import org.junit.Test;
-
 import io.jitstatic.utils.LinkedException;
 
 public class LinkedExceptionTest {
@@ -33,7 +33,7 @@ public class LinkedExceptionTest {
 		LinkedException le = new LinkedException();
 		le.add(new Exception("OK test Message"));
 		le.add(null);
-		String message = le.getMessage();
+		String message = le.getLocalizedMessage();
 		assertEquals("class java.lang.Exception: OK test Message", message);
 	}
 }

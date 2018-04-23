@@ -20,9 +20,9 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import io.jitstatic.utils.ShouldNeverHappenException;
 
@@ -31,6 +31,6 @@ public class ShouldNeverHappenExceptionTest {
     @Test
     public void test() {
         ShouldNeverHappenException s = new ShouldNeverHappenException("", new Exception());
-        assertTrue(s.getMessage().isEmpty());
+        assertTrue(s.getLocalizedMessage().isEmpty());
     }
 }

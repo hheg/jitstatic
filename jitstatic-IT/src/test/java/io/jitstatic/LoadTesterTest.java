@@ -19,9 +19,8 @@ package io.jitstatic;
  * limitations under the License.
  * #L%
  */
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,20 +32,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -79,15 +78,11 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.rules.RuleChain;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,10 +97,8 @@ import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
-import io.dropwizard.testing.junit.DropwizardAppRule;
-import io.jitstatic.JitstaticApplication;
-import io.jitstatic.JitstaticConfiguration;
-import io.jitstatic.LoadTest;
+import io.dropwizard.testing.junit5.DropwizardAppExtension;
+import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
@@ -115,18 +108,18 @@ import io.jitstatic.hosted.HostedFactory;
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
  */
-@RunWith(Parameterized.class)
-@Category(LoadTest.class)
+@Tag("slow")
+@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith(DataProviderResolver.class)
 public class LoadTesterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");
     private static final String METADATA = ".metadata";
-    private static final String MASTER = "master";
+    static final String MASTER = "master";
     private static final Logger LOG = LoggerFactory.getLogger(LoadTesterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final String UTF_8 = "UTF-8";
-    private static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final AtomicInteger GITUPDATES = new AtomicInteger(0);
     private static final AtomicInteger PUTUPDATES = new AtomicInteger(0);
@@ -135,66 +128,34 @@ public class LoadTesterTest {
     private static final int A_CLIENTS = 10;
     private static final int A_UPDTRS = 10;
 
-    private final DropwizardAppRule<JitstaticConfiguration> DW;
     private final BlockingQueue<JitStaticUpdaterClient> clients = new LinkedBlockingDeque<>(A_CLIENTS);
     private final BlockingQueue<ClientUpdater> updaters = new LinkedBlockingQueue<>(A_UPDTRS);
-    private final String[] names;
-    private final String[] branches;
-    private final boolean cache;
 
-    @Parameterized.Parameters
-    public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][] { { new String[] { "a" }, new String[] { MASTER }, false },
-                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" }, false },
-                { new String[] { "a" }, new String[] { MASTER }, true },
-                { new String[] { "a", "b", "c" }, new String[] { MASTER, "develop", "something" }, true } });
-    }
-
-    public LoadTesterTest(String[] names, String[] branches, boolean cache) {
-        this.cache = cache;
-        this.names = names;
-        this.branches = branches;
-        this.versions = new ConcurrentHashMap<>();
-        for (String branch : branches) {
-            for (String name : names) {
-                Map<String, String> m = new ConcurrentHashMap<>();
-                m.put(name, "nothing");
-                versions.put(branch, m);
-            }
-        }
-    }
-
-    @Rule
-    public final RuleChain chain = RuleChain.outerRule(TMP_FOLDER).around((DW = new DropwizardAppRule<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()))));
-
-    private final Map<String, Map<String, String>> versions;
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
+            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+    private String[] names;
+    private String[] branches;
+    private boolean cache;
+    private Map<String, Map<String, String>> versions;
     private UsernamePasswordCredentialsProvider provider;
 
     private String gitAdress;
     private String adminAdress;
 
-    @Before
+    @BeforeEach
     public synchronized void setup() throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         provider = new UsernamePasswordCredentialsProvider(hf.getUserName(), hf.getSecret());
         int localPort = DW.getLocalPort();
         gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
         adminAdress = String.format("http://localhost:%d/admin", localPort);
-        for (int i = 0; i < A_CLIENTS; i++) {
-            clients.add(buildKeyClient());
-        }
-        initRepo();
-        for (int i = 0; i < A_UPDTRS; i++) {
-            updaters.put(new ClientUpdater(gitAdress, provider));
-        }
         GITFAILURES.set(0);
         GITUPDATES.set(0);
         PUTFAILURES.set(0);
         PUTUPDATES.set(0);
     }
 
-    @After
+    @AfterEach
     public void after() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
         SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
         List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull).collect(Collectors.toList());
@@ -205,7 +166,7 @@ public class LoadTesterTest {
             Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
             try {
                 LOG.info(response.readEntity(String.class));
-                File workingFolder = TMP_FOLDER.newFolder();
+                File workingFolder = getFolderFile();
                 try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
                     for (String branch : branches) {
                         checkoutBranch(branch, git);
@@ -255,12 +216,26 @@ public class LoadTesterTest {
         LOG.info("Put failures: {}", PUTFAILURES.get());
     }
 
-    @Test
-    public void testLoad() {
+    @RepeatedTest(4)
+    public void testLoad(TestData data)
+            throws InvalidRemoteException, TransportException, GitAPIException, IOException, InterruptedException, URISyntaxException {
+        synchronized (this) {
+            this.names = data.names;
+            this.branches = data.branches;
+            this.cache = data.cache;
+            this.versions = data.versions;
+        }
+        initRepo();
+        for (int i = 0; i < A_CLIENTS; i++) {
+            clients.add(buildKeyClient());
+        }
+        for (int i = 0; i < A_UPDTRS; i++) {
+            updaters.put(new ClientUpdater(gitAdress, provider));
+        }
         ExecutorService clientPool = Executors.newFixedThreadPool(A_CLIENTS);
         ExecutorService updaterPool = Executors.newFixedThreadPool(A_UPDTRS);
-        Future<?>[] clientJobs = new Future[A_CLIENTS];
-        Future<?>[] updaterJobs = new Future[A_UPDTRS];
+        CompletableFuture<?>[] clientJobs = new CompletableFuture[A_CLIENTS];
+        CompletableFuture<?>[] updaterJobs = new CompletableFuture[A_UPDTRS];
         long start = System.currentTimeMillis();
         do {
             execClientJobs(clientPool, clientJobs);
@@ -271,30 +246,26 @@ public class LoadTesterTest {
         clientPool.shutdown();
     }
 
-    private void waitForJobstoFinish(Future<?>[] clientJobs, Future<?>[] updaterJobs) {
-        int idx = clientJobs.length + updaterJobs.length;
-        while (idx > 0) {
-            idx = completeJobs(clientJobs, idx);
-            idx = completeJobs(updaterJobs, idx);
+    private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs) {
+        CompletableFuture<Void> allClientJobs = CompletableFuture.allOf(clientJobs);
+        CompletableFuture<Void> allUpdaterJobs = CompletableFuture.allOf(updaterJobs);
+        try {
+            allClientJobs.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            e.printStackTrace();
+        }        
+        try {
+            allUpdaterJobs.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {         
+            e.printStackTrace();
         }
     }
 
-    private int completeJobs(Future<?>[] jobs, int idx) {
-        for (int i = 0; i < jobs.length; i++) {
-            Future<?> f = jobs[i];
-            if (f != null && f.isDone()) {
-                jobs[i] = null;
-                idx--;
-            }
-        }
-        return idx;
-    }
-
-    private void execUpdatersJobs(ExecutorService updaterPool, Future<?>[] updaterJobs) {
+    private void execUpdatersJobs(ExecutorService updaterPool, CompletableFuture<?>[] updaterJobs) {
         for (int i = 0; i < updaterJobs.length; i++) {
-            Future<?> f = updaterJobs[i];
+            CompletableFuture<?> f = updaterJobs[i];
             if (f == null || f.isDone()) {
-                updaterJobs[i] = updaterPool.submit(() -> {
+                updaterJobs[i] = CompletableFuture.runAsync(() -> {
                     ClientUpdater cu;
                     try {
                         cu = updaters.take();
@@ -312,28 +283,32 @@ public class LoadTesterTest {
                     } catch (InterruptedException e1) {
                         LOG.error("TestSuiteError: Updater interrupted and killed", e1);
                     }
-                });
+                }, updaterPool);
             }
         }
     }
 
-    private void execClientJobs(ExecutorService clientPool, Future<?>[] clientJobs) {
+    private static File getFolderFile() throws IOException {
+        return Files.createTempDirectory("junit").toFile();
+    }
+
+    private void execClientJobs(ExecutorService clientPool, CompletableFuture<?>[] clientJobs) {
         for (int i = 0; i < clientJobs.length; i++) {
-            Future<?> f = clientJobs[i];
+            CompletableFuture<?> f = clientJobs[i];
             if (f == null || f.isDone()) {
-                clientJobs[i] = clientPool.submit(() -> {
+                clientJobs[i] = CompletableFuture.runAsync(() -> {
                     try {
                         clientCode();
                     } catch (InterruptedException | IOException e) {
                         LOG.error("TestSuiteError: Interrupted ", e);
                     }
-                });
+                }, clientPool);
             }
         }
     }
 
     private void initRepo() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-        File workingFolder = TMP_FOLDER.newFolder();
+        File workingFolder = getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             int c = 0;
             byte[] data = getData(c);
@@ -347,6 +322,7 @@ public class LoadTesterTest {
             git.commit().setMessage("i:a:0").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
             for (String branch : branches) {
+                System.out.println("Creating " + branch);
                 if (!MASTER.equals(branch)) {
                     git.checkout().setName(branch).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
                     verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
@@ -406,7 +382,7 @@ public class LoadTesterTest {
                                         client.getKey(name, branch, newTag, LoadTesterTest::read);
                                     }
                                 } catch (APIException e) {
-                                    LOG.error("TestSuiteError: Failed to modify " + c + " " + e.getMessage());
+                                    LOG.error("TestSuiteError: Failed to modify " + c + " " + e.getLocalizedMessage());
                                     PUTFAILURES.incrementAndGet();
                                 } catch (Exception e) {
                                     PUTFAILURES.incrementAndGet();
@@ -438,8 +414,8 @@ public class LoadTesterTest {
     }
 
     private JitStaticUpdaterClient buildKeyClient() throws URISyntaxException {
-        JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
+        JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/")
+                .setUser(USER).setPassword(PASSWORD);
         if (cache) {
             builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())
                     .setHttpClientBuilder(CachingHttpClients.custom());
@@ -457,7 +433,7 @@ public class LoadTesterTest {
     private static Supplier<String> getFolder() {
         return () -> {
             try {
-                return TMP_FOLDER.newFolder().toString();
+                return getFolderFile().toString();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -498,7 +474,7 @@ public class LoadTesterTest {
 
         public ClientUpdater(final String gitAdress, final UsernamePasswordCredentialsProvider provider)
                 throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-            this.workingFolder = TMP_FOLDER.newFolder();
+            this.workingFolder = getFolderFile();
             Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call().close();
             this.provider = provider;
         }

@@ -53,7 +53,7 @@ public class CorruptedSourceException extends Exception {
 				sb.append("ID: ").append(fileInfo == null ? "null" : ObjectId.toString(fileInfo.getObjectId())).append(" Name: ")
 						.append((fileInfo == null ? "FILE_NAME_MISSING" : fileInfo.getFileName())).append(" ")
 						.append(" Reason: ")
-						.append((fileError.getRight() == null ? "null" : fileError.getRight().getMessage())).append(System.lineSeparator());
+						.append((fileError.getRight() == null ? "null" : fileError.getRight().getLocalizedMessage())).append(System.lineSeparator());
 			}
 		}
 		return sb.toString();
