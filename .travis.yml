@@ -5,9 +5,21 @@ env:
   - FILE=$HOME/jitstatic-$TRAVIS_TAG.jar
   - USERNAME=hheg
   - secure: E04BqPnJGz+DP5lNUL/KKdx5TGIMRE3vBhUd5e9ARQxUtNiiL5LuYHdTZyg3uTvk1DbeE+dqKSimQ4Qy9p1BtOVyJ9ltfgJlGjbfi1i7f98vt4z48gU9SPgJCB848DJODVg1Wv7qjt0UfQZyQrkxv61yaGWta2LtK26arD62ztLS59QUV3wwnpujuoipSEDCDcYzWuRIsVJoHRlrx+I96qdVA6GE4XomyrVbJ2zBQQd035iwCu64cVY2s7e52YS29rgT6qKMbNug9loFwPSSs4SJPpCxxKiSMtoiqd8/Ug+OamvUE+pMYpTSsSauU1YK2x9HzZmWOkqNmegfnFYMtOD0aM8VmsOrmfI28kJHZR6ZYXa9wFT47rCuPRnX+AZBKryi073KUF1oqSj8DbufHlO0Mm293ARou1sgfVxqFyrTYRvP6UVG5iiIrm/lP/bcTmSxRk1oSWIH8CS/fXd3RriBNsq6tLOk7uj7Iz2sFQuwcT/p/k04qtVN0s5hSxuob8XVil7x0sBz0mLn/3npE+gH/dsUAG2i8vaAYTb8LkK1N6wXiOJUwl5yfvja/Qwz66AJH8OpiIbmGsOeha91m1UyfKLo8ImcGvAS8gYHjCSJ4HBKWZFegG79OV+Q5de9GL0jDm1w8FcYa0UjkxhYZ5uwAkRaX8PXErwcSBZiNSI=
-jdk:
-- oraclejdk9
+
+
+dist: trusty
 sudo: required
+
+before_install:
+  - wget https://github.com/sormuras/bach/raw/master/install-jdk.sh
+
+matrix:
+  include:
+# 10
+    - env: JDK='Oracle JDK 10'
+      jdk: oraclejdk10
+    - env: JDK='OpenJDK 10'
+      install: . ./install-jdk.sh -F 10 -L GPL
 install: true
 script:
 - mvn clean install -B -V -DskipTests=true

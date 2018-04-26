@@ -1,4 +1,4 @@
-FROM openjdk:9.0.4-12-jre-slim-sid
+FROM openjdk:10.0.1-10-jdk-slim-sid
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 
