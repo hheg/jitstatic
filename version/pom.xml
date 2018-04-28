@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.9.3-SNAPSHOT</version>
+		<version>0.9.3-read-SNAPSHOT</version>
 	</parent>
 	<artifactId>version</artifactId>
 	<dependencies>
