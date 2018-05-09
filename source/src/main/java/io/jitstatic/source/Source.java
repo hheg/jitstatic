@@ -26,8 +26,6 @@ import io.jitstatic.StorageData;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
-import java.util.concurrent.CompletableFuture;
-
 public interface Source extends AutoCloseable, CheckHealth {
     public void close();
 
@@ -39,12 +37,12 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public CompletableFuture<String> modify(String key, String ref, byte[] data, String version, String message,
+    public String modify(String key, String ref, byte[] data, String version, String message,
             String userInfo, String userMail);
 
-    public CompletableFuture<Pair<String, String>> addKey(String key, String finalRef, byte[] data, StorageData metaData,
+    public Pair<String, String> addKey(String key, String finalRef, byte[] data, StorageData metaData,
             String message, String userInfo, String userMail);
 
-    public CompletableFuture<String> modify(StorageData metaData, String metaDataVersion, String message, String userInfo,
+    public String modify(StorageData metaData, String metaDataVersion, String message, String userInfo,
             String userMail, String key, String finalRef);
 }

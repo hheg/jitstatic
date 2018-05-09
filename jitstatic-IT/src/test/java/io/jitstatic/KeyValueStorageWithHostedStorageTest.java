@@ -209,7 +209,7 @@ public class KeyValueStorageWithHostedStorageTest {
                     key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, tf);
-            assertEquals(new String(newData), key.data.toString());
+            assertEquals(new String(newData, "UTF-8"), key.data.toString());
         }
     }
 
@@ -224,7 +224,7 @@ public class KeyValueStorageWithHostedStorageTest {
                     new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
-            assertEquals(new String(prettyData), key.data);
+            assertEquals(new String(prettyData,"UTF-8"), key.data);
         }
     }
 
@@ -372,7 +372,7 @@ public class KeyValueStorageWithHostedStorageTest {
     }
 
     private TriFunction<InputStream, String, String, Entity<String>> stringFactory = (is, v, t) -> {
-        try (Scanner s = new Scanner(is).useDelimiter("\\A")) {
+        try (Scanner s = new Scanner(is,"UTF-8").useDelimiter("\\A")) {
             String result = s.hasNext() ? s.next() : "";
             return new Entity<String>(v, t, result);
         }

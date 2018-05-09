@@ -22,7 +22,7 @@ package io.jitstatic.hosted;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -38,11 +38,11 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
 	private final String defaultRef;
-	private final ExecutorService repoExecutor;
+	private final Executor repoExecutor;
 	private final ErrorReporter errorReporter;
 	private final RepositoryBus bus;
 
-	public JitStaticReceivePackFactory(final ExecutorService repoExecutor, final ErrorReporter reporter,
+	public JitStaticReceivePackFactory(final Executor repoExecutor, final ErrorReporter reporter,
 			final String defaultRef, final RepositoryBus bus) {
 		this.defaultRef = Objects.requireNonNull(defaultRef);
 		this.errorReporter = Objects.requireNonNull(reporter);

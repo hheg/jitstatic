@@ -57,21 +57,16 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator));
         } catch (final Exception e) {
-            cleanupIfFailed(source, storage);
+            closeSilently(source);
+            closeSilently(storage);
             throw e;
         }
     }
 
-    private void cleanupIfFailed(final Source source, final Storage storage) {
+    private void closeSilently(final AutoCloseable source) {
         if (source != null) {
             try {
                 source.close();
-            } catch (final Exception ignore) {
-            }
-        }
-        if (storage != null) {
-            try {
-                storage.close();
             } catch (final Exception ignore) {
             }
         }

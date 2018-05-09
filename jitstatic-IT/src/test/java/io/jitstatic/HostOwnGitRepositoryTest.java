@@ -23,6 +23,7 @@ package io.jitstatic;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -372,7 +373,24 @@ public class HostOwnGitRepositoryTest {
             assertArrayEquals(bytes, readAllBytes);
         }
     }
-
+    
+    @Test
+    public void testReloadedAfterManualPush()
+            throws IOException, InvalidRemoteException, TransportException, GitAPIException, URISyntaxException {
+        File workingFolder = getFolder().toFile();
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticUpdaterClient client = buildClient()) {
+            createData(STORE, git);
+            Entity first = client.getKey(STORE, REFS_HEADS_MASTER, tf);
+            Files.write(workingFolder.toPath().resolve(STORE), getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("New file data").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            Entity second = client.getKey(STORE, REFS_HEADS_MASTER, tf);
+            assertNotEquals(first.getTag(), second.getTag());
+        }
+    }
+    
     @Test
     public void testAddingKeyWithMasterMetaData() throws Exception {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
@@ -438,8 +456,9 @@ public class HostOwnGitRepositoryTest {
     private Path createData(String localFilePath, Git git) throws IOException, UnsupportedEncodingException, GitAPIException,
             NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
             WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
-        Path path = Paths.get(getRepopath(git), localFilePath);
-        Path mpath = Paths.get(getRepopath(git), localFilePath + METADATA);
+        String repopath = getRepopath(git);
+        Path path = Paths.get(repopath, localFilePath);
+        Path mpath = Paths.get(repopath, localFilePath + METADATA);
         Files.createDirectories(path.getParent());
         Files.write(path, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
         Files.write(mpath, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
