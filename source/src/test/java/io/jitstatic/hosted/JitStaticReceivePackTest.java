@@ -342,7 +342,7 @@ public class JitStaticReceivePackTest {
 
         assertEquals(errormsg, rc.getMessage());
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        assertEquals("General error while deleting branches " + errormsg, rp.getFault().getMessage());
+        assertEquals("General error while deleting branches. Error is: " + errormsg, rp.getFault().getMessage());
     }
 
     @Test
@@ -534,7 +534,9 @@ public class JitStaticReceivePackTest {
     }
 
     Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+        Path createTempDirectory = Files.createTempDirectory("junit");
+        createTempDirectory.toFile().deleteOnExit();
+        return createTempDirectory;
     }
 
     private static byte[] brackets() {

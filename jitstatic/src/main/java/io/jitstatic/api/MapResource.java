@@ -83,11 +83,11 @@ public class MapResource {
             final @Context Request request, final @Context HttpHeaders headers) {
 
         checkKey(key);
-        
+
         helper.checkRef(ref);
 
         final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
-        if (!si.isPresent()) {
+        if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         final StoreInfo storeInfo = si.get();
@@ -114,7 +114,7 @@ public class MapResource {
     }
 
     private void checkKey(final String key) {
-        if(key.endsWith("/")) {
+        if (key.endsWith("/")) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
     }
@@ -144,16 +144,16 @@ public class MapResource {
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        
+
         checkKey(key);
-        
+
         helper.checkHeaders(headers);
 
         helper.checkValidRef(ref);
 
         final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
 
-        if (!si.isPresent()) {
+        if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         final StoreInfo storeInfo = si.get();
@@ -170,9 +170,9 @@ public class MapResource {
         if (response != null) {
             return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
         }
-        
-        final String newVersion = helper
-                .unwrapWithPUTApi(storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+
+        final String newVersion = helper.unwrapWithPUTApi(
+                storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -192,8 +192,8 @@ public class MapResource {
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {               
-        
+    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
+
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
@@ -201,18 +201,20 @@ public class MapResource {
             LOG.info("Resource " + data.getKey() + " is denied for user " + user.get());
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        
-        if(data.getKey().endsWith("/")) {
+
+        if (data.getKey().endsWith("/")) {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
-        
+
         final Optional<StoreInfo> si = helper.unwrap(storage.get(data.getKey(), data.getBranch()));
-        if (si.isPresent()) {
-            throw new WebApplicationException(Status.CONFLICT);
+        if (si != null && si.isPresent()) {
+            throw new WebApplicationException(String.format("Key '%s' already exist in branch %s", data.getKey(), data.getBranch()),
+                    Status.CONFLICT);
         }
-        final StoreInfo result = helper.unwrapWithPOSTApi(
-                storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
-        return Response.ok().tag(new EntityTag(result.getVersion())).header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType())
-                .header(HttpHeaders.CONTENT_ENCODING, UTF_8).entity(result.getData()).build();
+        final StoreInfo result = helper.unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
+                data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        return Response.ok().tag(new EntityTag(result.getVersion()))
+                .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+                .entity(result.getData()).build();
     }
 }

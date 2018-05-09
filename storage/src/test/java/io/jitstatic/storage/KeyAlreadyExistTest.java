@@ -31,6 +31,6 @@ public class KeyAlreadyExistTest {
     @Test
     public void test() {
         KeyAlreadyExist k = new KeyAlreadyExist("key", "branch");
-        assertEquals("key already exist in branch branch", k.getLocalizedMessage());
+        assertEquals("Key 'key' already exist in branch branch", k.getLocalizedMessage());
     }
 }

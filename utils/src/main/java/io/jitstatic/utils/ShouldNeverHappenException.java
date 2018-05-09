@@ -21,10 +21,14 @@ package io.jitstatic.utils;
  */
 
 public class ShouldNeverHappenException extends RuntimeException {
-	
-	private static final long serialVersionUID = -1254892071325637569L;
 
-	public ShouldNeverHappenException(final String message, final Throwable t) {
-		super(message,t);
-	}
+    private static final long serialVersionUID = -1254892071325637569L;
+
+    public ShouldNeverHappenException(final String message, final Throwable t) {
+        super(message, t);
+    }
+
+    public ShouldNeverHappenException(final String message) {
+        super(message);
+    }
 }

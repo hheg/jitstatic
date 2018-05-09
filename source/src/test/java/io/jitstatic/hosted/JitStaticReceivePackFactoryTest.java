@@ -56,7 +56,7 @@ public class JitStaticReceivePackFactoryTest {
     private Git git;
 
     private final ErrorReporter reporter = new ErrorReporter();
-    private final String defaultRef = "refs/heads/master";
+    private static final String defaultRef = "refs/heads/master";
     private HttpServletRequest req;
     private ExecutorService service;
 

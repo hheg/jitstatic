@@ -313,17 +313,18 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(metaData);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
         final String finalRef = checkRef(ref);
+        
         return CompletableFuture.supplyAsync(() -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                try {
+                try {                    
                     final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-                    if (sourceInfo != null) {
+                    if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                         throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-                    }
+                    }                    
                 } catch (final RefNotFoundException e) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }

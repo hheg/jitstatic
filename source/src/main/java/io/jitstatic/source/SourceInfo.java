@@ -33,8 +33,9 @@ public class SourceInfo {
 
     public SourceInfo(final MetaFileData metaFileData, final SourceFileData sourceFileData) {
         this.metaFileData = metaFileData;
-        if(sourceFileData == null && !metaFileData.isMasterMetaData()) {
-            throw new IllegalArgumentException(String.format("sourceFileData cannot be null if metaFileData %s is not a masterMetaData file",metaFileData.getFileName()));
+        if (sourceFileData == null && !metaFileData.isMasterMetaData()) {
+            throw new IllegalArgumentException(String
+                    .format("sourceFileData cannot be null if metaFileData %s is not a masterMetaData file", metaFileData.getFileName()));
         }
         this.sourceFileData = sourceFileData;
     }
@@ -59,5 +60,9 @@ public class SourceInfo {
 
     public InputStream getMetadataInputStream() throws IOException {
         return metaFileData.getInputStream();
+    }
+
+    public boolean isMetaDataSource() {
+        return sourceFileData == null && metaFileData != null;
     }
 }

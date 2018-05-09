@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
@@ -144,18 +145,21 @@ public class SourceExtractorTest {
             }).map(p -> {
                 SourceFileData sdf = p.getRight();
                 return Pair.of(sdf.getFileInfo(), sdf.getInputStreamHolder());
-            }).map(m -> Pair.<ObjectId, Set<String>>of(m.getLeft().getObjectId(), new HashSet<>(Arrays.asList(m.getLeft().getFileName())))).reduce((a, b) -> {
-                assertEquals(a.getLeft(), b.getLeft());
-                a.getRight().addAll(b.getRight());
-                return a;
-            });
+            }).map(m -> Pair.<ObjectId, Set<String>>of(m.getLeft().getObjectId(), new HashSet<>(Arrays.asList(m.getLeft().getFileName()))))
+                    .reduce((a, b) -> {
+                        assertEquals(a.getLeft(), b.getLeft());
+                        a.getRight().addAll(b.getRight());
+                        return a;
+                    });
             assertTrue(reduce.isPresent());
             assertTrue(reduce.get().getRight().size() == 4);
         }
     }
+
     // This shouldn't happen since it would be illegal to push this commit
     @Test
-    public void testCheckBranchWithRemovedObjects() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+    public void testCheckBranchWithRemovedObjects()
+            throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
         final String key = "file";
         final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
@@ -196,9 +200,9 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo branch = se.openBranch(REFS_HEADS_MASTER, key);
-        try (final InputStream is = branch.getSourceInputStream();) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), "UTF-8"));) {
             assertNotNull(is);
-            String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
+            String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
         }
 
@@ -231,9 +235,9 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo tag = se.openTag(Constants.R_TAGS + "tag", key);
-        try (final InputStream is = tag.getSourceInputStream();) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(tag.getSourceInputStream(), "UTF-8"));) {
             assertNotNull(is);
-            String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
+            String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
         }
     }
@@ -252,9 +256,9 @@ public class SourceExtractorTest {
             }
             SourceExtractor se = new SourceExtractor(git.getRepository());
             SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
-            try (final InputStream is = branch.getSourceInputStream();) {
+            try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), "UTF-8"));) {
                 assertNotNull(is);
-                String parsed = new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
+                String parsed = is.lines().collect(Collectors.joining());
                 assertEquals(getData(), parsed);
             }
         });
@@ -370,8 +374,10 @@ public class SourceExtractorTest {
         final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final Path file = tempGitFolder.toPath().resolve(key);
-            file.getParent().toFile().mkdirs();
-            Path metadata = file.getParent().resolve(METADATA);
+            Path metadata = Objects.requireNonNull(file.getParent()).resolve(METADATA);
+            if (key.contains("/")) {
+                assertTrue(Objects.requireNonNull(file.getParent()).toFile().mkdirs());
+            }
             Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
             Files.write(metadata, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
             local.add().addFilepattern(".").call();
@@ -396,8 +402,8 @@ public class SourceExtractorTest {
         final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             Path file = tempGitFolder.toPath().resolve(key1);
-            file.getParent().toFile().mkdirs();
-            Path metadata = file.getParent().resolve(METADATA);
+            Objects.requireNonNull(file.getParent()).toFile().mkdirs();
+            Path metadata = Objects.requireNonNull(file.getParent()).resolve(METADATA);
             Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
             Files.write(metadata, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
 
@@ -460,9 +466,11 @@ public class SourceExtractorTest {
         final Path file = temporaryGitFolder.toPath().resolve(key);
         final Path mfile = temporaryGitFolder.toPath().resolve(key + METADATA);
         if (key.endsWith("/")) {
-            file.toFile().mkdirs();
+            assertTrue(file.toFile().mkdirs());
         } else {
-            file.getParent().toFile().mkdirs();
+            if (!Files.exists(Objects.requireNonNull(file.getParent()))) {
+                assertTrue(Objects.requireNonNull(file.getParent().toFile().mkdirs()));
+            }
             Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         }
         Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
@@ -472,13 +480,16 @@ public class SourceExtractorTest {
     }
 
     File getFolder() throws IOException {
-        return Files.createTempDirectory("junit").toFile();
+        File file = Files.createTempDirectory("junit").toFile();
+        file.deleteOnExit();
+        return file;
     }
 
     private void createFileAndCommit(File tempGitFolder, Git local, final String key, int i)
-            throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException, IOException,
-            UnsupportedEncodingException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+            throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
+            IOException, UnsupportedEncodingException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException,
+            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException,
+            TransportException {
         final String round = (i == 0 ? "" : String.valueOf(i));
         final String branchName = "master" + round;
         if (i > 0) {
@@ -497,8 +508,8 @@ public class SourceExtractorTest {
     private void checkForErrors() {
         try (SourceChecker sc = new SourceChecker(git.getRepository())) {
             List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check = sc.check();
-            List<Pair<FileObjectIdStore, Exception>> errors = check.stream().map(Pair::getRight).flatMap(List::stream).filter(Pair::isPresent)
-                    .filter(p -> p.getRight() != null).collect(Collectors.toList());
+            List<Pair<FileObjectIdStore, Exception>> errors = check.stream().map(Pair::getRight).flatMap(List::stream)
+                    .filter(Pair::isPresent).filter(p -> p.getRight() != null).collect(Collectors.toList());
             assertEquals(Arrays.asList(), errors);
         }
     }
@@ -521,7 +532,7 @@ public class SourceExtractorTest {
     }
 
     private String readData(SourceInfo openBranch) throws IOException {
-        try (InputStream is = openBranch.getMetadataInputStream(); Scanner s = new Scanner(is)) {
+        try (InputStream is = openBranch.getMetadataInputStream(); Scanner s = new Scanner(is, "UTF-8")) {
             s.useDelimiter("\\A");
             return s.hasNext() ? s.next() : "";
         }

@@ -65,6 +65,10 @@ public class StoreInfo {
         return data == null && version == null;
     }
 
+    public boolean isNormalKey() {
+        return !isMasterMetaData() && version != null && data != null;
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;

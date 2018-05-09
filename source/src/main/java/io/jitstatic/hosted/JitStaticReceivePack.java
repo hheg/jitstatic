@@ -59,8 +59,8 @@ public class JitStaticReceivePack extends ReceivePack {
     private final ExecutorService repoExecutor;
     private final RepositoryBus bus;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final ExecutorService service, final ErrorReporter errorReporter,
-            final RepositoryBus bus) {
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final ExecutorService service,
+            final ErrorReporter errorReporter, final RepositoryBus bus) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
@@ -123,7 +123,8 @@ public class JitStaticReceivePack extends ReceivePack {
             }
         } catch (final IOException storageIsCorrupt) {
             sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
-            final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT : Result.REJECTED_OTHER_REASON);
+            final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT
+                    : Result.REJECTED_OTHER_REASON);
             testRc.setResult(result, storageIsCorrupt.getMessage());
             setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final Exception unexpected) {
@@ -212,10 +213,8 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void setFault(final Exception e) {
-        final Exception unregistered = fault.getAndSet(e);
-        if (unregistered != null) {
-            LOG.error("Unregistered error ", unregistered);
-        }
+        fault.getAndSet(e);        
+        LOG.error("Error occourred ",e);
     }
 
     private void cleanUpRepository(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
@@ -263,7 +262,7 @@ public class JitStaticReceivePack extends ReceivePack {
             ru.setForceUpdate(true);
             checkResult(rc.getRefName(), ru.delete());
         } catch (final Exception e) {
-            final String msg = "General error while deleting branches " + e.getLocalizedMessage();
+            final String msg = "General error while deleting branches. Error is: " + e.getLocalizedMessage();
             setFault(new RepositoryException(msg, e));
             sendError(msg);
             sendError("Please clean up repository manually");
