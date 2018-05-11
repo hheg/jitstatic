@@ -28,11 +28,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -45,6 +44,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,10 +61,9 @@ import io.jitstatic.StorageData;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.utils.ErrorConsumingThreadFactory;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
-import io.jitstatic.utils.VersionIsNotSameException;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class HostedGitRepositoryManager implements Source {
@@ -77,12 +76,12 @@ public class HostedGitRepositoryManager implements Source {
     private final JitStaticReceivePackFactory receivePackFactory;
     private final ErrorReporter errorReporter;
     private final RepositoryBus repositoryBus;
-    private final ExecutorService repoExecutor;
+    private final SubmittingExecutor repoExecutor;
     private final SourceUpdater updater;
+    private final JitStaticUploadPackFactory uploadPackFactory;
 
-    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
-            final ExecutorService repoExecutor, final ErrorReporter errorReporter)
-            throws CorruptedSourceException, IOException {
+    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final Executor repoExecutor,
+            final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
                 throw new IllegalArgumentException(String.format("Path %s is a file", workingDirectory));
@@ -105,8 +104,7 @@ public class HostedGitRepositoryManager implements Source {
             throw new RuntimeException(e);
         }
 
-        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(
-                this.bareRepository);
+        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(this.bareRepository);
 
         if (!errors.isEmpty()) {
             throw new CorruptedSourceException(errors);
@@ -115,19 +113,17 @@ public class HostedGitRepositoryManager implements Source {
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(this.bareRepository);
         this.repositoryBus = new RepositoryBus(errorReporter);
-        this.receivePackFactory = new JitStaticReceivePackFactory(
-                Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"), errorReporter, defaultRef,
-                repositoryBus);
+        this.receivePackFactory = new JitStaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
+                errorReporter, defaultRef, repositoryBus);
+        this.uploadPackFactory = new JitStaticUploadPackFactory(repoExecutor, errorReporter);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
-        this.repoExecutor = repoExecutor;
+        this.repoExecutor = new SubmittingExecutor(repoExecutor);
     }
 
     private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
             final ErrorReporter reporter) throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef,
-                Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("repo", reporter::setFault)),
-                reporter);
+        this(workingDirectory, endPointName, defaultRef, new PriorityExecutor(), reporter);
     }
 
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
@@ -145,15 +141,13 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(
-            final Repository bareRepository) {
+    private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(final Repository bareRepository) {
         try (final SourceChecker sc = new SourceChecker(bareRepository)) {
             return sc.check();
         }
     }
 
-    private static Repository setUpBareRepository(final Path repositoryBase)
-            throws IOException, IllegalStateException, GitAPIException {
+    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
         LOG.info("Mounting repository on " + repositoryBase);
         Repository repo = getRepository(repositoryBase);
         if (repo == null) {
@@ -174,11 +168,6 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public void close() {
-        repoExecutor.shutdown();
-        try {
-            repoExecutor.awaitTermination(10, TimeUnit.SECONDS);
-        } catch (InterruptedException ignore) {
-        }
         try {
             this.bareRepository.close();
         } catch (final Exception ignore) {
@@ -243,8 +232,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public CompletableFuture<String> modify(final String key, String ref, final byte[] data, final String version,
-            final String message, final String userInfo, String userMail) {
+    public String modify(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
+            String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(message);
@@ -255,20 +244,20 @@ public class HostedGitRepositoryManager implements Source {
         if (finalRef.startsWith(Constants.R_TAGS)) {
             throw new UnsupportedOperationException("Tags cannot be modified");
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
                 if (!checkVersion(version, key, finalRef)) {
-                    throw new WrappingAPIException(new VersionIsNotSameException());
+                    throw new WrappingAPIException(new VersionIsNotSame());
                 }
                 return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }, repoExecutor);
+        }));
     }
 
     private String checkRef(String ref) {
@@ -303,8 +292,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public CompletableFuture<Pair<String, String>> addKey(final String key, String ref, final byte[] data,
-            final StorageData metaData, final String message, final String userInfo, final String userMail) {
+    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final StorageData metaData, final String message,
+            final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
@@ -313,33 +302,31 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(metaData);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
         final String finalRef = checkRef(ref);
-        return CompletableFuture.supplyAsync(() -> {
+        return unwrap(repoExecutor.submit((Callable<Pair<String, String>> & WriteOperation) () -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                try {
+                try {                    
                     final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-                    if (sourceInfo != null) {
+                    if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                         throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-                    }
+                    }                    
                 } catch (final RefNotFoundException e) {
-                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
+                    throw new WrappingAPIException(e);
                 }
-                return updater.addKey(
-                        Pair.of(Pair.of(key, data),
-                                Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
+                return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
                         actualRef, message, userInfo, userMail);
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }, repoExecutor);
+        }));
     }
 
     @Override
-    public CompletableFuture<String> modify(final StorageData metaData, final String metaDataVersion,
-            final String message, final String userInfo, final String userMail, final String key, String ref) {
+    public String modify(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
+            final String userMail, final String key, String ref) {
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
@@ -349,21 +336,33 @@ public class HostedGitRepositoryManager implements Source {
         if (finalRef.startsWith(Constants.R_TAGS)) {
             throw new UnsupportedOperationException("Tags cannot be modified");
         }
-        return CompletableFuture.supplyAsync(() -> {
+        return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
             try {
                 final Ref actualRef = bareRepository.findRef(finalRef);
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
                 if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
-                    throw new WrappingAPIException(new VersionIsNotSameException());
+                    throw new WrappingAPIException(new VersionIsNotSame());
                 }
-                return updater.updateMetaData(key + JitStaticConstants.METADATA, actualRef, unwrap(metaDataConverter),
-                        message, userInfo, userMail);
+                return updater.updateMetaData(key + JitStaticConstants.METADATA, actualRef, unwrap(metaDataConverter), message, userInfo,
+                        userMail);
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }, repoExecutor);
+        }));
+    }
+
+    private static <T> T unwrap(final SubmittedSupplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (final RuntimeException re) {
+            Throwable cause = re.getCause();
+            if (cause instanceof WrappingAPIException) {
+                throw (WrappingAPIException) cause;
+            }
+            throw re;
+        }
     }
 
     private static <T> T unwrap(final CompletableFuture<T> f) {
@@ -389,5 +388,9 @@ public class HostedGitRepositoryManager implements Source {
                 throw new ShouldNeverHappenException("", e1);
             }
         });
+    }
+
+    public UploadPackFactory<HttpServletRequest> getUploadPackFactory() {
+        return uploadPackFactory;
     }
 }

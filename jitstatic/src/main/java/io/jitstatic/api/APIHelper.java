@@ -38,7 +38,7 @@ import org.slf4j.Logger;
 
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.storage.StoreInfo;
-import io.jitstatic.utils.VersionIsNotSameException;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 class APIHelper {
@@ -60,10 +60,11 @@ class APIHelper {
             if (cause instanceof WrappingAPIException) {
                 final Exception apiException = (Exception) cause.getCause();
                 if (apiException instanceof KeyAlreadyExist) {
-                    throw new WebApplicationException(Status.CONFLICT);
+                    final KeyAlreadyExist kae = (KeyAlreadyExist) apiException;
+                    throw new WebApplicationException(kae.getMessage(), Status.CONFLICT);
                 } else if (apiException instanceof RefNotFoundException) {
                     // Error message here means that the branch is not found.
-                    throw new WebApplicationException(Status.NOT_FOUND);
+                    throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
                 } else if (apiException instanceof IOException) {
                     throw new WebApplicationException("Data is malformed", 422);
                 }
@@ -112,10 +113,10 @@ class APIHelper {
                 if (apiException instanceof RefNotFoundException) {
                     return null;
                 }
-                if (apiException instanceof VersionIsNotSameException) {
+                if (apiException instanceof VersionIsNotSame) {
                     throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
-                if(apiException instanceof KeyAlreadyExist) {
+                if (apiException instanceof KeyAlreadyExist) {
                     throw new WebApplicationException(Status.CONFLICT);
                 }
             }

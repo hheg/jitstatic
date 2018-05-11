@@ -39,9 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -82,7 +80,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import io.jitstatic.SourceChecker;
-import io.jitstatic.utils.ErrorConsumingThreadFactory;
 import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePackTest {
@@ -101,7 +98,7 @@ public class JitStaticReceivePackTest {
     private Path storeMetaPath;
     private TestProtocol<Object> protocol;
     private URIish uri;
-    private ExecutorService service;
+    private Executor service;
     private ErrorReporter errorReporter;
     private RepositoryBus bus;
 
@@ -109,7 +106,8 @@ public class JitStaticReceivePackTest {
     public void setup() throws IllegalStateException, GitAPIException, IOException {
         remoteBareGit = Git.init().setDirectory(getFolder().toFile()).setBare(true).call();
         File workingFolder = getFolder().toFile();
-        clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder).call();
+        clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder)
+                .call();
         storePath = workingFolder.toPath().resolve(STORE);
         storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
         Files.write(storePath, data, StandardOpenOption.CREATE);
@@ -120,7 +118,7 @@ public class JitStaticReceivePackTest {
 
         errorReporter = new ErrorReporter();
         bus = new RepositoryBus(errorReporter);
-        service = Executors.newSingleThreadExecutor(new ErrorConsumingThreadFactory("testRepo", errorReporter::setFault));
+        service = new PriorityExecutor();
 
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
@@ -135,14 +133,16 @@ public class JitStaticReceivePackTest {
         remoteBareGit.close();
         clientGit.close();
         Transport.unregister(protocol);
-        service.shutdown();
-        service.awaitTermination(1, TimeUnit.SECONDS);
-        assertEquals(null, errorReporter.getFault());
+        Exception fault = errorReporter.getFault();
+        if (fault != null) {
+            fault.printStackTrace();
+        }
+        assertEquals(null, fault);
     }
 
     @Test
-    public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, RevisionSyntaxException,
-            AmbiguousObjectException, IncorrectObjectTypeException, IOException {
+    public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException,
+            RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
         Repository localRepository = clientGit.getRepository();
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
@@ -172,8 +172,8 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
-    public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, GitAPIException {
+    public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException,
+            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, GitAPIException {
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("New commit").call();
@@ -239,7 +239,8 @@ public class JitStaticReceivePackTest {
         assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
         assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
         final File newFolder = getFolder().toFile();
-        try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
+        try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
+                .call()) {
             byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
             assertArrayEquals(data, readAllBytes);
         }
@@ -267,7 +268,7 @@ public class JitStaticReceivePackTest {
 
         assertEquals(Result.REJECTED_NOCREATE, rc.getResult());
         assertEquals("Couldn't create test branch for " + REF_HEADS_MASTER + " because " + errormsg, rc.getMessage());
-        assertEquals(null, rp.getFault());
+        assertEquals(null, errorReporter.getFault());
     }
 
     @Test
@@ -304,7 +305,7 @@ public class JitStaticReceivePackTest {
 
         assertEquals(errormsg, rc.getMessage());
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        assertEquals(errormsg, rp.getFault().getMessage());
+        assertEquals(errormsg, errorReporter.getFault().getMessage());
     }
 
     @Test
@@ -342,7 +343,7 @@ public class JitStaticReceivePackTest {
 
         assertEquals(errormsg, rc.getMessage());
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        assertEquals("General error while deleting branches " + errormsg, rp.getFault().getMessage());
+        assertEquals("General error while deleting branches. Error is: " + errormsg, errorReporter.getFault().getMessage());
     }
 
     @Test
@@ -378,52 +379,27 @@ public class JitStaticReceivePackTest {
 
         assertEquals("General error " + errormsg, rc.getMessage());
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        assertEquals("General error " + errormsg, rp.getFault().getMessage());
+        assertEquals("General error " + errormsg, errorReporter.getFault().getMessage());
     }
 
     @Test
-    public void testDeleteDefaultBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
+    public void testDeleteDefaultBranch()
+            throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
         clientGit.branchCreate().setName("other").call();
         Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.checkout().setName("other").call();
         clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
         ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
-            @Override
-            protected List<ReceiveCommand> filterCommands(Result want) {
-                return Arrays.asList(rc);
-            }
-        });
+        JitStaticReceivePack rp = Mockito
+                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
+                    @Override
+                    protected List<ReceiveCommand> filterCommands(Result want) {
+                        return Arrays.asList(rc);
+                    }
+                });
         rp.executeCommands();
         assertEquals(Result.REJECTED_NODELETE, rc.getResult());
-        assertEquals(null, rp.getFault());
-    }
-
-    @Test
-    public void testBranchIsTestBranchIsMissingAfterCreation() throws Exception {
-        Repository remoteRepository = Mockito.mock(Repository.class);
-        RefUpdate ru = Mockito.mock(RefUpdate.class);
-
-        RemoteTestUtils.copy("/test3.json", storePath);
-        clientGit.add().addFilepattern(STORE).call();
-        ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
-        RevCommit c = clientGit.commit().setMessage("New commit").call();
-
-        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
-
-        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
-            @Override
-            protected List<ReceiveCommand> filterCommands(Result want) {
-                return Arrays.asList(rc);
-            }
-        });
-        Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
-        Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
-        Mockito.when(ru.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
-        Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
-        rp.executeCommands();
-        assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
+        assertEquals(null, errorReporter.getFault());
     }
 
     @Test
@@ -456,6 +432,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(testUpdate.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_MISSING_OBJECT, rc.getResult());
     }
@@ -490,6 +467,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(master);
+        Mockito.when(testUpdate.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_NONFASTFORWARD, rc.getResult());
     }
@@ -528,13 +506,15 @@ public class JitStaticReceivePackTest {
         Mockito.when(testUpdate.delete()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        Exception fault = rp.getFault();
+        Exception fault = errorReporter.getFault();
         assertTrue(fault instanceof RepositoryException);
         assertSame(e, fault.getCause());
     }
 
     Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+        Path createTempDirectory = Files.createTempDirectory("junit");
+        createTempDirectory.toFile().deleteOnExit();
+        return createTempDirectory;
     }
 
     private static byte[] brackets() {

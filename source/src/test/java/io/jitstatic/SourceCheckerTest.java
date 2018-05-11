@@ -30,7 +30,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -57,8 +56,8 @@ public class SourceCheckerTest {
 
     @BeforeEach
     public void setup() throws Exception {
-        final File base = Files.createTempDirectory(UUID.randomUUID().toString()).toFile();
-        final File wBase = Files.createTempDirectory(UUID.randomUUID().toString()).toFile();
+        final File base = createTempFiles();
+        final File wBase = createTempFiles();
         bareGit = Git.init().setBare(true).setDirectory(base).call();
         workingGit = Git.cloneRepository().setURI(bareGit.getRepository().getDirectory().toURI().toString()).setDirectory(wBase).call();
 
@@ -66,6 +65,12 @@ public class SourceCheckerTest {
         workingGit.add().addFilepattern(store).call();
         workingGit.commit().setMessage("Initial commit").call();
         workingGit.push().call();
+    }
+
+    private File createTempFiles() throws IOException {
+        File file = Files.createTempDirectory("junit").toFile();
+        file.deleteOnExit();
+        return file;
     }
 
     @AfterEach

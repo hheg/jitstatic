@@ -143,14 +143,7 @@ public class SourceExtractor {
             treeWalker.setRecursive(false);
             treeWalker.setPostOrderTraversal(false);
             if (key != null) {
-                final Path path = Path.of(key);
-                final TreeFilter pfg;
-                if (path.isDirectory()) {
-                    pfg = PathFilterGroup.createFromStrings(key + JitStaticConstants.METADATA);
-                } else {
-                    pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA, path.getParentElements() + JitStaticConstants.METADATA);
-                }
-                treeWalker.setFilter(pfg);
+                treeWalker.setFilter(getTreeFilter(key));
             }
             while (treeWalker.next()) {
                 if (!treeWalker.isSubtree()) {
@@ -181,6 +174,17 @@ public class SourceExtractor {
             error = new RepositoryDataError(new FileObjectIdStore(key, tree.getId()), new InputStreamHolder(e));
         }
         return new BranchData(metaFiles, dataFiles, error);
+    }
+
+    private TreeFilter getTreeFilter(final String key) {
+        final Path path = Path.of(key);
+        final TreeFilter pfg;
+        if (path.isDirectory()) {
+            pfg = PathFilterGroup.createFromStrings(key + JitStaticConstants.METADATA);
+        } else {
+            pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA, path.getParentElements() + JitStaticConstants.METADATA);
+        }
+        return pfg;
     }
 
     private InputStreamHolder getInputStreamFor(final ObjectId objectId) {

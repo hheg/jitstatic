@@ -20,19 +20,16 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+public class VersionIsNotSame extends Exception {
 
-import org.junit.jupiter.api.Test;
+	private static final long serialVersionUID = 1L;
 
-import io.jitstatic.utils.VersionIsNotSame;
-import io.jitstatic.utils.WrappingAPIException;
-
-public class WrappingAPIExceptionTest {
-
-	@Test
-	public void testWrappingAPIException() {
-		VersionIsNotSame v = new VersionIsNotSame();
-		WrappingAPIException w = new WrappingAPIException(v);
-		assertEquals(v, w.getCause());
+	public VersionIsNotSame() {
+		super();
+	}
+	
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
 	}
 }

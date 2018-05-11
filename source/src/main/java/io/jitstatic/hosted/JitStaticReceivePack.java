@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -54,17 +54,19 @@ import io.jitstatic.utils.Pair;
 public class JitStaticReceivePack extends ReceivePack {
 
     private static final Logger LOG = LogManager.getLogger(JitStaticReceivePack.class);
-    private final AtomicReference<Exception> fault = new AtomicReference<>();
-    private final String defaultRef;
-    private final ExecutorService repoExecutor;
-    private final RepositoryBus bus;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final ExecutorService service, final ErrorReporter errorReporter,
+    private final String defaultRef;
+    private final SubmittingExecutor repoExecutor;
+    private final RepositoryBus bus;
+    private final ErrorReporter errorReporter;
+
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final Executor service, final ErrorReporter errorReporter,
             final RepositoryBus bus) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
-        this.repoExecutor = Objects.requireNonNull(service);
+        this.repoExecutor = new SubmittingExecutor(Objects.requireNonNull(service));
+        this.errorReporter = errorReporter;
     }
 
     // TODO do the checks the original code does
@@ -76,7 +78,7 @@ public class JitStaticReceivePack extends ReceivePack {
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
                 checkBranch(cmdsToBeExecuted, rc);
             } else {
-                if (rc.getRefName().equals(defaultRef)) {
+                if (defaultRef.equals(rc.getRefName())) {
                     rc.setResult(Result.REJECTED_NODELETE, "Cannot delete default branch " + defaultRef);
                 }
                 cmdsToBeExecuted.add(Pair.of(rc, null)); // Deleted branches
@@ -123,7 +125,8 @@ public class JitStaticReceivePack extends ReceivePack {
             }
         } catch (final IOException storageIsCorrupt) {
             sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
-            final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT : Result.REJECTED_OTHER_REASON);
+            final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT
+                    : Result.REJECTED_OTHER_REASON);
             testRc.setResult(result, storageIsCorrupt.getMessage());
             setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final Exception unexpected) {
@@ -151,7 +154,7 @@ public class JitStaticReceivePack extends ReceivePack {
         }
     }
 
-    private void signalReload(List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
+    private void signalReload(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
         final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft().getRefName())
                 .collect(Collectors.toList());
         bus.process(refsToUpdate);
@@ -159,7 +162,7 @@ public class JitStaticReceivePack extends ReceivePack {
 
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) throws InterruptedException, ExecutionException {
         final Repository repository = getRepository();
-        repoExecutor.submit(() -> {
+        repoExecutor.submit((Callable<List<Either<Exception, Void>>> & WriteOperation) () -> {
             return cmds.stream().map(p -> {
                 final ReceiveCommand orig = p.getLeft();
                 final ReceiveCommand test = p.getRight();
@@ -212,10 +215,8 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void setFault(final Exception e) {
-        final Exception unregistered = fault.getAndSet(e);
-        if (unregistered != null) {
-            LOG.error("Unregistered error ", unregistered);
-        }
+        errorReporter.setFault(e);
+        LOG.error("Error occourred ", e);
     }
 
     private void cleanUpRepository(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
@@ -263,15 +264,10 @@ public class JitStaticReceivePack extends ReceivePack {
             ru.setForceUpdate(true);
             checkResult(rc.getRefName(), ru.delete());
         } catch (final Exception e) {
-            final String msg = "General error while deleting branches " + e.getLocalizedMessage();
+            final String msg = "General error while deleting branches. Error is: " + e.getLocalizedMessage();
             setFault(new RepositoryException(msg, e));
             sendError(msg);
             sendError("Please clean up repository manually");
         }
     }
-
-    public Exception getFault() {
-        return fault.getAndSet(null);
-    }
-
 }

@@ -133,13 +133,13 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testDealingWhenFailed() throws Exception {
-        RuntimeException r = new RuntimeException();
-        assertSame(assertThrows(RuntimeException.class, () -> {
+        TestException r = new TestException("Test Exception");
+        assertSame(r, assertThrows(TestException.class, () -> {
             HostedFactory hf = mock(HostedFactory.class);
             config.setHostedFactory(hf);
             doThrow(r).when(hf).build(environment);
             app.run(config, environment);
-        }), r);
+        }));
     }
 
     @Test
@@ -153,15 +153,24 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testClosingSourceAndThrow() throws Exception {
-        assertThrows(RuntimeException.class, () -> {
-            doThrow(new RuntimeException("Test exception")).when(source).close();
-            doThrow(new RuntimeException("Test exception")).when(storage).close();
+        assertThrows(TestException.class, () -> {
+            doThrow(new TestException("Test exception1")).when(source).close();
+            doThrow(new TestException("Test exception2")).when(storage).close();
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
-            when(config.getAddKeyAuthenticator()).thenThrow(new RuntimeException("Test exception"));
+            when(config.getAddKeyAuthenticator()).thenThrow(new TestException("Test exception3"));
             when(hostedFactory.build(environment)).thenReturn(source);
             when(storageFactory.build(source, environment)).thenReturn(storage);
             app.run(config, environment);
         });
+    }
+
+    private static class TestException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        public TestException(String msg) {
+            super(msg);
+        }
     }
 }

@@ -1,4 +1,4 @@
-package io.jitstatic.utils;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,19 +20,5 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
-
-import io.jitstatic.utils.VersionIsNotSame;
-import io.jitstatic.utils.WrappingAPIException;
-
-public class WrappingAPIExceptionTest {
-
-	@Test
-	public void testWrappingAPIException() {
-		VersionIsNotSame v = new VersionIsNotSame();
-		WrappingAPIException w = new WrappingAPIException(v);
-		assertEquals(v, w.getCause());
-	}
+public interface WriteOperation {
 }

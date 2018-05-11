@@ -151,6 +151,8 @@ public class HostedFactory {
         gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
         gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
+        
+        gs.setUploadPackFactory(hostedGitRepositoryManager.getUploadPackFactory());
 
         final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
         servlet.setInitParameter(BASE_PATH, hostedGitRepositoryManager.repositoryURI().getRawPath());

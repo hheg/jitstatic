@@ -1,4 +1,4 @@
-package io.jitstatic.utils;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,16 +20,5 @@ package io.jitstatic.utils;
  * #L%
  */
 
-public class VersionIsNotSameException extends Exception {
-
-	private static final long serialVersionUID = 1L;
-
-	public VersionIsNotSameException() {
-		super();
-	}
-	
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
-	}
+public interface ReadOperation {
 }

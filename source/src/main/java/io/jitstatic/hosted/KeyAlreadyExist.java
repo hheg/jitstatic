@@ -25,7 +25,7 @@ public class KeyAlreadyExist extends RuntimeException {
     private static final long serialVersionUID = 3551414727296198256L;
 
     public KeyAlreadyExist(final String key, final String branch) {
-        super(key + " already exist in branch " + branch);
+        super("Key '"+ key + "' already exist in branch " + branch);
     }
 
     @Override
