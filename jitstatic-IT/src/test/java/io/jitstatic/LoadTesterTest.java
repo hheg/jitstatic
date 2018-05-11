@@ -392,7 +392,6 @@ public class LoadTesterTest {
     }
 
     private static byte[] getData(int c) throws UnsupportedEncodingException {
-        // String s = "{\"data\":\"" + c + "\"}";
         String s = "{\"data\":" + c + ",\"salt\":\"" + UUID.randomUUID() + "\"}";
         return s.getBytes(UTF_8);
     }
@@ -402,7 +401,7 @@ public class LoadTesterTest {
             try {
                 return new Entity(tag, MAPPER.readValue(is, JsonNode.class));
             } catch (IOException e) {
-                LOG.error("ERROR READING ENTITY");
+                LOG.error("ERROR READING ENTITY", e);
                 throw new UncheckedIOException(e);
             }
         }
@@ -440,6 +439,10 @@ public class LoadTesterTest {
     private <T> T take(ConcurrentLinkedQueue<T> clients) {
         T client;
         while ((client = clients.poll()) == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignore) {
+            }
         }
         return client;
     }

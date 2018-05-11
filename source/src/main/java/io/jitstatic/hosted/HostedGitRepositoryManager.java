@@ -308,20 +308,24 @@ public class HostedGitRepositoryManager implements Source {
                 if (actualRef == null) {
                     throw new WrappingAPIException(new RefNotFoundException(finalRef));
                 }
-                try {                    
-                    final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-                    if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
-                        throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-                    }                    
-                } catch (final RefNotFoundException e) {
-                    throw new WrappingAPIException(e);
-                }
+                checkIfKeyAlreadyExist(key, finalRef);
                 return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
                         actualRef, message, userInfo, userMail);
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);
             }
         }));
+    }
+
+    private void checkIfKeyAlreadyExist(final String key, final String finalRef) {
+        try {                    
+            final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
+            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }                    
+        } catch (final RefNotFoundException e) {
+            throw new WrappingAPIException(e);
+        }
     }
 
     @Override
