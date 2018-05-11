@@ -74,7 +74,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StoreInfo;
-import io.jitstatic.utils.VersionIsNotSameException;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
@@ -445,7 +445,7 @@ public class MapResourceTest {
         when(storage.get(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(), Mockito.any()))
                 .thenReturn(CompletableFuture.supplyAsync(() -> {
-                    throw new WrappingAPIException(new VersionIsNotSameException());
+                    throw new WrappingAPIException(new VersionIsNotSame());
                 }));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);

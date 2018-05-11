@@ -25,24 +25,39 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.ServiceMayNotContinueException;
+import org.eclipse.jgit.transport.UploadPack;
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.hosted.LogoPoster;
 
 public class LogoPosterTest {
 
-	private final ReceivePack rp = mock(ReceivePack.class);
-	
-	@Test
-	public void testLogoPoster() {	
-		doAnswer((i) -> {
-             System.out.println(Arrays.toString(i.getArguments()));
-             return null;	
-		}).when(rp).sendMessage(any());		
-		LogoPoster poster = new LogoPoster();
-		poster.onPreReceive(rp,null);
-	}
+    private final ReceivePack rp = mock(ReceivePack.class);
+    private final UploadPack up = mock(UploadPack.class);
+
+    @Test
+    public void testRecieveLogoPoster() {
+        doAnswer((i) -> {
+            System.out.println(Arrays.toString(i.getArguments()));
+            return null;
+        }).when(rp).sendMessage(any());
+        LogoPoster poster = new LogoPoster();
+        poster.onPreReceive(rp, null);
+    }
+
+    @Test
+    public void testUploadLogoPoster() throws ServiceMayNotContinueException {
+        doAnswer((i) -> {
+            System.out.println(Arrays.toString(i.getArguments()));
+            return null;
+        }).when(up).sendMessage(any());
+        LogoPoster poster = new LogoPoster();
+        poster.onPreReceive(rp, null);
+        poster.onBeginNegotiateRound(up, List.of(), 0);
+    }
 
 }

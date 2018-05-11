@@ -282,7 +282,7 @@ public class GitStorage implements Storage {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = storeInfo.get().getStorageData().getContentType();
-            final String newVersion = source.modify(key, finalRef, data, oldVersion, message, userInfo, userEmail).join();
+            final String newVersion = source.modify(key, finalRef, data, oldVersion, message, userInfo, userEmail);
             refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);
@@ -303,7 +303,7 @@ public class GitStorage implements Storage {
         final StoreInfo storeInfo = si.get();
         if (storeInfo.getMetaDataVersion().equals(metaDataVersion)) {
             if (storeInfo.isMasterMetaData()) {
-                refMap.clear(); // TODO
+                refMap.clear(); // TODO Don't clear all keys. Check which ones that could be left alone
                 refMap.put(key, Optional.of(new StoreInfo(metaData, newVersion)));
             } else {
                 refMap.put(key, Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
@@ -348,7 +348,7 @@ public class GitStorage implements Storage {
                 if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
                 }
-                final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail).join();
+                final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
                 final StoreInfo storeInfo = new StoreInfo(data, metaData, version.getLeft(), version.getRight());
                 map.put(key, Optional.of(storeInfo));
                 return storeInfo;
@@ -428,7 +428,7 @@ public class GitStorage implements Storage {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String contentType = metaData.getContentType();
-            final String newVersion = source.modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef).join();
+            final String newVersion = source.modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef);
             refreshMetaData(metaData, key, metaDataVersion, newVersion, refMap, contentType);
             return newVersion;
         }, keyExecutor);

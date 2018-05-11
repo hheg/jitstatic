@@ -32,7 +32,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -58,12 +58,12 @@ public class JitStaticReceivePackFactoryTest {
     private final ErrorReporter reporter = new ErrorReporter();
     private static final String defaultRef = "refs/heads/master";
     private HttpServletRequest req;
-    private ExecutorService service;
+    private Executor service;
 
     @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
         git = Git.init().setDirectory(getFolder().toFile()).call();
-        service = mock(ExecutorService.class);
+        service = mock(Executor.class);
         req = mock(HttpServletRequest.class);
     }
 

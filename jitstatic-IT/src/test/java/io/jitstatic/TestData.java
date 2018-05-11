@@ -20,6 +20,7 @@ package io.jitstatic;
  * #L%
  */
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,18 +29,28 @@ public class TestData {
     final String[] branches;
     final boolean cache;
     final Map<String, Map<String, String>> versions;
+    final int clients;
+    final int updaters;
 
-    public TestData(String[] names, String[] branches, boolean cache) {
+    public TestData(String[] names, String[] branches, boolean cache, int clients, int updaters) {
         this.cache = cache;
-        this.names = names;
-        this.branches = branches;
+        this.names = Arrays.copyOf(names, names.length);
+        this.branches = Arrays.copyOf(branches, branches.length);
+        this.clients = clients;
+        this.updaters = updaters;
         this.versions = new ConcurrentHashMap<>();
         for (String branch : branches) {
-            for (String name : names) {
-                Map<String, String> m = new ConcurrentHashMap<>();
-                m.put(name, "nothing");
-                versions.put(branch, m);
+            Map<String, String> m = new ConcurrentHashMap<>();
+            for (String name : names) {                
+                m.put(name, "nothing");                
             }
+            versions.put(branch, m);
         }
+    }
+
+    @Override
+    public String toString() {
+        return "TestData [names=" + Arrays.toString(names) + ", branches=" + Arrays.toString(branches) + ", cache=" + cache + ", versions="
+                + versions + ", clients=" + clients + ", updaters=" + updaters + "]";
     }
 }

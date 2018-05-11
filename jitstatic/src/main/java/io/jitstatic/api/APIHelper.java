@@ -38,7 +38,7 @@ import org.slf4j.Logger;
 
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.storage.StoreInfo;
-import io.jitstatic.utils.VersionIsNotSameException;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 class APIHelper {
@@ -113,7 +113,7 @@ class APIHelper {
                 if (apiException instanceof RefNotFoundException) {
                     return null;
                 }
-                if (apiException instanceof VersionIsNotSameException) {
+                if (apiException instanceof VersionIsNotSame) {
                     throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
                 if (apiException instanceof KeyAlreadyExist) {

@@ -138,7 +138,7 @@ public class GitStorageTest {
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
             when(source.modify(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
-                    Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2_MD));
+                    Mockito.any())).thenReturn((SHA_2_MD));
 
             CompletableFuture<Optional<StoreInfo>> completableFuture = gs.get("root/", null);
             StoreInfo storeInfo = completableFuture.join().get();
@@ -338,7 +338,7 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
             when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message), Mockito.eq(userInfo),
-                    Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
+                    Mockito.anyString())).thenReturn((SHA_2));
             Future<Optional<StoreInfo>> first = gs.get(key, null);
             StoreInfo storeInfo = first.get().get();
             assertNotNull(storeInfo);
@@ -372,7 +372,7 @@ public class GitStorageTest {
 
                 when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
                 when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.any(), Mockito.eq(SHA_1), Mockito.eq(message),
-                        Mockito.eq(userInfo), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
+                        Mockito.anyString(), Mockito.anyString())).thenReturn((SHA_2));
                 Future<Optional<StoreInfo>> first = gs.get(key, null);
                 StoreInfo storeInfo = first.get().get();
                 assertNotNull(storeInfo);
@@ -463,7 +463,7 @@ public class GitStorageTest {
 
                 when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
                 when(source.modify(Mockito.eq(key), Mockito.any(), Mockito.eq(data), Mockito.eq(SHA_1), Mockito.eq(message),
-                        Mockito.eq(userInfo), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(SHA_2));
+                        Mockito.anyString(), Mockito.anyString())).thenReturn((SHA_2));
                 Future<Optional<StoreInfo>> first = gs.get(key, null);
                 StoreInfo storeInfo = first.get().get();
                 assertNotNull(storeInfo);
@@ -478,7 +478,7 @@ public class GitStorageTest {
     @Test
     public void testAddKey() throws Exception {
         when(source.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(CompletableFuture.completedFuture(Pair.of("1", "1")));
+                .thenReturn((Pair.of("1", "1")));
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
@@ -507,7 +507,7 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
             when(source.modify(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
-                    Mockito.any())).thenReturn(CompletableFuture.completedFuture(SHA_2_MD));
+                    Mockito.any())).thenReturn((SHA_2_MD));
             Future<Optional<StoreInfo>> first = gs.get(key, null);
             StoreInfo storeInfo = first.get().get();
             assertNotNull(storeInfo);
