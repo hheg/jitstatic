@@ -104,6 +104,8 @@ public class JitStaticReceivePack extends ReceivePack {
             }
         } catch (final IOException e) {
             rc.setResult(Result.REJECTED_NOCREATE, "Couldn't create test branch for " + branch + " because " + e.getLocalizedMessage());
+        } catch (final UpdateResultException updateResult) {
+            interpretResult(rc, updateResult, rc.getRefName());
         }
     }
 
@@ -155,8 +157,11 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void signalReload(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft().getRefName())
-                .collect(Collectors.toList());
+        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft())
+                .map(rc -> rc.getRefName()).map(refName -> {
+                    sendMessage("Reloading " + refName);
+                    return refName;
+                }).collect(Collectors.toList());
         bus.process(refsToUpdate);
     }
 
@@ -169,12 +174,8 @@ public class JitStaticReceivePack extends ReceivePack {
                 try {
                     final String refName = orig.getRefName();
                     final Ref ref = repository.findRef(refName);
-                    if (!ObjectId.equals(orig.getOldId(), ObjectId.zeroId()) && ref == null) {
-                        throw new RefNotFoundException(refName);
-                    }
-                    if (ref != null && !ObjectId.equals(ref.getObjectId(), orig.getOldId())) {
-                        throw new CommandIsStale(refName, orig.getOldId(), ref.getObjectId());
-                    }
+                    checkForRef(orig, refName, ref);
+                    checkForBranchStaleness(orig, refName, ref);
                     final RefUpdate updateRef = repository.updateRef(refName);
                     updateRef.setRefLogMessage("JitStatic Git push", true);
                     updateRef.setRefLogIdent(getRefLogIdent());
@@ -194,6 +195,9 @@ public class JitStaticReceivePack extends ReceivePack {
                 } catch (final RefNotFoundException e1) {
                     orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
                     return Either.<Exception, Void>left(e1);
+                } catch (final UpdateResultException updateResult) {
+                    interpretResult(orig, updateResult, orig.getRefName());
+                    return Either.<Exception, Void>left(updateResult);
                 } catch (final IOException e) {
                     orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
                     final String msg = "Error while writing commit, repo is in an unknown state ";
@@ -203,6 +207,35 @@ public class JitStaticReceivePack extends ReceivePack {
                 }
             }).filter(Either::isLeft).collect(Collectors.toList());
         }).get().stream().forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
+    }
+
+    private void interpretResult(final ReceiveCommand rc, final UpdateResultException updateResult, final String refName) {
+        switch (updateResult.getResult()) {
+        case LOCK_FAILURE:
+            rc.setResult(Result.LOCK_FAILURE, "Failed to lock " + refName);
+            break;
+        case NOT_ATTEMPTED:
+        case REJECTED:
+            rc.setResult(Result.REJECTED_NONFASTFORWARD, refName);
+            break;
+        case REJECTED_CURRENT_BRANCH:           
+        default:
+            rc.setResult(Result.REJECTED_CURRENT_BRANCH, refName);
+            break;
+
+        }
+    }
+
+    private void checkForBranchStaleness(final ReceiveCommand orig, final String refName, final Ref ref) throws CommandIsStale {
+        if (ref != null && !ObjectId.equals(ref.getObjectId(), orig.getOldId())) {
+            throw new CommandIsStale(refName, orig.getOldId(), ref.getObjectId());
+        }
+    }
+
+    private void checkForRef(final ReceiveCommand orig, final String refName, final Ref ref) throws RefNotFoundException {
+        if (!ObjectId.equals(orig.getOldId(), ObjectId.zeroId()) && ref == null) {
+            throw new RefNotFoundException(refName);
+        }
     }
 
     private boolean ifAllOk(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
@@ -223,7 +256,7 @@ public class JitStaticReceivePack extends ReceivePack {
         cmds.stream().forEach(p -> deleteTempBranch(p.getRight()));
     }
 
-    private void createTmpBranch(final String testBranchName, final String branch) throws IOException {
+    private void createTmpBranch(final String testBranchName, final String branch) throws IOException, UpdateResultException {
         final RefUpdate updateRef = getRepository().updateRef(testBranchName);
         ObjectId base = getRepository().resolve(branch);
         if (base == null) {
@@ -236,7 +269,8 @@ public class JitStaticReceivePack extends ReceivePack {
         checkResult(testBranchName, updateRef.forceUpdate());
     }
 
-    private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result) throws IOException {
+    private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result)
+            throws IOException, UpdateResultException {
         switch (result) {
         case FAST_FORWARD:
         case FORCED:
@@ -244,11 +278,12 @@ public class JitStaticReceivePack extends ReceivePack {
         case RENAMED:
         case NO_CHANGE:
             break;
-        case IO_FAILURE:
         case LOCK_FAILURE:
         case NOT_ATTEMPTED:
         case REJECTED:
         case REJECTED_CURRENT_BRANCH:
+            throw new UpdateResultException(result);
+        case IO_FAILURE:
         default:
             throw new IOException("Created branch " + testBranchName + " failed with " + result);
         }
