@@ -141,7 +141,7 @@ Content-Length: 20
 
 ## JitStatic (the long version)
 
-The repository contains files which contains the data. Each of these files are also the access key and its possible to use directories to separate files. The data in these keys must be in JSON (in this version) however it will be possible to store any data in the future :).
+The repository contains files which contains the data. Each of these files are also the access key and its possible to use directories to separate files. The keys can contain any data you want.
 ```json
 {"hello" : "world"}
 ```
@@ -280,7 +280,7 @@ Fast-forward
  create mode 100644 test
  create mode 100644 test.metadata
  
- git log git log --graph --pretty=format:'%h %d %s %cr <%an>' --abbrev-commit --date=relative
+git log --graph --pretty=format:'%h %d %s %cr <%an>' --abbrev-commit --date=relative
 * d397e03 - (HEAD -> master, origin/master) testmessage (4 minutes ago) <user>
 * 7cfbec2 - message (4 minutes ago) <user1>
 * 3af867a - Initial commit (4 minutes ago) <hheg>
@@ -325,7 +325,7 @@ You can find a Java client for jitstatic at
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.2.2</version>
+    <version>0.3.1</version>
 </dependency>
 ```
 
