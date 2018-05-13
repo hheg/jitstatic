@@ -141,7 +141,7 @@ Content-Length: 20
 
 ## JitStatic (the long version)
 
-The repository contains files which contains the data. Each of these files are also the access key and its possible to use directories to separate files. The keys can contain any data you want.
+The repository contains files which contains the data. Each of these files are also the access key and its possible to use directories to separate files. The keys could contain any data you want.
 ```json
 {"hello" : "world"}
 ```
