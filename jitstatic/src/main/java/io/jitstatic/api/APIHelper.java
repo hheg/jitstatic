@@ -149,7 +149,7 @@ class APIHelper {
         if (requestHeaders.size() > 1) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
-        for (String header : requestHeaders) {
+        for (final String header : requestHeaders) {
             if (header.equals("\"" + tag.getValue() + "\"")) {
                 return Response.notModified().tag(tag).build();
             }

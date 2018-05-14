@@ -24,8 +24,19 @@ import io.jitstatic.hosted.InputStreamHolder;
 
 public class MetaFileData extends FileData {
 
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+    private final boolean isKeyMetaFile;
+
+    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder, final boolean isKeyMetaFile) {
         super(fileInfo, inputStreamHolder);
+        this.isKeyMetaFile = isKeyMetaFile;
+    }
+
+    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+        this(fileInfo, inputStreamHolder, false);
+    }
+
+    public boolean isKeyMetaFile() {
+        return isKeyMetaFile;
     }
 
 }

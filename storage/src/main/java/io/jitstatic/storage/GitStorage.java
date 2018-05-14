@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -82,13 +81,13 @@ public class GitStorage implements Storage {
         final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(ref -> CompletableFuture.supplyAsync(() -> {
             LOG.info("Reloading " + ref);
             final Map<String, Optional<StoreInfo>> map = cache.get(ref);
-            return (map != null ? new HashSet<>(map.keySet()) : Collections.<String>emptySet());
-        }, refExecutor).thenApplyAsync(files -> waitForTasks(refresh(ref, files)).thenApply(list -> {
+            return (map != null ? new HashSet<>(map.keySet()) : Set.<String>of());
+        }, refExecutor).thenApplyAsync(files -> waitForTasks(refreshRef(ref, files)).thenApply(list -> {
             final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
             if (!faults.isEmpty()) {
                 throw new LinkedException(faults);
             }
-            return list.stream().filter(Either::isLeft).map(Either::getLeft).filter(Optional::isPresent).map(Optional::get)
+            return list.stream().filter(Either::isLeft).map(Either::getLeft).flatMap(Optional::stream)
                     .filter(p -> p.getRight() != null).collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
         })).thenCompose(future -> future).thenAcceptAsync(map -> {
             if (map.size() > 0) {
@@ -115,7 +114,7 @@ public class GitStorage implements Storage {
     }
 
     private static <T> CompletableFuture<List<Either<T, Exception>>> waitForTasks(final List<CompletableFuture<T>> tasks) {
-        CompletableFuture<Void> all = CompletableFuture.allOf(tasks.toArray(new CompletableFuture[tasks.size()]));
+        final CompletableFuture<Void> all = CompletableFuture.allOf(tasks.toArray(new CompletableFuture[tasks.size()]));
         return all.thenApply(v -> tasks.stream().map(future -> {
             try {
                 return Either.<T, Exception>left(future.join());
@@ -125,7 +124,7 @@ public class GitStorage implements Storage {
         }).collect(Collectors.toList()));
     }
 
-    private List<CompletableFuture<Optional<Pair<String, StoreInfo>>>> refresh(final String ref, final Set<String> files) {
+    private List<CompletableFuture<Optional<Pair<String, StoreInfo>>>> refreshRef(final String ref, final Set<String> files) {
         return files.stream().map(key -> CompletableFuture.supplyAsync(() -> {
             try {
                 return Optional.of(Pair.of(key, load(key, ref)));
@@ -150,11 +149,9 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public CompletableFuture<Optional<StoreInfo>> get(final String key, String ref) {
-        Objects.requireNonNull(key);
-        ref = checkRef(ref);
-        final String finalRef = ref;
-        final Map<String, Optional<StoreInfo>> refMap = cache.get(ref);
+    public CompletableFuture<Optional<StoreInfo>> getKey(final String key, String ref) {                
+        final String finalRef = checkRef(ref);
+        final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
         if (refMap == null) {
             return CompletableFuture.supplyAsync(() -> {
                 Map<String, Optional<StoreInfo>> map = cache.get(finalRef);
@@ -262,7 +259,6 @@ public class GitStorage implements Storage {
     @Override
     public CompletableFuture<String> put(final String key, String ref, final byte[] data, final String oldVersion, final String message,
             final String userInfo, final String userEmail) {
-        ref = checkRef(ref);
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
@@ -271,7 +267,7 @@ public class GitStorage implements Storage {
         if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
             throw new IllegalArgumentException("message cannot be empty");
         }
-        final String finalRef = ref;
+        final String finalRef = checkRef(ref);
         return CompletableFuture.supplyAsync(() -> {
             final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
             if (refMap == null) {
@@ -281,9 +277,8 @@ public class GitStorage implements Storage {
             if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String contentType = storeInfo.get().getStorageData().getContentType();
             final String newVersion = source.modify(key, finalRef, data, oldVersion, message, userInfo, userEmail);
-            refreshKey(data, key, oldVersion, newVersion, refMap, contentType);
+            refreshKey(data, key, oldVersion, newVersion, refMap, storeInfo.get().getStorageData().getContentType());
             return newVersion;
         }, keyExecutor);
     }
@@ -314,17 +309,18 @@ public class GitStorage implements Storage {
     @Override
     public CompletableFuture<StoreInfo> add(final String key, String branch, final byte[] data, final StorageData metaData,
             final String message, final String userInfo, final String userMail) {
-        Objects.requireNonNull(key);
-        Objects.requireNonNull(data);
-        Objects.requireNonNull(metaData);
-        Objects.requireNonNull(message);
-        Objects.requireNonNull(userInfo);
-        Objects.requireNonNull(userMail);
+        Objects.requireNonNull(key, "key cannot be null");
+        Objects.requireNonNull(data, "data cannot be null");
+        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(metaData, "metaData cannot be null");
+        Objects.requireNonNull(userMail, "userMail cannot be null");
 
-        branch = checkRef(branch);
+        if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
+            throw new IllegalArgumentException("message cannot be empty");
+        }
 
-        final String finalRef = branch;
-
+        final String finalRef = checkRef(branch);
+        isRefATag(finalRef);
         return CompletableFuture.supplyAsync(() -> {
             Map<String, Optional<StoreInfo>> refStore = cache.get(finalRef);
             if (refStore != null) {
@@ -375,7 +371,7 @@ public class GitStorage implements Storage {
             final StorageData metaData = readMetaData(source);
             try (final InputStream sourceStream = source.getSourceInputStream()) {
                 if (!metaData.isHidden()) {
-                    if (sourceStream != null) {
+                    if (sourceStream != null) { // Implicitly an master .metadata SourceInfo instance...
                         return new StoreInfo(HANDLER.readStorageData(sourceStream), metaData, source.getSourceVersion(),
                                 source.getMetaDataVersion());
                     } else {
@@ -406,15 +402,16 @@ public class GitStorage implements Storage {
     @Override
     public CompletableFuture<String> putMetaData(final String key, String ref, final StorageData metaData, final String metaDataVersion,
             final String message, final String userInfo, final String userMail) {
-        Objects.requireNonNull(metaData);
-        Objects.requireNonNull(key);
-        Objects.requireNonNull(metaDataVersion);
-        Objects.requireNonNull(message);
-        Objects.requireNonNull(userInfo);
-        Objects.requireNonNull(userMail);
-        ref = checkRef(ref);
-
-        final String finalRef = ref;
+        Objects.requireNonNull(key, "key cannot be null");
+        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(metaData, "metaData cannot be null");
+        Objects.requireNonNull(userMail, "userMail cannot be null");        
+        Objects.requireNonNull(metaDataVersion, "metaDataVersion cannot be null");
+        Objects.requireNonNull(message,"message cannot be null");
+        
+        final String finalRef = checkRef(ref);
+        isRefATag(finalRef);
+     
         return CompletableFuture.supplyAsync(() -> {
             final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
             if (refMap == null) {
@@ -427,9 +424,8 @@ public class GitStorage implements Storage {
             if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String contentType = metaData.getContentType();
             final String newVersion = source.modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef);
-            refreshMetaData(metaData, key, metaDataVersion, newVersion, refMap, contentType);
+            refreshMetaData(metaData, key, metaDataVersion, newVersion, refMap, metaData.getContentType());
             return newVersion;
         }, keyExecutor);
     }
@@ -449,6 +445,42 @@ public class GitStorage implements Storage {
 
     private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
         return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getStorageData().isProtected();
+    }
+
+    @Override
+    public void delete(final String key, final String ref, final String user, final String message, final String userMail) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(user);
+        Objects.requireNonNull(user);
+        Objects.requireNonNull(message);
+        Objects.requireNonNull(userMail);
+
+        final String finalRef = checkRef(ref);
+        isRefATag(finalRef);
+        if(key.endsWith("/")) {
+            // We don't support deleting master .metadata files right now
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
+        }
+        
+        CompletableFuture.runAsync(() -> {
+            
+            try {
+                source.delete(key, finalRef, user, message, userMail);
+            } catch (final UncheckedIOException ioe) {
+                consumeError(ioe);
+            }
+            final Map<String, Optional<StoreInfo>> map = cache.get(finalRef);
+            if (map != null) {
+                map.put(key, Optional.empty());
+            }
+
+        }, keyExecutor);
+    }
+
+    private void isRefATag(final String finalRef) {
+        if (finalRef.startsWith(Constants.R_TAGS)) {
+            throw new UnsupportedOperationException("Tags cannot be modified");
+        }
     }
 
 }
