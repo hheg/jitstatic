@@ -25,9 +25,9 @@
 		<log4j.version>2.11.0</log4j.version>
 		<metrics.version>4.0.2</metrics.version>
 		<maven.compiler.release>10</maven.compiler.release>
-		<junit.jupiter.version>5.2.0-M1</junit.jupiter.version>
-		<junit.vintage.version>5.2.0-M1</junit.vintage.version>
-		<junit.platform.version>1.2.0-M1</junit.platform.version>
+		<junit.jupiter.version>5.2.0</junit.jupiter.version>
+		<junit.vintage.version>5.2.0</junit.vintage.version>
+		<junit.platform.version>1.2.0</junit.platform.version>
 	</properties>
 	<licenses>
 		<license>
