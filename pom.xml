@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.jitstatic</groupId>
 	<artifactId>jitstatic-parent</artifactId>
-	<version>0.9.4-delete-SNAPSHOT</version>
+	<version>0.9.4-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<modules>
 		<module>jitstatic</module>

@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.9.4-delete-SNAPSHOT</version>
+		<version>0.9.4-SNAPSHOT</version>
 	</parent>
 	<artifactId>utils</artifactId>
 
