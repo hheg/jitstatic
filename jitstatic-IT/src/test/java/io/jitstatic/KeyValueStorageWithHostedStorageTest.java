@@ -224,7 +224,7 @@ public class KeyValueStorageWithHostedStorageTest {
                     new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
-            assertEquals(new String(prettyData,"UTF-8"), key.data);
+            assertEquals(new String(prettyData, "UTF-8"), key.data);
         }
     }
 
@@ -324,11 +324,21 @@ public class KeyValueStorageWithHostedStorageTest {
             String modifyMetaKey = client.modifyMetaKey("accept/", null, metaKey.tag, new ModifyUserKeyData(
                     new MetaData(Set.of(new User(user, pass)), "application/json", true, false, List.of()), "msg", "mail", "info"));
             assertNotEquals(metaKey.tag, modifyMetaKey);
-            System.out.println("new tag " + modifyMetaKey + " old tag=" + metaKey.tag);
-            // assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, ()
-            // -> firstUpdater.getKey("accept/genkey", tf)).getStatusCode());
             Entity<JsonNode> key2 = secondUpdater.getKey("accept/genkey", tf);
             assertNotNull(key2);
+        }
+    }
+
+    @Test
+    public void testDeleteKey() throws Exception {
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
+            assertEquals(getData(), key.data.toString());
+            assertNotNull(key.getTag());
+            client.delete(new CommitData(ACCEPT_STORAGE, "message", "user", "mail"));
+            Thread.sleep(100);
+            assertEquals(HttpStatus.NOT_FOUND_404,
+                    assertThrows(APIException.class, () -> client.getKey(ACCEPT_STORAGE, null, tf)).getStatusCode());
         }
     }
 
@@ -372,7 +382,7 @@ public class KeyValueStorageWithHostedStorageTest {
     }
 
     private TriFunction<InputStream, String, String, Entity<String>> stringFactory = (is, v, t) -> {
-        try (Scanner s = new Scanner(is,"UTF-8").useDelimiter("\\A")) {
+        try (Scanner s = new Scanner(is, "UTF-8").useDelimiter("\\A")) {
             String result = s.hasNext() ? s.next() : "";
             return new Entity<String>(v, t, result);
         }

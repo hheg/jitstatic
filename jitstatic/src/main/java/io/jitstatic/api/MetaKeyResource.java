@@ -87,7 +87,7 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -122,7 +122,7 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }

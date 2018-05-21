@@ -65,4 +65,8 @@ public class SourceInfo {
     public boolean isMetaDataSource() {
         return sourceFileData == null && metaFileData != null;
     }
+
+    public boolean hasKeyMetaData() {
+        return metaFileData.isKeyMetaFile();
+    }
 }

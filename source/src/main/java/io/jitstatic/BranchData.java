@@ -76,7 +76,7 @@ class BranchData {
     }
 
     public Pair<MetaFileData, SourceFileData> getFirstPair(final String key) {
-        final List<Pair<MetaFileData, SourceFileData>> data = pair();//.stream().filter(predicate);
+        final List<Pair<MetaFileData, SourceFileData>> data = pair();
         if (data.size() == 0) {
             return Pair.ofNothing();
         }

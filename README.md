@@ -3,12 +3,13 @@
 
 # JitStatic
 
-JitStatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET.
-It's supposed to work as a online "static" store where data changes but still need to be under version control.
+JitStatic is a key-value storage where the data is managed by a git repository. You can access each key from the database with a simple GET or modify a key with a PUT and still do all the operations you'd do with git to manage the database.
+Modifications to keys are stored in the Git history as if it would if you changed it locally.
+It's supposed to work as a online store where data changes but still need to be under version and access control. It can host any type of data.
 
-You can push and pull from it as if it were an ordinary git repo (full git support except for .gitattributes). Accessing the repo and the data end point can be configured to be on separate user/password combinations.
+The Git interface is powered by JGit and offers almost full Git support (except for .gitattributes). Accessing the repo and the data end point can be configured to be on separate user/password combinations.
 
-### Use case:
+### An example Use case:
 
 The use case could be used for is business configuration data where the data is not directly related to specific code. These tend to end up in a database where they are logged in some fashion. After some time they ususally gets forgotten why they are there and their purpose. Having them connected to Git could mean you can use them with your documentation or issue tracker in a more natural way than having them stored in a database. 
 
@@ -46,7 +47,7 @@ storage is the key-value end point and hosted is the git end point.
 docker pull hheg/jitstatic:latest
 docker run -e USER=huser -e PASS=hseCr3t -v $PWD:/home/jitstatic/db -d -p 8085:8085 hheg/jitstatic:latest
 ```
-Now the container is reachable on port 8085
+The container is reachable on port 8085. Remember to run the container in an empty directory or change $PWD to a directory of your liking.
 
 ### Manually: 
 To setup an instance you download a jitstatic.jar and store the above example configuration in a file, lets say `config.yaml`
@@ -55,49 +56,61 @@ To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
-INFO  [2018-04-14 17:58:29,514] org.eclipse.jetty.util.log: Logging initialized @1751ms to org.eclipse.jetty.util.log.Slf4jLog
-INFO  [2018-04-14 17:58:29,596] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-04-14 17:58:29,597] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-04-14 17:58:29,603] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
-INFO  [2018-04-14 17:58:29,743] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
-INFO  [2018-04-14 17:58:29,776] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-04-14 17:58:29,776] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-04-14 17:58:29,778] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-04-14 17:58:29,878] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@3009eed7{HTTP/1.1,[http/1.1]}{0.0.0.0:8080}
-INFO  [2018-04-14 17:58:29,880] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT, build timestamp: 2017-11-21T22:27:37+01:00, git hash: 82b8fb23f757335bb3329d540ce37a2a2615f0a8
-INFO  [2018-04-14 17:58:30,546] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
+INFO  [2018-05-21 20:30:22,133] org.eclipse.jetty.util.log: Logging initialized @1573ms to org.eclipse.jetty.util.log.Slf4jLog
+INFO  [2018-05-21 20:30:22,207] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-05-21 20:30:22,209] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-05-21 20:30:22,213] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
+INFO  [2018-05-21 20:30:22,375] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
+INFO  [2018-05-21 20:30:22,406] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-05-21 20:30:22,407] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-05-21 20:30:22,408] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
+INFO  [2018-05-21 20:30:22,489] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@14d1737a{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-05-21 20:30:22,491] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT, build timestamp: 2017-11-21T22:27:37+01:00, git hash: 82b8fb23f757335bb3329d540ce37a2a2615f0a8
+INFO  [2018-05-21 20:30:23,034] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
     GET     /info/commitid (io.jitstatic.api.JitstaticInfoResource)
     GET     /info/version (io.jitstatic.api.JitstaticInfoResource)
     GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     PUT     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     POST    /storage (io.jitstatic.api.MapResource)
+    DELETE  /storage/{key : .+} (io.jitstatic.api.MapResource)
     GET     /storage/{key : .+} (io.jitstatic.api.MapResource)
     PUT     /storage/{key : .+} (io.jitstatic.api.MapResource)
 
-WARN  [2018-04-14 17:58:30,549] org.glassfish.jersey.internal.Errors: The following warnings have been detected: WARNING: Parameter authFilterClass of type java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> from private final java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> io.dropwizard.auth.AuthDynamicFeature.authFilterClass is not resolvable to a concrete type.
-WARNING: Parameter authFilterClass of type java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> from private final java.lang.Class<? extends javax.ws.rs.container.ContainerRequestFilter> io.dropwizard.auth.AuthDynamicFeature.authFilterClass is not resolvable to a concrete type.
-
-INFO  [2018-04-14 17:58:30,556] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@598778cc{/app,null,AVAILABLE}
-INFO  [2018-04-14 17:58:30,561] io.dropwizard.setup.AdminEnvironment: tasks = 
+INFO  [2018-05-21 20:30:23,042] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@1607d391{/app,null,AVAILABLE}
+INFO  [2018-05-21 20:30:23,049] io.dropwizard.setup.AdminEnvironment: tasks = 
 
     POST    /tasks/log-level (io.dropwizard.servlets.tasks.LogConfigurationTask)
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
-INFO  [2018-04-14 17:58:30,567] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@120411ec{/admin,null,AVAILABLE}
-INFO  [2018-04-14 17:58:30,573] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@3009eed7{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-04-14 17:58:30,574] org.eclipse.jetty.server.Server: Started @2812ms
+INFO  [2018-05-21 20:30:23,054] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@1bb4c431{/admin,null,AVAILABLE}
+INFO  [2018-05-21 20:30:23,066] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@14d1737a{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-05-21 20:30:23,067] org.eclipse.jetty.server.Server: Started @2509ms
 
 ```
-
 This should start JitStatic on port 8085.
 
 Now you can clone the git repository with:
 ```bash
 git clone http://localhost:8085/app/jitstatic/git
+Cloning to "git"...
+remote:    __  _ _   __ _        _   _      
+remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___ 
+remote:     \ \ | __\ \| __/ _` | __| |/ __|
+remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
+remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
+remote:                                     0.9.4
+remote: Counting objects: 4, done
+remote: Finding sources: 100% (4/4)
+remote: Getting sizes: 100% (3/3)
+remote: Total 4 (delta 0), reused 4 (delta 0)
+Packing up objects: 100% (4/4), done.
+
 Warning: You seem to have cloned an empty repository
 ```
-In you target directory create a key store file:
+Remember to use the values for the master user and password you chose when you started the container (in the example above it's `huser` and password is `hseCr3t`). 
+
+In your target directory create a key store file:
 ```bash
 echo '{"hello" : "world"}' > hello_world
 echo '{"users" : [{"password": "1234", "user" : "user1"}]}' > hello_world.metadata
@@ -118,13 +131,13 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     
+remote:                                     0.9.4
 remote: Checking refs/heads/master branch.
 remote: refs/heads/master OK!
 To http://localhost:8085/app/jitstatic/jitstatic.git
  * [new branch]      master -> master
 ```
-
+The `Checking refs/heads/master branch` line is JitStatic checking that all the keys have a corresponding metadata file in the repository.
 Now you can do:
 ```bash
 curl --user user1:1234 -i http://localhost:8085/app/storage/hello_world
@@ -317,15 +330,42 @@ Content-Encoding: utf-8
 Content-Length: 0
 ```
 
+### API for deleting a key
+
+The API for deleting a key looks like the following:
+
+```
+curl -i -H 'Content-Type: application/json' \
+-H 'X-jitstatic-name: user' \
+-H 'X-jitstatic-message: why I am deleting' \
+-H 'X-jitstatic-mail: user@somewhere.org' \
+--user user1:1234 -X DELETE \
+http://localhost:8085/app/storage/hello_world
+HTTP/1.1 200 OK
+Date: Mon, 21 May 2018 21:09:29 GMT
+Content-Length: 0
+
+```
+Deleting master metadata files is not supported, but is considered to be supported.
+
+### MetaKeys
+
+Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` propterty.
+You could if you want create a master .metadata in the directory root and all keys in that directory (not subfolders) will have that key. If you need you can override that by sepecifying a specific metadata file for a particular file in that folder.
+Example:
+```json
+{"users":[{"user":"name","password":"pass"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}]}
+```
+
 ## Java client
 
-You can find a Java client for jitstatic at 
+You can find a Java client for JitStatic at 
 
 ```xml
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.3.1</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 

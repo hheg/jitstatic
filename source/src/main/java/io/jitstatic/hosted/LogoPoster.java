@@ -54,12 +54,7 @@ public class LogoPoster implements PreReceiveHook, PreUploadHook {
     @Override
     public void onBeginNegotiateRound(final UploadPack up, final Collection<? extends ObjectId> wants, final int cntOffered)
             throws ServiceMayNotContinueException {
-        up.sendMessage(line1);
-        up.sendMessage(line2);
-        up.sendMessage(line3);
-        up.sendMessage(line4);
-        up.sendMessage(line5);
-        up.sendMessage(line6);
+        // NOOP
     }
 
     @Override
@@ -72,6 +67,12 @@ public class LogoPoster implements PreReceiveHook, PreUploadHook {
     public void onSendPack(final UploadPack up, final Collection<? extends ObjectId> wants,final  Collection<? extends ObjectId> haves)
             throws ServiceMayNotContinueException {
         // NOOP
+        up.sendMessage(line1);
+        up.sendMessage(line2);
+        up.sendMessage(line3);
+        up.sendMessage(line4);
+        up.sendMessage(line5);
+        up.sendMessage(line6);
     }
 
 }
