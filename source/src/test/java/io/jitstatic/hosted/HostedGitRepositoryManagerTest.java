@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -156,6 +157,22 @@ public class HostedGitRepositoryManagerTest {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "", REF_HEADS_MASTER);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Parameter endPointName cannot be empty"));
+    }
+    
+    @Test
+    public void testForEmptyDefaultBranch() throws CorruptedSourceException, IOException {
+        assertThat(assertThrows(IllegalArgumentException.class, () -> {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", "");) {
+            }
+        }).getLocalizedMessage(), CoreMatchers.containsString("defaultBranch cannot be empty"));
+    }
+    
+    @Test
+    public void testForNullDefaultBranch() throws CorruptedSourceException, IOException {
+        assertThat(assertThrows(NullPointerException.class, () -> {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", null);) {
+            }
+        }).getLocalizedMessage(), CoreMatchers.containsString("defaultBranch cannot be null"));
     }
 
     @Test
@@ -450,6 +467,124 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
             assertThrows(UnsupportedOperationException.class, () -> grm.modify(new StorageData(Set.of(), "", false, false, List.of()), "1",
                     "msg", "ui", "mail", STORE, "refs/tags/tag"));
+        }
+    }
+
+    @Test
+    public void testDelete() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            addFilesAndPush(gitFolder, git);
+            SourceInfo sourceInfo = grm.getSourceInfo(STORE, null);
+            assertNotNull(sourceInfo);
+            grm.delete(STORE, null, "user", "msg", "user");
+            SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
+            assertNull(sourceInfo2);
+        }
+    }
+
+    @Test
+    public void testRootMasterMetaData() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            final Path file = gitFolder.toPath().resolve(STORE);
+            final Path mfile = gitFolder.toPath().resolve(METADATA);
+            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Test commit").call();
+            verifyOkPush(git.push().call());
+
+            SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
+            assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
+
+        }
+    }
+
+    @Test
+    public void testMasterMetaData() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            final Path file = gitFolder.toPath().resolve("base/" + STORE);
+            final Path mfile = gitFolder.toPath().resolve("base/" + METADATA);
+            file.getParent().toFile().mkdirs();
+
+            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Test commit").call();
+            verifyOkPush(git.push().call());
+
+            SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo("base/", null);
+            assertNotNull(sourceInfoMasterMetaData);
+
+        }
+    }
+
+    @Test
+    public void testDeleteRootMasterMetaData() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            final Path file = gitFolder.toPath().resolve(STORE);
+            final Path mfile = gitFolder.toPath().resolve(METADATA);
+            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Test commit").call();
+            verifyOkPush(git.push().call());
+
+            SourceInfo sourceInfo = grm.getSourceInfo(STORE, null);
+            assertNotNull(sourceInfo);
+            SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
+            assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
+            grm.delete(STORE, null, "user", "msg", "user");
+            SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
+            assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
+            sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
+            assertNotNull(sourceInfoMasterMetaData);
+        }
+    }
+
+    @Test
+    public void testDeleteMasterMetaData() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            final String base = "base/";
+            final Path file = gitFolder.toPath().resolve(base + STORE);
+            final Path mfile = gitFolder.toPath().resolve(base + METADATA);
+            file.getParent().toFile().mkdirs();
+            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Test commit").call();
+            verifyOkPush(git.push().call());
+
+            SourceInfo sourceInfo = grm.getSourceInfo(base + STORE, null);
+            assertNotNull(sourceInfo);
+            SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
+            assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
+            grm.delete(base + STORE, null, "user", "msg", "user");
+            SourceInfo sourceInfo2 = grm.getSourceInfo(base + STORE, null);
+            assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
+            sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
+            assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
+        }
+    }
+
+    @Test
+    public void testGetSourceInfoWithEmptyKey() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            addFilesAndPush(gitFolder, git);
+            assertThrows(IllegalArgumentException.class, () -> grm.getSourceInfo("", null));
+            assertThrows(IllegalArgumentException.class, () -> grm.getSourceInfo("/key", null));
+            assertNull(grm.getSourceInfo("/", null));
         }
     }
 

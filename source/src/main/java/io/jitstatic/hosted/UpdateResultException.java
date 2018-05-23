@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -20,23 +20,20 @@ package io.jitstatic;
  * #L%
  */
 
-import io.jitstatic.hosted.InputStreamHolder;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 
-public class MetaFileData extends FileData {
+public class UpdateResultException extends Exception {
 
-    private final boolean isKeyMetaFile;
+    private static final long serialVersionUID = 7168839837242628353L;
 
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder, final boolean isKeyMetaFile) {
-        super(fileInfo, inputStreamHolder);
-        this.isKeyMetaFile = isKeyMetaFile;
+    private final Result result;
+
+    public UpdateResultException(final Result result) {
+        super(result.name());
+        this.result = result;
     }
 
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-        this(fileInfo, inputStreamHolder, false);
+    public Result getResult() {
+        return result;
     }
-
-    public boolean isKeyMetaFile() {
-        return isKeyMetaFile;
-    }
-
 }

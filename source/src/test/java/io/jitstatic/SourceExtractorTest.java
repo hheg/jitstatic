@@ -67,6 +67,7 @@ import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.hamcrest.CoreMatchers;
@@ -459,6 +460,28 @@ public class SourceExtractorTest {
         try (InputStream is = openBranch.getSourceInputStream()) {
             assertNull(is);
         }
+    }
+
+    @Test
+    public void testHandleRepositoryError() throws Exception {
+        IOException e = new IOException("Test");
+        Repository repo = Mockito.mock(Repository.class);
+        ObjectReader reader = Mockito.mock(ObjectReader.class);
+        Ref ref = Mockito.mock(Ref.class);
+        Mockito.when(ref.getObjectId()).thenReturn(ObjectId.zeroId());
+        Mockito.when(repo.findRef(Mockito.anyString())).thenReturn(ref);
+        Mockito.when(repo.newObjectReader()).thenReturn(reader);
+        Mockito.when(reader.open(Mockito.any())).thenThrow(e);
+        SourceExtractor se = new SourceExtractor(repo);
+        Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sbe = se.sourceBranchExtractor(REFS_HEADS_MASTER);
+        List<BranchData> right = sbe.getRight();
+        assertTrue(right.size() == 1);
+        BranchData branchData = right.get(0);
+        RepositoryDataError fileDataError = branchData.getFileDataError();
+        assertNotNull(fileDataError);
+        assertSame(e, fileDataError.getInputStreamHolder().exception());
+        assertSame(e, assertThrows(RuntimeException.class, () -> fileDataError.getInputStream()).getCause());
+        assertNotNull(fileDataError.getFileObjectIdStore());
     }
 
     private void addFilesAndPush(final String key, File temporaryGitFolder, Git local)

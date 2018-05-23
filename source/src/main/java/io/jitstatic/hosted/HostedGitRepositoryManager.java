@@ -216,9 +216,18 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public SourceInfo getSourceInfo(final String key, String ref) throws RefNotFoundException {
+    public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
         Objects.requireNonNull(key);
         ref = checkRef(ref);
+        if (key.isEmpty()) {
+            throw new IllegalArgumentException("Key is empty");
+        }
+        if (key.equals("/")) {
+            key = "";
+        } else if (key.startsWith("/")) {
+            throw new IllegalArgumentException("Key starts with a '/' " + key);
+        }
+
         try {
             if (ref.startsWith(Constants.R_HEADS)) {
                 return extractor.openBranch(ref, key);
@@ -233,7 +242,7 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public String modify(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
-            String userMail) {
+            final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(message);
@@ -241,15 +250,10 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(userMail);
         Objects.requireNonNull(key);
         final String finalRef = checkRef(ref);
-        if (finalRef.startsWith(Constants.R_TAGS)) {
-            throw new UnsupportedOperationException("Tags cannot be modified");
-        }
+        checkIfTag(finalRef);
         return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
             try {
-                final Ref actualRef = bareRepository.findRef(finalRef);
-                if (actualRef == null) {
-                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
-                }
+                final Ref actualRef = findRef(finalRef);
                 if (!checkVersion(version, key, finalRef)) {
                     throw new WrappingAPIException(new VersionIsNotSame());
                 }
@@ -258,6 +262,14 @@ public class HostedGitRepositoryManager implements Source {
                 throw new UncheckedIOException(e);
             }
         }));
+    }
+
+    private Ref findRef(final String finalRef) throws IOException {
+        final Ref actualRef = bareRepository.findRef(finalRef);
+        if (actualRef == null) {
+            throw new WrappingAPIException(new RefNotFoundException(finalRef));
+        }
+        return actualRef;
     }
 
     private String checkRef(String ref) {
@@ -300,22 +312,14 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(userMail);
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);
-        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
         final String finalRef = checkRef(ref);
+        checkIfTag(finalRef);
+        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
+
         return unwrap(repoExecutor.submit((Callable<Pair<String, String>> & WriteOperation) () -> {
             try {
-                final Ref actualRef = bareRepository.findRef(finalRef);
-                if (actualRef == null) {
-                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
-                }
-                try {                    
-                    final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-                    if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
-                        throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-                    }                    
-                } catch (final RefNotFoundException e) {
-                    throw new WrappingAPIException(e);
-                }
+                final Ref actualRef = findRef(finalRef);                
+                checkIfKeyAlreadyExist(key, finalRef);
                 return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
                         actualRef, message, userInfo, userMail);
             } catch (final IOException e) {
@@ -324,24 +328,30 @@ public class HostedGitRepositoryManager implements Source {
         }));
     }
 
+    private void checkIfKeyAlreadyExist(final String key, final String finalRef) {
+        try {
+            final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
+            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
+        } catch (final RefNotFoundException e) {
+            throw new WrappingAPIException(e);
+        }
+    }
+
     @Override
     public String modify(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
             final String userMail, final String key, String ref) {
-        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
         Objects.requireNonNull(userMail);
         Objects.requireNonNull(key);
         final String finalRef = checkRef(ref);
-        if (finalRef.startsWith(Constants.R_TAGS)) {
-            throw new UnsupportedOperationException("Tags cannot be modified");
-        }
+        checkIfTag(finalRef);
+        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
         return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
             try {
-                final Ref actualRef = bareRepository.findRef(finalRef);
-                if (actualRef == null) {
-                    throw new WrappingAPIException(new RefNotFoundException(finalRef));
-                }
+                final Ref actualRef = findRef(finalRef);
                 if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
                     throw new WrappingAPIException(new VersionIsNotSame());
                 }
@@ -353,11 +363,17 @@ public class HostedGitRepositoryManager implements Source {
         }));
     }
 
+    private void checkIfTag(final String finalRef) {
+        if (finalRef.startsWith(Constants.R_TAGS)) {
+            throw new UnsupportedOperationException("Tags cannot be modified");
+        }
+    }
+
     private static <T> T unwrap(final SubmittedSupplier<T> supplier) {
         try {
             return supplier.get();
         } catch (final RuntimeException re) {
-            Throwable cause = re.getCause();
+            final Throwable cause = re.getCause();
             if (cause instanceof WrappingAPIException) {
                 throw (WrappingAPIException) cause;
             }
@@ -365,17 +381,14 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static <T> T unwrap(final CompletableFuture<T> f) {
+    private static <T> T unwrap(final CompletableFuture<T> future) {
         try {
-            return f.join();
+            return future.join();
         } catch (final CompletionException ce) {
             final Throwable cause = ce.getCause();
             if (cause instanceof WrappingAPIException) {
                 throw (WrappingAPIException) cause;
-            }
-            if (cause instanceof RuntimeException) {
-                throw (RuntimeException) cause;
-            }
+            }            
             throw ce;
         }
     }
@@ -392,5 +405,30 @@ public class HostedGitRepositoryManager implements Source {
 
     public UploadPackFactory<HttpServletRequest> getUploadPackFactory() {
         return uploadPackFactory;
+    }
+
+    @Override
+    public void delete(final String key, String ref, final String user, final String message, final String userMail) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(user);
+        Objects.requireNonNull(message);
+        Objects.requireNonNull(userMail);
+        final String finalRef = checkRef(ref);
+        checkIfTag(finalRef);
+
+        unwrap(repoExecutor.submit((Runnable & WriteOperation) () -> {
+            try {
+                final Ref actualRef = findRef(finalRef);
+                final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
+                if (sourceInfo == null) {
+                    return;
+                }
+                updater.deleteKey(key, actualRef, user, message, userMail, sourceInfo.hasKeyMetaData());
+            } catch (final IOException e) {
+                throw new UncheckedIOException(e);
+            } catch (final RefNotFoundException e) {
+                throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
+            }
+        }));
     }
 }

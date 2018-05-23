@@ -473,6 +473,45 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
+    public void testFailedToLockBranch() throws Exception {
+        RemoteTestUtils.copy("/test3.json", storePath);
+        Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        clientGit.add().addFilepattern(STORE).call();
+        RevCommit c = clientGit.commit().setMessage("New commit").call();
+        ReceiveCommand rc = Mockito.spy(new ReceiveCommand(c.getId(), ObjectId.fromString(SHA_1), REF_HEADS_MASTER, Type.UPDATE));
+        RefUpdate ru = Mockito.mock(RefUpdate.class);
+        RefUpdate testUpdate = Mockito.mock(RefUpdate.class);
+        Repository remoteRepository = Mockito.mock(Repository.class);
+        Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
+        SourceChecker sc = Mockito.mock(SourceChecker.class);
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+            @Override
+            protected List<ReceiveCommand> filterCommands(Result want) {
+                return Arrays.asList(rc);
+            }
+
+            @Override
+            SourceChecker getSourceChecker() {
+                return sc;
+            }
+        });
+
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
+        Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD)
+                .thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.LOCK_FAILURE);
+        Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(master);
+        Mockito.when(rc.getOldId()).thenReturn(master.getObjectId());
+        Mockito.when(testUpdate.delete()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
+
+        rp.executeCommands();
+
+        assertEquals(Result.LOCK_FAILURE, rc.getResult());
+    }
+
+    @Test
     public void testIOExceptionWhenCommitting() throws Exception {
         IOException e = new IOException("Test");
         RemoteTestUtils.copy("/test3.json", storePath);

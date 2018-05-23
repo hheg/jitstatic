@@ -20,23 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
-import io.jitstatic.hosted.InputStreamHolder;
+import java.util.List;
 
-public class MetaFileData extends FileData {
+public class WriteData {
 
-    private final boolean isKeyMetaFile;
+    final List<String> branches;
+    final List<String> names;
 
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder, final boolean isKeyMetaFile) {
-        super(fileInfo, inputStreamHolder);
-        this.isKeyMetaFile = isKeyMetaFile;
-    }
-
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-        this(fileInfo, inputStreamHolder, false);
-    }
-
-    public boolean isKeyMetaFile() {
-        return isKeyMetaFile;
+    WriteData(final List<String> branches, final List<String> names) {
+        this.branches = branches;
+        this.names = names;
     }
 
 }

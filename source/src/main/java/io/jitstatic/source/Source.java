@@ -45,4 +45,6 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String modify(StorageData metaData, String metaDataVersion, String message, String userInfo,
             String userMail, String key, String finalRef);
+
+    public void delete(String key, String ref, String user, String message, String userMail);
 }

@@ -108,7 +108,7 @@ public class MetaKeyResourceTest {
     public void testGetAKey() {
         StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.get("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
@@ -152,7 +152,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.get("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
                 .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_PRECONDITION_FAILED));
@@ -168,7 +168,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
-        Mockito.when(storage.get("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.isNull(), Mockito.isA(StorageData.class), Mockito.eq("2"), Mockito.eq("message"),
                 Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(CompletableFuture.completedFuture("3"));
         Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
@@ -186,7 +186,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.get("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
                 .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(422));
@@ -197,7 +197,7 @@ public class MetaKeyResourceTest {
     public void testGetMasterMetaData() {
         StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.get("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Response response = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
@@ -215,7 +215,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
-        Mockito.when(storage.get("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
+        Mockito.when(storage.getKey("dog/", null)).thenReturn(CompletableFuture.completedFuture(Optional.of(sd)));
         Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(StorageData.class), Mockito.eq("2"), Mockito.eq("message"),
                 Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(CompletableFuture.completedFuture("3"));
         Response put = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")

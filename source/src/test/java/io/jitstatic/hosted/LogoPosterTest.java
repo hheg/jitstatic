@@ -31,6 +31,7 @@ import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.UploadPack;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import io.jitstatic.hosted.LogoPoster;
 
@@ -47,6 +48,7 @@ public class LogoPosterTest {
         }).when(rp).sendMessage(any());
         LogoPoster poster = new LogoPoster();
         poster.onPreReceive(rp, null);
+        Mockito.verify(rp, Mockito.times(6)).sendMessage(Mockito.anyString());
     }
 
     @Test
@@ -57,7 +59,8 @@ public class LogoPosterTest {
         }).when(up).sendMessage(any());
         LogoPoster poster = new LogoPoster();
         poster.onPreReceive(rp, null);
-        poster.onBeginNegotiateRound(up, List.of(), 0);
+        poster.onSendPack(up, List.of(), List.of());
+        Mockito.verify(rp, Mockito.times(6)).sendMessage(Mockito.anyString());
     }
 
 }

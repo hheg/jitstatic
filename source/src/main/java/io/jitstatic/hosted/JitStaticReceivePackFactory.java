@@ -20,7 +20,7 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
@@ -37,59 +37,59 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
-	private final String defaultRef;
-	private final Executor repoExecutor;
-	private final ErrorReporter errorReporter;
-	private final RepositoryBus bus;
+    private final String defaultRef;
+    private final Executor repoExecutor;
+    private final ErrorReporter errorReporter;
+    private final RepositoryBus bus;
 
-	public JitStaticReceivePackFactory(final Executor repoExecutor, final ErrorReporter reporter,
-			final String defaultRef, final RepositoryBus bus) {
-		this.defaultRef = Objects.requireNonNull(defaultRef);
-		this.errorReporter = Objects.requireNonNull(reporter);
-		this.repoExecutor = Objects.requireNonNull(repoExecutor);
-		this.bus = Objects.requireNonNull(bus);
-	}
+    public JitStaticReceivePackFactory(final Executor repoExecutor, final ErrorReporter reporter, final String defaultRef,
+            final RepositoryBus bus) {
+        this.defaultRef = Objects.requireNonNull(defaultRef);
+        this.errorReporter = Objects.requireNonNull(reporter);
+        this.repoExecutor = Objects.requireNonNull(repoExecutor);
+        this.bus = Objects.requireNonNull(bus);
+    }
 
-	static class ServiceConfig {
-		final boolean set;
+    static class ServiceConfig {
+        final boolean set;
 
-		final boolean enabled;
+        final boolean enabled;
 
-		ServiceConfig(final Config cfg) {
-			set = cfg.getString("http", null, "receivepack") != null;
-			enabled = cfg.getBoolean("http", "receivepack", false);
-		}
-	}
+        ServiceConfig(final Config cfg) {
+            set = cfg.getString("http", null, "receivepack") != null;
+            enabled = cfg.getBoolean("http", "receivepack", false);
+        }
+    }
 
-	@Override
-	public ReceivePack create(final HttpServletRequest req, final Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-		final ServiceConfig cfg = db.getConfig().get(ServiceConfig::new);
-		String user = req.getRemoteUser();
+    @Override
+    public ReceivePack create(final HttpServletRequest req, final Repository db)
+            throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+        final ServiceConfig cfg = db.getConfig().get(ServiceConfig::new);
+        String user = req.getRemoteUser();
 
-		if (cfg.set) {
-			if (cfg.enabled) {
-				if (user == null || "".equals(user))
-					user = "anonymous";
-				return createFor(req, db, user);
-			}
-			throw new ServiceNotEnabledException();
-		}
+        if (cfg.set) {
+            if (cfg.enabled) {
+                if (user == null || "".equals(user))
+                    user = "anonymous";
+                return createFor(req, db, user);
+            }
+            throw new ServiceNotEnabledException();
+        }
 
-		if (user != null && !"".equals(user))
-			return createFor(req, db, user);
-		throw new ServiceNotAuthorizedException();
-	}
+        if (user != null && !"".equals(user))
+            return createFor(req, db, user);
+        throw new ServiceNotAuthorizedException();
+    }
 
-	protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-		final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, repoExecutor, errorReporter, bus);
-		rp.setRefLogIdent(toPersonIdent(req, user));
-		rp.setAtomic(true);
-		rp.setPreReceiveHook(PreReceiveHookChain.newChain(Arrays.asList(new LogoPoster())));
-		return rp;
-	}
+    protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, repoExecutor, errorReporter, bus);
+        rp.setRefLogIdent(toPersonIdent(req, user));
+        rp.setAtomic(true);
+        rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));
+        return rp;
+    }
 
-	private static PersonIdent toPersonIdent(final HttpServletRequest req, final String user) {
-		return new PersonIdent(user, user + "@" + req.getRemoteHost());
-	}
+    private static PersonIdent toPersonIdent(final HttpServletRequest req, final String user) {
+        return new PersonIdent(user, user + "@" + req.getRemoteHost());
+    }
 }

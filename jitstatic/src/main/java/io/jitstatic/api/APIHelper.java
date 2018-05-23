@@ -58,10 +58,9 @@ class APIHelper {
         } catch (final ExecutionException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof WrappingAPIException) {
-                final Exception apiException = (Exception) cause.getCause();
-                if (apiException instanceof KeyAlreadyExist) {
-                    final KeyAlreadyExist kae = (KeyAlreadyExist) apiException;
-                    throw new WebApplicationException(kae.getMessage(), Status.CONFLICT);
+                final Throwable apiException = cause.getCause();
+                if (apiException instanceof KeyAlreadyExist) {                    
+                    throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
                 } else if (apiException instanceof RefNotFoundException) {
                     // Error message here means that the branch is not found.
                     throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
@@ -106,7 +105,7 @@ class APIHelper {
         } catch (final ExecutionException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof WrappingAPIException) {
-                final Exception apiException = (Exception) cause.getCause();
+                final Throwable apiException = cause.getCause();
                 if (apiException instanceof UnsupportedOperationException) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
@@ -114,10 +113,10 @@ class APIHelper {
                     return null;
                 }
                 if (apiException instanceof VersionIsNotSame) {
-                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
+                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.PRECONDITION_FAILED);
                 }
                 if (apiException instanceof KeyAlreadyExist) {
-                    throw new WebApplicationException(Status.CONFLICT);
+                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
             }
             log.error("Error while unwrapping future", e);
@@ -150,7 +149,7 @@ class APIHelper {
         if (requestHeaders.size() > 1) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
-        for (String header : requestHeaders) {
+        for (final String header : requestHeaders) {
             if (header.equals("\"" + tag.getValue() + "\"")) {
                 return Response.notModified().tag(tag).build();
             }

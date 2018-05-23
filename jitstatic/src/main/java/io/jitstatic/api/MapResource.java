@@ -25,9 +25,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -58,12 +60,16 @@ import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StoreInfo;
+import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class MapResource {
-
+    private static final String X_JITSTATIC = "X-jitstatic";
+    private static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
+    private static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
+    private static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     private static final String UTF_8 = "utf-8";
-    static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
     private final Storage storage;
     private final AddKeyAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
@@ -86,7 +92,7 @@ public class MapResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -105,7 +111,7 @@ public class MapResource {
         }
 
         if (!user.isPresent()) {
-            LOG.info("Resource " + key + " needs a user");
+            LOG.info("Resource {} needs a user", key);
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
 
@@ -151,7 +157,7 @@ public class MapResource {
 
         helper.checkValidRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.get(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
 
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -182,7 +188,7 @@ public class MapResource {
 
     private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
         if (!allowedUsers.contains(user.get())) {
-            LOG.info("Resource " + key + " is denied for user " + user.get());
+            LOG.info("Resource {} is denied for user {}", key, user.get());
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
     }
@@ -198,7 +204,7 @@ public class MapResource {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
         if (!addKeyAuthenticator.authenticate(user.get())) {
-            LOG.info("Resource " + data.getKey() + " is denied for user " + user.get());
+            LOG.info("Resource {} is denied for user {}", data.getKey(), user.get());
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
 
@@ -206,7 +212,7 @@ public class MapResource {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.get(data.getKey(), data.getBranch()));
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(data.getKey(), data.getBranch()));
         if (si != null && si.isPresent()) {
             throw new WebApplicationException(String.format("Key '%s' already exist in branch %s", data.getKey(), data.getBranch()),
                     Status.CONFLICT);
@@ -216,5 +222,55 @@ public class MapResource {
         return Response.ok().tag(new EntityTag(result.getVersion()))
                 .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
                 .entity(result.getData()).build();
+    }
+
+    @DELETE
+    @Path("/{key : .+}")
+    @Timed(name = "delete_storage_time")
+    @Metered(name = "delete_storage_counter")
+    @ExceptionMetered(name = "delete_storage_exception")
+    public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
+        if (!user.isPresent()) {
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
+        // Yak...
+        final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);
+        final String message = notEmpty(headers.getHeaderString(X_JITSTATIC_MESSAGE), X_JITSTATIC_MESSAGE);
+        final String userMail = notEmpty(headers.getHeaderString(X_JITSTATIC_MAIL), X_JITSTATIC_MAIL);
+
+        checkKey(key);
+
+        helper.checkValidRef(ref);
+
+        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+
+        if (si == null || !si.isPresent()) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        final StoreInfo storeInfo = si.get();
+        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
+        if (allowedUsers.isEmpty()) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
+
+        checkIfAllowed(key, user, allowedUsers);
+        try {
+            storage.delete(key, ref, userHeader, message, userMail);
+        } catch (WrappingAPIException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof UnsupportedOperationException) {
+                throw new WebApplicationException(key, Status.METHOD_NOT_ALLOWED);
+            }
+        }
+
+        return Response.ok().build();
+    }
+
+    private String notEmpty(final String headerString, final String headerName) {
+        if (headerString == null || headerString.isEmpty()) {
+            throw new WebApplicationException("Missing " + headerName, Status.BAD_REQUEST);
+        }
+        return headerString;
     }
 }

@@ -1,5 +1,6 @@
 package io.jitstatic.hosted;
 
+import java.util.List;
 import java.util.concurrent.Executor;
 
 /*-
@@ -22,11 +23,11 @@ import java.util.concurrent.Executor;
  * #L%
  */
 
-
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PreUploadHookChain;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
@@ -56,7 +57,7 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
             throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         if (db.getConfig().get(ServiceConfig::new).enabled) {
             final JitStaticUploadPack jitStaticUploadPack = new JitStaticUploadPack(db, service, errorReporter);
-//            jitStaticUploadPack.setPreUploadHook(new LogoPoster());
+            jitStaticUploadPack.setPreUploadHook(PreUploadHookChain.newChain(List.of(new LogoPoster())));
             return jitStaticUploadPack;
         } else
             throw new ServiceNotEnabledException();
