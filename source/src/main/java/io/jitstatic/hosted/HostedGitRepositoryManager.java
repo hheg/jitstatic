@@ -388,10 +388,7 @@ public class HostedGitRepositoryManager implements Source {
             final Throwable cause = ce.getCause();
             if (cause instanceof WrappingAPIException) {
                 throw (WrappingAPIException) cause;
-            }
-            if (cause instanceof RuntimeException) {
-                throw (RuntimeException) cause;
-            }
+            }            
             throw ce;
         }
     }
