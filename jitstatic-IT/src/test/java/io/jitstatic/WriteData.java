@@ -32,4 +32,9 @@ public class WriteData {
         this.names = names;
     }
 
+    @Override
+    public String toString() {
+        return "WriteData [branches=" + branches + ", names=" + names + "]";
+    }
+
 }
