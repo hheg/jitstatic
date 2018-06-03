@@ -89,6 +89,7 @@ import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.tools.Utils;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class HostOwnGitRepositoryTest {
@@ -120,11 +121,7 @@ public class HostOwnGitRepositoryTest {
 
     @AfterEach
     public void after() {
-        SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        errors.stream().forEach(e -> e.printStackTrace());
-        assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
+        Utils.checkContainerForErrors(DW);
     }
 
     @Test

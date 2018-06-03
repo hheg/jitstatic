@@ -107,6 +107,7 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.tools.Utils;
 
 @Tag("slow")
 @ExtendWith(DropwizardExtensionsSupport.class)
@@ -239,7 +240,7 @@ public class LoadWriterTest {
         } finally {
             statsClient.close();
         }
-        checkContainerForErrors();
+        Utils.checkContainerForErrors(DW);
     }
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, WriteData testData)

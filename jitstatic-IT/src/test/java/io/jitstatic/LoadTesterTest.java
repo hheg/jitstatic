@@ -25,9 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -104,7 +108,7 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
-import io.jitstatic.utils.ShouldNeverHappenException;
+import io.jitstatic.tools.Utils;
 
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
@@ -119,7 +123,7 @@ public class LoadTesterTest {
     private static final Logger LOG = LogManager.getLogger(LoadTesterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final AtomicInteger GITUPDATES = new AtomicInteger(0);
     private final AtomicInteger PUTUPDATES = new AtomicInteger(0);
@@ -183,7 +187,7 @@ public class LoadTesterTest {
         LOG.info("Git failures: {}", GITFAILURES.get());
         LOG.info("Put updates: {}", PUTUPDATES.get());
         LOG.info("Put failures: {}", PUTFAILURES.get());
-        checkContainerForErrors();
+        Utils.checkContainerForErrors(DW);
     }
 
     private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc) {
@@ -221,14 +225,6 @@ public class LoadTesterTest {
             LOG.info("{} contains {}", name, d);
         }
         return data;
-    }
-
-    private void checkContainerForErrors() {
-        SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        errors.stream().forEach(e -> LOG.error("HEALTHCHECK ERROR ", e));
-        assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
 
     @ParameterizedTest
@@ -315,7 +311,7 @@ public class LoadTesterTest {
                                 }
                             }
                         }
-                    } catch (GitAPIException | IOException e) {
+                    } catch (Exception e) {
                         LOG.error("TestSuiteError: Repo error ", e);
                     } finally {
                         updaters.add(cu);
@@ -371,9 +367,6 @@ public class LoadTesterTest {
                 git.checkout().setName(branch).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
                 verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
             }
-            for (String name : testData.names) {
-                testData.versions.get(branch).put(name, value);
-            }
         }
     }
 
@@ -418,11 +411,6 @@ public class LoadTesterTest {
                     try {
                         Entity entity = client.getKey(name, ref, LoadTesterTest::read);
                         String readValue = entity.getValue().toString();
-                        String v = testData.versions.get(branch).get(name);
-                        if (!v.equals(readValue)) {
-                            LOG.error("TestSuiteError: Version comparison " + name + ":" + branch + " failed version=" + v + " actual="
-                                    + readValue);
-                        }
                         if (Math.random() < 0.5) {
                             modifyKey(testData, client, branch, name, ref, entity, readValue);
                         }
@@ -455,7 +443,6 @@ public class LoadTesterTest {
             String newTag = client.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
                     entity.getTag());
             PUTUPDATES.incrementAndGet();
-            updateData(branch, name, data, testData, c);
             LOG.info("Ok modified " + name + ":" + branch + " with " + c);
             if (Math.random() < 0.5) {
                 client.getKey(name, branch, newTag, LoadTesterTest::read);
@@ -528,36 +515,11 @@ public class LoadTesterTest {
         return head;
     }
 
-    private void updateData(String branch, String name, byte[] newState, TestData data, int newValue) {
-        data.versions.get(branch).compute(name, (k, v) -> {
-            try {
-                int intv = readValue(v);
-                if (intv < newValue) {
-                    String newStateString = new String(newState, "UTF-8");
-                    LOG.info("Updating " + name + ":" + branch + " from " + v + " to " + newStateString);
-                    return newStateString;
-                }
-            } catch (UnsupportedEncodingException e) {
-                throw new ShouldNeverHappenException("Encoding", e);
-            }
-            return v;
-        });
-    }
-
-    private int readValue(String v) {
-        try {
-            return MAPPER.readValue(v, JsonNode.class).get("data").asInt();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-
-    }
-
     private JsonNode readData(Path filedata) throws IOException, JsonParseException, JsonMappingException {
         try {
             return MAPPER.readValue(filedata.toFile(), JsonNode.class);
         } catch (Exception e) {
-            LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata), "UTF-8"));
+            LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata), UTF_8));
             throw e;
         }
     }
@@ -603,10 +565,18 @@ public class LoadTesterTest {
                     }
                     if (ok) {
                         String v = new String(data, "UTF-8");
-                        updateData(branch, key, data, testData, c);
                         LOG.info("OK push " + c + " " + key + ":" + branch + " from " + readData + " to " + v + " commit " + message);
                     }
                 }
+            } catch (TransportException e) {
+                Throwable cause = e.getCause();
+                if (cause == null) {
+                    throw e;
+                }
+                if (!(cause instanceof org.eclipse.jgit.errors.TransportException)) {
+                    throw e;
+                }
+                LOG.warn("Got known error {}", cause.getMessage());
             }
         }
     }
