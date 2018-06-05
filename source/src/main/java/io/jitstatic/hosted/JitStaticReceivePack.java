@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
@@ -149,8 +148,6 @@ public class JitStaticReceivePack extends ReceivePack {
                 commitCommands(cmds);
                 signalReload(cmds);
             }
-        } catch (final InterruptedException | ExecutionException e) {
-            setFault(new RepositoryException("Writing to repo was interrupted", e));
         } finally {
             cleanUpRepository(cmds);
         }
@@ -165,7 +162,7 @@ public class JitStaticReceivePack extends ReceivePack {
         bus.process(refsToUpdate);
     }
 
-    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) throws InterruptedException, ExecutionException {
+    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
         final Repository repository = getRepository();
         repoExecutor.submit((Callable<List<Either<Exception, Void>>> & WriteOperation) () -> {
             return cmds.stream().map(p -> {
@@ -218,7 +215,7 @@ public class JitStaticReceivePack extends ReceivePack {
         case REJECTED:
             rc.setResult(Result.REJECTED_NONFASTFORWARD, refName);
             break;
-        case REJECTED_CURRENT_BRANCH:           
+        case REJECTED_CURRENT_BRANCH:
         default:
             rc.setResult(Result.REJECTED_CURRENT_BRANCH, refName);
             break;

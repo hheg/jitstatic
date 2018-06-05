@@ -58,6 +58,9 @@ public class JitStaticUploadPack extends UploadPack {
                     LOG.error("Upload resulted in error ", e);
                 }
                 throw new UncheckedIOException(e);
+            } catch (final Exception e) {
+                errorReporter.setFault(e);
+                LOG.error("Upload resulted in error ", e);
             }
         }));
     }
