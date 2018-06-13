@@ -318,7 +318,7 @@ public class HostedGitRepositoryManager implements Source {
 
         return unwrap(repoExecutor.submit((Callable<Pair<String, String>> & WriteOperation) () -> {
             try {
-                final Ref actualRef = findRef(finalRef);                
+                final Ref actualRef = findRef(finalRef);
                 checkIfKeyAlreadyExist(key, finalRef);
                 return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
                         actualRef, message, userInfo, userMail);
@@ -388,7 +388,7 @@ public class HostedGitRepositoryManager implements Source {
             final Throwable cause = ce.getCause();
             if (cause instanceof WrappingAPIException) {
                 throw (WrappingAPIException) cause;
-            }            
+            }
             throw ce;
         }
     }
@@ -430,5 +430,14 @@ public class HostedGitRepositoryManager implements Source {
                 throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
             }
         }));
+    }
+
+    @Override
+    public String getRefId(final String ref) throws IOException {
+        final Ref actualRef = extractor.getRef(ref);
+        if (actualRef == null) {
+            return null;
+        }
+        return actualRef.getObjectId().name();
     }
 }

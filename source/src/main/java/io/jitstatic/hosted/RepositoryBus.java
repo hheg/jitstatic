@@ -25,28 +25,29 @@ import java.util.Collections;
 import java.util.List;
 
 import io.jitstatic.source.SourceEventListener;
+import io.jitstatic.utils.Pair;
 
 public class RepositoryBus {
 
-	private final List<SourceEventListener> sourceEventListeners = Collections.synchronizedList(new ArrayList<>());
-	private final ErrorReporter reporter;
+    private final List<SourceEventListener> sourceEventListeners = Collections.synchronizedList(new ArrayList<>());
+    private final ErrorReporter reporter;
 
-	public RepositoryBus(final ErrorReporter reporter) {
-		this.reporter = reporter;
-	}
+    public RepositoryBus(final ErrorReporter reporter) {
+        this.reporter = reporter;
+    }
 
-	public void process(final List<String> refsToUpdate) {
-		this.sourceEventListeners.forEach(sourceEventListener -> {
-			try {
-				sourceEventListener.onEvent(refsToUpdate);
-			} catch (final Exception ex) {
-				reporter.setFault(ex);
-			}
-		});
-	}
+    public void process(final List<Pair<String, String>> refsToUpdate) {
+        this.sourceEventListeners.forEach(sourceEventListener -> {
+            try {
+                sourceEventListener.onEvent(refsToUpdate);
+            } catch (final Exception ex) {
+                reporter.setFault(ex);
+            }
+        });
+    }
 
-	void addListener(final SourceEventListener listener) {
-		this.sourceEventListeners.add(listener);
-	}
+    void addListener(final SourceEventListener listener) {
+        this.sourceEventListeners.add(listener);
+    }
 
 }

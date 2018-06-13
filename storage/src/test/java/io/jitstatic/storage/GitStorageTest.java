@@ -184,13 +184,14 @@ public class GitStorageTest {
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(si2.getMetaDataVersion()).thenReturn(SHA_2_MD);
             when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si1);
-
-            gs.reload(Arrays.asList(REF_HEADS_MASTER));
+            when(source.getRefId(Mockito.anyString())).thenReturn("1").thenReturn("2");
+            
+            gs.reload(List.of(Pair.of(REF_HEADS_MASTER, "1")));
             StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null, false, false, List.of()),
                     SHA_1, SHA_1_MD);
             assertTrue(Arrays.equals(storage.getData(), gs.getKey("key", null).get().get().getData()));
             when(source.getSourceInfo(Mockito.anyString(), Mockito.anyString())).thenReturn(si2);
-            gs.reload(Arrays.asList(REF_HEADS_MASTER));
+            gs.reload(List.of(Pair.of(REF_HEADS_MASTER, "2")));
             storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users, null, false, false, List.of()), SHA_2,
                     SHA_2_MD);
             assertTrue(Arrays.equals(storage.getData(), gs.getKey("key", null).get().get().getData()));
@@ -250,10 +251,11 @@ public class GitStorageTest {
     public void testCheckHealthWithFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
+        when(source.getRefId(Mockito.anyString())).thenReturn("1");
 
         try (GitStorage gs = new GitStorage(source, null); InputStream is = getInputStream(0); InputStream md = getMetaData()) {
 
-            gs.reload(Arrays.asList(REF_HEADS_MASTER));
+            gs.reload(List.of(Pair.of(REF_HEADS_MASTER, "1")));
             assertNull(gs.getKey("test3.json", null).get());
             assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
             Mockito.reset(source);
@@ -272,16 +274,18 @@ public class GitStorageTest {
     public void testCheckHealthWithOldFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
-        assertSame(assertThrows(RuntimeException.class, () -> {
+        when(source.getRefId(Mockito.anyString())).thenReturn("1");
+        
+        assertSame(cause, assertThrows(RuntimeException.class, () -> {
             try (GitStorage gs = new GitStorage(source, null);) {
-                gs.reload(Arrays.asList(REF_HEADS_MASTER));
+                gs.reload(List.of(Pair.of(REF_HEADS_MASTER, "1")));
                 assertNull(gs.getKey("key", null).get());
                 assertEquals(cause.getLocalizedMessage(),
                         assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
                 gs.getKey("key", null).get();
                 gs.checkHealth();
             }
-        }), cause);
+        }));
     }
 
     @Test
@@ -523,7 +527,7 @@ public class GitStorageTest {
             gs.checkHealth();
         }
     }
-    
+
     @Test
     public void testDelete() throws Exception {
         try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
@@ -537,15 +541,16 @@ public class GitStorageTest {
             when(si.getMetadataInputStream()).thenReturn(mtest3);
             when(si.getSourceVersion()).thenReturn(SHA_1);
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
-                
-            when(source.getSourceInfo(Mockito.eq(key), Mockito.anyString())).thenReturn(si);            
+
+            when(source.getSourceInfo(Mockito.eq(key), Mockito.anyString())).thenReturn(si);
             gs.delete(key, null, userInfo, message, usermail);
             Thread.sleep(1000);
             gs.checkHealth();
-            Mockito.verify(source).delete(Mockito.eq(key), Mockito.eq(REF_HEADS_MASTER), Mockito.eq(userInfo),Mockito.eq(message), Mockito.eq(usermail));
+            Mockito.verify(source).delete(Mockito.eq(key), Mockito.eq(REF_HEADS_MASTER), Mockito.eq(userInfo), Mockito.eq(message),
+                    Mockito.eq(usermail));
         }
     }
-    
+
     private StoreInfo unwrap(Future<StoreInfo> future) {
         try {
             return future.get();

@@ -23,6 +23,8 @@ package io.jitstatic.source;
 import java.util.EventListener;
 import java.util.List;
 
+import io.jitstatic.utils.Pair;
+
 public interface SourceEventListener extends EventListener {
-	public void onEvent(List<String> updatedRefs);
+    public void onEvent(List<Pair<String, String>> updatedRefs);
 }

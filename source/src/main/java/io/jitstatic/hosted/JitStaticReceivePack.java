@@ -154,9 +154,11 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void signalReload(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft())
-                .map(rc -> rc.getRefName()).map(refName -> {
-                    sendMessage("Reloading " + refName);
+        final List<Pair<String, String>> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK)
+                .map(p -> p.getLeft()).map(ref -> {
+                    final ObjectId actualRef = ref.getNewId();
+                    final Pair<String, String> refName = Pair.of(ref.getRefName(), actualRef.name());
+                    sendMessage("Reloading " + refName.getLeft());
                     return refName;
                 }).collect(Collectors.toList());
         bus.process(refsToUpdate);

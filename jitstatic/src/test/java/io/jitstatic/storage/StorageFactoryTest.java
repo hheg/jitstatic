@@ -28,8 +28,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -37,6 +38,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
@@ -46,6 +48,7 @@ import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StorageFactory;
+import io.jitstatic.utils.Pair;
 
 public class StorageFactoryTest {
 
@@ -56,10 +59,11 @@ public class StorageFactoryTest {
     private StorageFactory sf = new StorageFactory();
 
     @Test
-    public void testBuild() throws InterruptedException, ExecutionException {
+    public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
+        when(source.getRefId(Mockito.anyString())).thenReturn("1");
         try (Storage storage = sf.build(source, env);) {
-            storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
+            storage.reload(List.of(Pair.of(Constants.R_HEADS + Constants.MASTER, "1")));
             assertEquals(Optional.empty(), storage.getKey("key", null).get());
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));

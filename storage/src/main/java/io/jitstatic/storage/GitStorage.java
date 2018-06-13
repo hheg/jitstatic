@@ -75,33 +75,38 @@ public class GitStorage implements Storage {
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
     }
 
-    public void reload(final List<String> refsToReload) {
+    public void reload(final List<Pair<String, String>> refsToReload) {
         Objects.requireNonNull(refsToReload);
-        final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(ref -> CompletableFuture.supplyAsync(() -> {
-            LOG.info("Reloading " + ref);
-            final Map<String, Optional<StoreInfo>> map = cache.get(ref);
-            return (map != null ? new HashSet<>(map.keySet()) : Set.<String>of());
-        }, refExecutor).thenApplyAsync(files -> waitForTasks(refreshRef(ref, files)).thenApply(list -> {
-            final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
-            if (!faults.isEmpty()) {
-                throw new LinkedException(faults);
-            }
-            return list.stream().filter(Either::isLeft).map(Either::getLeft).flatMap(Optional::stream)
-                    .filter(p -> p.getRight() != null).collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
-        })).thenCompose(future -> future).thenAcceptAsync(map -> {
-            if (map.size() > 0) {
-                final Map<String, Optional<StoreInfo>> originalMap = cache.get(ref);
-                CompletableFuture
-                        .runAsync(
-                                () -> originalMap.entrySet().stream().filter(e -> e.getValue().isPresent())
-                                        .filter(e -> !map.containsKey(e.getKey())).forEach(e -> map.put(e.getKey(), e.getValue())),
-                                keyExecutor)
-                        .join();
-                cache.put(ref, map);
-            } else {
-                cache.remove(ref);
-            }
-        }, refExecutor)).collect(Collectors.toCollection(() -> new ArrayList<>(refsToReload.size())));
+        final List<CompletableFuture<Void>> tasks = refsToReload.stream().map(pRef -> {
+            final String ref = pRef.getLeft();
+            final String refId = pRef.getRight(); // TODO
+            return CompletableFuture.supplyAsync(() -> {
+                checkIfRefIsCurrent(ref, refId);
+                LOG.info("Reloading " + ref);
+                final Map<String, Optional<StoreInfo>> map = cache.get(ref);
+                return (map != null ? new HashSet<>(map.keySet()) : Set.<String>of());
+            }, refExecutor).thenApplyAsync(files -> waitForTasks(refreshRef(ref, files)).thenApply(list -> {
+                final List<Exception> faults = list.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
+                if (!faults.isEmpty()) {
+                    throw new LinkedException(faults);
+                }
+                return list.stream().filter(Either::isLeft).map(Either::getLeft).flatMap(Optional::stream).filter(p -> p.getRight() != null)
+                        .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
+            })).thenCompose(future -> future).thenAcceptAsync(map -> {
+                if (map.size() > 0) {
+                    final Map<String, Optional<StoreInfo>> originalMap = cache.get(ref);
+                    CompletableFuture
+                            .runAsync(
+                                    () -> originalMap.entrySet().stream().filter(e -> e.getValue().isPresent())
+                                            .filter(e -> !map.containsKey(e.getKey())).forEach(e -> map.put(e.getKey(), e.getValue())),
+                                    keyExecutor)
+                            .join();
+                    cache.put(ref, map);
+                } else {
+                    cache.remove(ref);
+                }
+            }, refExecutor);
+        }).collect(Collectors.toCollection(() -> new ArrayList<>(refsToReload.size())));
 
         waitForTasks(tasks).thenAccept(listOfEithers -> {
             final List<Exception> errors = listOfEithers.stream().filter(Either::isRight).map(e -> e.getRight())
@@ -110,6 +115,18 @@ public class GitStorage implements Storage {
                 consumeError(new LinkedException(errors));
             }
         }).join();
+    }
+
+    private void checkIfRefIsCurrent(final String ref, final String refId) {
+        String actualRefId;
+        try {
+            actualRefId = source.getRefId(ref);
+            if (!refId.equals(actualRefId)) {
+                throw new RuntimeException("Ref " + ref + " is not current.");
+            }
+        } catch (final IOException e) {
+            throw new RuntimeException("Ref " + ref + " is not current.");
+        }
     }
 
     private static <T> CompletableFuture<List<Either<T, Exception>>> waitForTasks(final List<CompletableFuture<T>> tasks) {
@@ -148,7 +165,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public CompletableFuture<Optional<StoreInfo>> getKey(final String key, String ref) {                
+    public CompletableFuture<Optional<StoreInfo>> getKey(final String key, String ref) {
         final String finalRef = checkRef(ref);
         final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
         if (refMap == null) {
@@ -398,13 +415,13 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(userInfo, "userInfo cannot be null");
         Objects.requireNonNull(metaData, "metaData cannot be null");
-        Objects.requireNonNull(userMail, "userMail cannot be null");        
+        Objects.requireNonNull(userMail, "userMail cannot be null");
         Objects.requireNonNull(metaDataVersion, "metaDataVersion cannot be null");
-        Objects.requireNonNull(message,"message cannot be null");
-        
+        Objects.requireNonNull(message, "message cannot be null");
+
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-     
+
         return CompletableFuture.supplyAsync(() -> {
             final Map<String, Optional<StoreInfo>> refMap = cache.get(finalRef);
             if (refMap == null) {
@@ -450,13 +467,13 @@ public class GitStorage implements Storage {
 
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-        if(key.endsWith("/")) {
+        if (key.endsWith("/")) {
             // We don't support deleting master .metadata files right now
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-        
+
         CompletableFuture.runAsync(() -> {
-            
+
             try {
                 source.delete(key, finalRef, user, message, userMail);
             } catch (final UncheckedIOException ioe) {

@@ -1,5 +1,7 @@
 package io.jitstatic.source;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -47,4 +49,6 @@ public interface Source extends AutoCloseable, CheckHealth {
             String userMail, String key, String finalRef);
 
     public void delete(String key, String ref, String user, String message, String userMail);
+
+    public String getRefId(String ref) throws IOException;
 }

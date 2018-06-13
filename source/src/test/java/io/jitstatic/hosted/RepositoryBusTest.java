@@ -21,7 +21,7 @@ package io.jitstatic.hosted;
  */
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -29,29 +29,30 @@ import org.mockito.Mockito;
 import io.jitstatic.hosted.ErrorReporter;
 import io.jitstatic.hosted.RepositoryBus;
 import io.jitstatic.source.SourceEventListener;
+import io.jitstatic.utils.Pair;
 
 public class RepositoryBusTest {
 
-	@Test
-	public void testRepositoryBus() {
-		ErrorReporter errorReporter = new ErrorReporter();
-		RepositoryBus bus = new RepositoryBus(errorReporter);
-		SourceEventListener sel = Mockito.mock(SourceEventListener.class);
-		bus.addListener(sel);
-		bus.process(Arrays.asList("1"));
-		Mockito.verify(sel).onEvent(Mockito.any());
-		assertEquals(null, errorReporter.getFault());
-	}
-	
-	@Test
-	public void testRepositoryBusSelThrowsError() {
-		ErrorReporter errorReporter = new ErrorReporter();
-		RuntimeException e = new RuntimeException("Test Triggered");
-		RepositoryBus bus = new RepositoryBus(errorReporter);
-		SourceEventListener sel = Mockito.mock(SourceEventListener.class);
-		bus.addListener(sel);
-		Mockito.doThrow(e).when(sel).onEvent(Mockito.any());
-		bus.process(Arrays.asList("refs/heads/someref"));
-		assertEquals(e,errorReporter.getFault());
-	}
+    @Test
+    public void testRepositoryBus() {
+        ErrorReporter errorReporter = new ErrorReporter();
+        RepositoryBus bus = new RepositoryBus(errorReporter);
+        SourceEventListener sel = Mockito.mock(SourceEventListener.class);
+        bus.addListener(sel);
+        bus.process(List.of(Pair.of("1", null)));
+        Mockito.verify(sel).onEvent(Mockito.any());
+        assertEquals(null, errorReporter.getFault());
+    }
+
+    @Test
+    public void testRepositoryBusSelThrowsError() {
+        ErrorReporter errorReporter = new ErrorReporter();
+        RuntimeException e = new RuntimeException("Test Triggered");
+        RepositoryBus bus = new RepositoryBus(errorReporter);
+        SourceEventListener sel = Mockito.mock(SourceEventListener.class);
+        bus.addListener(sel);
+        Mockito.doThrow(e).when(sel).onEvent(Mockito.any());
+        bus.process(List.of(Pair.of("refs/heads/someref", null)));
+        assertEquals(e, errorReporter.getFault());
+    }
 }

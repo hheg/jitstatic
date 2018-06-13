@@ -4,7 +4,7 @@ package io.jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,11 @@ import java.util.concurrent.CompletableFuture;
 
 import io.jitstatic.StorageData;
 import io.jitstatic.utils.CheckHealth;
+import io.jitstatic.utils.Pair;
 
 public interface Storage extends AutoCloseable, CheckHealth {
 	public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref);
-	public void reload(List<String> refsToReload);
+	public void reload(List<Pair<String,String>> refsToReload);
 	public void close();
 	public CompletableFuture<String> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
     public CompletableFuture<StoreInfo> add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
