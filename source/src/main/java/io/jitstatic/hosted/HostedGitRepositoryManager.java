@@ -408,13 +408,4 @@ public class HostedGitRepositoryManager implements Source {
             throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
         }
     }
-
-    @Override
-    public String getRefId(final String ref) throws IOException {
-        final Ref actualRef = extractor.getRef(ref);
-        if (actualRef == null) {
-            return null;
-        }
-        return actualRef.getObjectId().name();
-    }
 }

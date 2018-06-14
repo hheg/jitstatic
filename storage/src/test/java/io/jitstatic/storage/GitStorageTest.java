@@ -183,7 +183,6 @@ public class GitStorageTest {
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(si2.getMetaDataVersion()).thenReturn(SHA_2_MD);
             when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF_HEADS_MASTER))).thenReturn(si1).thenReturn(si2);
-            when(source.getRefId(Mockito.anyString())).thenReturn("1").thenReturn("2");
 
             gs.reload(List.of(REF_HEADS_MASTER));
             StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null, false, false, List.of()),
@@ -249,7 +248,6 @@ public class GitStorageTest {
     public void testCheckHealthWithFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
-        when(source.getRefId(Mockito.anyString())).thenReturn("1");
 
         try (GitStorage gs = new GitStorage(source, null); InputStream is = getInputStream(0); InputStream md = getMetaData()) {
 
@@ -272,7 +270,6 @@ public class GitStorageTest {
     public void testCheckHealthWithOldFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(Mockito.anyString(), Mockito.anyString());
-        when(source.getRefId(Mockito.anyString())).thenReturn("1");
 
         assertSame(cause, assertThrows(RuntimeException.class, () -> {
             try (GitStorage gs = new GitStorage(source, null);) {

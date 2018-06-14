@@ -30,8 +30,8 @@ import java.util.function.Supplier;
 class RefHolder {
 
     final Map<String, Optional<StoreInfo>> refCache;
-    final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
-    final ReentrantLock keyLock = new ReentrantLock(true);
+    private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
+    private final ReentrantLock keyLock = new ReentrantLock(true);
     private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
     private final String ref;
 

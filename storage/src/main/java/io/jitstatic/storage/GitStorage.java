@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -68,7 +69,7 @@ public class GitStorage implements Storage {
 
     public void reload(final List<String> refsToReload) {
         Objects.requireNonNull(refsToReload);
-        refsToReload.stream().forEach(ref -> {
+        refsToReload.parallelStream().forEach(ref -> {
             final RefHolder refHolder = cache.get(ref);
             if (refHolder != null) {
                 try {
@@ -76,20 +77,13 @@ public class GitStorage implements Storage {
                         LOG.info("Reloading " + ref);
                         final Set<String> files = (refHolder != null ? new HashSet<>(refHolder.refCache.keySet()) : Set.<String>of());
 
-                        final List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef = refreshRef(ref, files);
-                        final List<Exception> faults = refreshRef.stream().filter(Either::isRight).map(Either::getRight)
-                                .collect(Collectors.toList());
-                        if (!faults.isEmpty()) {
-                            throw new LinkedException(faults);
-                        }
-                        final Map<String, Optional<StoreInfo>> newMap = refreshRef.stream().filter(Either::isLeft).map(Either::getLeft)
-                                .flatMap(Optional::stream).filter(p -> p.getRight() != null)
-                                .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
+                        final Map<String, Optional<StoreInfo>> newMap = refreshFiles(ref, files);
                         if (newMap.size() > 0) {
                             final RefHolder originalRefHolder = cache.get(ref);
-                            originalRefHolder.refCache.entrySet().stream().filter(e -> e.getValue().isPresent())
-                                    // Can't trust that the old keys are loaded from the new branch...
-                                    .filter(e -> !newMap.containsKey(e.getKey())).forEach(e -> newMap.put(e.getKey(), e.getValue()));
+                            final Set<String> oldKeys = originalRefHolder.refCache.entrySet().stream().filter(e -> e.getValue().isPresent())
+                                    .filter(e -> !newMap.containsKey(e.getKey())).map(Entry::getKey).collect(Collectors.toSet());
+                            final Map<String, Optional<StoreInfo>> refreshedOldFiles = refreshFiles(ref, oldKeys);
+                            newMap.putAll(refreshedOldFiles);
                             cache.put(ref, new RefHolder(ref, newMap));
                         } else {
                             cache.remove(ref);
@@ -101,6 +95,18 @@ public class GitStorage implements Storage {
                 }
             }
         });
+    }
+
+    private Map<String, Optional<StoreInfo>> refreshFiles(final String ref, final Set<String> files) {
+        final List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef = refreshRef(ref, files);
+        final List<Exception> faults = refreshRef.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
+        if (!faults.isEmpty()) {
+            throw new LinkedException(faults);
+        }
+        final Map<String, Optional<StoreInfo>> newMap = refreshRef.stream().filter(Either::isLeft).map(Either::getLeft)
+                .flatMap(Optional::stream).filter(p -> p.getRight() != null)
+                .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Optional.of(p.getRight())));
+        return newMap;
     }
 
     private List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef(final String ref, final Set<String> files) {

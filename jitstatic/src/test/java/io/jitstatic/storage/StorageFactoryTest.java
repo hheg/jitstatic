@@ -38,7 +38,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
@@ -60,7 +59,6 @@ public class StorageFactoryTest {
     @Test
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
-        when(source.getRefId(Mockito.anyString())).thenReturn("1");
         try (Storage storage = sf.build(source, env);) {
             storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null).get());
