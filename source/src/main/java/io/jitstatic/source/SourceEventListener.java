@@ -24,5 +24,5 @@ import java.util.EventListener;
 import java.util.List;
 
 public interface SourceEventListener extends EventListener {
-	public void onEvent(List<String> updatedRefs);
+    public void onEvent(List<String> updatedRefs);
 }

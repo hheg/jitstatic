@@ -111,7 +111,6 @@ public class HostedGitRepositoryManagerTest {
     public void setup() throws IOException {
         tempDir = getFolder();
         tempFile = Files.createTempFile("junit", "");
-        service = new PriorityExecutor();
     }
 
     Path getFolder() throws IOException {

@@ -26,9 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -56,16 +53,14 @@ public class JitStaticReceivePack extends ReceivePack {
     private static final Logger LOG = LogManager.getLogger(JitStaticReceivePack.class);
 
     private final String defaultRef;
-    private final SubmittingExecutor repoExecutor;
     private final RepositoryBus bus;
     private final ErrorReporter errorReporter;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final Executor service, final ErrorReporter errorReporter,
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter,
             final RepositoryBus bus) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
-        this.repoExecutor = new SubmittingExecutor(Objects.requireNonNull(service));
         this.errorReporter = errorReporter;
     }
 
@@ -147,66 +142,62 @@ public class JitStaticReceivePack extends ReceivePack {
         try {
             if (ifAllOk(cmds)) {
                 commitCommands(cmds);
-                signalReload(cmds);
             }
-        } catch (final InterruptedException | ExecutionException e) {
-            setFault(new RepositoryException("Writing to repo was interrupted", e));
         } finally {
             cleanUpRepository(cmds);
         }
     }
 
     private void signalReload(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft())
-                .map(rc -> rc.getRefName()).map(refName -> {
-                    sendMessage("Reloading " + refName);
-                    return refName;
-                }).collect(Collectors.toList());
+        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft()).map(ref -> {
+            final String refName = ref.getRefName();
+            sendMessage("Reloading " + refName);
+            return refName;
+        }).collect(Collectors.toList());
         bus.process(refsToUpdate);
     }
 
-    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) throws InterruptedException, ExecutionException {
+    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
         final Repository repository = getRepository();
-        repoExecutor.submit((Callable<List<Either<Exception, Void>>> & WriteOperation) () -> {
-            return cmds.stream().map(p -> {
-                final ReceiveCommand orig = p.getLeft();
-                final ReceiveCommand test = p.getRight();
-                try {
-                    final String refName = orig.getRefName();
-                    final Ref ref = repository.findRef(refName);
-                    checkForRef(orig, refName, ref);
-                    checkForBranchStaleness(orig, refName, ref);
-                    final RefUpdate updateRef = repository.updateRef(refName);
-                    updateRef.setRefLogMessage("JitStatic Git push", true);
-                    updateRef.setRefLogIdent(getRefLogIdent());
-                    updateRef.setPushCertificate(getPushCertificate());
-                    if (test == null) { // Deleted branch
-                        updateRef.setNewObjectId(orig.getNewId());
-                        orig.setResult(updateRef.forceUpdate());
-                    } else {
-                        updateRef.setNewObjectId(test.getNewId());
-                        checkResult(refName, updateRef.forceUpdate());
-                        orig.setResult(test.getResult(), test.getMessage());
-                    }
-                    return Either.<Exception, Void>right(null);
-                } catch (final CommandIsStale e1) {
-                    orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getLocalizedMessage());
-                    return Either.<Exception, Void>left(e1);
-                } catch (final RefNotFoundException e1) {
-                    orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
-                    return Either.<Exception, Void>left(e1);
-                } catch (final UpdateResultException updateResult) {
-                    interpretResult(orig, updateResult, orig.getRefName());
-                    return Either.<Exception, Void>left(updateResult);
-                } catch (final IOException e) {
-                    orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
-                    final String msg = "Error while writing commit, repo is in an unknown state ";
-                    final RepositoryException repoException = new RepositoryException(msg, e);
-                    setFault(repoException);
-                    return Either.<Exception, Void>left(repoException);
+        cmds.stream().map(p -> {
+            final ReceiveCommand orig = p.getLeft();
+            final ReceiveCommand test = p.getRight();
+            try {
+                final String refName = orig.getRefName();
+                final Ref ref = repository.findRef(refName);
+                checkForRef(orig, refName, ref);
+                checkForBranchStaleness(orig, refName, ref);
+                final RefUpdate updateRef = repository.updateRef(refName);
+                updateRef.setRefLogMessage("JitStatic Git push", true);
+                updateRef.setRefLogIdent(getRefLogIdent());
+                updateRef.setPushCertificate(getPushCertificate());
+                if (test == null) { // Deleted branch
+                    updateRef.setNewObjectId(orig.getNewId());
+                    orig.setResult(updateRef.forceUpdate());
+                } else {
+                    updateRef.setNewObjectId(test.getNewId());
+                    checkResult(refName, updateRef.forceUpdate());
+                    orig.setResult(test.getResult(), test.getMessage());
                 }
-            }).filter(Either::isLeft).collect(Collectors.toList());
-        }).get().stream().forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
+                signalReload(List.of(p));
+                return Either.<Exception, Void>right(null);
+            } catch (final CommandIsStale e1) {
+                orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getLocalizedMessage());
+                return Either.<Exception, Void>left(e1);
+            } catch (final RefNotFoundException e1) {
+                orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
+                return Either.<Exception, Void>left(e1);
+            } catch (final UpdateResultException updateResult) {
+                interpretResult(orig, updateResult, orig.getRefName());
+                return Either.<Exception, Void>left(updateResult);
+            } catch (final IOException e) {
+                orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
+                final String msg = "Error while writing commit, repo is in an unknown state ";
+                final RepositoryException repoException = new RepositoryException(msg, e);
+                setFault(repoException);
+                return Either.<Exception, Void>left(repoException);
+            }
+        }).filter(Either::isLeft).forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
     }
 
     private void interpretResult(final ReceiveCommand rc, final UpdateResultException updateResult, final String refName) {
@@ -218,7 +209,7 @@ public class JitStaticReceivePack extends ReceivePack {
         case REJECTED:
             rc.setResult(Result.REJECTED_NONFASTFORWARD, refName);
             break;
-        case REJECTED_CURRENT_BRANCH:           
+        case REJECTED_CURRENT_BRANCH:
         default:
             rc.setResult(Result.REJECTED_CURRENT_BRANCH, refName);
             break;
@@ -239,12 +230,8 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private boolean ifAllOk(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        return cmds.stream().allMatch(p -> {
-            if (p.getRight() == null) {
-                return p.getLeft().getResult() == Result.NOT_ATTEMPTED;
-            }
-            return p.getRight().getResult() == Result.OK;
-        });
+        return cmds.stream().allMatch(
+                p -> (p.getRight() == null ? p.getLeft().getResult() == Result.NOT_ATTEMPTED : p.getRight().getResult() == Result.OK));
     }
 
     private void setFault(final Exception e) {

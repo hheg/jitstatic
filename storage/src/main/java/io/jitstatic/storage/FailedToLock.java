@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.storage;
 
 /*-
  * #%L
@@ -20,21 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.List;
+public class FailedToLock extends Exception {
 
-public class WriteData {
+    private static final long serialVersionUID = 2393164769037426630L;
 
-    final List<String> branches;
-    final List<String> names;
-
-    WriteData(final List<String> branches, final List<String> names) {
-        this.branches = branches;
-        this.names = names;
+    public FailedToLock(final String ref) {
+        super(ref);
     }
 
     @Override
-    public String toString() {
-        return "WriteData [branches=" + branches + ", names=" + names + "]";
+    public synchronized Throwable initCause(Throwable cause) {
+        return this;
     }
-
 }

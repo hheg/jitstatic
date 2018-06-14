@@ -20,7 +20,6 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
@@ -29,16 +28,15 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.SortedMap;
-import java.util.UUID;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -48,7 +46,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.ws.rs.client.Client;
@@ -77,7 +74,6 @@ import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -85,7 +81,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 
-import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -103,6 +98,7 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.tools.Utils;
 
 @Tag("slow")
 @ExtendWith(DropwizardExtensionsSupport.class)
@@ -112,7 +108,7 @@ public class LoadWriterTest {
     private static final Logger LOG = LogManager.getLogger(LoadWriterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String METADATA = ".metadata";
     static final String MASTER = "master";
@@ -123,6 +119,7 @@ public class LoadWriterTest {
     private String gitAdress;
     private String adminAdress;
     private WriteData data;
+    private Optional<ResultData> result;
 
     @BeforeEach
     public void setup()
@@ -144,15 +141,18 @@ public class LoadWriterTest {
         int size = data.branches.size() * data.names.size();
         ExecutorService service = Executors.newFixedThreadPool(size);
         try {
-            @SuppressWarnings("rawtypes")
-            CompletableFuture[] jobs = new CompletableFuture[size];
+            @SuppressWarnings("unchecked")
+            CompletableFuture<ResultData>[] jobs = new CompletableFuture[size];
             int j = 0;
             for (String branch : data.branches) {
                 for (String key : data.names) {
                     jobs[j] = CompletableFuture.supplyAsync(() -> {
                         try (JitStaticUpdaterClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
-                            return execute(buildKeyClient, branch, key, tag);
+                            ResultData resultData = execute(buildKeyClient, branch, key, tag);
+                            LOG.info("Thread:{} key:{} branch:{} iters:{} duration:{}ms length:{}bytes", Thread.currentThread().getName(),
+                                    key, branch, resultData.iterations, resultData.duration, resultData.bytes);
+                            return resultData;
                         }
                     }, service);
                     j++;
@@ -160,31 +160,32 @@ public class LoadWriterTest {
             }
             CompletableFuture<Void> wait = CompletableFuture.allOf(jobs);
             wait.get(30, TimeUnit.SECONDS);
-            Stream.of(jobs).map(CompletableFuture::join).map(o -> (ResultData) o).reduce(ResultData::sum)
-                    .ifPresent(r -> LOG.info("Thread:{}  Iters:{} time:{}ms length:{}bytes", Thread.currentThread().getName(), r.iterations,
-                            r.duration, r.bytes));
+            result = Stream.of(jobs).map(CompletableFuture::join).reduce(ResultData::sum);
+
         } finally {
             service.shutdown();
         }
     }
 
-    private ResultData execute(JitStaticUpdaterClient buildKeyClient, String branch, final String key, String tag) {
-        long bytes = 0;
+    private double divide(long nominator, long denominator) {
+        return nominator / (double) (denominator / 1000);
+    }
+
+    private ResultData execute(final JitStaticUpdaterClient buildKeyClient, final String branch, final String key, String tag) {
+        int bytes = 0;
         long stop = 0;
         int i = 1;
         long start = System.currentTimeMillis();
-        while ((stop = System.currentTimeMillis()) - start < 20_000) {
-            try {
+        try {
+            while ((stop = System.currentTimeMillis()) - start < 20_000) {
                 byte[] data2 = getData(i);
                 bytes += data2.length;
                 tag = buildKeyClient.modifyKey(data2, new CommitData(key, branch, "k:" + key + ":" + i, "userinfo", "mail"), tag);
-            } catch (Exception e) {
-                LOG.error("Error ", e);
+                i++;
             }
-            i++;
+        } catch (Exception e) {
+            LOG.error("Error ", e);
         }
-        LOG.info("Thread:{} iters:{} key:{} branch:{} duration:{}ms length:{}bytes", Thread.currentThread().getName(), key, branch, i,
-                (stop - start), bytes);
         return new ResultData(i, (stop - start), bytes);
     }
 
@@ -220,6 +221,9 @@ public class LoadWriterTest {
                             LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent());
                         }
                     }
+                    result.ifPresent(r -> LOG.info("Thread: {}  Iters: {} time: {}ms length: {}b Writes: {}/s Bytes: {}b/s",
+                            Thread.currentThread().getName(), r.iterations, r.duration, r.bytes, divide(r.iterations, r.duration),
+                            divide(r.bytes, r.duration)));
                 }
             } finally {
                 response.close();
@@ -227,7 +231,7 @@ public class LoadWriterTest {
         } finally {
             statsClient.close();
         }
-        checkContainerForErrors();
+        Utils.checkContainerForErrors(DW);
     }
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, WriteData testData)
@@ -240,7 +244,7 @@ public class LoadWriterTest {
             git.add().addFilepattern(".").call();
             git.commit().setMessage("i:a:0").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
-            String value = new String(data, "UTF-8");
+            String value = new String(data, UTF_8);
             pushBranches(provider, testData, git, c, value);
         }
     }
@@ -341,8 +345,7 @@ public class LoadWriterTest {
     }
 
     private static byte[] getData(int c) throws UnsupportedEncodingException {
-        String s = "{\"data\":" + c + ",\"salt\":\"" + UUID.randomUUID() + "\"}";
-        return s.getBytes(UTF_8);
+        return new StringBuilder("{\"data\":").append(c).append("}").toString().getBytes(UTF_8);
     }
 
     private static UsernamePasswordCredentialsProvider getCredentials(final HostedFactory hf) {
@@ -367,17 +370,9 @@ public class LoadWriterTest {
         try {
             return MAPPER.readValue(filedata.toFile(), JsonNode.class);
         } catch (Exception e) {
-            LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata), "UTF-8"));
+            LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata), UTF_8));
             throw e;
         }
-    }
-
-    private void checkContainerForErrors() {
-        SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        errors.stream().forEach(e -> LOG.error("HEALTHCHECK ERROR ", e));
-        assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
 
     private static Supplier<String> getFolder() {
@@ -411,9 +406,9 @@ public class LoadWriterTest {
     private static class ResultData {
         int iterations;
         long duration;
-        long bytes;
+        int bytes;
 
-        public ResultData(int iterations, long duration, long bytes) {
+        public ResultData(int iterations, long duration, int bytes) {
             this.iterations = iterations;
             this.duration = duration;
             this.bytes = bytes;

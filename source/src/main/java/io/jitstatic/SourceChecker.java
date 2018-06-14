@@ -23,7 +23,6 @@ package io.jitstatic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,7 +77,7 @@ public class SourceChecker implements AutoCloseable {
         final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData).flatMap(List::stream)
                 .filter(Pair::isPresent).collect(Collectors.toList());
 
-        return Arrays.asList(Pair.of(revCommit.getRight(), branchErrors));
+        return List.of(Pair.of(revCommit.getRight(), branchErrors));
     }
 
     @Override

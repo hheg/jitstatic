@@ -25,9 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
@@ -46,7 +43,6 @@ public class JitStaticUploadPackFactoryTest {
 
     @Test
     public void testCreate() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-        ExecutorService service = Executors.newSingleThreadExecutor();
         ErrorReporter reporter = new ErrorReporter();
         HttpServletRequest req = mock(HttpServletRequest.class);
         Repository db = mock(Repository.class);
@@ -59,13 +55,12 @@ public class JitStaticUploadPackFactoryTest {
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(true);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
 
-        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(service, reporter);
+        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(reporter);
         assertNotNull(jsrpf.create(req, db));
     }
 
     @Test
     public void testServiceNotEnabledException() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-        ExecutorService service = Executors.newSingleThreadExecutor();
         ErrorReporter reporter = new ErrorReporter();
         HttpServletRequest req = mock(HttpServletRequest.class);
         Repository db = mock(Repository.class);
@@ -78,7 +73,7 @@ public class JitStaticUploadPackFactoryTest {
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(false);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
 
-        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(service, reporter);
+        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(reporter);
         assertThrows(ServiceNotEnabledException.class, () -> jsrpf.create(req, db));
     }
 }

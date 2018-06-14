@@ -220,4 +220,8 @@ public class SourceExtractor {
         }).map(this::fileLoader)
                 .collect(Collectors.toConcurrentMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
     }
+
+    public Ref getRef(final String ref) throws IOException {
+        return repository.findRef(ref);
+    }
 }

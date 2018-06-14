@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.storage;
 
 /*-
  * #%L
@@ -20,21 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.List;
+public class LoadException extends RuntimeException {
+    private static final long serialVersionUID = 8301145459750779096L;
 
-public class WriteData {
-
-    final List<String> branches;
-    final List<String> names;
-
-    WriteData(final List<String> branches, final List<String> names) {
-        this.branches = branches;
-        this.names = names;
+    LoadException(final Exception e) {
+        super(e);
     }
 
     @Override
-    public String toString() {
-        return "WriteData [branches=" + branches + ", names=" + names + "]";
+    public synchronized Throwable initCause(Throwable cause) {
+        return this;
     }
 
 }

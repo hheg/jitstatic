@@ -41,9 +41,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.SortedMap;
-import java.util.stream.Collectors;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
@@ -66,13 +63,11 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.hamcrest.CoreMatchers;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,6 +84,7 @@ import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.tools.Utils;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class HostOwnGitRepositoryTest {
@@ -120,11 +116,7 @@ public class HostOwnGitRepositoryTest {
 
     @AfterEach
     public void after() {
-        SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        errors.stream().forEach(e -> e.printStackTrace());
-        assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
+        Utils.checkContainerForErrors(DW);
     }
 
     @Test

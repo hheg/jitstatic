@@ -28,8 +28,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -56,10 +57,10 @@ public class StorageFactoryTest {
     private StorageFactory sf = new StorageFactory();
 
     @Test
-    public void testBuild() throws InterruptedException, ExecutionException {
+    public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
         try (Storage storage = sf.build(source, env);) {
-            storage.reload(Arrays.asList(Constants.R_HEADS + Constants.MASTER));
+            storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null).get());
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));
