@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executor;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -98,7 +97,6 @@ public class JitStaticReceivePackTest {
     private Path storeMetaPath;
     private TestProtocol<Object> protocol;
     private URIish uri;
-    private Executor service;
     private ErrorReporter errorReporter;
     private RepositoryBus bus;
 
@@ -118,10 +116,9 @@ public class JitStaticReceivePackTest {
 
         errorReporter = new ErrorReporter();
         bus = new RepositoryBus(errorReporter);
-        service = new PriorityExecutor();
 
         protocol = new TestProtocol<Object>(null, (req, db) -> {
-            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, service, errorReporter, bus);
+            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus);
             return receivePack;
 
         });
@@ -258,7 +255,7 @@ public class JitStaticReceivePackTest {
 
         ReceiveCommand rc = new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE);
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -295,7 +292,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
         Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -332,7 +329,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
         Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -361,7 +358,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
         ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -391,7 +388,7 @@ public class JitStaticReceivePackTest {
         clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
         ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
         JitStaticReceivePack rp = Mockito
-                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, service, errorReporter, bus) {
+                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, errorReporter, bus) {
                     @Override
                     protected List<ReceiveCommand> filterCommands(Result want) {
                         return Arrays.asList(rc);
@@ -414,7 +411,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -449,7 +446,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -484,7 +481,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -524,7 +521,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, service, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);

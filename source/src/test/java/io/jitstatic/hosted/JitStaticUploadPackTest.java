@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
-import java.util.concurrent.Executor;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -49,7 +48,7 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadPack() throws IOException {
-        Executor service = new PriorityExecutor();
+        
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -63,7 +62,7 @@ public class JitStaticUploadPackTest {
         OutputStream os = new ByteArrayOutputStream();
         OutputStream messages = new ByteArrayOutputStream();
         ErrorReporter errorReporter = new ErrorReporter();
-        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, service, errorReporter);
+        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
         up.upload(is, os, messages);
@@ -72,7 +71,7 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadFailsWithStaleBaseline() throws IOException {
-        Executor service = new PriorityExecutor();
+        
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -87,7 +86,7 @@ public class JitStaticUploadPackTest {
         OutputStream messages = mock(OutputStream.class);
         Mockito.doThrow(new WantNotValidException(ObjectId.zeroId())).when(os).write(Mockito.any(), Mockito.anyInt(), Mockito.anyInt());
         ErrorReporter errorReporter = new ErrorReporter();
-        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, service, errorReporter);
+        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter);
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
@@ -97,7 +96,7 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadFailsWithUnknownError() throws IOException {
-        Executor service = new PriorityExecutor();
+        
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -113,7 +112,7 @@ public class JitStaticUploadPackTest {
         Mockito.doThrow(new UploadPackInternalServerErrorException(new RuntimeException())).when(os).write(Mockito.any(), Mockito.anyInt(),
                 Mockito.anyInt());
         ErrorReporter errorReporter = new ErrorReporter();
-        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, service, errorReporter);
+        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter);
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());

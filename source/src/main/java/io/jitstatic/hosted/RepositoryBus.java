@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 
 import io.jitstatic.source.SourceEventListener;
-import io.jitstatic.utils.Pair;
 
 public class RepositoryBus {
 
@@ -36,7 +35,7 @@ public class RepositoryBus {
         this.reporter = reporter;
     }
 
-    public void process(final List<Pair<String, String>> refsToUpdate) {
+    public void process(final List<String> refsToUpdate) {
         this.sourceEventListeners.forEach(sourceEventListener -> {
             try {
                 sourceEventListener.onEvent(refsToUpdate);

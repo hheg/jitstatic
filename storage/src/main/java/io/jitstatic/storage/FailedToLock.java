@@ -1,10 +1,10 @@
-package io.jitstatic.source;
+package io.jitstatic.storage;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,16 @@ package io.jitstatic.source;
  * #L%
  */
 
-import java.util.EventListener;
-import java.util.List;
+public class FailedToLock extends Exception {
 
-public interface SourceEventListener extends EventListener {
-    public void onEvent(List<String> updatedRefs);
+    private static final long serialVersionUID = 2393164769037426630L;
+
+    public FailedToLock(final String ref) {
+        super(ref);
+    }
+
+    @Override
+    public synchronized Throwable initCause(Throwable cause) {
+        return this;
+    }
 }

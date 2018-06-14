@@ -23,9 +23,7 @@ package io.jitstatic.hosted;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,43 +35,27 @@ import org.eclipse.jgit.transport.WantNotValidException;
 public class JitStaticUploadPack extends UploadPack {
     private static final Logger LOG = LogManager.getLogger(JitStaticUploadPack.class);
 
-    private final SubmittingExecutor service;
     private final ErrorReporter errorReporter;
 
-    public JitStaticUploadPack(final Repository copyFrom, final Executor service, final ErrorReporter errorReporter) {
+    public JitStaticUploadPack(final Repository copyFrom, final ErrorReporter errorReporter) {
         super(copyFrom);
-        this.service = new SubmittingExecutor(Objects.requireNonNull(service));
         this.errorReporter = Objects.requireNonNull(errorReporter);
     }
 
     @Override
     public void upload(final InputStream input, final OutputStream output, final OutputStream messages) throws IOException {
-        unwrap(service.submit((Runnable & ReadOperation)() -> {
-            try {
-                super.upload(input, output, messages);
-            } catch (final IOException e) {               
-                if (!("org.eclipse.jetty.io.EofException".equals(e.getClass().getCanonicalName()) || (e instanceof WantNotValidException)
-                        || (e instanceof UploadPackInternalServerErrorException))) {
-                    errorReporter.setFault(e);
-                    LOG.error("Upload resulted in error ", e);
-                }
-                throw new UncheckedIOException(e);
-            } catch (final Exception e) {
+        try {
+            super.upload(input, output, messages);
+        } catch (final IOException e) {
+            if (!("org.eclipse.jetty.io.EofException".equals(e.getClass().getCanonicalName()) || (e instanceof WantNotValidException)
+                    || (e instanceof UploadPackInternalServerErrorException))) {
                 errorReporter.setFault(e);
                 LOG.error("Upload resulted in error ", e);
             }
-        }));
-    }
-
-    private void unwrap(final SubmittedSupplier<Void> f) throws IOException {
-        try {
-            f.get();
-        } catch (final RuntimeException re) {
-            final Throwable cause = re.getCause();
-            if (cause instanceof UncheckedIOException) {
-                throw (IOException) cause.getCause();
-            }
-            throw re;
+            throw e;
+        } catch (final Exception e) {
+            errorReporter.setFault(e);
+            LOG.error("Upload resulted in error ", e);
         }
     }
 }

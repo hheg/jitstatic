@@ -29,7 +29,6 @@ import org.mockito.Mockito;
 import io.jitstatic.hosted.ErrorReporter;
 import io.jitstatic.hosted.RepositoryBus;
 import io.jitstatic.source.SourceEventListener;
-import io.jitstatic.utils.Pair;
 
 public class RepositoryBusTest {
 
@@ -39,7 +38,7 @@ public class RepositoryBusTest {
         RepositoryBus bus = new RepositoryBus(errorReporter);
         SourceEventListener sel = Mockito.mock(SourceEventListener.class);
         bus.addListener(sel);
-        bus.process(List.of(Pair.of("1", null)));
+        bus.process(List.of("1"));
         Mockito.verify(sel).onEvent(Mockito.any());
         assertEquals(null, errorReporter.getFault());
     }
@@ -52,7 +51,7 @@ public class RepositoryBusTest {
         SourceEventListener sel = Mockito.mock(SourceEventListener.class);
         bus.addListener(sel);
         Mockito.doThrow(e).when(sel).onEvent(Mockito.any());
-        bus.process(List.of(Pair.of("refs/heads/someref", null)));
+        bus.process(List.of("refs/heads/someref"));
         assertEquals(e, errorReporter.getFault());
     }
 }

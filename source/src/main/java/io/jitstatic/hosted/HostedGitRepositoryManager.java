@@ -28,7 +28,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -76,7 +75,6 @@ public class HostedGitRepositoryManager implements Source {
     private final JitStaticReceivePackFactory receivePackFactory;
     private final ErrorReporter errorReporter;
     private final RepositoryBus repositoryBus;
-    private final SubmittingExecutor repoExecutor;
     private final SourceUpdater updater;
     private final JitStaticUploadPackFactory uploadPackFactory;
 
@@ -113,17 +111,16 @@ public class HostedGitRepositoryManager implements Source {
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(this.bareRepository);
         this.repositoryBus = new RepositoryBus(errorReporter);
-        this.receivePackFactory = new JitStaticReceivePackFactory(Objects.requireNonNull(repoExecutor, "Repo executor cannot be null"),
-                errorReporter, defaultRef, repositoryBus);
-        this.uploadPackFactory = new JitStaticUploadPackFactory(repoExecutor, errorReporter);
+        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter,
+                defaultRef, repositoryBus);
+        this.uploadPackFactory = new JitStaticUploadPackFactory(errorReporter);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
-        this.repoExecutor = new SubmittingExecutor(repoExecutor);
     }
 
     private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
             final ErrorReporter reporter) throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef, new PriorityExecutor(), reporter);
+        this(workingDirectory, endPointName, defaultRef, null, reporter);
     }
 
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
@@ -251,17 +248,15 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(key);
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
-        return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
-            try {
-                final Ref actualRef = findRef(finalRef);
-                if (!checkVersion(version, key, finalRef)) {
-                    throw new WrappingAPIException(new VersionIsNotSame());
-                }
-                return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
-            } catch (final IOException e) {
-                throw new UncheckedIOException(e);
+        try {
+            final Ref actualRef = findRef(finalRef);
+            if (!checkVersion(version, key, finalRef)) {
+                throw new WrappingAPIException(new VersionIsNotSame());
             }
-        }));
+            return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
+        } catch (final IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private Ref findRef(final String finalRef) throws IOException {
@@ -316,16 +311,14 @@ public class HostedGitRepositoryManager implements Source {
         checkIfTag(finalRef);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
 
-        return unwrap(repoExecutor.submit((Callable<Pair<String, String>> & WriteOperation) () -> {
-            try {
-                final Ref actualRef = findRef(finalRef);
-                checkIfKeyAlreadyExist(key, finalRef);
-                return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
-                        actualRef, message, userInfo, userMail);
-            } catch (final IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }));
+        try {
+            final Ref actualRef = findRef(finalRef);
+            checkIfKeyAlreadyExist(key, finalRef);
+            return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + JitStaticConstants.METADATA, unwrap(metaDataConverter))),
+                    actualRef, message, userInfo, userMail);
+        } catch (final IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private void checkIfKeyAlreadyExist(final String key, final String finalRef) {
@@ -349,18 +342,16 @@ public class HostedGitRepositoryManager implements Source {
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
-        return unwrap(repoExecutor.submit((Callable<String> & WriteOperation) () -> {
-            try {
-                final Ref actualRef = findRef(finalRef);
-                if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
-                    throw new WrappingAPIException(new VersionIsNotSame());
-                }
-                return updater.updateMetaData(key + JitStaticConstants.METADATA, actualRef, unwrap(metaDataConverter), message, userInfo,
-                        userMail);
-            } catch (final IOException e) {
-                throw new UncheckedIOException(e);
+        try {
+            final Ref actualRef = findRef(finalRef);
+            if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
+                throw new WrappingAPIException(new VersionIsNotSame());
             }
-        }));
+            return updater.updateMetaData(key + JitStaticConstants.METADATA, actualRef, unwrap(metaDataConverter), message, userInfo,
+                    userMail);
+        } catch (final IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private void checkIfTag(final String finalRef) {
@@ -368,19 +359,7 @@ public class HostedGitRepositoryManager implements Source {
             throw new UnsupportedOperationException("Tags cannot be modified");
         }
     }
-
-    private static <T> T unwrap(final SubmittedSupplier<T> supplier) {
-        try {
-            return supplier.get();
-        } catch (final RuntimeException re) {
-            final Throwable cause = re.getCause();
-            if (cause instanceof WrappingAPIException) {
-                throw (WrappingAPIException) cause;
-            }
-            throw re;
-        }
-    }
-
+    
     private static <T> T unwrap(final CompletableFuture<T> future) {
         try {
             return future.join();
@@ -416,20 +395,18 @@ public class HostedGitRepositoryManager implements Source {
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
 
-        unwrap(repoExecutor.submit((Runnable & WriteOperation) () -> {
-            try {
-                final Ref actualRef = findRef(finalRef);
-                final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-                if (sourceInfo == null) {
-                    return;
-                }
-                updater.deleteKey(key, actualRef, user, message, userMail, sourceInfo.hasKeyMetaData());
-            } catch (final IOException e) {
-                throw new UncheckedIOException(e);
-            } catch (final RefNotFoundException e) {
-                throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
+        try {
+            final Ref actualRef = findRef(finalRef);
+            final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
+            if (sourceInfo == null) {
+                return;
             }
-        }));
+            updater.deleteKey(key, actualRef, user, message, userMail, sourceInfo.hasKeyMetaData());
+        } catch (final IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (final RefNotFoundException e) {
+            throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
+        }
     }
 
     @Override

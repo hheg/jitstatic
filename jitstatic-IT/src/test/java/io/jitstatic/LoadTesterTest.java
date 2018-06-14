@@ -104,6 +104,9 @@ import io.jitstatic.tools.Utils;
 
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
+ * Two common errors:
+ * WantNotValidException happens when the git client is out of sync when pulling
+ * Broken pipe. The git client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
  */
 @Tag("slow")
 @ExtendWith(DropwizardExtensionsSupport.class)

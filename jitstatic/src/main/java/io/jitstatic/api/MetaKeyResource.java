@@ -47,10 +47,12 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
+import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.storage.FailedToLock;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StoreInfo;
 
@@ -135,8 +137,13 @@ public class MetaKeyResource {
             return noChangeBuilder.tag(tag).build();
         }
 
-        final String newVersion = helper.unwrapWithPUTApi(
-                storage.putMetaData(key, ref, data.getMetaData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(storage.putMetaData(key, ref, data.getMetaData(),
+                currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+
+        if (result.isRight()) {
+            return Response.status(Status.PRECONDITION_FAILED).tag(tag).build();
+        }
+        final String newVersion = result.getLeft();
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }

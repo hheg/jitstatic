@@ -48,7 +48,6 @@ import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StorageFactory;
-import io.jitstatic.utils.Pair;
 
 public class StorageFactoryTest {
 
@@ -63,7 +62,7 @@ public class StorageFactoryTest {
         when(env.jersey()).thenReturn(jersey);
         when(source.getRefId(Mockito.anyString())).thenReturn("1");
         try (Storage storage = sf.build(source, env);) {
-            storage.reload(List.of(Pair.of(Constants.R_HEADS + Constants.MASTER, "1")));
+            storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null).get());
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));

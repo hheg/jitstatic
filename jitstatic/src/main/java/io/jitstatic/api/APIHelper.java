@@ -23,8 +23,7 @@ package io.jitstatic.api;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.EntityTag;
@@ -49,17 +48,13 @@ class APIHelper {
         this.log = log;
     }
 
-    StoreInfo unwrapWithPOSTApi(final Future<StoreInfo> add) {
+    StoreInfo unwrapWithPOSTApi(final Supplier<StoreInfo> add) {
         try {
             return add.get();
-        } catch (final InterruptedException e) {
-            log.error("Instruction was interrupted", e);
-            throw new WebApplicationException(Status.REQUEST_TIMEOUT);
-        } catch (final ExecutionException e) {
-            final Throwable cause = e.getCause();
-            if (cause instanceof WrappingAPIException) {
-                final Throwable apiException = cause.getCause();
-                if (apiException instanceof KeyAlreadyExist) {                    
+        } catch (final Exception e) {
+            if (e instanceof WrappingAPIException) {
+                final Throwable apiException = e.getCause();
+                if (apiException instanceof KeyAlreadyExist) {
                     throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
                 } else if (apiException instanceof RefNotFoundException) {
                     // Error message here means that the branch is not found.
@@ -96,16 +91,12 @@ class APIHelper {
         }
     }
 
-    <T> T unwrapWithPUTApi(final Future<T> future) {
+    <T> T unwrapWithPUTApi(final Supplier<T> supplier) {
         try {
-            return future.get();
-        } catch (final InterruptedException e) {
-            log.error("Instruction was interrupted", e);
-            throw new WebApplicationException(Status.REQUEST_TIMEOUT);
-        } catch (final ExecutionException e) {
-            final Throwable cause = e.getCause();
-            if (cause instanceof WrappingAPIException) {
-                final Throwable apiException = cause.getCause();
+            return supplier.get();
+        } catch (final Exception e) {
+            if (e instanceof WrappingAPIException) {
+                final Throwable apiException = e.getCause();
                 if (apiException instanceof UnsupportedOperationException) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
@@ -124,10 +115,10 @@ class APIHelper {
         }
     }
 
-    <T> Optional<T> unwrap(final Future<Optional<T>> future) {
+    <T> Optional<T> unwrap(final Supplier<Optional<T>> supplier) {
         try {
-            return future.get();
-        } catch (final InterruptedException | ExecutionException e) {
+            return supplier.get();
+        } catch (final Exception e) {
             log.error("Error while unwrapping future", e);
             return Optional.empty();
         }

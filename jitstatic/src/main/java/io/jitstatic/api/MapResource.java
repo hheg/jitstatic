@@ -52,12 +52,14 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
+import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.HeaderPair;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.storage.FailedToLock;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StoreInfo;
 import io.jitstatic.utils.WrappingAPIException;
@@ -171,14 +173,25 @@ public class MapResource {
         checkIfAllowed(key, user, allowedUsers);
 
         final String currentVersion = storeInfo.getVersion();
-        final ResponseBuilder response = request.evaluatePreconditions(new EntityTag(currentVersion));
+        final EntityTag entityTag = new EntityTag(currentVersion);
+        final ResponseBuilder response = request.evaluatePreconditions(entityTag);
 
         if (response != null) {
-            return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+            return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
         }
 
-        final String newVersion = helper.unwrapWithPUTApi(
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
                 storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+
+        if (result == null) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        
+        if (result.isRight()) {
+            return Response.status(Status.PRECONDITION_FAILED).tag(entityTag).build();
+        }
+        final String newVersion = result.getLeft();
+
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }

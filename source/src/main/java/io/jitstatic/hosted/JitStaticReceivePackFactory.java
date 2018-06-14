@@ -22,7 +22,6 @@ package io.jitstatic.hosted;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -38,15 +37,12 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
     private final String defaultRef;
-    private final Executor repoExecutor;
     private final ErrorReporter errorReporter;
     private final RepositoryBus bus;
 
-    public JitStaticReceivePackFactory(final Executor repoExecutor, final ErrorReporter reporter, final String defaultRef,
-            final RepositoryBus bus) {
+    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RepositoryBus bus) {
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.errorReporter = Objects.requireNonNull(reporter);
-        this.repoExecutor = Objects.requireNonNull(repoExecutor);
         this.bus = Objects.requireNonNull(bus);
     }
 
@@ -82,7 +78,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     }
 
     protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, repoExecutor, errorReporter, bus);
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus);
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));
