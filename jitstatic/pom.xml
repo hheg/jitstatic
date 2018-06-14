@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.11.0</version>
+		<version>0.11.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>jitstatic</artifactId>
 	<dependencies>
@@ -88,22 +88,22 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.11.0</version>
+			<version>0.11.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>storage</artifactId>
-			<version>0.11.0</version>
+			<version>0.11.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>version</artifactId>
-			<version>0.11.0</version>
+			<version>0.11.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.11.0</version>
+			<version>0.11.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.activation</groupId>
