@@ -30,9 +30,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.CorruptedSourceException;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.reporting.ReportingFactory;
 import io.jitstatic.source.Source;
@@ -71,7 +71,7 @@ public class JitstaticConfiguration extends Configuration {
         return hosted;
     }
 
-    public void setHostedFactory(HostedFactory hosted) {
+    public void setHostedFactory(final HostedFactory hosted) {
         this.hosted = hosted;
     }
 

@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -20,16 +20,25 @@ package io.jitstatic.storage;
  * #L%
  */
 
-public class FailedToLock extends Exception {
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
 
-    private static final long serialVersionUID = 2393164769037426630L;
+import io.jitstatic.hosted.InputStreamHolder;
 
-    public FailedToLock(final String ref) {
-        super(ref);
-    }
+public class RepositoryDataError extends FileData {
 
-    @Override
-    public synchronized Throwable initCause(Throwable cause) {
-        return this;
-    }
+	public RepositoryDataError(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+		super(fileInfo, inputStreamHolder);
+		Objects.requireNonNull(inputStreamHolder.exception());
+	}
+
+	@Override
+	public InputStream getInputStream() throws IOException {
+		throw new RuntimeException(getInputStreamHolder().exception());
+	}
+
+	public FileObjectIdStore getFileObjectIdStore() {
+		return getFileInfo();
+	}
 }

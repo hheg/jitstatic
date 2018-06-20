@@ -22,19 +22,20 @@ package io.jitstatic.storage;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 import com.spencerwi.either.Either;
 
 import io.jitstatic.StorageData;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.CheckHealth;
 
 public interface Storage extends AutoCloseable, CheckHealth {
-	public Supplier<Optional<StoreInfo>> getKey(String key, String ref);
+	public Optional<StoreInfo> getKey(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
-	public Supplier<Either<String, FailedToLock>> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
-    public Supplier<StoreInfo> add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
-    public Supplier<Either<String, FailedToLock>> putMetaData(String key, String ref, StorageData metaData, String metaDataVersion, String message, String userInfo, String userMail);
+	public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
+    public StoreInfo add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
+    public Either<String, FailedToLock> putMetaData(String key, String ref, StorageData metaData, String metaDataVersion, String message, String userInfo, String userMail);
     public void delete(String key, String ref, String user, String message, String userMail);
 }

@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.utils.Path;
 

@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
-import io.jitstatic.CorruptedSourceException;
+import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedGitRepositoryManager;
 import io.jitstatic.source.Source;
 

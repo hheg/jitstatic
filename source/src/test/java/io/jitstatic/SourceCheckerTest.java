@@ -42,7 +42,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.SourceChecker;
+import io.jitstatic.check.FileIsMissingMetaData;
+import io.jitstatic.check.FileObjectIdStore;
+import io.jitstatic.check.SourceChecker;
 import io.jitstatic.hosted.RemoteTestUtils;
 import io.jitstatic.utils.Pair;
 

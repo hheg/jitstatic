@@ -61,7 +61,7 @@ public class StorageFactoryTest {
         when(env.jersey()).thenReturn(jersey);
         try (Storage storage = sf.build(source, env);) {
             storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
-            assertEquals(Optional.empty(), storage.getKey("key", null).get());
+            assertEquals(Optional.empty(), storage.getKey("key", null));
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));
         verify(jersey).register(RolesAllowedDynamicFeature.class);

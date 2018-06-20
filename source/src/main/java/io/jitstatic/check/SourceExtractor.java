@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -43,6 +43,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;

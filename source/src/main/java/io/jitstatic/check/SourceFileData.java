@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -20,25 +20,12 @@ package io.jitstatic;
  * #L%
  */
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Objects;
-
 import io.jitstatic.hosted.InputStreamHolder;
 
-public class RepositoryDataError extends FileData {
+public class SourceFileData extends FileData {
 
-	public RepositoryDataError(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+	public SourceFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
 		super(fileInfo, inputStreamHolder);
-		Objects.requireNonNull(inputStreamHolder.exception());
 	}
-
-	@Override
-	public InputStream getInputStream() throws IOException {
-		throw new RuntimeException(getInputStreamHolder().exception());
-	}
-
-	public FileObjectIdStore getFileObjectIdStore() {
-		return getFileInfo();
-	}
+	
 }

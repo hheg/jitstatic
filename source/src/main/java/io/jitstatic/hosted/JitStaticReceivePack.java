@@ -42,10 +42,10 @@ import org.eclipse.jgit.transport.ReceivePack;
 
 import com.spencerwi.either.Either;
 
-import io.jitstatic.CorruptedSourceException;
-import io.jitstatic.FileObjectIdStore;
 import io.jitstatic.JitStaticConstants;
-import io.jitstatic.SourceChecker;
+import io.jitstatic.check.CorruptedSourceException;
+import io.jitstatic.check.FileObjectIdStore;
+import io.jitstatic.check.SourceChecker;
 import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePack extends ReceivePack {
@@ -162,40 +162,47 @@ public class JitStaticReceivePack extends ReceivePack {
         cmds.stream().map(p -> {
             final ReceiveCommand orig = p.getLeft();
             final ReceiveCommand test = p.getRight();
+            final String refName = orig.getRefName();
             try {
-                final String refName = orig.getRefName();
-                final Ref ref = repository.findRef(refName);
-                checkForRef(orig, refName, ref);
-                checkForBranchStaleness(orig, refName, ref);
-                final RefUpdate updateRef = repository.updateRef(refName);
-                updateRef.setRefLogMessage("JitStatic Git push", true);
-                updateRef.setRefLogIdent(getRefLogIdent());
-                updateRef.setPushCertificate(getPushCertificate());
-                if (test == null) { // Deleted branch
-                    updateRef.setNewObjectId(orig.getNewId());
-                    orig.setResult(updateRef.forceUpdate());
-                } else {
-                    updateRef.setNewObjectId(test.getNewId());
-                    checkResult(refName, updateRef.forceUpdate());
-                    orig.setResult(test.getResult(), test.getMessage());
-                }
-                signalReload(List.of(p));
-                return Either.<Exception, Void>right(null);
-            } catch (final CommandIsStale e1) {
-                orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getLocalizedMessage());
+                return bus.getRefHolder(refName).lockWriteAll(() -> {
+                    try {
+                        final Ref ref = repository.findRef(refName);
+                        checkForRef(orig, refName, ref);
+                        checkForBranchStaleness(orig, refName, ref);
+                        final RefUpdate updateRef = repository.updateRef(refName);
+                        updateRef.setRefLogMessage("JitStatic Git push", true);
+                        updateRef.setRefLogIdent(getRefLogIdent());
+                        updateRef.setPushCertificate(getPushCertificate());
+                        if (test == null) { // Deleted branch
+                            updateRef.setNewObjectId(orig.getNewId());
+                            orig.setResult(updateRef.forceUpdate());
+                        } else {
+                            updateRef.setNewObjectId(test.getNewId());
+                            checkResult(refName, updateRef.forceUpdate());
+                            orig.setResult(test.getResult(), test.getMessage());
+                        }
+                        signalReload(List.of(p));
+                        return Either.<Exception, Void>right(null);
+                    } catch (final CommandIsStale e1) {
+                        orig.setResult(Result.REJECTED_NONFASTFORWARD, e1.getLocalizedMessage());
+                        return Either.<Exception, Void>left(e1);
+                    } catch (final RefNotFoundException e1) {
+                        orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
+                        return Either.<Exception, Void>left(e1);
+                    } catch (final UpdateResultException updateResult) {
+                        interpretResult(orig, updateResult, orig.getRefName());
+                        return Either.<Exception, Void>left(updateResult);
+                    } catch (final IOException e) {
+                        orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
+                        final String msg = "Error while writing commit, repo is in an unknown state ";
+                        final RepositoryException repoException = new RepositoryException(msg, e);
+                        setFault(repoException);
+                        return Either.<Exception, Void>left(repoException);
+                    }
+                });
+            } catch (final FailedToLock e1) {
+                orig.setResult(Result.LOCK_FAILURE, e1.getLocalizedMessage());
                 return Either.<Exception, Void>left(e1);
-            } catch (final RefNotFoundException e1) {
-                orig.setResult(Result.REJECTED_MISSING_OBJECT, e1.getLocalizedMessage());
-                return Either.<Exception, Void>left(e1);
-            } catch (final UpdateResultException updateResult) {
-                interpretResult(orig, updateResult, orig.getRefName());
-                return Either.<Exception, Void>left(updateResult);
-            } catch (final IOException e) {
-                orig.setResult(Result.REJECTED_OTHER_REASON, e.getLocalizedMessage());
-                final String msg = "Error while writing commit, repo is in an unknown state ";
-                final RepositoryException repoException = new RepositoryException(msg, e);
-                setFault(repoException);
-                return Either.<Exception, Void>left(repoException);
             }
         }).filter(Either::isLeft).forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
     }

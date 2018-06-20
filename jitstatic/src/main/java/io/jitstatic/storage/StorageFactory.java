@@ -46,6 +46,7 @@ public class StorageFactory {
 		env.jersey().register(RolesAllowedDynamicFeature.class);
 		env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
 		final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());
+		source.addRefHolderFactory(gitStorage::getRefHolderLock);
 		source.addListener((updatedRefs) -> {
 			try {
 				gitStorage.reload(updatedRefs);

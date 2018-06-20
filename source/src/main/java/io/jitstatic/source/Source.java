@@ -1,5 +1,7 @@
 package io.jitstatic.source;
 
+import java.util.function.Function;
+
 /*-
  * #%L
  * jitstatic
@@ -23,12 +25,13 @@ package io.jitstatic.source;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
 import io.jitstatic.StorageData;
+import io.jitstatic.hosted.RefHolder;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
 public interface Source extends AutoCloseable, CheckHealth {
     public void close();
-
+    
     public void addListener(SourceEventListener listener);
 
     public void start();
@@ -47,5 +50,7 @@ public interface Source extends AutoCloseable, CheckHealth {
             String userMail, String key, String finalRef);
 
     public void delete(String key, String ref, String user, String message, String userMail);
+
+    public void addRefHolderFactory(Function<String,RefHolder> factory);
 
 }

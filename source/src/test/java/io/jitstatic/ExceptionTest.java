@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.MetaDataFileIsMissingSourceFile;
 import io.jitstatic.UpdateFailedException;
+import io.jitstatic.check.MetaDataFileIsMissingSourceFile;
 
 public class ExceptionTest {
 

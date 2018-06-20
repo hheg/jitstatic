@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -50,13 +51,13 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.CorruptedSourceException;
-import io.jitstatic.FileObjectIdStore;
 import io.jitstatic.JitStaticConstants;
-import io.jitstatic.SourceChecker;
-import io.jitstatic.SourceExtractor;
 import io.jitstatic.SourceUpdater;
 import io.jitstatic.StorageData;
+import io.jitstatic.check.CorruptedSourceException;
+import io.jitstatic.check.FileObjectIdStore;
+import io.jitstatic.check.SourceChecker;
+import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
@@ -111,8 +112,7 @@ public class HostedGitRepositoryManager implements Source {
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(this.bareRepository);
         this.repositoryBus = new RepositoryBus(errorReporter);
-        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter,
-                defaultRef, repositoryBus);
+        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, repositoryBus);
         this.uploadPackFactory = new JitStaticUploadPackFactory(errorReporter);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
@@ -359,7 +359,7 @@ public class HostedGitRepositoryManager implements Source {
             throw new UnsupportedOperationException("Tags cannot be modified");
         }
     }
-    
+
     private static <T> T unwrap(final CompletableFuture<T> future) {
         try {
             return future.join();
@@ -407,5 +407,10 @@ public class HostedGitRepositoryManager implements Source {
         } catch (final RefNotFoundException e) {
             throw new ShouldNeverHappenException("delete key:" + key + " ref:" + finalRef, e);
         }
+    }
+
+    @Override
+    public void addRefHolderFactory(final Function<String, RefHolder> factory) {
+        this.repositoryBus.setRefHolderFactory(factory);
     }
 }

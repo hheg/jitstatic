@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -20,16 +20,17 @@ package io.jitstatic;
  * #L%
  */
 
-public class FileIsMissingMetaData extends Exception {
+public class MetaDataFileIsMissingSourceFile extends Exception {
 
-	private static final long serialVersionUID = 190867139018903657L;
+	private static final long serialVersionUID = 6044973559570290649L;
 
-	public FileIsMissingMetaData(final String file) {
-		super(file + " is missing metadata file i.e '" + file + JitStaticConstants.METADATA + "'");
+	public MetaDataFileIsMissingSourceFile(final String file) {
+		super(file + " is missing matching source file");
 	}
 
 	@Override
 	public Throwable fillInStackTrace() {
 		return this;
 	}
+
 }

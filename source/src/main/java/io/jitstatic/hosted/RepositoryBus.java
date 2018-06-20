@@ -23,16 +23,26 @@ package io.jitstatic.hosted;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 import io.jitstatic.source.SourceEventListener;
 
 public class RepositoryBus {
 
     private final List<SourceEventListener> sourceEventListeners = Collections.synchronizedList(new ArrayList<>());
+    private volatile Function<String, RefHolder> refSource;
     private final ErrorReporter reporter;
 
     public RepositoryBus(final ErrorReporter reporter) {
         this.reporter = reporter;
+    }
+
+    public void setRefHolderFactory(final Function<String, RefHolder> factory) {
+        refSource = factory;
+    }
+
+    public RefHolder getRefHolder(final String ref) {
+        return refSource.apply(ref);
     }
 
     public void process(final List<String> refsToUpdate) {

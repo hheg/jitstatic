@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -37,6 +37,8 @@ import org.eclipse.jgit.lib.Repository;
 
 import com.spencerwi.either.Either;
 
+import io.jitstatic.JitStaticConstants;
+import io.jitstatic.SourceJSONParser;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.utils.Pair;
 

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.eclipse.jgit.lib.ObjectId;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.FileObjectIdStore;
+import io.jitstatic.check.FileObjectIdStore;
 
 public class FileObjectIdStoreTest {
 

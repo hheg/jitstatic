@@ -52,7 +52,7 @@ import org.mockito.Mockito;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.jetty.setup.ServletEnvironment;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.CorruptedSourceException;
+import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.source.Source;
 

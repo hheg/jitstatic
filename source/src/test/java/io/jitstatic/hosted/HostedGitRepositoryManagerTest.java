@@ -86,9 +86,9 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.CorruptedSourceException;
-import io.jitstatic.RepositoryIsMissingIntendedBranch;
 import io.jitstatic.StorageData;
+import io.jitstatic.check.CorruptedSourceException;
+import io.jitstatic.check.RepositoryIsMissingIntendedBranch;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;

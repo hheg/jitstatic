@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -78,7 +79,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import io.jitstatic.SourceChecker;
+import io.jitstatic.check.SourceChecker;
 import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePackTest {
@@ -116,7 +117,9 @@ public class JitStaticReceivePackTest {
 
         errorReporter = new ErrorReporter();
         bus = new RepositoryBus(errorReporter);
-
+        // We are not testing Source's capabilities here.
+        bus.setRefHolderFactory((ref) -> new RefHolder(ref, new ConcurrentHashMap<>(), null));
+        
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus);
             return receivePack;
@@ -212,6 +215,7 @@ public class JitStaticReceivePackTest {
             System.out.println(messages);
         }
         assertEquals(Status.OK, rru.getStatus());
+        assertEquals(null, errorReporter.getFault());
     }
 
     @Test
@@ -235,6 +239,7 @@ public class JitStaticReceivePackTest {
         }
         assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
         assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
+        assertEquals(null, errorReporter.getFault());
         final File newFolder = getFolder().toFile();
         try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
                 .call()) {

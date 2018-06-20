@@ -1,4 +1,6 @@
-package io.jitstatic;
+package io.jitstatic.check;
+
+import io.jitstatic.JitStaticConstants;
 
 /*-
  * #%L
@@ -20,23 +22,16 @@ package io.jitstatic;
  * #L%
  */
 
-import io.jitstatic.hosted.InputStreamHolder;
+public class FileIsMissingMetaData extends Exception {
 
-public class MetaFileData extends FileData {
+	private static final long serialVersionUID = 190867139018903657L;
 
-    private final boolean isKeyMetaFile;
+	public FileIsMissingMetaData(final String file) {
+		super(file + " is missing metadata file i.e '" + file + JitStaticConstants.METADATA + "'");
+	}
 
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder, final boolean isKeyMetaFile) {
-        super(fileInfo, inputStreamHolder);
-        this.isKeyMetaFile = isKeyMetaFile;
-    }
-
-    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-        this(fileInfo, inputStreamHolder, false);
-    }
-
-    public boolean isKeyMetaFile() {
-        return isKeyMetaFile;
-    }
-
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

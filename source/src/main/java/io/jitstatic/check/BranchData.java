@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.Path;
 
