@@ -52,9 +52,9 @@ import com.spencerwi.either.Either;
 import io.dropwizard.auth.Auth;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.storage.FailedToLock;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.storage.StoreInfo;
 
 @Path("metakey")
 public class MetaKeyResource {
@@ -89,7 +89,7 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -124,7 +124,7 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -137,7 +137,7 @@ public class MetaKeyResource {
             return noChangeBuilder.tag(tag).build();
         }
 
-        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(storage.putMetaData(key, ref, data.getMetaData(),
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.putMetaData(key, ref, data.getMetaData(),
                 currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
 
         if (result.isRight()) {

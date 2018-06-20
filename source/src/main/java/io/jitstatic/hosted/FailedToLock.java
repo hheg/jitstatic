@@ -20,5 +20,16 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-public interface ReadOperation {
+public class FailedToLock extends Exception {
+
+    private static final long serialVersionUID = 2393164769037426630L;
+
+    public FailedToLock(final String ref) {
+        super(ref);
+    }
+
+    @Override
+    public synchronized Throwable initCause(Throwable cause) {
+        return this;
+    }
 }

@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -22,10 +22,21 @@ package io.jitstatic;
 
 import io.jitstatic.hosted.InputStreamHolder;
 
-public class SourceFileData extends FileData {
+public class MetaFileData extends FileData {
 
-	public SourceFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
-		super(fileInfo, inputStreamHolder);
-	}
-	
+    private final boolean isKeyMetaFile;
+
+    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder, final boolean isKeyMetaFile) {
+        super(fileInfo, inputStreamHolder);
+        this.isKeyMetaFile = isKeyMetaFile;
+    }
+
+    public MetaFileData(final FileObjectIdStore fileInfo, final InputStreamHolder inputStreamHolder) {
+        this(fileInfo, inputStreamHolder, false);
+    }
+
+    public boolean isKeyMetaFile() {
+        return isKeyMetaFile;
+    }
+
 }

@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.hosted;
 
 /*-
  * #%L

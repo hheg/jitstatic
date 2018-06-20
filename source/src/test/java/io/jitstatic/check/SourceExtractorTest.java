@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -78,6 +78,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
+import io.jitstatic.JitStaticConstants;
+import io.jitstatic.check.BranchData;
+import io.jitstatic.check.FileObjectIdStore;
+import io.jitstatic.check.MetaFileData;
+import io.jitstatic.check.RepositoryDataError;
+import io.jitstatic.check.SourceChecker;
+import io.jitstatic.check.SourceExtractor;
+import io.jitstatic.check.SourceFileData;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
 

@@ -23,8 +23,8 @@ package io.jitstatic.source;
 import java.io.IOException;
 import java.io.InputStream;
 
-import io.jitstatic.MetaFileData;
-import io.jitstatic.SourceFileData;
+import io.jitstatic.check.MetaFileData;
+import io.jitstatic.check.SourceFileData;
 
 public class SourceInfo {
 

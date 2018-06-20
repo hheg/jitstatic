@@ -1,10 +1,10 @@
-package io.jitstatic.storage;
+package io.jitstatic.check;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,19 @@ package io.jitstatic.storage;
  * #L%
  */
 
-public class LoadException extends RuntimeException {
-    private static final long serialVersionUID = 8301145459750779096L;
 
-    LoadException(final Exception e) {
-        super(e);
-    }
+public class RepositoryIsMissingIntendedBranch extends RuntimeException {
+	public RepositoryIsMissingIntendedBranch(String msg) {
+		super(msg);
+	}
 
-    @Override
-    public synchronized Throwable initCause(Throwable cause) {
-        return this;
-    }
-
+	private static final long serialVersionUID = -7606348017682123021L;
+	/*
+	 * (non-Javadoc) Not caring about the stack here, just for signaling an error;
+	 * @see java.lang.Throwable#fillInStackTrace()
+	 */
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

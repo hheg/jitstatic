@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
@@ -71,10 +70,10 @@ import io.dropwizard.testing.junit5.ResourceExtension;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.storage.FailedToLock;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.storage.StoreInfo;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -131,7 +130,7 @@ public class MapResourceTest {
 
     @Test
     public void testGettingKeyFromResource() throws InterruptedException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("dog"));
+        Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .get(JsonNode.class);
@@ -140,7 +139,7 @@ public class MapResourceTest {
 
     @Test
     public void testGettingKeyFromResourceWithNoAuthentication() {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("dog"));
+        Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         assertThat(assertThrows(WebApplicationException.class, () -> RESOURCES.target("/storage/dog").request().get(JsonNode.class))
                 .getLocalizedMessage(), Matchers.containsString(Status.UNAUTHORIZED.toString()));
@@ -148,7 +147,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyNotFound() {
-        when(storage.getKey(Mockito.eq("cat"), Mockito.any())).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("cat"), Mockito.any())).thenReturn(Optional.empty());
         assertEquals(compileMsg(Status.NOT_FOUND), assertThrows(WebApplicationException.class,
                 () -> RESOURCES.target("/storage/cat").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(StorageData.class))
                         .getLocalizedMessage());
@@ -156,7 +155,7 @@ public class MapResourceTest {
 
     @Test
     public void testNoAuthorizationOnPermittedResource() throws InterruptedException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("horse"));
+        Optional<StoreInfo> expected = DATA.get("horse");
         when(storage.getKey("horse", null)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -164,7 +163,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("dog"));
+        Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
         assertEquals("HTTP 401 Unauthorized", assertThrows(WebApplicationException.class, () -> {
@@ -174,7 +173,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyIsFoundWithBranch() throws InterruptedException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("horse"));
+        Optional<StoreInfo> expected = DATA.get("horse");
         when(storage.getKey(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/heads/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -198,7 +197,7 @@ public class MapResourceTest {
 
     @Test
     public void testKeyIsFoundWithTags() throws InterruptedException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("horse"));
+        Optional<StoreInfo> expected = DATA.get("horse");
         when(storage.getKey(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -206,7 +205,7 @@ public class MapResourceTest {
 
     @Test
     public void testDoubleKeyIsFoundWithTags() throws InterruptedException {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("horse"));
+        Optional<StoreInfo> expected = DATA.get("horse");
         when(storage.getKey(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
@@ -215,7 +214,7 @@ public class MapResourceTest {
     @Test
     public void testGetAKeyWithETag() {
         Optional<StoreInfo> optional = DATA.get("horse");
-        when(storage.getKey(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(() -> (optional));
+        when(storage.getKey(Mockito.matches("horse/horse"), Mockito.matches("refs/tags/branch"))).thenReturn(optional);
         Response response = RESOURCES.target("/storage/horse/horse").queryParam("ref", "refs/tags/branch").request()
                 .header(HttpHeaders.IF_MATCH, "\"" + optional.get().getVersion() + "\"").get();
         assertEquals(HttpStatus.NOT_MODIFIED_304, response.getStatus());
@@ -261,7 +260,7 @@ public class MapResourceTest {
     public void testPutADeletedKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         ModifyKeyData data = new ModifyKeyData();
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(Optional.empty());
         byte[] readTree = "{\"food\" : [\"treats\",\"meat\"]}".getBytes(UTF_8);
         data.setMessage("message");
         data.setData(readTree);
@@ -279,8 +278,8 @@ public class MapResourceTest {
     public void testPutAKey() throws IOException, RefNotFoundException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        Supplier<Either<String, FailedToLock>> expected = () -> Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        Either<String, FailedToLock> expected = Either.left("2");
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
                 Mockito.any())).thenReturn(expected);
         ModifyKeyData data = new ModifyKeyData();
@@ -294,7 +293,7 @@ public class MapResourceTest {
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         EntityTag entityTag = response.getEntityTag();
-        assertEquals(expected.get().getLeft(), entityTag.getValue());
+        assertEquals(expected.getLeft(), entityTag.getValue());
         response.close();
     }
 
@@ -302,8 +301,8 @@ public class MapResourceTest {
     public void testPutAKeyOtherVersion() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        Supplier<Either<String, FailedToLock>> expected = () -> Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        Either<String, FailedToLock> expected = Either.left("2");
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
                 Mockito.any())).thenReturn(expected);
         ModifyKeyData data = new ModifyKeyData();
@@ -324,8 +323,8 @@ public class MapResourceTest {
     public void testPutAKeyOtherVersionMissingHeader() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        Supplier<Either<String, FailedToLock>> expected = () -> Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        Either<String, FailedToLock> expected = Either.left("2");
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
                 Mockito.any())).thenReturn(expected);
         ModifyKeyData data = new ModifyKeyData();
@@ -343,7 +342,7 @@ public class MapResourceTest {
     @Test
     public void testPutAMissingKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
-        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(Optional.empty());
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -361,7 +360,7 @@ public class MapResourceTest {
     public void testPutAKeyWithNoUsers() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
         Optional<StoreInfo> storeInfo = DATA.get("horse");
-        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(storeInfo);
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -379,7 +378,7 @@ public class MapResourceTest {
     public void testPutAKeyWithWrongUser() throws IOException {
         WebTarget target = RESOURCES.target("/storage/cat");
         Optional<StoreInfo> storeInfo = DATA.get("cat");
-        when(storage.getKey(Mockito.eq("cat"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("cat"), Mockito.eq(null))).thenReturn(storeInfo);
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -396,9 +395,9 @@ public class MapResourceTest {
     public void testPutKeyIsFoundButNotFoundWhenModifying() throws RefNotFoundException, IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.any())).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.any())).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.any(), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn(() -> (null));
+                Mockito.any())).thenReturn(null);
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -416,11 +415,9 @@ public class MapResourceTest {
     public void testPutKeyButRefIsDeletedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn(() -> {
-                    throw new WrappingAPIException(new RefNotFoundException(""));
-                });
+                Mockito.any())).thenThrow(new WrappingAPIException(new RefNotFoundException("")));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -438,11 +435,9 @@ public class MapResourceTest {
     public void testPutKeyButKeyIsDeletedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn(() -> {
-                    throw new WrappingAPIException(new UnsupportedOperationException(""));
-                });
+                Mockito.any())).thenThrow(new WrappingAPIException(new UnsupportedOperationException("")));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -460,11 +455,9 @@ public class MapResourceTest {
     public void testPutKeyButVersionIsChangedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn((storeInfo));
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn((() -> {
-                    throw new WrappingAPIException(new VersionIsNotSame());
-                }));
+                Mockito.any())).thenThrow((new WrappingAPIException(new VersionIsNotSame())));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -482,11 +475,9 @@ public class MapResourceTest {
     public void testPutKeyGeneralError() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn((storeInfo));
         when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn((() -> {
-                    throw new WrappingAPIException(new Exception("Test exception"));
-                }));
+                Mockito.any())).thenThrow(new WrappingAPIException(new Exception("Test exception")));
         ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         data.setMessage("message");
@@ -517,21 +508,20 @@ public class MapResourceTest {
 
     @Test
     public void testNotModified() {
-        Optional<StoreInfo> storeInfo = DATA.get("dog");
-        Supplier<Optional<StoreInfo>> expected = () -> (storeInfo);
+        Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
-        assertEquals(storeInfo.get().getVersion(), response.getEntityTag().getValue());
+        assertEquals(DATA.get("dog").get().getVersion(), response.getEntityTag().getValue());
         response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"" + storeInfo.get().getVersion() + "\"")
-                .get();
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + DATA.get("dog").get().getVersion() + "\"").get();
         assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
     }
 
     @Test
     public void testGetapplicatiOnoctetstream() {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("book"));
+        Optional<StoreInfo> expected = DATA.get("book");
         when(storage.getKey("book", null)).thenReturn(expected);
         Response response = RESOURCES.target("/storage/book").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
@@ -541,10 +531,10 @@ public class MapResourceTest {
 
     @Test
     public void testModifyApplicatiOnoctetStream() {
-        Supplier<Optional<StoreInfo>> expected = () -> (DATA.get("book"));
+        Optional<StoreInfo> expected = DATA.get("book");
         when(storage.getKey("book", null)).thenReturn(expected);
         when(storage.put(Mockito.eq("book"), Mockito.eq(null), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
-                Mockito.any())).thenReturn(() -> Either.left("2"));
+                Mockito.any())).thenReturn(Either.left("2"));
         Response response = RESOURCES.target("/storage/book").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         assertArrayEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, response.readEntity(byte[].class));
@@ -568,9 +558,9 @@ public class MapResourceTest {
     public void testAddKey() throws JsonProcessingException {
         StoreInfo si = new StoreInfo(new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "1",
                 "1");
-        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.add(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
-                Mockito.any())).thenReturn(() -> (si));
+                Mockito.any())).thenReturn(si);
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
                 new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
@@ -606,7 +596,7 @@ public class MapResourceTest {
     public void testAddKeyWrongUser() throws UnsupportedEncodingException {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(() -> (new StoreInfo(data, new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1")));
+                .thenReturn(new StoreInfo(data, new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1"));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
                         new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "test", "user", "test@test.com")));
@@ -627,12 +617,10 @@ public class MapResourceTest {
     @Test
     public void testAddKeyKeyAlreadyExist() throws UnsupportedEncodingException {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        Supplier<StoreInfo> runAsync = (() -> {
-            throw new WrappingAPIException(new KeyAlreadyExist("test", REFS_HEADS_MASTER));
-        });
-        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(() -> (Optional.empty()));
+
+        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(runAsync);
+                .thenThrow(new WrappingAPIException(new KeyAlreadyExist("test", REFS_HEADS_MASTER)));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
                         new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "test", "user", "test@test.com")));
@@ -643,12 +631,9 @@ public class MapResourceTest {
     @Test
     public void testAddKeyBranchNotFound() throws UnsupportedEncodingException {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        Supplier<StoreInfo> runAsync = (() -> {
-            throw new WrappingAPIException(new RefNotFoundException(REFS_HEADS_MASTER));
-        });
-        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(runAsync);
+                .thenThrow(new WrappingAPIException(new RefNotFoundException(REFS_HEADS_MASTER)));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
                         new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "test", "user", "test@test.com")));
@@ -659,12 +644,9 @@ public class MapResourceTest {
     @Test
     public void testAddKeyDataIsMalformed() {
         byte[] data = new byte[] { 1 };
-        Supplier<StoreInfo> runAsync = (() -> {
-            throw new WrappingAPIException(new IOException("Data is malformed"));
-        });
-        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(() -> (Optional.empty()));
+        when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(runAsync);
+                .thenThrow(new WrappingAPIException(new IOException("Data is malformed")));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
                         new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "test", "user", "test@test.com")));
@@ -685,8 +667,8 @@ public class MapResourceTest {
     public void testModifyKetWithoutIFMatchtag() throws UnsupportedEncodingException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        Supplier<Either<String, FailedToLock>> expected = () -> Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(() -> (storeInfo));
+        Either<String, FailedToLock> expected = Either.left("2");
+        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
         when(storage.put(Mockito.eq("dog"), Mockito.isNull(), Mockito.<byte[]>any(), Mockito.eq("1"), Mockito.eq("message"), Mockito.any(),
                 Mockito.any())).thenReturn(expected);
         ModifyKeyData data = new ModifyKeyData();
@@ -729,7 +711,7 @@ public class MapResourceTest {
     @Test
     public void testDeleteKey() {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header("X-jitstatic-name", "user").header("X-jitstatic-mail", "mail").header("X-jitstatic-message", "msg")
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).delete();
@@ -740,7 +722,7 @@ public class MapResourceTest {
     @Test
     public void testDeleteKeyNoUserSet() {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/dog").request().header("X-jitstatic-name", "user").header("X-jitstatic-mail", "mail")
                 .header("X-jitstatic-message", "msg").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).delete();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), delete.getStatus());
@@ -750,7 +732,7 @@ public class MapResourceTest {
     @Test
     public void testDeleteKeyNoUserKey() {
         Optional<StoreInfo> storeInfo = DATA.get("horse");
-        when(storage.getKey(Mockito.eq("horse"), Mockito.isNull())).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("horse"), Mockito.isNull())).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/horse").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header("X-jitstatic-name", "user").header("X-jitstatic-mail", "mail").header("X-jitstatic-message", "msg")
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).delete();
@@ -761,7 +743,7 @@ public class MapResourceTest {
     @Test
     public void testDeleteNoHeaderInfoSet() {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(() -> (storeInfo));
+        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header("X-jitstatic-mail", "mail").header("X-jitstatic-message", "msg").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .delete();

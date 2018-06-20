@@ -33,7 +33,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
 import io.jitstatic.StorageData;
-import io.jitstatic.storage.StoreInfo;
+import io.jitstatic.hosted.StoreInfo;
 
 public class StoreInfoTest {
 

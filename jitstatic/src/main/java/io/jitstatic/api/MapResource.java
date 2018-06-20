@@ -59,9 +59,9 @@ import io.jitstatic.HeaderPair;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.storage.FailedToLock;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.storage.StoreInfo;
 import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
@@ -94,9 +94,9 @@ public class MapResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
+            throw new WebApplicationException(key + " in " + ref, Status.NOT_FOUND);
         }
         final StoreInfo storeInfo = si.get();
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
@@ -159,7 +159,7 @@ public class MapResource {
 
         helper.checkValidRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
 
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -181,12 +181,12 @@ public class MapResource {
         }
 
         final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
-                storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+                () -> storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
 
         if (result == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        
+
         if (result.isRight()) {
             return Response.status(Status.PRECONDITION_FAILED).tag(entityTag).build();
         }
@@ -225,13 +225,13 @@ public class MapResource {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(data.getKey(), data.getBranch()));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(data.getKey(), data.getBranch()));
         if (si != null && si.isPresent()) {
             throw new WebApplicationException(String.format("Key '%s' already exist in branch %s", data.getKey(), data.getBranch()),
                     Status.CONFLICT);
         }
-        final StoreInfo result = helper.unwrapWithPOSTApi(storage.add(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
-                data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final StoreInfo result = helper.unwrapWithPOSTApi(() -> storage.add(data.getKey(), data.getBranch(), data.getData(),
+                data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
         return Response.ok().tag(new EntityTag(result.getVersion()))
                 .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
                 .entity(result.getData()).build();
@@ -256,7 +256,7 @@ public class MapResource {
 
         helper.checkValidRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(storage.getKey(key, ref));
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
 
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(Status.NOT_FOUND);

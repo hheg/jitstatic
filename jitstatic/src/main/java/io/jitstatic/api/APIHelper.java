@@ -35,8 +35,9 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 
+import io.jitstatic.UpdateFailedException;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.storage.StoreInfo;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -109,6 +110,8 @@ class APIHelper {
                 if (apiException instanceof KeyAlreadyExist) {
                     throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
+            } else if(e instanceof UpdateFailedException) {
+                throw new WebApplicationException("Key is being updated",Status.PRECONDITION_FAILED);
             }
             log.error("Error while unwrapping future", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
