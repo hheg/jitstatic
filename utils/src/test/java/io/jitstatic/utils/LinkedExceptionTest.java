@@ -37,6 +37,7 @@ public class LinkedExceptionTest {
         le.add(new Exception("e2"));
         le.addAll(Arrays.asList(new Exception("e3")));        
         assertFalse(le.isEmpty());
+        assertTrue(le.getMessage().startsWith("java.lang.RuntimeException"));
     }
 
     @Test
