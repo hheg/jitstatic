@@ -79,7 +79,7 @@ public class RefHolderTest {
                     }
                     try {
                         Thread.sleep(100);
-                    } catch (InterruptedException e) {                        
+                    } catch (InterruptedException e) {
                     }
                     return true;
                 }, "a");
@@ -91,7 +91,7 @@ public class RefHolderTest {
         }
         Thread.sleep(100);
         b.set(false);
-        ref.lockWrite(() -> {            
+        ref.lockWrite(() -> {
             return true;
         }, "b");
         async.join();
@@ -160,10 +160,11 @@ public class RefHolderTest {
     public void testLockWriteAll() throws FailedToLock {
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         AtomicBoolean b = new AtomicBoolean(true);
-
+        AtomicBoolean c = new AtomicBoolean(true);
         CompletableFuture<Boolean> async = CompletableFuture.supplyAsync(() -> {
             try {
                 return ref.lockWriteAll(() -> {
+                    c.set(false);
                     while (b.get()) {
                     }
                     return true;
@@ -172,6 +173,8 @@ public class RefHolderTest {
                 throw new ShouldNeverHappenException("");
             }
         });
+        while (c.get()) {
+        }
         assertThrows(FailedToLock.class, () -> ref.lockWriteAll(() -> "1"));
         b.set(false);
         async.join();
