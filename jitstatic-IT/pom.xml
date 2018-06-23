@@ -1,5 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
@@ -21,8 +20,7 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-		<!-- Should only depend on the shaded jar, but eclipse isn't smart enough 
-			to understand that it is one. Fix this -->
+		<!-- Should only depend on the shaded jar, but eclipse isn't smart enough to understand that it is one. Fix this -->
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
@@ -151,7 +149,6 @@
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<argLine>-XX:-OmitStackTraceInFastThrow</argLine>
 					<includes>
 						<include>**/Test*.java</include>
 						<include>**/*Test.java</include>
@@ -159,7 +156,6 @@
 						<include>**/*TestCase.java</include>
 					</includes>
 					<properties>
-						<!-- <includeTags>fast</includeTags> -->
 						<excludeTags>slow</excludeTags>
 					</properties>
 				</configuration>
