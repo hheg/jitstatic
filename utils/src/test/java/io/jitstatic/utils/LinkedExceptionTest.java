@@ -20,7 +20,6 @@ package io.jitstatic.utils;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,10 +35,9 @@ public class LinkedExceptionTest {
     public void testLinkedException() {
         LinkedException le = new LinkedException(Arrays.asList(new RuntimeException("re"), new Exception("e1")));
         le.add(new Exception("e2"));
-        le.addAll(Arrays.asList(new Exception("e3")));
-        assertEquals("class java.lang.RuntimeException: re\n" + "class java.lang.Exception: e1\n" + "class java.lang.Exception: e2\n"
-                + "class java.lang.Exception: e3", le.getLocalizedMessage());
+        le.addAll(Arrays.asList(new Exception("e3")));        
         assertFalse(le.isEmpty());
+        assertTrue(le.getMessage().startsWith("java.lang.RuntimeException"));
     }
 
     @Test

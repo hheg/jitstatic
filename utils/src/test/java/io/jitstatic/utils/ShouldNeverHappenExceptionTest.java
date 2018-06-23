@@ -33,4 +33,10 @@ public class ShouldNeverHappenExceptionTest {
         ShouldNeverHappenException s = new ShouldNeverHappenException("", new Exception());
         assertTrue(s.getLocalizedMessage().isEmpty());
     }
+
+    @Test
+    public void testJustMessage() {
+        ShouldNeverHappenException s = new ShouldNeverHappenException("");
+        assertTrue(s.getLocalizedMessage().isEmpty());
+    }
 }

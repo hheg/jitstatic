@@ -104,7 +104,7 @@ import io.jitstatic.tools.Utils;
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class LoadWriterTest {
 
-    private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");
+    private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
     private static final Logger LOG = LogManager.getLogger(LoadWriterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
@@ -159,7 +159,7 @@ public class LoadWriterTest {
                 }
             }
             CompletableFuture<Void> wait = CompletableFuture.allOf(jobs);
-            wait.get(30, TimeUnit.SECONDS);
+            wait.get(60, TimeUnit.SECONDS);
             result = Stream.of(jobs).map(CompletableFuture::join).reduce(ResultData::sum);
 
         } finally {

@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.11.1</version>
+		<version>0.11.2</version>
 	</parent>
 	<artifactId>jitstatic</artifactId>
 	<dependencies>
@@ -88,22 +88,22 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.11.1</version>
+			<version>0.11.2</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>storage</artifactId>
-			<version>0.11.1</version>
+			<version>0.11.2</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>version</artifactId>
-			<version>0.11.1</version>
+			<version>0.11.2</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.11.1</version>
+			<version>0.11.2</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.activation</groupId>
@@ -225,19 +225,12 @@
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<argLine>-XX:-OmitStackTraceInFastThrow</argLine>
 					<includes>
 						<include>**/Test*.java</include>
 						<include>**/*Test.java</include>
 						<include>**/*Tests.java</include>
 						<include>**/*TestCase.java</include>
 					</includes>
-					<properties>
-						<!-- <includeTags>fast</includeTags> -->
-						<excludeTags>slow</excludeTags>
-						<!-- <configurationParameters> junit.jupiter.conditions.deactivate 
-							= * </configurationParameters> -->
-					</properties>
 				</configuration>
 				<dependencies>
 					<dependency>

@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,22 +80,8 @@ public class RefHolder {
             } finally {
                 unlock(key);
             }
-
         }
         throw new FailedToLock(ref);
-    }
-
-    public void lockWrite(final Runnable runnable, final String key) throws FailedToLock {
-        if (tryLock(key)) {
-            try {
-                runnable.run();
-                return;
-            } finally {
-                unlock(key);
-            }
-        }
-        throw new FailedToLock(ref);
-
     }
 
     public <T> T write(final Supplier<T> supplier) {
@@ -157,7 +144,7 @@ public class RefHolder {
     }
 
     private Set<String> getFiles() {
-        return refCache.keySet();
+        return refCache.entrySet().stream().filter(e -> e.getValue().isPresent()).map(Entry::getKey).collect(Collectors.toSet());
     }
 
     private Map<String, Optional<StoreInfo>> getCache() {
@@ -165,7 +152,7 @@ public class RefHolder {
     }
 
     public boolean isEmpty() {
-        return refCache.values().stream().filter(Optional::isPresent).findAny().isPresent();
+        return !refCache.values().stream().filter(Optional::isPresent).flatMap(Optional::stream).findAny().isPresent();
     }
 
     public void setCache(final Map<String, Optional<StoreInfo>> newMap) {
@@ -215,7 +202,7 @@ public class RefHolder {
         return files.stream().map(key -> {
             try {
                 return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.of(Pair.of(key, load(key))));
-            } catch (final RefNotFoundException ignore) {                
+            } catch (final RefNotFoundException ignore) {
             } catch (final Exception e) {
                 return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(
                         new RuntimeException(key + " in " + ref + " had the following error", e));
@@ -277,7 +264,7 @@ public class RefHolder {
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
         Optional<StoreInfo> storeInfoContainer;
         final Map<String, Optional<StoreInfo>> refMap = getCache();
-        if (storeInfo != null) {            
+        if (storeInfo != null) {
             if (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo)) {
                 storeInfoContainer = Optional.of(storeInfo);
                 refMap.putIfAbsent(key, storeInfoContainer);
@@ -319,7 +306,7 @@ public class RefHolder {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
             Optional<StoreInfo> optional = getCache().get(plainKey);
-            if (optional != null && !optional.isPresent()) {
+            if (optional != null && optional.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
         }

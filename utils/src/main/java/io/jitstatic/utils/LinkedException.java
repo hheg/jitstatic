@@ -1,5 +1,7 @@
 package io.jitstatic.utils;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 /*-
  * #%L
  * jitstatic
@@ -27,40 +29,44 @@ import java.util.stream.Collectors;
 
 public class LinkedException extends RuntimeException {
 
-	private static final long serialVersionUID = 1L;
-	private final List<Exception> exceptions = new ArrayList<>();
+    private static final long serialVersionUID = 1L;
+    private final List<Exception> exceptions;
 
-	public LinkedException(final List<Exception> errors) {
-		super("");
-		exceptions.addAll(errors);
-	}
-	
-	public LinkedException() {
-		super("");
-	}
+    public LinkedException(final List<Exception> errors) {
+        super("");
+        exceptions = new ArrayList<>(errors);
+    }
 
-	public void add(final Exception e) {
-		if (e != null) {
-			exceptions.add(e);
-		}
-	}
+    public LinkedException() {
+        super("");
+        exceptions = new ArrayList<>();
+    }
 
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
-	}
+    public void add(final Exception e) {
+        if (e != null) {
+            exceptions.add(e);
+        }
+    }
 
-	@Override
-	public String getMessage() {
-		return exceptions.stream().map(e -> e.getClass().toString() + ": " + e.getMessage())
-				.collect(Collectors.joining(System.lineSeparator()));
-	}
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 
-	public void addAll(List<Exception> errors) {
-		exceptions.addAll(Objects.requireNonNull(errors));
-	}
+    @Override
+    public String getMessage() {
+        return exceptions.stream().map(e -> {
+            StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            return sw.toString();
+        }).collect(Collectors.joining("and" + System.lineSeparator()));
+    }
 
-	public boolean isEmpty() {
-		return exceptions.isEmpty();
-	}
+    public void addAll(List<Exception> errors) {
+        exceptions.addAll(Objects.requireNonNull(errors));
+    }
+
+    public boolean isEmpty() {
+        return exceptions.isEmpty();
+    }
 }
