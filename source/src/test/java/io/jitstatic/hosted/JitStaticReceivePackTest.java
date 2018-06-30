@@ -70,6 +70,7 @@ import org.eclipse.jgit.transport.ReceiveCommand.Type;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
+import org.eclipse.jgit.transport.RequestNotYetReadException;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
@@ -119,7 +120,7 @@ public class JitStaticReceivePackTest {
         bus = new RepositoryBus(errorReporter);
         // We are not testing Source's capabilities here.
         bus.setRefHolderFactory((ref) -> new RefHolder(ref, new ConcurrentHashMap<>(), null));
-        
+
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus);
             return receivePack;
@@ -265,6 +266,11 @@ public class JitStaticReceivePackTest {
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
             }
+
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
         };
         rp.executeCommands();
 
@@ -302,7 +308,13 @@ public class JitStaticReceivePackTest {
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
             }
+
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
         };
+
         rp.executeCommands();
 
         assertEquals(errormsg, rc.getMessage());
@@ -339,6 +351,11 @@ public class JitStaticReceivePackTest {
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
             }
+
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
         };
 
         rp.executeCommands();
@@ -368,7 +385,13 @@ public class JitStaticReceivePackTest {
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
             }
+
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
         });
+
         Mockito.when(remoteRepository.updateRef(Mockito.any())).thenReturn(ru);
         Mockito.when(remoteRepository.updateRef(Mockito.any(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(RefUpdate.Result.NEW);
@@ -398,7 +421,39 @@ public class JitStaticReceivePackTest {
                     protected List<ReceiveCommand> filterCommands(Result want) {
                         return Arrays.asList(rc);
                     }
+
+                    @Override
+                    public boolean isSideBand() throws RequestNotYetReadException {
+                        return false;
+                    }
                 });
+
+        rp.executeCommands();
+        assertEquals(Result.REJECTED_NODELETE, rc.getResult());
+        assertEquals(null, errorReporter.getFault());
+    }
+
+    @Test
+    public void testDeleteDefaultBranchMessage()
+            throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
+        clientGit.branchCreate().setName("other").call();
+        Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
+        clientGit.checkout().setName("other").call();
+        clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
+        ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
+        JitStaticReceivePack rp = Mockito
+                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, errorReporter, bus) {
+                    @Override
+                    protected List<ReceiveCommand> filterCommands(Result want) {
+                        return Arrays.asList(rc);
+                    }
+
+                    @Override
+                    public boolean isSideBand() throws RequestNotYetReadException {
+                        return true;
+                    }
+                });
+
         rp.executeCommands();
         assertEquals(Result.REJECTED_NODELETE, rc.getResult());
         assertEquals(null, errorReporter.getFault());
@@ -426,8 +481,12 @@ public class JitStaticReceivePackTest {
             SourceChecker getSourceChecker() {
                 return sc;
             }
-        });
 
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
+        });
         Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
         Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(null);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
@@ -461,8 +520,12 @@ public class JitStaticReceivePackTest {
             SourceChecker getSourceChecker() {
                 return sc;
             }
-        });
 
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
+        });
         Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
@@ -495,6 +558,11 @@ public class JitStaticReceivePackTest {
             @Override
             SourceChecker getSourceChecker() {
                 return sc;
+            }
+
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
             }
         });
 
@@ -536,8 +604,12 @@ public class JitStaticReceivePackTest {
             SourceChecker getSourceChecker() {
                 return sc;
             }
-        });
 
+            @Override
+            public boolean isSideBand() throws RequestNotYetReadException {
+                return false;
+            }
+        });
         Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
