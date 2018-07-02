@@ -51,8 +51,8 @@ public class JitStaticUploadPack extends UploadPack {
                     || (e instanceof UploadPackInternalServerErrorException))) {
                 errorReporter.setFault(e);
                 LOG.error("Upload resulted in error ", e);
-            }
-            throw e;
+                throw e;
+            }            
         } catch (final Exception e) {
             errorReporter.setFault(e);
             LOG.error("Upload resulted in error ", e);

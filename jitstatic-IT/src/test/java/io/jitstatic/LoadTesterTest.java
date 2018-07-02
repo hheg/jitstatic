@@ -44,7 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +51,7 @@ import java.util.regex.Pattern;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.core.Response;
 
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.impl.client.cache.CacheConfig;
 import org.apache.http.impl.client.cache.CachingHttpClients;
 import org.apache.logging.log4j.LogManager;
@@ -78,7 +78,6 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
@@ -99,6 +98,7 @@ import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
+import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.tools.Utils;
 
@@ -108,22 +108,18 @@ import io.jitstatic.tools.Utils;
  * WantNotValidException happens when the git client is out of sync when pulling
  * Broken pipe. The git client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
  */
-@Tag("slow")
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class LoadTesterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");
     private static final String METADATA = ".metadata";
+    private static final boolean log = false;
     static final String MASTER = "master";
     private static final Logger LOG = LogManager.getLogger(LoadTesterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private final AtomicInteger GITUPDATES = new AtomicInteger(0);
-    private final AtomicInteger PUTUPDATES = new AtomicInteger(0);
-    private final AtomicInteger GITFAILURES = new AtomicInteger(0);
-    private final AtomicInteger PUTFAILURES = new AtomicInteger(0);
 
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
@@ -131,6 +127,8 @@ public class LoadTesterTest {
     private String gitAdress;
     private String adminAdress;
     private TestData data;
+    private Counters putCounters;
+    private Counters gitCounters;
 
     @BeforeEach
     public void setup()
@@ -139,14 +137,6 @@ public class LoadTesterTest {
         int localPort = DW.getLocalPort();
         gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
         adminAdress = String.format("http://localhost:%d/admin", localPort);
-        resetCounters();
-    }
-
-    private void resetCounters() {
-        GITFAILURES.set(0);
-        GITUPDATES.set(0);
-        PUTFAILURES.set(0);
-        PUTUPDATES.set(0);
     }
 
     @AfterEach
@@ -156,19 +146,23 @@ public class LoadTesterTest {
         try {
             Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
             try {
-                LOG.info(response.readEntity(String.class));
+                log(() -> LOG.info(response.readEntity(String.class)));
                 File workingFolder = getFolderFile();
                 try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
                         .setCredentialsProvider(getCredentials(hf)).call()) {
                     LOG.info(data.toString());
                     for (String branch : data.branches) {
-                        checkoutBranch(branch, git);
-                        LOG.info("##### {} #####", branch);
-                        Map<String, Integer> data = pairNamesWithData(workingFolder);
-                        Map<String, Integer> cnt = new HashMap<>();
-                        for (RevCommit rc : git.log().call()) {
-                            String msg = matchData(data, cnt, rc);
-                            LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent());
+                        try {
+                            checkoutBranch(branch, git);
+                            LOG.info("##### {} #####", branch);
+                            Map<String, Integer> data = pairNamesWithData(workingFolder);
+                            Map<String, Integer> cnt = new HashMap<>();
+                            for (RevCommit rc : git.log().call()) {
+                                String msg = matchData(data, cnt, rc);
+                                log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
+                            }
+                        } catch (IOException | GitAPIException e) {
+                            e.printStackTrace();
                         }
                     }
                 }
@@ -178,11 +172,17 @@ public class LoadTesterTest {
         } finally {
             statsClient.close();
         }
-        LOG.info("Git updates: {}", GITUPDATES.get());
-        LOG.info("Git failures: {}", GITFAILURES.get());
-        LOG.info("Put updates: {}", PUTUPDATES.get());
-        LOG.info("Put failures: {}", PUTFAILURES.get());
+        LOG.info("Git updates: {}", gitCounters.updates);
+        LOG.info("Git failures: {}", gitCounters.failiures);
+        LOG.info("Put updates: {}", putCounters.updates);
+        LOG.info("Put failures: {}", putCounters.failiures);
         Utils.checkContainerForErrors(DW);
+    }
+
+    private static void log(Runnable r) {
+        if (log) {
+            r.run();
+        }
     }
 
     private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc) {
@@ -193,9 +193,9 @@ public class LoadTesterTest {
             Integer value = cnt.get(split[1]);
             Integer newValue = Integer.valueOf(split[2]);
             if (value != null) {
-                assertEquals(Integer.valueOf(value.intValue() - 1), newValue);
+                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, msg);
             } else {
-                assertEquals(data.get(split[1]), newValue);
+                assertEquals(data.get(split[1]), newValue, msg);
             }
             cnt.put(split[1], newValue);
         } else {
@@ -226,8 +226,8 @@ public class LoadTesterTest {
     @ArgumentsSource(DataArgumentProvider.class)
     public void testLoad(TestData data) throws Exception {
         this.data = data;
-        ConcurrentLinkedQueue<JitStaticUpdaterClient> clients = new ConcurrentLinkedQueue<>();
-        ConcurrentLinkedQueue<ClientUpdater> updaters = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<JitStaticUpdater> clients = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<GitClientUpdater> updaters = new ConcurrentLinkedQueue<>();
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         int localPort = DW.getLocalPort();
         String gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
@@ -236,16 +236,18 @@ public class LoadTesterTest {
         try {
             initRepo(getCredentials(hf), data);
             for (int i = 0; i < data.clients; i++) {
-                clients.add(buildKeyClient(data.cache));
+                clients.add(new JitStaticUpdater(buildKeyClient(data.cache)));
             }
             for (int i = 0; i < data.updaters; i++) {
-                updaters.add(new ClientUpdater(gitAdress, hf.getUserName(), hf.getSecret()));
+                updaters.add(new GitClientUpdater(gitAdress, hf.getUserName(), hf.getSecret()));
             }
             CompletableFuture<?>[] clientJobs = new CompletableFuture[data.clients];
             CompletableFuture<?>[] updaterJobs = new CompletableFuture[data.updaters];
             doWork(data, clients, updaters, clientPool, updaterPool, clientJobs, updaterJobs);
             waitForJobstoFinish(clientJobs, updaterJobs);
         } finally {
+            putCounters = clients.stream().map(JitStaticUpdater::counter).reduce(Counters::add).get();
+            gitCounters = updaters.stream().map(GitClientUpdater::counter).reduce(Counters::add).get();
             clients.stream().forEach(c -> {
                 try {
                     c.close();
@@ -257,7 +259,7 @@ public class LoadTesterTest {
         }
     }
 
-    private void doWork(TestData data, ConcurrentLinkedQueue<JitStaticUpdaterClient> clients, ConcurrentLinkedQueue<ClientUpdater> updaters,
+    private void doWork(TestData data, ConcurrentLinkedQueue<JitStaticUpdater> clients, ConcurrentLinkedQueue<GitClientUpdater> updaters,
             ExecutorService clientPool, ExecutorService updaterPool, CompletableFuture<?>[] clientJobs,
             CompletableFuture<?>[] updaterJobs) {
         long start = System.currentTimeMillis();
@@ -283,7 +285,7 @@ public class LoadTesterTest {
         long start = System.currentTimeMillis();
         try {
             LOG.info("Waiting...");
-            jobs.get(1, TimeUnit.HOURS);
+            jobs.get(60, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             LOG.error("Failed to wait", e);
         } finally {
@@ -292,12 +294,12 @@ public class LoadTesterTest {
     }
 
     private void execUpdatersJobs(ExecutorService updaterPool, CompletableFuture<?>[] updaterJobs,
-            ConcurrentLinkedQueue<ClientUpdater> updaters, TestData data) {
+            ConcurrentLinkedQueue<GitClientUpdater> updaters, TestData data) {
         for (int i = 0; i < updaterJobs.length; i++) {
             CompletableFuture<?> f = updaterJobs[i];
             if (f == null || f.isDone()) {
                 updaterJobs[i] = CompletableFuture.runAsync(() -> {
-                    ClientUpdater cu = take(updaters);
+                    GitClientUpdater cu = take(updaters);
                     try {
                         synchronized (cu) {
                             for (String branch : data.branches) {
@@ -324,7 +326,7 @@ public class LoadTesterTest {
     }
 
     private void execClientJobs(ExecutorService clientPool, CompletableFuture<?>[] clientJobs,
-            ConcurrentLinkedQueue<JitStaticUpdaterClient> clients, TestData testData) {
+            ConcurrentLinkedQueue<JitStaticUpdater> clients, TestData testData) {
         for (int i = 0; i < clientJobs.length; i++) {
             CompletableFuture<?> f = clientJobs[i];
             if (f == null || f.isDone()) {
@@ -396,9 +398,9 @@ public class LoadTesterTest {
         return new Entity(tag, null);
     }
 
-    private void clientCode(ConcurrentLinkedQueue<JitStaticUpdaterClient> clients, TestData testData)
+    private void clientCode(ConcurrentLinkedQueue<JitStaticUpdater> clients, TestData testData)
             throws InterruptedException, JsonParseException, JsonMappingException, IOException {
-        JitStaticUpdaterClient client = take(clients);
+        JitStaticUpdater client = take(clients);
         try {
             for (String branch : testData.branches) {
                 for (String name : testData.names) {
@@ -407,7 +409,7 @@ public class LoadTesterTest {
                         Entity entity = client.getKey(name, ref, LoadTesterTest::read);
                         String readValue = entity.getValue().toString();
                         if (Math.random() < 0.5) {
-                            modifyKey(testData, client, branch, name, ref, entity, readValue);
+                            client.modifyKey(testData, branch, name, ref, entity, readValue);
                         }
                     } catch (Exception e) {
                         LOG.error("TestSuiteError: Failed with ", e);
@@ -430,36 +432,13 @@ public class LoadTesterTest {
         return client;
     }
 
-    private void modifyKey(TestData testData, JitStaticUpdaterClient client, String branch, String name, String ref, Entity entity,
-            String readValue) {
-        int c = entity.getValue().get("data").asInt() + 1;
-        try {
-            byte[] data = getData(c);
-            String newTag = client.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
-                    entity.getTag());
-            PUTUPDATES.incrementAndGet();
-            LOG.info("Ok modified " + name + ":" + branch + " with " + c);
-            if (Math.random() < 0.5) {
-                client.getKey(name, branch, newTag, LoadTesterTest::read);
-            }
-        } catch (APIException e) {
-            LOG.error("TestSuiteError: Failed to modify " + c + " " + e.getLocalizedMessage());
-            PUTFAILURES.incrementAndGet();
-        } catch (Exception e) {
-            PUTFAILURES.incrementAndGet();
-            LOG.error("TestSuiteError: General error " + c, e);
-        }
-    }
-
-    private boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) throws UnsupportedEncodingException {
+    private static boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) throws UnsupportedEncodingException {
         PushResult pushResult = iterable.iterator().next();
         RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate("refs/heads/" + branch);
         if (Status.OK == remoteUpdate.getStatus()) {
-            GITUPDATES.incrementAndGet();
             return true;
         } else {
-            GITFAILURES.incrementAndGet();
-            LOG.error("TestSuiteError: FAILED push " + c + " with " + remoteUpdate);
+            log(() -> LOG.warn("TestSuiteError: FAILED push {} with {}", c, remoteUpdate));
         }
         return false;
     }
@@ -514,24 +493,70 @@ public class LoadTesterTest {
         try {
             return MAPPER.readValue(filedata.toFile(), JsonNode.class);
         } catch (Exception e) {
-            LOG.error("Failed file looks like:" + new String(Files.readAllBytes(filedata), UTF_8));
+            LOG.error("Failed file looks like:{}", new String(Files.readAllBytes(filedata), UTF_8));
             throw e;
         }
     }
 
-    private class ClientUpdater {
+    private class JitStaticUpdater implements AutoCloseable {
+        private final Counters counter;
+        private final JitStaticUpdaterClient updater;
+
+        public JitStaticUpdater(JitStaticUpdaterClient updater) {
+            this.updater = updater;
+            this.counter = new Counters(0, 0);
+        }
+
+        public Entity getKey(String name, String ref, TriFunction<InputStream, String, String, Entity> object)
+                throws ClientProtocolException, APIException, URISyntaxException, IOException {
+            return updater.getKey(name, ref, object);
+        }
+
+        private void modifyKey(TestData testData, String branch, String name, String ref, Entity entity, String readValue) {
+            int c = entity.getValue().get("data").asInt() + 1;
+            try {
+                byte[] data = getData(c);
+                String newTag = updater.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
+                        entity.getTag());
+                counter.updates++;
+                log(() -> LOG.info("Ok modified {};{} with {}", name, branch, c));
+                if (Math.random() < 0.5) {
+                    updater.getKey(name, branch, newTag, LoadTesterTest::read);
+                }
+            } catch (APIException e) {
+                log(() -> LOG.info("TestSuiteError: Failed to modify {} {}", c, e.getLocalizedMessage()));
+                counter.failiures++;
+            } catch (Exception e) {
+                counter.failiures++;
+                LOG.error("TestSuiteError: General error " + c, e);
+            }
+        }
+
+        public Counters counter() {
+            return counter;
+        }
+
+        @Override
+        public void close() throws Exception {
+            updater.close();
+        }
+    }
+
+    private class GitClientUpdater {
 
         private final File workingFolder;
         private final String name;
         private final String pass;
+        private final Counters counter;
 
-        public ClientUpdater(final String gitAdress, String name, String pass)
+        public GitClientUpdater(final String gitAdress, String name, String pass)
                 throws InvalidRemoteException, TransportException, GitAPIException, IOException {
             this.workingFolder = getFolderFile();
             this.name = name;
             this.pass = pass;
             Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(getCredentials(name, pass)).call()
                     .close();
+            this.counter = new Counters(0, 0);
         }
 
         public void updateClient(String key, String branch, TestData testData)
@@ -559,8 +584,11 @@ public class LoadTesterTest {
                         }
                     }
                     if (ok) {
+                        counter.updates++;
                         String v = new String(data, "UTF-8");
-                        LOG.info("OK push " + c + " " + key + ":" + branch + " from " + readData + " to " + v + " commit " + message);
+                        log(() -> LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, v, message));
+                    } else {
+                        counter.failiures++;
                     }
                 }
             } catch (TransportException e) {
@@ -572,7 +600,12 @@ public class LoadTesterTest {
                     throw e;
                 }
                 LOG.warn("Got known error {}", cause.getMessage());
+                counter.failiures++;
             }
+        }
+
+        public Counters counter() {
+            return counter;
         }
     }
 
@@ -594,5 +627,19 @@ public class LoadTesterTest {
             return tag;
         }
 
+    }
+
+    private static class Counters {
+        private int updates;
+        private int failiures;
+
+        public Counters(final int gitUpdates, final int gitFailiures) {
+            this.updates = gitUpdates;
+            this.failiures = gitFailiures;
+        }
+
+        public static Counters add(Counters a, Counters b) {
+            return new Counters(a.updates + b.updates, a.failiures + b.failiures);
+        }
     }
 }

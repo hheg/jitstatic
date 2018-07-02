@@ -76,7 +76,6 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
@@ -100,11 +99,11 @@ import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.tools.Utils;
 
-@Tag("slow")
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class LoadWriterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
+    private static final boolean log = false;
     private static final Logger LOG = LogManager.getLogger(LoadWriterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
@@ -167,6 +166,12 @@ public class LoadWriterTest {
         }
     }
 
+    private static void log(Runnable r) {
+        if (log) {
+            r.run();
+        }
+    }
+
     private double divide(long nominator, long denominator) {
         return nominator / (double) (denominator / 1000);
     }
@@ -206,7 +211,7 @@ public class LoadWriterTest {
         try {
             Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
             try {
-                LOG.info(response.readEntity(String.class));
+                log(() -> LOG.info(response.readEntity(String.class)));
                 File workingFolder = getFolderFile();
                 try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
                         .setCredentialsProvider(getCredentials(hf)).call()) {
@@ -218,7 +223,7 @@ public class LoadWriterTest {
                         Map<String, Integer> cnt = new HashMap<>();
                         for (RevCommit rc : git.log().call()) {
                             String msg = matchData(data, cnt, rc);
-                            LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent());
+                            log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                         }
                     }
                     result.ifPresent(r -> LOG.info("Thread: {}  Iters: {} time: {}ms length: {}b Writes: {}/s Bytes: {}b/s",
@@ -326,9 +331,9 @@ public class LoadWriterTest {
             Integer value = cnt.get(split[1]);
             Integer newValue = Integer.valueOf(split[2]);
             if (value != null) {
-                assertEquals(Integer.valueOf(value.intValue() - 1), newValue);
+                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, msg);
             } else {
-                assertEquals(data.get(split[1]), newValue);
+                assertEquals(data.get(split[1]), newValue, msg);
             }
             cnt.put(split[1], newValue);
         } else {
