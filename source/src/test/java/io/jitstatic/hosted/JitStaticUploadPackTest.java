@@ -90,7 +90,7 @@ public class JitStaticUploadPackTest {
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
-        assertThrows(WantNotValidException.class, () -> up.upload(is, os, messages));
+        assertThrows(WantNotValidException.class, () -> up.internalupload(is, os, messages));
         assertNull(errorReporter.getFault());
     }
 
@@ -116,7 +116,7 @@ public class JitStaticUploadPackTest {
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
-        assertThrows(UploadPackInternalServerErrorException.class, () -> up.upload(is, os, messages));
+        assertThrows(UploadPackInternalServerErrorException.class, () -> up.internalupload(is, os, messages));
         assertNull(errorReporter.getFault());
     }
 }
