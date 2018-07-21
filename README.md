@@ -179,7 +179,7 @@ At the moment the application only allows basic authentication so be sure you se
 
 To clone the repo you just type (the username and password defined in the Dropwizard configuration file)
 ```bash
-git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/jitstatic.git
+git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/git
 ```
 It's also possible to reach keys (files) through refs so if you make a call like:
 
