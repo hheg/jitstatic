@@ -213,17 +213,9 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
-        Objects.requireNonNull(key);
+    public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {                
         ref = checkRef(ref);
-        if (key.isEmpty()) {
-            throw new IllegalArgumentException("Key is empty");
-        }
-        if (key.equals("/")) {
-            key = "";
-        } else if (key.startsWith("/")) {
-            throw new IllegalArgumentException("Key starts with a '/' " + key);
-        }
+        key = checkKeyFormat(Objects.requireNonNull(key));
 
         try {
             if (ref.startsWith(Constants.R_HEADS)) {
@@ -237,8 +229,20 @@ public class HostedGitRepositoryManager implements Source {
         throw new RefNotFoundException(ref);
     }
 
+    private String checkKeyFormat(String key) {
+        if (key.isEmpty()) {
+            throw new IllegalArgumentException("Key is empty");
+        }
+        if (key.equals("/")) {
+            key = "";
+        } else if (key.startsWith("/")) {
+            throw new IllegalArgumentException("Key starts with a '/' " + key);
+        }
+        return key;
+    }
+
     @Override
-    public String modify(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
+    public String modifyKey(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
             final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
@@ -333,7 +337,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modify(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
+    public String modifyMetadata(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
             final String userMail, final String key, String ref) {
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);

@@ -356,7 +356,7 @@ public class HostedGitRepositoryManagerTest {
             JsonNode firstValue = readJsonData(firstSourceInfo);
             String firstVersion = firstSourceInfo.getSourceVersion();
             byte[] modified = "{\"one\":\"two\"}".getBytes(UTF_8);
-            String newVersion = grm.modify(STORE, null, modified, firstVersion, message, userInfo, "user@somewhere.org");
+            String newVersion = grm.modifyKey(STORE, null, modified, firstVersion, message, userInfo, "user@somewhere.org");
             assertNotEquals(firstVersion, newVersion);
             SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
             JsonNode secondValue = readJsonData(secondSourceInfo);
@@ -374,7 +374,7 @@ public class HostedGitRepositoryManagerTest {
     public void testModifyTag() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(UnsupportedOperationException.class, () -> {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
-                grm.modify("key", "refs/tags/tag", new byte[] { 1, 2, 3, 4 }, "1", "m", "ui", "m");
+                grm.modifyKey("key", "refs/tags/tag", new byte[] { 1, 2, 3, 4 }, "1", "m", "ui", "m");
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Tags cannot be modified"));
     }
@@ -427,7 +427,7 @@ public class HostedGitRepositoryManagerTest {
 
             String firstVersion = firstSourceInfo.getMetaDataVersion();
             StorageData newData = new StorageData(new HashSet<>(), "newcontent", false, false, List.of());
-            String newVersion = grm.modify(newData, firstVersion, message, userInfo, "user@somewhere.org", STORE, null);
+            String newVersion = grm.modifyMetadata(newData, firstVersion, message, userInfo, "user@somewhere.org", STORE, null);
             assertNotEquals(firstVersion, newVersion);
             SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
             StorageData secondValue;
@@ -464,7 +464,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-            assertThrows(UnsupportedOperationException.class, () -> grm.modify(new StorageData(Set.of(), "", false, false, List.of()), "1",
+            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new StorageData(Set.of(), "", false, false, List.of()), "1",
                     "msg", "ui", "mail", STORE, "refs/tags/tag"));
         }
     }

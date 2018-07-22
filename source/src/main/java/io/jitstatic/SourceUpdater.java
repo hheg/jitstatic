@@ -199,7 +199,7 @@ public class SourceUpdater {
             final List<String> filesToDelete = new ArrayList<>(2);
             filesToDelete.add(file);
             if (hasKeyMetaFile) {
-                filesToDelete.add(file + ".metadata");
+                filesToDelete.add(file + JitStaticConstants.METADATA);
             }
             buildTreeIndex(filesToDelete, rw, headRef, dirCacheBuilder);
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);

@@ -40,13 +40,13 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public String modify(String key, String ref, byte[] data, String version, String message,
+    public String modifyKey(String key, String ref, byte[] data, String version, String message,
             String userInfo, String userMail);
 
     public Pair<String, String> addKey(String key, String finalRef, byte[] data, StorageData metaData,
             String message, String userInfo, String userMail);
 
-    public String modify(StorageData metaData, String metaDataVersion, String message, String userInfo,
+    public String modifyMetadata(StorageData metaData, String metaDataVersion, String message, String userInfo,
             String userMail, String key, String finalRef);
 
     public void delete(String key, String ref, String user, String message, String userMail);

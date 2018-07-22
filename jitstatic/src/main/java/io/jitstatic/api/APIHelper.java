@@ -61,6 +61,7 @@ class APIHelper {
                     // Error message here means that the branch is not found.
                     throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
                 } else if (apiException instanceof IOException) {
+                    log.error("IO Error while executing command", e);
                     throw new WebApplicationException("Data is malformed", 422);
                 }
             }
@@ -110,8 +111,8 @@ class APIHelper {
                 if (apiException instanceof KeyAlreadyExist) {
                     throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
                 }
-            } else if(e instanceof UpdateFailedException) {
-                throw new WebApplicationException("Key is being updated",Status.PRECONDITION_FAILED);
+            } else if (e instanceof UpdateFailedException) {
+                throw new WebApplicationException("Key is being updated", Status.PRECONDITION_FAILED);
             }
             log.error("Error while unwrapping future", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);

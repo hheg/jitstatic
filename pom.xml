@@ -15,13 +15,13 @@
 		<module>utils</module>
 	</modules>
 	<properties>
-		<dropwizard.version>1.3.3</dropwizard.version>
+		<dropwizard.version>1.3.5</dropwizard.version>
 		<jgit.version>4.11.0.201803080745-r</jgit.version>		
 		<jersey.version>2.26</jersey.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.build.fileEncoding>UTF-8</project.build.fileEncoding>
 		<jackson.version>2.9.5</jackson.version>
-		<jetty.version>9.4.10.v20180503</jetty.version>
+		<jetty.version>9.4.11.v20180605</jetty.version>
 		<log4j.version>2.11.0</log4j.version>
 		<metrics.version>4.0.2</metrics.version>
 		<maven.compiler.release>10</maven.compiler.release>
