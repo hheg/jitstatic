@@ -46,6 +46,7 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.component.LifeCycle.Listener;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -55,14 +56,16 @@ import io.dropwizard.setup.Environment;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.source.Source;
-
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
+@ExtendWith(TemporaryFolderExtension.class)
 public class HostedFactoryTest {
 
     private Environment env = mock(Environment.class);
     private ServletEnvironment senv = mock(ServletEnvironment.class);
     private Dynamic servlet = mock(Dynamic.class);
     private MutableServletContextHandler handler = mock(MutableServletContextHandler.class);
-
+    private TemporaryFolder tmpFolder;
     private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
@@ -153,6 +156,6 @@ public class HostedFactoryTest {
     }
 
     private Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+        return tmpFolder.createTemporaryDirectory().toPath();
     }
 }

@@ -98,9 +98,11 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.Utils;
 
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
 public class LoadWriterTest {
 
@@ -113,7 +115,7 @@ public class LoadWriterTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String METADATA = ".metadata";
     static final String MASTER = "master";
-
+    private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
 
@@ -151,7 +153,7 @@ public class LoadWriterTest {
                         try (JitStaticUpdaterClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
                             ResultData resultData = execute(buildKeyClient, branch, key, tag);
-                            printStats(resultData);                            
+                            printStats(resultData);
                             return resultData;
                         }
                     }, service);
@@ -384,7 +386,7 @@ public class LoadWriterTest {
         }
     }
 
-    private static Supplier<String> getFolder() {
+    private Supplier<String> getFolder() {
         return () -> {
             try {
                 return getFolderFile().toString();
@@ -394,10 +396,8 @@ public class LoadWriterTest {
         };
     }
 
-    private static File getFolderFile() throws IOException {
-        File file = Files.createTempDirectory("junit").toFile();
-        file.deleteOnExit();
-        return file;
+    private File getFolderFile() throws IOException {
+        return tmpfolder.createTemporaryDirectory();
     }
 
     private static Entity read(InputStream is, String tag, String contentType) {

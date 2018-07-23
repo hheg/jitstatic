@@ -45,15 +45,19 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.jitstatic.hosted.ErrorReporter;
 import io.jitstatic.hosted.JitStaticReceivePackFactory;
 import io.jitstatic.hosted.RepositoryBus;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class JitStaticReceivePackFactoryTest {
 
     private Git git;
-
+    private TemporaryFolder tmpFolder;
     private final ErrorReporter reporter = new ErrorReporter();
     private static final String defaultRef = "refs/heads/master";
     private HttpServletRequest req;
@@ -123,6 +127,6 @@ public class JitStaticReceivePackFactoryTest {
     }
 
     Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+        return tmpFolder.createTemporaryDirectory().toPath();
     }
 }

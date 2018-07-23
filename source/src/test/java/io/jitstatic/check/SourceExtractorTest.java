@@ -74,6 +74,7 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -87,15 +88,18 @@ import io.jitstatic.check.SourceChecker;
 import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.check.SourceFileData;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class SourceExtractorTest {
 
     private static final String UTF_8 = "UTF-8";
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String METADATA = ".metadata";
     private Git git;
-
+    private TemporaryFolder tmpFolder;
     private File workingFolder;
 
     @BeforeEach
@@ -511,9 +515,7 @@ public class SourceExtractorTest {
     }
 
     File getFolder() throws IOException {
-        File file = Files.createTempDirectory("junit").toFile();
-        file.deleteOnExit();
-        return file;
+        return tmpFolder.createTemporaryDirectory();
     }
 
     private void createFileAndCommit(File tempGitFolder, Git local, final String key, int i)

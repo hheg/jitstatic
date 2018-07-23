@@ -80,6 +80,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
@@ -93,9 +94,12 @@ import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.RepositoryIsMissingIntendedBranch;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class HostedGitRepositoryManagerTest {
 
     private static final String UTF_8 = "UTF-8";
@@ -104,7 +108,7 @@ public class HostedGitRepositoryManagerTest {
     private static final String ENDPOINT = "endpoint";
     private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
     private static final String STORE = "store";
-
+    private TemporaryFolder tmpFolder;
     private Path tempFile;
     private Path tempDir;
     private Executor service;
@@ -112,11 +116,11 @@ public class HostedGitRepositoryManagerTest {
     @BeforeEach
     public void setup() throws IOException {
         tempDir = getFolder();
-        tempFile = Files.createTempFile("junit", "");
+        tempFile = tmpFolder.createTemporaryFile();
     }
 
     Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+        return tmpFolder.createTemporaryDirectory().toPath();
     }
 
     @Test

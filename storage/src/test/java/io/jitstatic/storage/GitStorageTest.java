@@ -53,6 +53,7 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,9 +66,12 @@ import io.jitstatic.hosted.RefHolder;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class GitStorageTest {
 
     private static final String UTF_8 = "UTF-8";
@@ -77,20 +81,19 @@ public class GitStorageTest {
     private static final String SHA_1_MD = "67adef5dab64f8f4cb50712ab24bda6605befa81";
     private static final String SHA_2_MD = "67adef5dab64f8f4cb50712ab24bda6605befa82";
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
+    private TemporaryFolder tmpFolder;
     public Source source = mock(Source.class);
 
     private Path tempFile;
 
     @BeforeEach
     public void setup() throws Exception {
-        tempFile = Files.createTempFile("junit", UUID.randomUUID().toString());
+        tempFile = tmpFolder.createTemporaryFile();
     }
 
     @AfterEach
     public void tearDown() throws IOException {
         Mockito.reset(source);
-        Files.delete(tempFile);
     }
 
     @Test

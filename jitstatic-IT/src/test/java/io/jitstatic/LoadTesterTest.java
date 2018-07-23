@@ -101,6 +101,8 @@ import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.Utils;
 
 /*
@@ -109,7 +111,7 @@ import io.jitstatic.tools.Utils;
  * WantNotValidException happens when the git client is out of sync when pulling
  * Broken pipe. The git client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
  */
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
 public class LoadTesterTest {
 
@@ -122,7 +124,7 @@ public class LoadTesterTest {
     private static final String PASSWORD = "ssecret";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
+    private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
 
@@ -321,10 +323,8 @@ public class LoadTesterTest {
         }
     }
 
-    private static File getFolderFile() throws IOException {
-        File file = Files.createTempDirectory("junit").toFile();
-        file.deleteOnExit();
-        return file;
+    private File getFolderFile() throws IOException {
+        return tmpfolder.createTemporaryDirectory();
     }
 
     private void execClientJobs(ExecutorService clientPool, CompletableFuture<?>[] clientJobs,
@@ -463,7 +463,7 @@ public class LoadTesterTest {
         return jerseyClientBuilder.build(name);
     }
 
-    private static Supplier<String> getFolder() {
+    private Supplier<String> getFolder() {
         return () -> {
             try {
                 return getFolderFile().toString();

@@ -78,11 +78,15 @@ import org.eclipse.jgit.transport.URIish;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 
 import io.jitstatic.check.SourceChecker;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class JitStaticReceivePackTest {
 
     private static final String METADATA = ".metadata";
@@ -92,7 +96,7 @@ public class JitStaticReceivePackTest {
     private final Object o = new Object();
 
     private static final byte[] data = brackets();
-
+    private TemporaryFolder tmpFolder;
     private Git remoteBareGit;
     private Git clientGit;
     private Path storePath;
@@ -625,9 +629,7 @@ public class JitStaticReceivePackTest {
     }
 
     Path getFolder() throws IOException {
-        Path createTempDirectory = Files.createTempDirectory("junit");
-        createTempDirectory.toFile().deleteOnExit();
-        return createTempDirectory;
+        return tmpFolder.createTemporaryDirectory().toPath();
     }
 
     private static byte[] brackets() {

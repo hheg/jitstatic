@@ -21,7 +21,8 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-		<!-- Should only depend on the shaded jar, but eclipse isn't smart enough to understand that it is one. Fix this -->
+		<!-- Should only depend on the shaded jar, but eclipse isn't smart enough 
+			to understand that it is one. Fix this -->
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic</artifactId>
@@ -142,6 +143,12 @@
 		<dependency>
 			<groupId>org.hamcrest</groupId>
 			<artifactId>hamcrest-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jitstatic</groupId>
+			<artifactId>test-utils</artifactId>
+			<version>0.11.3-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

@@ -92,8 +92,10 @@ import io.jitstatic.client.MetaData;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class KeyValueStorageWithHostedStorageTest {
 
     private static final String UTF_8 = "UTF-8";
@@ -103,7 +105,7 @@ public class KeyValueStorageWithHostedStorageTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
-
+    private TemporaryFolder tmpfolder;
     private String adress;
 
     @BeforeEach
@@ -361,7 +363,7 @@ public class KeyValueStorageWithHostedStorageTest {
         }
     }
 
-    private static Supplier<String> getFolder() {
+    private Supplier<String> getFolder() {
         return () -> {
             try {
                 return getFolderFile().getAbsolutePath();
@@ -371,8 +373,8 @@ public class KeyValueStorageWithHostedStorageTest {
         };
     }
 
-    private static File getFolderFile() throws IOException {
-        return Files.createTempDirectory("junit").toFile();
+    private File getFolderFile() throws IOException {
+        return tmpfolder.createTemporaryDirectory(); 
     }
 
     private JitStaticUpdaterClientBuilder buildClient() {
