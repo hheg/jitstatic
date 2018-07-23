@@ -24,6 +24,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -42,6 +43,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -157,7 +159,7 @@ public class HostedGitRepositoryManagerTest {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Parameter endPointName cannot be empty"));
     }
-    
+
     @Test
     public void testForEmptyDefaultBranch() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(IllegalArgumentException.class, () -> {
@@ -165,7 +167,7 @@ public class HostedGitRepositoryManagerTest {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("defaultBranch cannot be empty"));
     }
-    
+
     @Test
     public void testForNullDefaultBranch() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(NullPointerException.class, () -> {
@@ -464,8 +466,9 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new StorageData(Set.of(), "", false, false, List.of()), "1",
-                    "msg", "ui", "mail", STORE, "refs/tags/tag"));
+            assertThrows(UnsupportedOperationException.class,
+                    () -> grm.modifyMetadata(new StorageData(Set.of(), "", false, false, List.of()), "1", "msg", "ui", "mail", STORE,
+                            "refs/tags/tag"));
         }
     }
 
@@ -477,7 +480,7 @@ public class HostedGitRepositoryManagerTest {
             addFilesAndPush(gitFolder, git);
             SourceInfo sourceInfo = grm.getSourceInfo(STORE, null);
             assertNotNull(sourceInfo);
-            grm.delete(STORE, null, "user", "msg", "user");
+            grm.deleteKey(STORE, null, "user", "msg", "user");
             SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
             assertNull(sourceInfo2);
         }
@@ -540,7 +543,7 @@ public class HostedGitRepositoryManagerTest {
             assertNotNull(sourceInfo);
             SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
             assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
-            grm.delete(STORE, null, "user", "msg", "user");
+            grm.deleteKey(STORE, null, "user", "msg", "user");
             SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
             assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
             sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
@@ -567,7 +570,7 @@ public class HostedGitRepositoryManagerTest {
             assertNotNull(sourceInfo);
             SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
             assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
-            grm.delete(base + STORE, null, "user", "msg", "user");
+            grm.deleteKey(base + STORE, null, "user", "msg", "user");
             SourceInfo sourceInfo2 = grm.getSourceInfo(base + STORE, null);
             assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
             sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
@@ -584,6 +587,25 @@ public class HostedGitRepositoryManagerTest {
             assertThrows(IllegalArgumentException.class, () -> grm.getSourceInfo("", null));
             assertThrows(IllegalArgumentException.class, () -> grm.getSourceInfo("/key", null));
             assertNull(grm.getSourceInfo("/", null));
+        }
+    }
+
+    @Test
+    public void testCreateAndDeleteRef()
+            throws CorruptedSourceException, IOException, InvalidRemoteException, TransportException, GitAPIException {
+        File gitFolder = getFolder().toFile();
+        String branch = "refs/heads/test";
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            addFilesAndPush(gitFolder, git);
+            Collection<Ref> branches = git.lsRemote().call();
+            assertFalse(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());
+            grm.createRef(branch);
+            branches = git.lsRemote().call();
+            assertTrue(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());
+            grm.deleteRef(branch);            
+            branches = git.lsRemote().call();
+            assertFalse(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());            
         }
     }
 

@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -339,6 +340,24 @@ public class KeyValueStorageWithHostedStorageTest {
             Thread.sleep(100);
             assertEquals(HttpStatus.NOT_FOUND_404,
                     assertThrows(APIException.class, () -> client.getKey(ACCEPT_STORAGE, null, tf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testAddBranchAndKey() throws URISyntaxException, ClientProtocolException, APIException, IOException {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/newbranch";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();) {
+            Entity<JsonNode> createdKey = client.createKey(data.getBytes(StandardCharsets.UTF_8),
+                    new CommitData("key", branch, "new key", "user", "mail"), new MetaData("application/json"), tf);
+            assertEquals(data, createdKey.data.toString());
+        }
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey("key", branch, tf);
+            assertEquals(data, key.data.toString());
         }
     }
 

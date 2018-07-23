@@ -78,6 +78,7 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
@@ -109,6 +110,7 @@ import io.jitstatic.tools.Utils;
  * Broken pipe. The git client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
  */
 @ExtendWith(DropwizardExtensionsSupport.class)
+@Tag("slow")
 public class LoadTesterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");

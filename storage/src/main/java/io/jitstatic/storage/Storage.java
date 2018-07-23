@@ -35,7 +35,7 @@ public interface Storage extends AutoCloseable, CheckHealth {
 	public void reload(List<String> refsToReload);
 	public void close();
 	public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
-    public StoreInfo add(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
+    public StoreInfo addKey(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
     public Either<String, FailedToLock> putMetaData(String key, String ref, StorageData metaData, String metaDataVersion, String message, String userInfo, String userMail);
     public void delete(String key, String ref, String user, String message, String userMail);
 }

@@ -122,7 +122,7 @@ public class SourceUpdater {
         ru.setForceRefLog(true);
         ru.setRefLogMessage("jitstatic " + method, true);
         ru.setExpectedOldObjectId(ref.getObjectId());
-        checkResult(ru.update(rw));
+        checkResult(ru.update(rw), ref.getName());
     }
 
     private ObjectId buildCommit(final Ref ref, final String message, final String userInfo, final String userMail,
@@ -169,7 +169,7 @@ public class SourceUpdater {
         return blob;
     }
 
-    private void checkResult(final Result update) {
+    private void checkResult(final Result update, final String ref) {
         switch (update) {
         case FAST_FORWARD:
         case FORCED:
@@ -185,7 +185,7 @@ public class SourceUpdater {
         case REJECTED_OTHER_REASON:
         case RENAMED:
         default:
-            throw new UpdateFailedException(update);
+            throw new UpdateFailedException(update, ref);
         }
     }
 
@@ -208,5 +208,24 @@ public class SourceUpdater {
             insertCommit(ref, rw, commiter, inserted, method);
             rw.dispose();
         }
+    }
+
+    public void createRef(final String baseRef, final String finalRef) throws IOException {
+        final RefUpdate updateRef = repository.updateRef(finalRef);
+        ObjectId base = repository.resolve(baseRef);
+        if (base == null) {
+            base = ObjectId.zeroId();
+        }
+        updateRef.setExpectedOldObjectId(ObjectId.zeroId());
+        updateRef.setNewObjectId(base);
+        updateRef.setForceUpdate(true);
+        updateRef.disableRefLog();
+        checkResult(updateRef.forceUpdate(), finalRef);
+    }
+
+    public void deleteRef(final String finalRef) throws IOException {
+        final RefUpdate ru = repository.updateRef(finalRef);
+        ru.setForceUpdate(true);
+        checkResult(ru.delete(), finalRef);
     }
 }

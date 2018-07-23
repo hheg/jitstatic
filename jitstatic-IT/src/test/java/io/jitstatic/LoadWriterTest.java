@@ -76,6 +76,7 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
@@ -100,6 +101,7 @@ import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.tools.Utils;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
+@Tag("slow")
 public class LoadWriterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
@@ -149,8 +151,7 @@ public class LoadWriterTest {
                         try (JitStaticUpdaterClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
                             ResultData resultData = execute(buildKeyClient, branch, key, tag);
-                            LOG.info("Thread:{} key:{} branch:{} iters:{} duration:{}ms length:{}bytes", Thread.currentThread().getName(),
-                                    key, branch, resultData.iterations, resultData.duration, resultData.bytes);
+                            printStats(resultData);                            
                             return resultData;
                         }
                     }, service);
@@ -226,9 +227,7 @@ public class LoadWriterTest {
                             log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                         }
                     }
-                    result.ifPresent(r -> LOG.info("Thread: {}  Iters: {} time: {}ms length: {}b Writes: {}/s Bytes: {}b/s",
-                            Thread.currentThread().getName(), r.iterations, r.duration, r.bytes, divide(r.iterations, r.duration),
-                            divide(r.bytes, r.duration)));
+                    result.ifPresent(this::printStats);
                 }
             } finally {
                 response.close();
@@ -237,6 +236,11 @@ public class LoadWriterTest {
             statsClient.close();
         }
         Utils.checkContainerForErrors(DW);
+    }
+
+    private void printStats(ResultData r) {
+        LOG.info("Thread: {}  Iters: {} time: {}ms length: {}B Writes: {}/s Bytes: {}B/s", Thread.currentThread().getName(), r.iterations,
+                r.duration, r.bytes, divide(r.iterations, r.duration), divide(r.bytes, r.duration));
     }
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, WriteData testData)
@@ -276,7 +280,7 @@ public class LoadWriterTest {
         if (Status.OK == remoteUpdate.getStatus()) {
             return true;
         } else {
-            LOG.error("TestSuiteError: FAILED push " + c + " with " + remoteUpdate);
+            LOG.error("TestSuiteError: FAILED push {} with {}", c, remoteUpdate);
         }
         return false;
     }

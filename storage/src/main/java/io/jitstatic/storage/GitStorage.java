@@ -1,5 +1,7 @@
 package io.jitstatic.storage;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -174,7 +176,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public StoreInfo add(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
+    public StoreInfo addKey(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
@@ -189,14 +191,25 @@ public class GitStorage implements Storage {
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
 
-        final RefHolder refStore = checkIfKeyAlreadyExists(key, finalRef);
+        RefHolder refStore = checkIfKeyAlreadyExists(key, finalRef);
         return refStore.write(() -> {
             SourceInfo sourceInfo = null;
             try {
                 try {
                     sourceInfo = source.getSourceInfo(key, finalRef);
-                } catch (final RefNotFoundException e) {
-                    throw new WrappingAPIException(e);
+                } catch (final RefNotFoundException ignore) {
+                    try {
+                        sourceInfo = source.getSourceInfo(key, defaultRef);
+                    } catch (final RefNotFoundException e1) {
+                        throw new ShouldNeverHappenException("Default ref " + defaultRef + " is not found");
+                    }
+                    if (sourceInfo == null) {
+                        try {
+                            source.createRef(finalRef);
+                        } catch (final IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
                 }
                 if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
@@ -208,6 +221,11 @@ public class GitStorage implements Storage {
             } finally {
                 if (sourceInfo == null) {
                     removeCacheRef(finalRef, refStore);
+                    try {
+                        source.deleteRef(finalRef);
+                    } catch (final IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
                 }
             }
         });
@@ -283,7 +301,7 @@ public class GitStorage implements Storage {
         if (refHolder != null) {
             refHolder.write(() -> {
                 try {
-                    source.delete(key, finalRef, user, message, userMail);
+                    source.deleteKey(key, finalRef, user, message, userMail);
                 } catch (final UncheckedIOException ioe) {
                     consumeError(ioe);
                 }

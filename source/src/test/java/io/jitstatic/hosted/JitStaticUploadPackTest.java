@@ -1,5 +1,7 @@
 package io.jitstatic.hosted;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 /*-
  * #%L
 
@@ -22,7 +24,6 @@ package io.jitstatic.hosted;
  */
 
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -90,7 +91,7 @@ public class JitStaticUploadPackTest {
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
-        assertThrows(WantNotValidException.class, () -> up.internalupload(is, os, messages));
+        up.upload(is, os, messages);
         assertNull(errorReporter.getFault());
     }
 
@@ -116,7 +117,31 @@ public class JitStaticUploadPackTest {
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
-        assertThrows(UploadPackInternalServerErrorException.class, () -> up.internalupload(is, os, messages));
-        assertNull(errorReporter.getFault());
+        up.upload(is, os, messages);
+        assertNull(errorReporter.getFault());        
+    }
+    
+    @Test
+    public void testInternalUpload() throws IOException {
+        Repository copyFrom = mock(Repository.class);
+        ObjectReader or = mock(ObjectReader.class);
+        RefFilter rf = mock(RefFilter.class);
+        TransferConfig tc = mock(TransferConfig.class);
+        StoredConfig sc = mock(StoredConfig.class);
+        when(tc.getRefFilter()).thenReturn(rf);
+        when(copyFrom.newObjectReader()).thenReturn(or);
+        when(copyFrom.getConfig()).thenReturn(sc);
+ 
+        ErrorReporter errorReporter = new ErrorReporter();
+        InputStream input = mock(InputStream.class);
+        OutputStream output = mock(OutputStream.class);
+        OutputStream messages = mock(OutputStream.class);
+        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter) {
+            void internalupload(InputStream input, OutputStream output, OutputStream messages) throws IOException {
+                throw new RuntimeException("Test");
+            };
+        };
+        up.upload(input, output, messages);
+        assertNotNull(errorReporter.getFault());
     }
 }

@@ -213,7 +213,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {                
+    public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
         ref = checkRef(ref);
         key = checkKeyFormat(Objects.requireNonNull(key));
 
@@ -242,8 +242,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyKey(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
-            final String userMail) {
+    public String modifyKey(final String key, String ref, final byte[] data, final String version, final String message,
+            final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(message);
@@ -391,7 +391,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void delete(final String key, String ref, final String user, final String message, final String userMail) {
+    public void deleteKey(final String key, String ref, final String user, final String message, final String userMail) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(user);
         Objects.requireNonNull(message);
@@ -416,5 +416,16 @@ public class HostedGitRepositoryManager implements Source {
     @Override
     public void addRefHolderFactory(final Function<String, RefHolder> factory) {
         this.repositoryBus.setRefHolderFactory(factory);
+    }
+
+    @Override
+    public void createRef(final String finalRef) throws IOException {
+        checkIfTag(finalRef);
+        updater.createRef(defaultRef, finalRef);
+    }
+
+    @Override
+    public void deleteRef(final String finalRef) throws IOException {
+        updater.deleteRef(finalRef);
     }
 }

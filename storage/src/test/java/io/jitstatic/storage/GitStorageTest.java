@@ -481,7 +481,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            StoreInfo si = gs.add("somekey", "refs/heads/master", pretty, new StorageData(new HashSet<>(), null, false, false, List.of()),
+            StoreInfo si = gs.addKey("somekey", "refs/heads/master", pretty, new StorageData(new HashSet<>(), null, false, false, List.of()),
                     "msg", "user", "mail");
             assertArrayEquals(pretty, si.getData());
             assertEquals("1", si.getVersion());
@@ -542,7 +542,7 @@ public class GitStorageTest {
             gs.delete(key, null, userInfo, message, usermail);
             Thread.sleep(1000);
             gs.checkHealth();
-            Mockito.verify(source).delete(Mockito.eq(key), Mockito.eq(REF_HEADS_MASTER), Mockito.eq(userInfo), Mockito.eq(message),
+            Mockito.verify(source).deleteKey(Mockito.eq(key), Mockito.eq(REF_HEADS_MASTER), Mockito.eq(userInfo), Mockito.eq(message),
                     Mockito.eq(usermail));
         }
     }
