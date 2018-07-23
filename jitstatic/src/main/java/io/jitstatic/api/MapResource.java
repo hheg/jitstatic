@@ -230,7 +230,7 @@ public class MapResource {
             throw new WebApplicationException(String.format("Key '%s' already exist in branch %s", data.getKey(), data.getBranch()),
                     Status.CONFLICT);
         }
-        final StoreInfo result = helper.unwrapWithPOSTApi(() -> storage.add(data.getKey(), data.getBranch(), data.getData(),
+        final StoreInfo result = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
                 data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
         return Response.ok().tag(new EntityTag(result.getVersion()))
                 .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)

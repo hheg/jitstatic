@@ -147,43 +147,33 @@ public class RefHolder {
         return refCache.entrySet().stream().filter(e -> e.getValue().isPresent()).map(Entry::getKey).collect(Collectors.toSet());
     }
 
-    private Map<String, Optional<StoreInfo>> getCache() {
-        return refCache;
-    }
-
     public boolean isEmpty() {
         return !refCache.values().stream().filter(Optional::isPresent).flatMap(Optional::stream).findAny().isPresent();
     }
 
-    public void setCache(final Map<String, Optional<StoreInfo>> newMap) {
-        refCache = newMap;
-    }
-
     public void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
             final String contentType) {
-        final Optional<StoreInfo> si = getKey(key);
-        final StoreInfo storeInfo = si.get();
-        if (storeInfo.getVersion().equals(oldversion)) {
-            putKey(key, Optional.of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion())));
-        }
+        refCache.computeIfPresent(key, (k, si) -> {
+            final StoreInfo storeInfo = si.get();
+            if ((si.isPresent() && storeInfo.getVersion().equals(oldversion)) || !si.isPresent()) {
+                return Optional.of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion()));
+            }
+            return si;
+        });
     }
 
     public void refreshMetaData(final StorageData metaData, final String key, final String metaDataVersion, final String newVersion,
-            final String contentType) {
+            final String contentType) {        
         final Optional<StoreInfo> si = getKey(key);
         final StoreInfo storeInfo = si.get();
         if (storeInfo.getMetaDataVersion().equals(metaDataVersion)) {
             if (storeInfo.isMasterMetaData()) {
-                clear(); // TODO Don't clear all keys. Check which ones that could be left alone
+                refCache.clear(); // TODO Don't clear all keys. Check which ones that could be left alone
                 putKey(key, Optional.of(new StoreInfo(metaData, newVersion)));
             } else {
                 putKey(key, Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
             }
         }
-    }
-
-    private void clear() {
-        getCache().clear();
     }
 
     private Map<String, Optional<StoreInfo>> refreshFiles(final Set<String> files) {
@@ -263,7 +253,7 @@ public class RefHolder {
 
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
         Optional<StoreInfo> storeInfoContainer;
-        final Map<String, Optional<StoreInfo>> refMap = getCache();
+        final Map<String, Optional<StoreInfo>> refMap = refCache;
         if (storeInfo != null) {
             if (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo)) {
                 storeInfoContainer = Optional.of(storeInfo);
@@ -294,7 +284,7 @@ public class RefHolder {
         final Map<String, Optional<StoreInfo>> newMap = refreshFiles(files);
         boolean isRefreshed = newMap.size() > 0;
         if (isRefreshed) {
-            setCache(newMap);
+            refCache = newMap;
         }
         return isRefreshed;
     }
@@ -305,7 +295,7 @@ public class RefHolder {
     public void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
-            Optional<StoreInfo> optional = getCache().get(plainKey);
+            Optional<StoreInfo> optional = refCache.get(plainKey);
             if (optional != null && optional.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }

@@ -45,17 +45,21 @@ public class JitStaticUploadPack extends UploadPack {
     @Override
     public void upload(final InputStream input, final OutputStream output, final OutputStream messages) throws IOException {
         try {
-            super.upload(input, output, messages);
+            internalupload(input, output, messages);
         } catch (final IOException e) {
             if (!("org.eclipse.jetty.io.EofException".equals(e.getClass().getCanonicalName()) || (e instanceof WantNotValidException)
                     || (e instanceof UploadPackInternalServerErrorException))) {
                 errorReporter.setFault(e);
                 LOG.error("Upload resulted in error ", e);
+                throw e;
             }
-            throw e;
         } catch (final Exception e) {
             errorReporter.setFault(e);
             LOG.error("Upload resulted in error ", e);
         }
+    }
+
+    void internalupload(final InputStream input, final OutputStream output, final OutputStream messages) throws IOException {
+        super.upload(input, output, messages);
     }
 }

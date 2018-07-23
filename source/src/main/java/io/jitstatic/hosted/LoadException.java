@@ -28,7 +28,7 @@ public class LoadException extends RuntimeException {
     }
 
     @Override
-    public synchronized Throwable initCause(Throwable cause) {
+    public Throwable initCause(Throwable cause) {
         return this;
     }
 

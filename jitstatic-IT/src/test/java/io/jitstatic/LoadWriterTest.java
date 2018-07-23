@@ -98,13 +98,16 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.Utils;
 
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
-@ExtendWith(DropwizardExtensionsSupport.class)
 public class LoadWriterTest {
 
     private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
+    private static final boolean log = false;
     private static final Logger LOG = LogManager.getLogger(LoadWriterTest.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
@@ -112,7 +115,7 @@ public class LoadWriterTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String METADATA = ".metadata";
     static final String MASTER = "master";
-
+    private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
 
@@ -150,8 +153,7 @@ public class LoadWriterTest {
                         try (JitStaticUpdaterClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
                             ResultData resultData = execute(buildKeyClient, branch, key, tag);
-                            LOG.info("Thread:{} key:{} branch:{} iters:{} duration:{}ms length:{}bytes", Thread.currentThread().getName(),
-                                    key, branch, resultData.iterations, resultData.duration, resultData.bytes);
+                            printStats(resultData);
                             return resultData;
                         }
                     }, service);
@@ -164,6 +166,12 @@ public class LoadWriterTest {
 
         } finally {
             service.shutdown();
+        }
+    }
+
+    private static void log(Runnable r) {
+        if (log) {
+            r.run();
         }
     }
 
@@ -206,7 +214,7 @@ public class LoadWriterTest {
         try {
             Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
             try {
-                LOG.info(response.readEntity(String.class));
+                log(() -> LOG.info(response.readEntity(String.class)));
                 File workingFolder = getFolderFile();
                 try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
                         .setCredentialsProvider(getCredentials(hf)).call()) {
@@ -218,12 +226,10 @@ public class LoadWriterTest {
                         Map<String, Integer> cnt = new HashMap<>();
                         for (RevCommit rc : git.log().call()) {
                             String msg = matchData(data, cnt, rc);
-                            LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent());
+                            log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                         }
                     }
-                    result.ifPresent(r -> LOG.info("Thread: {}  Iters: {} time: {}ms length: {}b Writes: {}/s Bytes: {}b/s",
-                            Thread.currentThread().getName(), r.iterations, r.duration, r.bytes, divide(r.iterations, r.duration),
-                            divide(r.bytes, r.duration)));
+                    result.ifPresent(this::printStats);
                 }
             } finally {
                 response.close();
@@ -232,6 +238,11 @@ public class LoadWriterTest {
             statsClient.close();
         }
         Utils.checkContainerForErrors(DW);
+    }
+
+    private void printStats(ResultData r) {
+        LOG.info("Thread: {}  Iters: {} time: {}ms length: {}B Writes: {}/s Bytes: {}B/s", Thread.currentThread().getName(), r.iterations,
+                r.duration, r.bytes, divide(r.iterations, r.duration), divide(r.bytes, r.duration));
     }
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, WriteData testData)
@@ -271,7 +282,7 @@ public class LoadWriterTest {
         if (Status.OK == remoteUpdate.getStatus()) {
             return true;
         } else {
-            LOG.error("TestSuiteError: FAILED push " + c + " with " + remoteUpdate);
+            LOG.error("TestSuiteError: FAILED push {} with {}", c, remoteUpdate);
         }
         return false;
     }
@@ -326,9 +337,9 @@ public class LoadWriterTest {
             Integer value = cnt.get(split[1]);
             Integer newValue = Integer.valueOf(split[2]);
             if (value != null) {
-                assertEquals(Integer.valueOf(value.intValue() - 1), newValue);
+                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, msg);
             } else {
-                assertEquals(data.get(split[1]), newValue);
+                assertEquals(data.get(split[1]), newValue, msg);
             }
             cnt.put(split[1], newValue);
         } else {
@@ -375,7 +386,7 @@ public class LoadWriterTest {
         }
     }
 
-    private static Supplier<String> getFolder() {
+    private Supplier<String> getFolder() {
         return () -> {
             try {
                 return getFolderFile().toString();
@@ -385,10 +396,8 @@ public class LoadWriterTest {
         };
     }
 
-    private static File getFolderFile() throws IOException {
-        File file = Files.createTempDirectory("junit").toFile();
-        file.deleteOnExit();
-        return file;
+    private File getFolderFile() throws IOException {
+        return tmpfolder.createTemporaryDirectory();
     }
 
     private static Entity read(InputStream is, String tag, String contentType) {

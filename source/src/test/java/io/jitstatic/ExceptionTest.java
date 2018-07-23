@@ -27,16 +27,20 @@ import org.junit.jupiter.api.Test;
 
 import io.jitstatic.UpdateFailedException;
 import io.jitstatic.check.MetaDataFileIsMissingSourceFile;
+import io.jitstatic.hosted.FailedToLock;
 
 public class ExceptionTest {
 
-	@Test
-	public void testCoverageTests() {
-		String file = "file";
-		MetaDataFileIsMissingSourceFile md = new MetaDataFileIsMissingSourceFile(file);
-		assertEquals(file + " is missing matching source file", md.getMessage());
-		UpdateFailedException up = new UpdateFailedException(Result.REJECTED);
-		assertEquals(Result.REJECTED.name(), up.getLocalizedMessage());
-	}
+    @Test
+    public void testCoverageTests() {
+        String file = "file";
+        String branch = "refs/heads/master";
+        MetaDataFileIsMissingSourceFile md = new MetaDataFileIsMissingSourceFile(file);
+        assertEquals(file + " is missing matching source file", md.getMessage());
+        UpdateFailedException up = new UpdateFailedException(Result.REJECTED, branch);
+        assertEquals(String.format("Got error %s when updating %s", Result.REJECTED.name(), branch), up.getLocalizedMessage());
+        FailedToLock ftl = new FailedToLock("ref");
+        ftl.fillInStackTrace();
+    }
 
 }

@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>io.jitstatic</groupId>
 		<artifactId>jitstatic-parent</artifactId>
-		<version>0.11.2</version>
+		<version>0.12.0</version>
 	</parent>
 	<artifactId>jitstatic</artifactId>
 	<dependencies>
@@ -88,22 +88,22 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>source</artifactId>
-			<version>0.11.2</version>
+			<version>0.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>storage</artifactId>
-			<version>0.11.2</version>
+			<version>0.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>version</artifactId>
-			<version>0.11.2</version>
+			<version>0.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>utils</artifactId>
-			<version>0.11.2</version>
+			<version>0.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.activation</groupId>
@@ -211,6 +211,12 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jitstatic</groupId>
+			<artifactId>test-utils</artifactId>
+			<version>0.12.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

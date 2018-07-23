@@ -24,14 +24,14 @@ import org.eclipse.jgit.lib.RefUpdate.Result;
 
 public class UpdateFailedException extends RuntimeException {
 
-	private static final long serialVersionUID = 1L;
-	
-	public UpdateFailedException(final Result update) {
-		super(update.name());
-	}
-	
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
-	}
+    private static final long serialVersionUID = 1L;
+
+    public UpdateFailedException(final Result update, final String ref) {
+        super(String.format("Got error %s when updating %s", update.name(), ref));
+    }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

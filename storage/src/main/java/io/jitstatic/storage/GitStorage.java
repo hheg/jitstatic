@@ -1,5 +1,7 @@
 package io.jitstatic.storage;
 
+import java.io.IOException;
+
 /*-
  * #%L
  * jitstatic
@@ -60,7 +62,7 @@ public class GitStorage implements Storage {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
     }
-    
+
     public RefHolder getRefHolderLock(final String ref) {
         return getRefHolder(ref);
     }
@@ -72,8 +74,7 @@ public class GitStorage implements Storage {
             if (refHolder != null) {
                 try {
                     refHolder.reloadAll(() -> {
-                        boolean isRefreshed = refHolder.refresh();
-                        if (!isRefreshed) {
+                        if (!refHolder.refresh()) {
                             cache.remove(ref);
                         }
                     });
@@ -117,17 +118,13 @@ public class GitStorage implements Storage {
         }
         return storeInfo;
     }
-    
+
     private boolean checkKeyIsDotFile(final String key) {
         return Path.of(key).getLastElement().startsWith(".");
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        RefHolder refHolder = cache.get(finalRef);
-        if (refHolder == null) {
-            refHolder = cache.computeIfAbsent(finalRef, (r) -> new RefHolder(r, new ConcurrentHashMap<>(), source));            
-        }
-        return refHolder;
+        return cache.computeIfAbsent(finalRef, (r) -> new RefHolder(r, new ConcurrentHashMap<>(), source));
     }
 
     @Override
@@ -169,17 +166,17 @@ public class GitStorage implements Storage {
                 if (storageIsForbidden(storeInfo)) {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
-                final String newVersion = source.modify(key, finalRef, data, oldVersion, message, userInfo, userEmail);
+                final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
                 refHolder.refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
                 return newVersion;
             }, key));
-        } catch (FailedToLock e) {
+        } catch (final FailedToLock e) {
             return Either.right(e);
         }
     }
 
     @Override
-    public StoreInfo add(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
+    public StoreInfo addKey(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
@@ -194,14 +191,25 @@ public class GitStorage implements Storage {
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
 
-        final RefHolder refStore = checkIfKeyAlreadyExists(key, finalRef);
+        RefHolder refStore = checkIfKeyAlreadyExists(key, finalRef);
         return refStore.write(() -> {
             SourceInfo sourceInfo = null;
             try {
                 try {
                     sourceInfo = source.getSourceInfo(key, finalRef);
-                } catch (final RefNotFoundException e) {
-                    throw new WrappingAPIException(e);
+                } catch (final RefNotFoundException ignore) {
+                    try {
+                        sourceInfo = source.getSourceInfo(key, defaultRef);
+                    } catch (final RefNotFoundException shouldnotHappen) {
+                        throw new ShouldNeverHappenException("Default ref " + defaultRef + " is not found");
+                    }
+                    if (sourceInfo == null) {
+                        try {
+                            source.createRef(finalRef);
+                        } catch (final IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
                 }
                 if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                     throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
@@ -212,7 +220,7 @@ public class GitStorage implements Storage {
                 return storeInfo;
             } finally {
                 if (sourceInfo == null) {
-                    removeCacheRef(finalRef, refStore);
+                    removeCacheRef(finalRef, refStore);                    
                 }
             }
         });
@@ -228,12 +236,7 @@ public class GitStorage implements Storage {
     }
 
     private void removeCacheRef(final String finalRef, final RefHolder newRefHolder) {
-        synchronized (cache) {
-            final RefHolder refHolder = cache.get(finalRef);
-            if (refHolder == newRefHolder && refHolder.isEmpty()) {
-                cache.remove(finalRef);
-            }
-        }
+        cache.computeIfPresent(finalRef, (a, b) -> b.isEmpty() ? null : b);
     }
 
     @Override
@@ -261,7 +264,7 @@ public class GitStorage implements Storage {
                 if (storageIsForbidden(storeInfo)) {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
-                final String newVersion = source.modify(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef);
+                final String newVersion = source.modifyMetadata(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef);
                 refHolder.refreshMetaData(metaData, key, metaDataVersion, newVersion, metaData.getContentType());
                 return newVersion;
 
@@ -293,7 +296,7 @@ public class GitStorage implements Storage {
         if (refHolder != null) {
             refHolder.write(() -> {
                 try {
-                    source.delete(key, finalRef, user, message, userMail);
+                    source.deleteKey(key, finalRef, user, message, userMail);
                 } catch (final UncheckedIOException ioe) {
                     consumeError(ioe);
                 }

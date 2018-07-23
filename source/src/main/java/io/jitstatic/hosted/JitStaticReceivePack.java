@@ -26,13 +26,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
@@ -67,22 +70,34 @@ public class JitStaticReceivePack extends ReceivePack {
     // TODO do the checks the original code does
     @Override
     protected void executeCommands() {
+        ProgressMonitor updating = NullProgressMonitor.INSTANCE;
+        if (isSideBand()) {
+            SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
+            pm.setDelayStart(250, TimeUnit.MILLISECONDS);
+            updating = pm;
+        }
         final List<ReceiveCommand> commands = filterCommands(Result.NOT_ATTEMPTED);
+        if (commands.isEmpty())
+            return;
+
         final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted = new ArrayList<>(commands.size());
-        for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {
+        updating.beginTask("Checking branches", cmdsToBeExecuted.size());
+        for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {            
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
-                checkBranch(cmdsToBeExecuted, rc);
+                checkBranch(cmdsToBeExecuted, rc, updating);
             } else {
                 if (defaultRef.equals(rc.getRefName())) {
                     rc.setResult(Result.REJECTED_NODELETE, "Cannot delete default branch " + defaultRef);
                 }
                 cmdsToBeExecuted.add(Pair.of(rc, null)); // Deleted branches
             }
+            updating.update(1);
         }
-        tryAndCommit(cmdsToBeExecuted);
+        updating.endTask();
+        tryAndCommit(cmdsToBeExecuted, updating);
     }
 
-    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc) {
+    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc, ProgressMonitor monitor) {
         final String branch = rc.getRefName();
         final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
         try {
@@ -138,10 +153,10 @@ public class JitStaticReceivePack extends ReceivePack {
         return new SourceChecker(getRepository());
     }
 
-    private void tryAndCommit(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
+    private void tryAndCommit(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
         try {
             if (ifAllOk(cmds)) {
-                commitCommands(cmds);
+                commitCommands(cmds, monitor);
             }
         } finally {
             cleanUpRepository(cmds);
@@ -157,9 +172,10 @@ public class JitStaticReceivePack extends ReceivePack {
         bus.process(refsToUpdate);
     }
 
-    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
+    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
         final Repository repository = getRepository();
-        cmds.stream().map(p -> {
+        monitor.beginTask("Commiting branches", cmds.size());
+        cmds.stream().map(p -> {            
             final ReceiveCommand orig = p.getLeft();
             final ReceiveCommand test = p.getRight();
             final String refName = orig.getRefName();
@@ -198,11 +214,15 @@ public class JitStaticReceivePack extends ReceivePack {
                         final RepositoryException repoException = new RepositoryException(msg, e);
                         setFault(repoException);
                         return Either.<Exception, Void>left(repoException);
+                    } finally {
+                        monitor.update(1);
                     }
                 });
             } catch (final FailedToLock e1) {
                 orig.setResult(Result.LOCK_FAILURE, e1.getLocalizedMessage());
                 return Either.<Exception, Void>left(e1);
+            } finally {
+                monitor.endTask();
             }
         }).filter(Either::isLeft).forEach(e -> sendError(e.getLeft().getLocalizedMessage()));
     }

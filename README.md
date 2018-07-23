@@ -34,7 +34,7 @@ logging:
 hosted:
     basePath: file:/tmp/jitstatic/remote
     servletName: jitstatic
-    hostedEndpoint: jitstatic.git
+    hostedEndpoint: git
     userName: huser
     secret: hseCr3t
 ```
@@ -179,7 +179,7 @@ At the moment the application only allows basic authentication so be sure you se
 
 To clone the repo you just type (the username and password defined in the Dropwizard configuration file)
 ```bash
-git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/jitstatic.git
+git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/git
 ```
 It's also possible to reach keys (files) through refs so if you make a call like:
 
@@ -298,6 +298,8 @@ git log --graph --pretty=format:'%h %d %s %cr <%an>' --abbrev-commit --date=rela
 * 7cfbec2 - message (4 minutes ago) <user1>
 * 3af867a - Initial commit (4 minutes ago) <hheg>
 ```
+
+If you add a key to a branch which does not currently exist, JitStatic will make a branch from the default branch (which usually is master) and add the key to that branch. However if the key already exist in the base branch you'll get an error that the key already exist.
 
 
 ### API for modifying a key's metadata

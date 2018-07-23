@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -41,18 +40,22 @@ import org.eclipse.jgit.lib.Ref;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.jitstatic.check.FileIsMissingMetaData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.hosted.RemoteTestUtils;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 
+@ExtendWith(TemporaryFolderExtension.class)
 public class SourceCheckerTest {
 
     private static final String REF_HEAD_MASTER = Constants.R_HEADS + "master";
     private static final String store = "data";
-
+    private TemporaryFolder tmpFolder;
     private Git bareGit;
     private Git workingGit;
 
@@ -70,9 +73,7 @@ public class SourceCheckerTest {
     }
 
     private File createTempFiles() throws IOException {
-        File file = Files.createTempDirectory("junit").toFile();
-        file.deleteOnExit();
-        return file;
+       return tmpFolder.createTemporaryDirectory();
     }
 
     @AfterEach

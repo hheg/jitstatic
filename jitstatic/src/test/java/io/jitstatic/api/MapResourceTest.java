@@ -559,7 +559,7 @@ public class MapResourceTest {
         StoreInfo si = new StoreInfo(new byte[] { 1 }, new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "1",
                 "1");
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
-        when(storage.add(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
+        when(storage.addKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(),
                 Mockito.any())).thenReturn(si);
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
                 new StorageData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "testmessage", "user", "test@test.com");
@@ -595,7 +595,7 @@ public class MapResourceTest {
     @Test
     public void testAddKeyWrongUser() throws UnsupportedEncodingException {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(new StoreInfo(data, new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1"));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
@@ -619,7 +619,7 @@ public class MapResourceTest {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
 
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
-        when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenThrow(new WrappingAPIException(new KeyAlreadyExist("test", REFS_HEADS_MASTER)));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
@@ -632,7 +632,7 @@ public class MapResourceTest {
     public void testAddKeyBranchNotFound() throws UnsupportedEncodingException {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
-        when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenThrow(new WrappingAPIException(new RefNotFoundException(REFS_HEADS_MASTER)));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
@@ -645,7 +645,7 @@ public class MapResourceTest {
     public void testAddKeyDataIsMalformed() {
         byte[] data = new byte[] { 1 };
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
-        when(storage.add(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenThrow(new WrappingAPIException(new IOException("Data is malformed")));
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,

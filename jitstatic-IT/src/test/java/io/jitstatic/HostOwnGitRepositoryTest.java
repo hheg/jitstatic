@@ -41,6 +41,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
@@ -84,9 +85,11 @@ import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.Utils;
 
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class HostOwnGitRepositoryTest {
 
     private static final String UTF_8 = "UTF-8";
@@ -98,7 +101,7 @@ public class HostOwnGitRepositoryTest {
     private static final String PASSWORD = "ssecret";
 
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
-
+    private TemporaryFolder tmpFolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolderString()));
 
@@ -365,7 +368,7 @@ public class HostOwnGitRepositoryTest {
             assertArrayEquals(bytes, readAllBytes);
         }
     }
-    
+
     @Test
     public void testReloadedAfterManualPush()
             throws IOException, InvalidRemoteException, TransportException, GitAPIException, URISyntaxException {
@@ -382,7 +385,7 @@ public class HostOwnGitRepositoryTest {
             assertNotEquals(first.getTag(), second.getTag());
         }
     }
-    
+
     @Test
     public void testAddingKeyWithMasterMetaData() throws Exception {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
@@ -460,16 +463,18 @@ public class HostOwnGitRepositoryTest {
         return path;
     }
 
-    private static String getFolderString() {
-        try {
-            return getFolder().toString();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    private Supplier<String> getFolderString() {
+        return () -> {
+            try {
+                return getFolder().toString();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
     }
 
-    private static Path getFolder() throws IOException {
-        return Files.createTempDirectory("junit");
+    private Path getFolder() throws IOException {
+        return tmpFolder.createTemporaryDirectory().toPath();
     }
 
     private JsonNode readSource(final Path storage) throws IOException {

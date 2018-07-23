@@ -214,16 +214,8 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
-        Objects.requireNonNull(key);
         ref = checkRef(ref);
-        if (key.isEmpty()) {
-            throw new IllegalArgumentException("Key is empty");
-        }
-        if (key.equals("/")) {
-            key = "";
-        } else if (key.startsWith("/")) {
-            throw new IllegalArgumentException("Key starts with a '/' " + key);
-        }
+        key = checkKeyFormat(Objects.requireNonNull(key));
 
         try {
             if (ref.startsWith(Constants.R_HEADS)) {
@@ -237,9 +229,21 @@ public class HostedGitRepositoryManager implements Source {
         throw new RefNotFoundException(ref);
     }
 
+    private String checkKeyFormat(String key) {
+        if (key.isEmpty()) {
+            throw new IllegalArgumentException("Key is empty");
+        }
+        if (key.equals("/")) {
+            key = "";
+        } else if (key.startsWith("/")) {
+            throw new IllegalArgumentException("Key starts with a '/' " + key);
+        }
+        return key;
+    }
+
     @Override
-    public String modify(final String key, String ref, final byte[] data, final String version, final String message, final String userInfo,
-            final String userMail) {
+    public String modifyKey(final String key, String ref, final byte[] data, final String version, final String message,
+            final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(message);
@@ -333,7 +337,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modify(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
+    public String modifyMetadata(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
             final String userMail, final String key, String ref) {
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
@@ -387,7 +391,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void delete(final String key, String ref, final String user, final String message, final String userMail) {
+    public void deleteKey(final String key, String ref, final String user, final String message, final String userMail) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(user);
         Objects.requireNonNull(message);
@@ -412,5 +416,19 @@ public class HostedGitRepositoryManager implements Source {
     @Override
     public void addRefHolderFactory(final Function<String, RefHolder> factory) {
         this.repositoryBus.setRefHolderFactory(factory);
+    }
+
+    @Override
+    public void createRef(final String ref) throws IOException {
+        checkIfTag(Objects.requireNonNull(ref));
+        updater.createRef(defaultRef, ref);
+    }
+
+    @Override
+    public void deleteRef(final String ref) throws IOException {
+        if (Objects.requireNonNull(ref).equals(defaultRef)) {
+            throw new IllegalArgumentException("Cannot delete default ref " + defaultRef);
+        }
+        updater.deleteRef(ref);
     }
 }

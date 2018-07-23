@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -91,8 +92,10 @@ import io.jitstatic.client.MetaData;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class KeyValueStorageWithHostedStorageTest {
 
     private static final String UTF_8 = "UTF-8";
@@ -102,7 +105,7 @@ public class KeyValueStorageWithHostedStorageTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
-
+    private TemporaryFolder tmpfolder;
     private String adress;
 
     @BeforeEach
@@ -342,7 +345,25 @@ public class KeyValueStorageWithHostedStorageTest {
         }
     }
 
-    private static Supplier<String> getFolder() {
+    @Test
+    public void testAddBranchAndKey() throws URISyntaxException, ClientProtocolException, APIException, IOException {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/newbranch";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();) {
+            Entity<JsonNode> createdKey = client.createKey(data.getBytes(StandardCharsets.UTF_8),
+                    new CommitData("key", branch, "new key", "user", "mail"), new MetaData("application/json"), tf);
+            assertEquals(data, createdKey.data.toString());
+        }
+        try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey("key", branch, tf);
+            assertEquals(data, key.data.toString());
+        }
+    }
+
+    private Supplier<String> getFolder() {
         return () -> {
             try {
                 return getFolderFile().getAbsolutePath();
@@ -352,8 +373,8 @@ public class KeyValueStorageWithHostedStorageTest {
         };
     }
 
-    private static File getFolderFile() throws IOException {
-        return Files.createTempDirectory("junit").toFile();
+    private File getFolderFile() throws IOException {
+        return tmpfolder.createTemporaryDirectory(); 
     }
 
     private JitStaticUpdaterClientBuilder buildClient() {

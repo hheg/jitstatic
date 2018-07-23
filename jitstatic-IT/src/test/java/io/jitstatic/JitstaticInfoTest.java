@@ -24,7 +24,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
@@ -35,7 +34,7 @@ import javax.ws.rs.client.Client;
 
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -45,17 +44,19 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 
-@ExtendWith(DropwizardExtensionsSupport.class)
+@ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class JitstaticInfoTest {
 
-    private static final DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
+    private final DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+    private TemporaryFolder tmpFolder;
+    private String adress;
 
-    private static String adress;
-
-    @BeforeAll
-    public static void setupClass() {
+    @BeforeEach
+    public void setupClass() {
         adress = String.format("http://localhost:%d/application/info", DW.getLocalPort());
     }
 
@@ -85,10 +86,10 @@ public class JitstaticInfoTest {
         return DW.client();
     }
 
-    private static Supplier<String> getFolder() {
+    private Supplier<String> getFolder() {
         return () -> {
             try {
-                return Files.createTempDirectory("junit").toString();
+                return tmpFolder.createTemporaryDirectory().toString();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
