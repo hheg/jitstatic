@@ -54,8 +54,8 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public void addRefHolderFactory(Function<String,RefHolder> factory);
 
-    public void createRef(String finalRef) throws IOException;
+    public void createRef(String ref) throws IOException;
 
-    public void deleteRef(String finalRef) throws IOException;
+    public void deleteRef(String ref) throws IOException;
 
 }

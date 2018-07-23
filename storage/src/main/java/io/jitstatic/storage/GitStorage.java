@@ -200,7 +200,7 @@ public class GitStorage implements Storage {
                 } catch (final RefNotFoundException ignore) {
                     try {
                         sourceInfo = source.getSourceInfo(key, defaultRef);
-                    } catch (final RefNotFoundException e1) {
+                    } catch (final RefNotFoundException shouldnotHappen) {
                         throw new ShouldNeverHappenException("Default ref " + defaultRef + " is not found");
                     }
                     if (sourceInfo == null) {
@@ -220,12 +220,7 @@ public class GitStorage implements Storage {
                 return storeInfo;
             } finally {
                 if (sourceInfo == null) {
-                    removeCacheRef(finalRef, refStore);
-                    try {
-                        source.deleteRef(finalRef);
-                    } catch (final IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
+                    removeCacheRef(finalRef, refStore);                    
                 }
             }
         });

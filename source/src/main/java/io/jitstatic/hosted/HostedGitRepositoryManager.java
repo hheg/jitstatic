@@ -419,13 +419,16 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void createRef(final String finalRef) throws IOException {
-        checkIfTag(finalRef);
-        updater.createRef(defaultRef, finalRef);
+    public void createRef(final String ref) throws IOException {
+        checkIfTag(Objects.requireNonNull(ref));
+        updater.createRef(defaultRef, ref);
     }
 
     @Override
-    public void deleteRef(final String finalRef) throws IOException {
-        updater.deleteRef(finalRef);
+    public void deleteRef(final String ref) throws IOException {
+        if (Objects.requireNonNull(ref).equals(defaultRef)) {
+            throw new IllegalArgumentException("Cannot delete default ref " + defaultRef);
+        }
+        updater.deleteRef(ref);
     }
 }
