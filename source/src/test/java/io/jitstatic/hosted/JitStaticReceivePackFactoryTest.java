@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import javax.servlet.http.HttpServletRequest;

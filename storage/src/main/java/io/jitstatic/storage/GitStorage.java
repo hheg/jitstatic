@@ -220,7 +220,7 @@ public class GitStorage implements Storage {
                 return storeInfo;
             } finally {
                 if (sourceInfo == null) {
-                    removeCacheRef(finalRef, refStore);                    
+                    removeCacheRef(finalRef, refStore);
                 }
             }
         });
@@ -292,23 +292,16 @@ public class GitStorage implements Storage {
             // We don't support deleting master .metadata files right now
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-        final RefHolder refHolder = cache.get(finalRef);
-        if (refHolder != null) {
-            refHolder.write(() -> {
-                try {
-                    source.deleteKey(key, finalRef, user, message, userMail);
-                } catch (final UncheckedIOException ioe) {
-                    consumeError(ioe);
-                }
-                refHolder.putKey(key, Optional.empty());
-            });
-            synchronized (cache) {
-                if (refHolder.isEmpty()) {
-                    cache.remove(finalRef);
-                }
+        final RefHolder refHolder = getRefHolder(finalRef);
+        refHolder.write(() -> {
+            try {
+                source.deleteKey(key, finalRef, user, message, userMail);
+            } catch (final UncheckedIOException ioe) {
+                consumeError(ioe);
             }
-        }
-
+            refHolder.putKey(key, Optional.empty());
+        });
+        cache.computeIfPresent(finalRef, (k, holder) -> holder.isEmpty() ? null : holder);
     }
 
     private void isRefATag(final String finalRef) {
