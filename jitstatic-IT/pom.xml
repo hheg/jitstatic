@@ -12,7 +12,7 @@
 		<dependency>
 			<groupId>io.jitstatic</groupId>
 			<artifactId>jitstatic-client</artifactId>
-			<version>0.4.1-SNAPSHOT</version>
+			<version>0.5.0</version>
 			<scope>test</scope>
 			<exclusions>
 				<exclusion>
