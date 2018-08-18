@@ -23,12 +23,14 @@ package io.jitstatic.api;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -74,6 +77,7 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -81,7 +85,7 @@ import io.jitstatic.utils.WrappingAPIException;
 public class MapResourceTest {
     private static final String APPLICATION_JSON = "application/json";
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String USER = "user";
     private static final String SECRET = "secret";
     private static final String PUSER = "puser";
@@ -162,7 +166,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testKeyIsFoundButWrongUser() throws UnsupportedEncodingException {
+    public void testKeyIsFoundButWrongUser() {
         Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
@@ -593,7 +597,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testAddKeyWrongUser() throws UnsupportedEncodingException {
+    public void testAddKeyWrongUser() {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(new StoreInfo(data, new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1"));
@@ -615,7 +619,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testAddKeyKeyAlreadyExist() throws UnsupportedEncodingException {
+    public void testAddKeyKeyAlreadyExist() {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
 
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
@@ -629,7 +633,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testAddKeyBranchNotFound() throws UnsupportedEncodingException {
+    public void testAddKeyBranchNotFound() {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
@@ -664,7 +668,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testModifyKetWithoutIFMatchtag() throws UnsupportedEncodingException {
+    public void testModifyKetWithoutIFMatchtag() {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
@@ -692,7 +696,7 @@ public class MapResourceTest {
     }
 
     @Test
-    public void testPutOnMasterMetaKeyShouldFail() throws UnsupportedEncodingException {
+    public void testPutOnMasterMetaKeyShouldFail() {
         WebTarget target = RESOURCES.target("/storage/dog/");
 
         ModifyKeyData data = new ModifyKeyData();
@@ -704,7 +708,7 @@ public class MapResourceTest {
         Response response = target.request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
-        assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        assertEquals(Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
         response.close();
     }
 
@@ -751,12 +755,33 @@ public class MapResourceTest {
         delete.close();
     }
 
+    @Test
+    public void testListAll() {
+        StoreInfo dogInfo = DATA.get("dog").get();
+        StoreInfo bookInfo = DATA.get("book").get();
+        Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
+        Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
+        when(storage.getList(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
+        List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
+                });
+        assertNotNull(list);
+        assertEquals(2, list.size());
+        assertEquals(new KeyData(dogPair), list.get(0));
+        assertEquals(new KeyData(bookPair), list.get(1));
+    }
+
+    @Test
+    public void testEmptyList() {
+        when(storage.getList(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(List.of());
+        assertEquals(Status.NOT_FOUND.getStatusCode(),
+                RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get().getStatus());
+
+    }
+
     private static String createCreds(String user, String secret) {
-        try {
-            return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
 
 }

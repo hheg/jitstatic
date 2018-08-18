@@ -240,7 +240,6 @@ public class JitStaticReceivePack extends ReceivePack {
         default:
             rc.setResult(Result.REJECTED_CURRENT_BRANCH, refName);
             break;
-
         }
     }
 

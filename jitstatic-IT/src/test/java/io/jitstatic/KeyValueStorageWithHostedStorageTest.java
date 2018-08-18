@@ -72,6 +72,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.codahale.metrics.health.HealthCheck.Result;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -81,6 +82,7 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.JitstaticApplication;
 import io.jitstatic.JitstaticConfiguration;
+import io.jitstatic.api.KeyData;
 import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
@@ -320,8 +322,6 @@ public class KeyValueStorageWithHostedStorageTest {
                 JitStaticUpdaterClient secondUpdater = buildClient().setUser(user).setPassword(pass).build()) {
             Entity<JsonNode> key = firstUpdater.getKey("accept/genkey", tf);
             assertNotNull(key);
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> firstUpdater.getKey("accept/", tf)).getStatusCode());
             Entity<JsonNode> metaKey = client.getMetaKey("accept/", null, tf);
 
             String modifyMetaKey = client.modifyMetaKey("accept/", null, metaKey.tag, new ModifyUserKeyData(
@@ -363,6 +363,94 @@ public class KeyValueStorageWithHostedStorageTest {
         }
     }
 
+    @Test
+    public void addKeyAndDeleteAndThenAddAgain() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> createdKey = client.createKey(data.getBytes(StandardCharsets.UTF_8),
+                    new CommitData("key", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"), tf);
+            assertEquals(data, createdKey.data.toString());
+            Entity<JsonNode> key = updaterClient.getKey("key", branch, tf);
+            assertEquals(data, key.data.toString());
+            updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"));
+            assertEquals(404, assertThrows(APIException.class, () -> updaterClient.getKey("key", branch, tf)).getStatusCode());
+            createdKey = client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key", branch, "new key", "user", "mail"),
+                    new MetaData("application/json"), tf);
+            key = updaterClient.getKey("key", branch, tf);
+            assertEquals(data, key.data.toString());
+            assertEquals(400, assertThrows(APIException.class,
+                    () -> updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"))).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testListAllFiles() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2");
+            for (String key : list) {
+                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"), tf);
+            }
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key3", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"), tf);
+            List<KeyData> result = updaterClient.listAll("/", (is) -> {
+                try {
+                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertNotNull(result);
+            assertEquals(2, result.size(), result.toString());
+            assertEquals("key1", result.get(0).getKey());
+            assertEquals("key2", result.get(1).getKey());
+        }
+    }
+
+    @Test
+    public void testListAllFilesTree() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1");
+            for (String key : list) {
+                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"), tf);
+            }
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("dir/key3", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"), tf);
+            List<KeyData> result = updaterClient.listAll("dir/", (is) -> {
+                try {
+                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertNotNull(result);
+            assertEquals(2, result.size());
+            assertEquals("dir/key1", result.get(0).getKey());
+            assertEquals("dir/key2", result.get(1).getKey());
+        }
+    }
+
     private Supplier<String> getFolder() {
         return () -> {
             try {
@@ -374,7 +462,7 @@ public class KeyValueStorageWithHostedStorageTest {
     }
 
     private File getFolderFile() throws IOException {
-        return tmpfolder.createTemporaryDirectory(); 
+        return tmpfolder.createTemporaryDirectory();
     }
 
     private JitStaticUpdaterClientBuilder buildClient() {

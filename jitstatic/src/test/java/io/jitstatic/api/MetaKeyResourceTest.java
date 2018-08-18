@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
@@ -63,7 +64,7 @@ import io.jitstatic.storage.Storage;
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class MetaKeyResourceTest {
 
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String PUSER = "puser";
     private static final String PSECRET = "psecret";
 
@@ -230,10 +231,6 @@ public class MetaKeyResourceTest {
     }
 
     private static String createCreds(String user, String secret) {
-        try {
-            return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
 }

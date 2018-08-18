@@ -1,6 +1,7 @@
 package io.jitstatic.source;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.function.Function;
 
 /*-
@@ -57,5 +58,7 @@ public interface Source extends AutoCloseable, CheckHealth {
     public void createRef(String ref) throws IOException;
 
     public void deleteRef(String ref) throws IOException;
+
+    public List<String> getList(String key, String ref) throws RefNotFoundException, IOException;
 
 }

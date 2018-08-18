@@ -251,7 +251,7 @@ public class RefHolderTest {
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshMetaData(storageData, "key", "1", "2", "application/json");
+        ref.refreshMetaData(storageData, "key", "1", "2");
         assertEquals("2", ref.getKey("key").get().getMetaDataVersion());
     }
 

@@ -76,6 +76,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -494,6 +495,25 @@ public class SourceExtractorTest {
         assertSame(e, fileDataError.getInputStreamHolder().exception());
         assertSame(e, assertThrows(RuntimeException.class, () -> fileDataError.getInputStream()).getCause());
         assertNotNull(fileDataError.getFileObjectIdStore());
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "/,'key1,key1.metadata,key2,key2.metadata,key3,key3.metadata'",
+            "data/,'data/key1,data/key1.metadata,data/key2,data/key2.metadata,data/key3,data/key3.metadata'",
+            "data/data/,'data/data/key1,data/data/key1.metadata,data/data/key2,data/data/key2.metadata,data/data/key3,data/data/key3.metadata'",
+            "data/data/data/,''" })
+    public void testListFiles(String key, String result) throws Exception {
+        File temporaryGitFolder = getFolder();
+        try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
+            for (String k : List.of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2",
+                    "data/data/key3", "decoy/key1", "decoy/decoy/key1")) {
+                addFilesAndPush(k, temporaryGitFolder, local);
+            }
+        }
+        SourceExtractor se = new SourceExtractor(git.getRepository());
+        List<String> listForKey = se.getListForKey(key, REFS_HEADS_MASTER);
+        String[] values = result.isEmpty() ? new String[0] : result.split(",");        
+        assertEquals(List.of(values), listForKey);
     }
 
     private void addFilesAndPush(final String key, File temporaryGitFolder, Git local)

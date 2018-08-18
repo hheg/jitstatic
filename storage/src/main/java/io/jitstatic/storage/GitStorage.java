@@ -27,8 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,6 +40,7 @@ import org.eclipse.jgit.lib.Constants;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.StorageData;
+import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
@@ -110,7 +113,7 @@ public class GitStorage implements Storage {
             try {
                 return refHolder.loadAndStore(key);
             } catch (final LoadException e) {
-                removeCacheRef(finalRef, refHolder);
+                removeCacheRef(finalRef);
                 return Optional.empty();
             } catch (final Exception e) {
                 consumeError(e);
@@ -167,6 +170,7 @@ public class GitStorage implements Storage {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
                 final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
+                
                 refHolder.refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
                 return newVersion;
             }, key));
@@ -220,7 +224,7 @@ public class GitStorage implements Storage {
                 return storeInfo;
             } finally {
                 if (sourceInfo == null) {
-                    removeCacheRef(finalRef, refStore);
+                    removeCacheRef(finalRef);
                 }
             }
         });
@@ -235,18 +239,18 @@ public class GitStorage implements Storage {
         return refStore;
     }
 
-    private void removeCacheRef(final String finalRef, final RefHolder newRefHolder) {
+    private void removeCacheRef(final String finalRef) {        
         cache.computeIfPresent(finalRef, (a, b) -> b.isEmpty() ? null : b);
     }
 
     @Override
-    public Either<String, FailedToLock> putMetaData(final String key, String ref, final StorageData metaData, final String metaDataVersion,
+    public Either<String, FailedToLock> putMetaData(final String key, String ref, final StorageData metaData, final String oldMetaDataVersion,
             final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(userInfo, "userInfo cannot be null");
         Objects.requireNonNull(metaData, "metaData cannot be null");
         Objects.requireNonNull(userMail, "userMail cannot be null");
-        Objects.requireNonNull(metaDataVersion, "metaDataVersion cannot be null");
+        Objects.requireNonNull(oldMetaDataVersion, "metaDataVersion cannot be null");
         Objects.requireNonNull(message, "message cannot be null");
 
         final String finalRef = checkRef(ref);
@@ -264,9 +268,10 @@ public class GitStorage implements Storage {
                 if (storageIsForbidden(storeInfo)) {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
-                final String newVersion = source.modifyMetadata(metaData, metaDataVersion, message, userInfo, userMail, key, finalRef);
-                refHolder.refreshMetaData(metaData, key, metaDataVersion, newVersion, metaData.getContentType());
-                return newVersion;
+                final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key, finalRef);
+                
+                refHolder.refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
+                return newMetaDataVersion;
 
             }, key));
         } catch (final FailedToLock e) {
@@ -301,7 +306,7 @@ public class GitStorage implements Storage {
             }
             refHolder.putKey(key, Optional.empty());
         });
-        cache.computeIfPresent(finalRef, (k, holder) -> holder.isEmpty() ? null : holder);
+        removeCacheRef(finalRef);        
     }
 
     private void isRefATag(final String finalRef) {
@@ -310,4 +315,26 @@ public class GitStorage implements Storage {
         }
     }
 
+    @Override
+    public List<Pair<String, StoreInfo>> getList(final String key, final String ref, final Optional<User> user) {
+        final String finalRef = checkRef(ref);
+        try {
+            final List<String> keys = source.getList(key, finalRef);
+            return keys.stream().parallel().map(k -> Pair.of(k, getKey(k, finalRef))).filter(p -> p.getRight().isPresent())
+                    .map(p -> Pair.of(p.getLeft(), p.getRight().get())).filter(p -> {
+                        final StoreInfo si = p.getRight();
+                        final Set<User> users = si.getStorageData().getUsers();
+                        if (user.isPresent()) {
+                            return users.contains(user.get());
+                        } else {
+                            return users.isEmpty();
+                        }
+                    }).collect(Collectors.toList());
+        } catch (final RefNotFoundException rnfe) {
+            return List.of();
+        } catch (final IOException e) {
+            consumeError(e);
+            return List.of();
+        }
+    }
 }

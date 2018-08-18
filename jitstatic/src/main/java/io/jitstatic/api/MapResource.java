@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
@@ -35,6 +36,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
@@ -62,6 +64,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
@@ -86,11 +89,9 @@ public class MapResource {
     @Timed(name = "get_storage_time")
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
-    @Path("/{key : .+}")
+    @Path("{key : .+}")
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request, final @Context HttpHeaders headers) {
-
-        checkKey(key);
 
         helper.checkRef(ref);
 
@@ -121,6 +122,29 @@ public class MapResource {
         return buildResponse(storeInfo, tag, data);
     }
 
+    @GET
+    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    public Response getRootList(final @QueryParam("ref") String ref, final @Auth Optional<User> user, final @Context Request request,
+            final @Context HttpHeaders headers) {
+        return getList("/", ref, user, request, headers);
+    }
+
+    @GET
+    @Timed(name = "get_search_time")
+    @Metered(name = "get_search_counter")
+    @ExceptionMetered(name = "get_search_exception")
+    @Path("{key : .+/}")
+    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+            final @Context Request request, final @Context HttpHeaders headers) {
+        helper.checkRef(ref);
+        final List<Pair<String, StoreInfo>> list = storage.getList(key, ref, user);
+        if (list.isEmpty()) {
+            return Response.status(Status.NOT_FOUND).build();
+        }
+        return Response.ok(list.stream().map(KeyData::new).collect(Collectors.toList())).build();
+    }
+
     private void checkKey(final String key) {
         if (key.endsWith("/")) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -143,12 +167,12 @@ public class MapResource {
     @Timed(name = "put_storage_time")
     @Metered(name = "put_storage_counter")
     @ExceptionMetered(name = "put_storage_exception")
-    @Path("/{key : .+}")
+    @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Valid @NotNull ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         // All resources without a user cannot be modified with this method. It has to
-        // be done through directly changing the file in the git repository.
+        // be done through directly changing the file in the Git repository.
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
@@ -238,7 +262,7 @@ public class MapResource {
     }
 
     @DELETE
-    @Path("/{key : .+}")
+    @Path("{key : .+}")
     @Timed(name = "delete_storage_time")
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
@@ -247,7 +271,7 @@ public class MapResource {
         if (!user.isPresent()) {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
-        // Yak...
+
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);
         final String message = notEmpty(headers.getHeaderString(X_JITSTATIC_MESSAGE), X_JITSTATIC_MESSAGE);
         final String userMail = notEmpty(headers.getHeaderString(X_JITSTATIC_MAIL), X_JITSTATIC_MAIL);
@@ -270,7 +294,7 @@ public class MapResource {
         checkIfAllowed(key, user, allowedUsers);
         try {
             storage.delete(key, ref, userHeader, message, userMail);
-        } catch (WrappingAPIException e) {
+        } catch (final WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof UnsupportedOperationException) {
                 throw new WebApplicationException(key, Status.METHOD_NOT_ALLOWED);

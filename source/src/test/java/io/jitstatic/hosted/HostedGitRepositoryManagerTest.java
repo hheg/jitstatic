@@ -209,6 +209,13 @@ public class HostedGitRepositoryManagerTest {
     }
 
     @Test
+    public void deleteDefaultRef() throws Exception {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            assertThrows(IllegalArgumentException.class, () -> grm.deleteRef(REF_HEADS_MASTER));
+        }
+    }
+
+    @Test
     public void testGetTagSourceStream() throws CorruptedSourceException, IOException, NoFilepatternException, GitAPIException {
         File workFolder = getFolder().toFile();
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
@@ -607,9 +614,30 @@ public class HostedGitRepositoryManagerTest {
             grm.createRef(branch);
             branches = git.lsRemote().call();
             assertTrue(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());
-            grm.deleteRef(branch);            
+            grm.deleteRef(branch);
             branches = git.lsRemote().call();
-            assertFalse(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());            
+            assertFalse(branches.stream().filter(b -> b.getName().equals(branch)).findAny().isPresent());
+        }
+    }
+
+    @Test
+    public void testGetList() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            addFilesAndPush(gitFolder, git);
+            List<String> keys = grm.getList(STORE, REF_HEADS_MASTER);
+            assertEquals(List.of("store"), keys);
+        }
+    }
+
+    @Test
+    public void testGetListFromNotExistingBranch() throws Exception {
+        File gitFolder = getFolder().toFile();
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+                Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
+            addFilesAndPush(gitFolder, git);
+            assertThrows(RefNotFoundException.class, () -> grm.getList(STORE, "refs/heads/notexisting"));
         }
     }
 
