@@ -60,7 +60,7 @@ import io.jitstatic.storage.Storage;
 public class MetaKeyResource {
 
     private static final String UTF_8 = "utf-8";
-    private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
+    private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
     private final AddKeyAuthenticator addKeyAuthenticator;
     private final APIHelper helper;

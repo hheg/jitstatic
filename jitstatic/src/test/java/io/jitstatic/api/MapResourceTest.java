@@ -105,7 +105,7 @@ public class MapResourceTest {
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
                             .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
-            .addResource(new MapResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
+            .addResource(new KeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
     @BeforeAll
     public static void setupClass() throws JsonProcessingException, IOException {

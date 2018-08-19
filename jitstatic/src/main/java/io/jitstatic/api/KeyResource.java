@@ -68,18 +68,18 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
-public class MapResource {
+public class KeyResource {
     private static final String X_JITSTATIC = "X-jitstatic";
     private static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
     private static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
     private static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     private static final String UTF_8 = "utf-8";
-    private static final Logger LOG = LoggerFactory.getLogger(MapResource.class);
+    private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
     private final AddKeyAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
 
-    public MapResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
+    public KeyResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
         this.helper = new APIHelper(LOG);
@@ -249,11 +249,6 @@ public class MapResource {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(data.getKey(), data.getBranch()));
-        if (si != null && si.isPresent()) {
-            throw new WebApplicationException(String.format("Key '%s' already exist in branch %s", data.getKey(), data.getBranch()),
-                    Status.CONFLICT);
-        }
         final StoreInfo result = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
                 data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
         return Response.ok().tag(new EntityTag(result.getVersion()))

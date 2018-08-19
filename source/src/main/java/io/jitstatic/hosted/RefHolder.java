@@ -259,22 +259,20 @@ public class RefHolder {
     }
 
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
-        Optional<StoreInfo> storeInfoContainer;
         final Map<String, Optional<StoreInfo>> refMap = refCache;
+        Optional<StoreInfo> storeInfoContainer;
         if (storeInfo != null) {
             if (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo)) {
-                storeInfoContainer = Optional.of(storeInfo);
-                refMap.putIfAbsent(key, storeInfoContainer);
+                storeInfoContainer = Optional.of(storeInfo);                
             } else {
                 /* StoreInfo could contain .metadata information but no key info */
                 storeInfoContainer = Optional.empty();
-                refMap.putIfAbsent(key, storeInfoContainer);
             }
         } else {
             storeInfoContainer = Optional.empty();
-            refMap.putIfAbsent(key, storeInfoContainer);
         }
-        return storeInfoContainer;
+        final Optional<StoreInfo> current = refMap.putIfAbsent(key, storeInfoContainer);
+        return current != null && current.isPresent() ? current : storeInfoContainer;
     }
 
     private boolean keyRequestedIsNormalKey(final String key, final StoreInfo storeInfo) {

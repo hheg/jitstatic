@@ -24,7 +24,7 @@ import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.api.JitstaticInfoResource;
-import io.jitstatic.api.MapResource;
+import io.jitstatic.api.KeyResource;
 import io.jitstatic.api.MetaKeyResource;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.source.Source;
@@ -53,7 +53,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
             final AddKeyAuthenticator authenticator = config.getAddKeyAuthenticator();
-            env.jersey().register(new MapResource(storage, authenticator));
+            env.jersey().register(new KeyResource(storage, authenticator));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator));
         } catch (final Exception e) {
