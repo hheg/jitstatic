@@ -75,15 +75,15 @@ public class RefHolder {
         refCache.put(key, store);
     }
 
-    public <T> T lockWrite(final Supplier<T> supplier, final String key) throws FailedToLock {
+    public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key) {
         if (tryLock(key)) {
             try {
-                return supplier.get();
+                return Either.left(supplier.get());
             } finally {
                 unlock(key);
             }
         }
-        throw new FailedToLock(ref);
+        return Either.right(new FailedToLock(ref));
     }
 
     public <T> T write(final Supplier<T> supplier) {
@@ -126,23 +126,24 @@ public class RefHolder {
         refLock.writeLock().unlock();
     }
 
-    public void reloadAll(final Runnable runnable) throws FailedToLock {
+    public boolean reloadAll(final Runnable runnable) {
         if (refLock.isWriteLockedByCurrentThread()) {
             runnable.run();
+            return true;
         } else {
-            throw new FailedToLock(ref);
+            return false;
         }
     }
 
-    public <T> T lockWriteAll(final Supplier<T> supplier) throws FailedToLock {
+    public <T> Either<T,FailedToLock> lockWriteAll(final Supplier<T> supplier) {
         if (refLock.writeLock().tryLock()) {
             try {
-                return supplier.get();
+                return Either.left(supplier.get());
             } finally {
                 refLock.writeLock().unlock();
             }
         }
-        throw new FailedToLock(ref);
+        return Either.right(new FailedToLock(ref));
     }
 
     private Set<String> getFiles() {

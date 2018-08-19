@@ -82,7 +82,7 @@ public class JitStaticReceivePack extends ReceivePack {
 
         final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted = new ArrayList<>(commands.size());
         updating.beginTask("Checking branches", cmdsToBeExecuted.size());
-        for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {            
+        for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
                 checkBranch(cmdsToBeExecuted, rc, updating);
             } else {
@@ -97,7 +97,8 @@ public class JitStaticReceivePack extends ReceivePack {
         tryAndCommit(cmdsToBeExecuted, updating);
     }
 
-    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc, ProgressMonitor monitor) {
+    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc,
+            ProgressMonitor monitor) {
         final String branch = rc.getRefName();
         final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
         try {
@@ -175,12 +176,12 @@ public class JitStaticReceivePack extends ReceivePack {
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
         final Repository repository = getRepository();
         monitor.beginTask("Commiting branches", cmds.size());
-        cmds.stream().map(p -> {            
+        cmds.stream().map(p -> {
             final ReceiveCommand orig = p.getLeft();
             final ReceiveCommand test = p.getRight();
             final String refName = orig.getRefName();
             try {
-                return bus.getRefHolder(refName).lockWriteAll(() -> {
+                Either<Either<Exception, Void>, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> {
                     try {
                         final Ref ref = repository.findRef(refName);
                         checkForRef(orig, refName, ref);
@@ -218,9 +219,12 @@ public class JitStaticReceivePack extends ReceivePack {
                         monitor.update(1);
                     }
                 });
-            } catch (final FailedToLock e1) {
-                orig.setResult(Result.LOCK_FAILURE, e1.getLocalizedMessage());
-                return Either.<Exception, Void>left(e1);
+                if (lock.isRight()) {
+                    FailedToLock ftl = lock.getRight();
+                    orig.setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
+                    return Either.<Exception, Void>left(ftl);
+                }
+                return lock.getLeft();
             } finally {
                 monitor.endTask();
             }

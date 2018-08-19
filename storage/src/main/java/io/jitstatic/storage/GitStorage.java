@@ -76,15 +76,14 @@ public class GitStorage implements Storage {
         refsToReload.stream().forEach(ref -> {
             final RefHolder refHolder = cache.get(ref);
             if (refHolder != null) {
-                try {
-                    refHolder.reloadAll(() -> {
-                        if (!refHolder.refresh()) {
-                            cache.remove(ref);
-                        }
-                    });
-                } catch (final FailedToLock ftl) {
-                    LOG.info("Failed to reload {}", ftl.getMessage());
-                    throw new ShouldNeverHappenException("Failed to reload " + ftl.getMessage());
+                if (!refHolder.reloadAll(() -> {
+                    if (!refHolder.refresh()) {
+                        cache.remove(ref);
+                    }
+                })) {
+                    final String msg = String.format("Failed to reload %s because couldn't aquire lock", ref);
+                    LOG.info(msg);
+                    throw new ShouldNeverHappenException(msg);
                 }
             }
         });
@@ -163,21 +162,16 @@ public class GitStorage implements Storage {
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
+        return refHolder.lockWrite(() -> {
+            final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
+            if (storageIsForbidden(storeInfo)) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+            final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
 
-        try {
-            return Either.left(refHolder.lockWrite(() -> {
-                final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
-                if (storageIsForbidden(storeInfo)) {
-                    throw new WrappingAPIException(new UnsupportedOperationException(key));
-                }
-                final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
-
-                refHolder.refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
-                return newVersion;
-            }, key));
-        } catch (final FailedToLock e) {
-            return Either.right(e);
-        }
+            refHolder.refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
+            return newVersion;
+        }, key);
     }
 
     @Override
@@ -196,15 +190,16 @@ public class GitStorage implements Storage {
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
         final RefHolder refStore = getRefHolder(finalRef);
-        try {
-            return refStore.lockWrite(() -> {
-                checkIfKeyIsPresent(key, finalRef, refStore);
-                final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
-                return storeIfNotHidden(key, finalRef, refStore, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
-            }, key);
-        } catch (final FailedToLock e) {
+
+        final Either<StoreInfo, FailedToLock> result = refStore.lockWrite(() -> {
+            checkIfKeyIsPresent(key, finalRef, refStore);
+            final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
+            return storeIfNotHidden(key, finalRef, refStore, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
+        }, key);
+        if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
+        return result.getLeft();
     }
 
     private void checkIfKeyIsPresent(final String key, final String finalRef, final RefHolder refholder) {
@@ -273,23 +268,20 @@ public class GitStorage implements Storage {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
 
-        try {
-            return Either.left(refHolder.lockWrite(() -> {
-                refHolder.checkIfPlainKeyExist(key);
-                final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
-                if (storageIsForbidden(storeInfo)) {
-                    throw new WrappingAPIException(new UnsupportedOperationException(key));
-                }
-                final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key,
-                        finalRef);
+        return refHolder.lockWrite(() -> {
+            refHolder.checkIfPlainKeyExist(key);
+            final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
+            if (storageIsForbidden(storeInfo)) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+            final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key,
+                    finalRef);
 
-                refHolder.refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
-                return newMetaDataVersion;
+            refHolder.refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
+            return newMetaDataVersion;
 
-            }, key));
-        } catch (final FailedToLock e) {
-            return Either.right(e);
-        }
+        }, key);
+
     }
 
     private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
