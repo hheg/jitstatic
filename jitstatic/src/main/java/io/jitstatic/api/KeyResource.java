@@ -95,11 +95,7 @@ public class KeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(key + " in " + ref, Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
+        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
 
         final Response noChange = helper.checkETag(headers, tag);
@@ -120,6 +116,14 @@ public class KeyResource {
 
         checkIfAllowed(key, user, allowedUsers);
         return buildResponse(storeInfo, tag, data);
+    }
+
+    private StoreInfo checkIfKeyExist(final String key, final String ref) {
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
+        if (si == null || !si.isPresent()) {
+            throw new WebApplicationException(key + " in " + ref, Status.NOT_FOUND);
+        }        
+        return si.get();
     }
 
     @GET
@@ -183,18 +187,7 @@ public class KeyResource {
 
         helper.checkValidRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
-        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        if (allowedUsers.isEmpty()) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
-        }
-
-        checkIfAllowed(key, user, allowedUsers);
+        final StoreInfo storeInfo = checkAccess(key, ref, user);
 
         final String currentVersion = storeInfo.getVersion();
         final EntityTag entityTag = new EntityTag(currentVersion);
@@ -221,6 +214,22 @@ public class KeyResource {
         }
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
 
+    }
+
+    private StoreInfo checkAccess(final String key, final String ref, final Optional<User> user) {
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
+
+        if (si == null || !si.isPresent()) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        final StoreInfo storeInfo = si.get();
+        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
+        if (allowedUsers.isEmpty()) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
+
+        checkIfAllowed(key, user, allowedUsers);
+        return storeInfo;
     }
 
     private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
@@ -275,18 +284,7 @@ public class KeyResource {
 
         helper.checkValidRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
-        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        if (allowedUsers.isEmpty()) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
-        }
-
-        checkIfAllowed(key, user, allowedUsers);
+        checkAccess(key, ref, user);
         try {
             storage.delete(key, ref, userHeader, message, userMail);
         } catch (final WrappingAPIException e) {

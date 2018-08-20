@@ -42,7 +42,6 @@ class SimpleLoginService extends AbstractLoginService {
 			return Arrays.copyOf(roles, 1);
 		}
 		return new String[] {};
-
 	}
 
 	@Override

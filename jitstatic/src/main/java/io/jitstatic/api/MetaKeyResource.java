@@ -83,17 +83,11 @@ public class MetaKeyResource {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
 
-        if (!addKeyAuthenticator.authenticate(user.get())) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
-        }
+        authorize(user);
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
+        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
         final EntityTag tag = new EntityTag(storeInfo.getMetaDataVersion());
         final Response noChange = helper.checkETag(headers, tag);
         if (noChange != null) {
@@ -101,6 +95,12 @@ public class MetaKeyResource {
         }
 
         return Response.ok(storeInfo.getStorageData()).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+    }
+
+    private void authorize(final Optional<User> user) {
+        if (!addKeyAuthenticator.authenticate(user.get())) {
+            throw new WebApplicationException(Status.UNAUTHORIZED);
+        }
     }
 
     @PUT
@@ -116,19 +116,13 @@ public class MetaKeyResource {
             throw new WebApplicationException(Status.UNAUTHORIZED);
         }
 
-        if (!addKeyAuthenticator.authenticate(user.get())) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
-        }
+        authorize(user);
 
         helper.checkHeaders(headers);
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
+        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
         final String currentVersion = storeInfo.getMetaDataVersion();
         final EntityTag tag = new EntityTag(currentVersion);
         final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
@@ -148,6 +142,14 @@ public class MetaKeyResource {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+    }
+
+    private StoreInfo checkIfKeyExist(final String key, final String ref) {
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
+        if (si == null || !si.isPresent()) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        return si.get();
     }
 
 }
