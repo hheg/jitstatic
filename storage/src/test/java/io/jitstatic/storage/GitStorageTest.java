@@ -468,10 +468,9 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            StoreInfo si = gs.addKey("somekey", "refs/heads/master", pretty,
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail");
-            assertArrayEquals(pretty, si.getData());
-            assertEquals("1", si.getVersion());
+            String si = gs.addKey("somekey", "refs/heads/master", pretty,
+                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail");            
+            assertEquals("1", si);
             gs.checkHealth();
         }
     }
@@ -544,10 +543,9 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            StoreInfo si = gs.addKey(key, branch, pretty, new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
+            String si = gs.addKey(key, branch, pretty, new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
                     "mail");
-            assertArrayEquals(pretty, si.getData());
-            assertEquals("1", si.getVersion());
+            assertEquals("1", si);
             gs.checkHealth();
             ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
             Mockito.verify(source).createRef(argument.capture());

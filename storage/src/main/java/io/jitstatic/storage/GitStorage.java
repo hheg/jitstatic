@@ -175,7 +175,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public StoreInfo addKey(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
+    public String addKey(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
@@ -191,10 +191,11 @@ public class GitStorage implements Storage {
         isRefATag(finalRef);
         final RefHolder refStore = getRefHolder(finalRef);
 
-        final Either<StoreInfo, FailedToLock> result = refStore.lockWrite(() -> {
+        final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             checkIfKeyIsPresent(key, finalRef, refStore);
             final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
-            return storeIfNotHidden(key, finalRef, refStore, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
+            storeIfNotHidden(key, finalRef, refStore, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
+            return version.getLeft();
         }, key);
         if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
@@ -236,14 +237,13 @@ public class GitStorage implements Storage {
         }
     }
 
-    private StoreInfo storeIfNotHidden(final String key, final String ref, final RefHolder refStore, final StoreInfo newStoreInfo) {
+    private void storeIfNotHidden(final String key, final String ref, final RefHolder refStore, final StoreInfo newStoreInfo) {
         if (newStoreInfo.getStorageData().isHidden()) {
             refStore.putKey(key, Optional.empty());
             CompletableFuture.runAsync(() -> removeCacheRef(ref));
         } else {
             refStore.putKey(key, Optional.of(newStoreInfo));
         }
-        return newStoreInfo;
     }
 
     private void removeCacheRef(final String finalRef) {

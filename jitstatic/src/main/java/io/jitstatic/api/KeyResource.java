@@ -122,7 +122,7 @@ public class KeyResource {
         final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
         if (si == null || !si.isPresent()) {
             throw new WebApplicationException(key + " in " + ref, Status.NOT_FOUND);
-        }        
+        }
         return si.get();
     }
 
@@ -244,6 +244,7 @@ public class KeyResource {
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
     public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
 
         if (!user.isPresent()) {
@@ -258,11 +259,9 @@ public class KeyResource {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
-        final StoreInfo result = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
+        final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
                 data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
-        return Response.ok().tag(new EntityTag(result.getVersion()))
-                .header(HttpHeaders.CONTENT_TYPE, result.getStorageData().getContentType()).header(HttpHeaders.CONTENT_ENCODING, UTF_8)
-                .entity(result.getData()).build();
+        return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
     @DELETE
