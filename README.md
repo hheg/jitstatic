@@ -266,9 +266,8 @@ Date: Sun, 04 Mar 2018 00:10:37 GMT
 ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
 Content-Type: application/json
 Content-Encoding: utf-8
-Content-Length: 19
+Content-Length: 0
 
-{"one" : "two"}
 ```
 You can now GET and PUT this endpoint with 
 ```
@@ -367,7 +366,7 @@ You can find a Java client for JitStatic at
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.4.0</version>
+    <version>0.6.0</version>
 </dependency>
 ```
 
