@@ -134,9 +134,9 @@ public class KeyResource {
     }
 
     @GET
-    @Timed(name = "get_search_time")
-    @Metered(name = "get_search_counter")
-    @ExceptionMetered(name = "get_search_exception")
+    @Timed(name = "get_list_time")
+    @Metered(name = "get_list_counter")
+    @ExceptionMetered(name = "get_list_exception")
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref,
