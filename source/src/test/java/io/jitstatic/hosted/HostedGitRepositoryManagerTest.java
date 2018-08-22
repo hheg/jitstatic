@@ -626,7 +626,7 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
-            List<String> keys = grm.getList(STORE, REF_HEADS_MASTER);
+            List<String> keys = grm.getList(STORE, REF_HEADS_MASTER, false);
             assertEquals(List.of("store"), keys);
         }
     }
@@ -637,7 +637,7 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
-            assertThrows(RefNotFoundException.class, () -> grm.getList(STORE, "refs/heads/notexisting"));
+            assertThrows(RefNotFoundException.class, () -> grm.getList(STORE, "refs/heads/notexisting", false));
         }
     }
 

@@ -511,7 +511,7 @@ public class SourceExtractorTest {
             }
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
-        List<String> listForKey = se.getListForKey(key, REFS_HEADS_MASTER);
+        List<String> listForKey = se.getListForKey(key, REFS_HEADS_MASTER, false);
         String[] values = result.isEmpty() ? new String[0] : result.split(",");        
         assertEquals(List.of(values), listForKey);
     }

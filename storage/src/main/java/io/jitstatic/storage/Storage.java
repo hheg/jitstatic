@@ -40,5 +40,5 @@ public interface Storage extends AutoCloseable, CheckHealth {
     public String addKey(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
     public Either<String, FailedToLock> putMetaData(String key, String ref, StorageData metaData, String metaDataVersion, String message, String userInfo, String userMail);
     public void delete(String key, String ref, String user, String message, String userMail);
-    public List<Pair<String, StoreInfo>> getList(String key, String ref, Optional<User> user);
+    public List<Pair<String, StoreInfo>> getList(String key, String ref, boolean recursive, Optional<User> user);
 }

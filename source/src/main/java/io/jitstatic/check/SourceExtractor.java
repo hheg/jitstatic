@@ -32,6 +32,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -228,43 +231,47 @@ public class SourceExtractor {
         return repository.findRef(ref);
     }
 
-    public List<String> getListForKey(final String key, final String ref) throws RefNotFoundException, IOException {
+    public List<String> getListForKey(final String key, final String ref, boolean recursive) throws RefNotFoundException, IOException {
         final Ref findBranch = findBranch(ref);
         final AnyObjectId reference = findBranch.getObjectId();
-        final List<String> keys = new ArrayList<>();
-        final byte[] keyData = key.getBytes(StandardCharsets.UTF_8);
+        final List<String> keys;
         try (final RevWalk rev = new RevWalk(repository)) {
             final RevCommit parsedCommit = rev.parseCommit(reference);
             final RevTree currentTree = rev.parseTree(parsedCommit.getTree());
             try (final TreeWalk treeWalker = new TreeWalk(repository)) {
                 treeWalker.addTree(currentTree);
-                treeWalker.setRecursive(false);
+                treeWalker.setRecursive(recursive);
                 if (!key.equals("/")) {
                     treeWalker.setFilter(PathFilterGroup.createFromStrings(key));
                 }
-
-                while (treeWalker.next()) {
-                    if (treeWalker.isSubtree()) {
-                        byte[] rawPath = treeWalker.getRawPath();
-                        int rawPathLength = rawPath.length;
-                        if (rawPathLength + 1 > keyData.length) {
-                            continue;
-                        }
-                        byte[] copyOfRawPath = Arrays.copyOf(rawPath, rawPathLength + 1);
-                        copyOfRawPath[rawPathLength] = '/';
-
-                        if (Arrays.compare(copyOfRawPath, 0, rawPathLength, keyData, 0, rawPathLength) == 0) {
-                            treeWalker.enterSubtree();
-                        }
-                    } else {
-                        final FileMode mode = treeWalker.getFileMode();
-                        if (mode == FileMode.REGULAR_FILE || mode == FileMode.EXECUTABLE_FILE) {
-                            keys.add(new String(treeWalker.getRawPath(), StandardCharsets.UTF_8));
-                        }
-                    }
-                }
+                keys = walkTree(key, treeWalker);
             }
             rev.dispose();
+        }
+        return keys;
+    }
+
+    private List<String> walkTree(final String key, final TreeWalk treeWalker)
+            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
+        final List<String> keys = new ArrayList<>();
+        final byte[] keyData = key.getBytes(StandardCharsets.UTF_8);
+        while (treeWalker.next()) {
+            if (treeWalker.isSubtree()) {
+                byte[] rawPath = treeWalker.getRawPath();
+                int rawPathLength = rawPath.length;
+                if (rawPathLength > keyData.length) {
+                    continue;
+                }
+
+                if (Arrays.compare(rawPath, 0, rawPathLength, keyData, 0, rawPathLength) == 0) {
+                    treeWalker.enterSubtree();
+                }
+            } else {
+                final FileMode mode = treeWalker.getFileMode();
+                if (mode == FileMode.REGULAR_FILE || mode == FileMode.EXECUTABLE_FILE) {
+                    keys.add(new String(treeWalker.getRawPath(), StandardCharsets.UTF_8));
+                }
+            }
         }
         return keys;
     }

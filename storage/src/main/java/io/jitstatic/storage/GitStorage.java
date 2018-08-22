@@ -321,10 +321,10 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getList(final String key, final String ref, final Optional<User> user) {
+    public List<Pair<String, StoreInfo>> getList(final String key, final String ref, boolean recursive, final Optional<User> user) {
         final String finalRef = checkRef(ref);
         try {
-            final List<String> keys = source.getList(key, finalRef);
+            final List<String> keys = source.getList(key, finalRef, recursive);
             return keys.stream().parallel().map(k -> Pair.of(k, getKey(k, finalRef))).filter(Pair::isPresent)
                     .filter(p -> p.getRight().isPresent()).map(p -> Pair.of(p.getLeft(), p.getRight().get())).filter(p -> {
                         final StoreInfo si = p.getRight();

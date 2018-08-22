@@ -128,9 +128,9 @@ public class KeyResource {
 
     @GET
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response getRootList(final @QueryParam("ref") String ref, final @Auth Optional<User> user, final @Context Request request,
-            final @Context HttpHeaders headers) {
-        return getList("/", ref, user, request, headers);
+    public Response getRootList(final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
+            final @Auth Optional<User> user, final @Context Request request, final @Context HttpHeaders headers) {
+        return getList("/", ref, recursive, user, request, headers);
     }
 
     @GET
@@ -139,10 +139,11 @@ public class KeyResource {
     @ExceptionMetered(name = "get_search_exception")
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-            final @Context Request request, final @Context HttpHeaders headers) {
+    public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+            @QueryParam("recursive") boolean recursive, final @Auth Optional<User> user, final @Context Request request,
+            final @Context HttpHeaders headers) {
         helper.checkRef(ref);
-        final List<Pair<String, StoreInfo>> list = storage.getList(key, ref, user);
+        final List<Pair<String, StoreInfo>> list = storage.getList(key, ref, recursive, user);
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
         }

@@ -369,10 +369,9 @@ public class KeyValueStorageWithHostedStorageTest {
         String data = getData(3);
         try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
                 JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
-            client.createKey(data.getBytes(StandardCharsets.UTF_8),
-                    new CommitData("key", branch, "new key", "user", "mail"),
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
-            
+
             Entity<JsonNode> key = updaterClient.getKey("key", branch, tf);
             assertEquals(data, key.data.toString());
             updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"));
@@ -426,7 +425,7 @@ public class KeyValueStorageWithHostedStorageTest {
         String data = getData(3);
         try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
                 JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
-            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1");
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1", "dir/k", "k", "di/k");
             for (String key : list) {
                 client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
                         new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
@@ -442,9 +441,45 @@ public class KeyValueStorageWithHostedStorageTest {
                 }
             });
             assertNotNull(result);
-            assertEquals(2, result.size());
-            assertEquals("dir/key1", result.get(0).getKey());
-            assertEquals("dir/key2", result.get(1).getKey());
+            assertEquals(3, result.size());
+            assertEquals("dir/k", result.get(0).getKey());
+            assertEquals("dir/key1", result.get(1).getKey());
+            assertEquals("dir/key2", result.get(2).getKey());
+        }
+    }
+
+    @Test
+    public void testListAllFilesTreeRecursive() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1", "dir/key/d");
+            for (String key : list) {
+                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
+            }
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("dir/key3", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"));
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("dir/dir/key3", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"));
+            List<KeyData> result = updaterClient.listAll("dir/", true, (is) -> {
+                try {
+                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertNotNull(result);
+            assertEquals(4, result.size());
+            assertEquals("dir/dir/key1", result.get(0).getKey());
+            assertEquals("dir/key/d", result.get(1).getKey());
+            assertEquals("dir/key1", result.get(2).getKey());
+            assertEquals("dir/key2", result.get(3).getKey());
         }
     }
 

@@ -434,9 +434,9 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public List<String> getList(final String key, String ref) throws RefNotFoundException, IOException {
+    public List<String> getList(final String key, String ref, boolean recursive) throws RefNotFoundException, IOException {
         Objects.requireNonNull(key);
         ref = checkRef(ref);
-        return extractor.getListForKey(key,ref).stream().filter(k -> !k.endsWith(JitStaticConstants.METADATA)).collect(Collectors.toList());
+        return extractor.getListForKey(key,ref, recursive).stream().filter(k -> !k.endsWith(JitStaticConstants.METADATA)).collect(Collectors.toList());
     }
 }
