@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -513,6 +514,40 @@ public class KeyValueStorageWithHostedStorageTest {
             assertNotNull(result);
             assertEquals(1, result.size());
             assertEquals("dir/key1", result.get(0).getKey());
+        }
+    }
+
+    @Test
+    public void testListAllFilesLight() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2");
+            for (String key : list) {
+                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
+            }
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key3", branch, "new key", "user", "mail"),
+                    new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"));
+            List<KeyData> result = updaterClient.listAll("/", false, true, (is) -> {
+                try {
+                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertNotNull(result);
+            assertEquals(2, result.size(), result.toString());
+            assertEquals("key1", result.get(0).getKey());
+            assertEquals("key2", result.get(1).getKey());
+            assertNull(result.get(0).getData());
+            assertNull(result.get(1).getData());
+            
         }
     }
 

@@ -129,8 +129,8 @@ public class KeyResource {
     @GET
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response getRootList(final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
-            final @Auth Optional<User> user, final @Context Request request, final @Context HttpHeaders headers) {
-        return getList("/", ref, recursive, user, request, headers);
+            @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
+        return getList("/", ref, recursive, light, user);
     }
 
     @GET
@@ -140,14 +140,15 @@ public class KeyResource {
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            @QueryParam("recursive") boolean recursive, final @Auth Optional<User> user, final @Context Request request,
-            final @Context HttpHeaders headers) {
+            @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
         helper.checkRef(ref);
         final List<Pair<String, StoreInfo>> list = storage.getList(key, ref, recursive, user);
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
         }
-        return Response.ok(list.stream().map(KeyData::new).collect(Collectors.toList())).build();
+        return Response
+                .ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList()))
+                .build();
     }
 
     private void checkKey(final String key) {

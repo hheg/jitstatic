@@ -760,7 +760,7 @@ public class MapResourceTest {
         StoreInfo bookInfo = DATA.get("book").get();
         Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
         Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
-        when(storage.getList(Mockito.any(), Mockito.any(), false, Mockito.any())).thenReturn(List.of(dogPair, bookPair));
+        when(storage.getList(Mockito.any(), Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
         List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
                 });
@@ -772,7 +772,7 @@ public class MapResourceTest {
 
     @Test
     public void testEmptyList() {
-        when(storage.getList(Mockito.any(), Mockito.any(), false, Mockito.any())).thenReturn(List.of());
+        when(storage.getList(Mockito.any(), Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(List.of());
         assertEquals(Status.NOT_FOUND.getStatusCode(),
                 RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get().getStatus());

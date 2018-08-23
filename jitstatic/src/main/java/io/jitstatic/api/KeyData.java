@@ -23,9 +23,6 @@ package io.jitstatic.api;
 import java.util.Arrays;
 import java.util.Objects;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
-
 import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -44,8 +41,6 @@ public class KeyData {
     @NotBlank
     private final String type;
 
-    @Size(min = 1)
-    @NotNull
     private final byte[] data;
 
     @NotBlank
@@ -55,13 +50,17 @@ public class KeyData {
     public KeyData(@JsonProperty("key") final String key, @JsonProperty("type") final String type, @JsonProperty("tag") final String tag,
             @JsonProperty("data") final byte[] data) {
         this.type = Objects.requireNonNull(type);
-        this.data = Objects.requireNonNull(data);
         this.tag = Objects.requireNonNull(tag);
         this.key = Objects.requireNonNull(key);
+        this.data = data;
     }
 
     public KeyData(final Pair<String, StoreInfo> p) {
         this(p.getLeft(), p.getRight().getStorageData().getContentType(), p.getRight().getVersion(), p.getRight().getData());
+    }
+
+    public KeyData(final String key, final StoreInfo si) {
+        this(key, si.getStorageData().getContentType(), si.getVersion(), null);
     }
 
     public String getKey() {
