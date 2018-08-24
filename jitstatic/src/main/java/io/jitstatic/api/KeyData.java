@@ -26,6 +26,8 @@ import java.util.Objects;
 import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -33,6 +35,7 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.Pair;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
+@JsonInclude(Include.NON_NULL)
 public class KeyData {
 
     @NotBlank
