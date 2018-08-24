@@ -41,6 +41,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 
 import com.spencerwi.either.Either;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.StorageData;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
@@ -48,6 +49,7 @@ import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
+@SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
 public class RefHolder {
 
     private static final Logger LOG = LogManager.getLogger(RefHolder.class);
@@ -73,15 +75,15 @@ public class RefHolder {
         refCache.put(key, store);
     }
 
-    public <T> T lockWrite(final Supplier<T> supplier, final String key) throws FailedToLock {
+    public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key) {
         if (tryLock(key)) {
             try {
-                return supplier.get();
+                return Either.left(supplier.get());
             } finally {
                 unlock(key);
             }
         }
-        throw new FailedToLock(ref);
+        return Either.right(new FailedToLock(ref));
     }
 
     public <T> T write(final Supplier<T> supplier) {
@@ -124,23 +126,24 @@ public class RefHolder {
         refLock.writeLock().unlock();
     }
 
-    public void reloadAll(final Runnable runnable) throws FailedToLock {
+    public boolean reloadAll(final Runnable runnable) {
         if (refLock.isWriteLockedByCurrentThread()) {
             runnable.run();
+            return true;
         } else {
-            throw new FailedToLock(ref);
+            return false;
         }
     }
 
-    public <T> T lockWriteAll(final Supplier<T> supplier) throws FailedToLock {
+    public <T> Either<T,FailedToLock> lockWriteAll(final Supplier<T> supplier) {
         if (refLock.writeLock().tryLock()) {
             try {
-                return supplier.get();
+                return Either.left(supplier.get());
             } finally {
                 refLock.writeLock().unlock();
             }
         }
-        throw new FailedToLock(ref);
+        return Either.right(new FailedToLock(ref));
     }
 
     private Set<String> getFiles() {
@@ -154,26 +157,31 @@ public class RefHolder {
     public void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
             final String contentType) {
         refCache.computeIfPresent(key, (k, si) -> {
-            final StoreInfo storeInfo = si.get();
-            if ((si.isPresent() && storeInfo.getVersion().equals(oldversion)) || !si.isPresent()) {
-                return Optional.of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion()));
+            if (si.isPresent()) {
+                final StoreInfo storeInfo = si.get();
+                if (oldversion.equals(storeInfo.getVersion())) {
+                    return Optional.of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion()));
+                }
             }
-            return si;
+            return null;
         });
     }
 
-    public void refreshMetaData(final StorageData metaData, final String key, final String metaDataVersion, final String newVersion,
-            final String contentType) {        
-        final Optional<StoreInfo> si = getKey(key);
-        final StoreInfo storeInfo = si.get();
-        if (storeInfo.getMetaDataVersion().equals(metaDataVersion)) {
-            if (storeInfo.isMasterMetaData()) {
-                refCache.clear(); // TODO Don't clear all keys. Check which ones that could be left alone
-                putKey(key, Optional.of(new StoreInfo(metaData, newVersion)));
-            } else {
-                putKey(key, Optional.of(new StoreInfo(storeInfo.getData(), metaData, storeInfo.getVersion(), newVersion)));
-            }
-        }
+    public void refreshMetaData(final StorageData metaData, final String key, final String oldMetaDataVersion,
+            final String newMetaDataVersion) {
+        write(() -> {
+            final Optional<StoreInfo> storeInfo = refCache.get(key);
+            storeInfo.ifPresent(si -> {
+                if (oldMetaDataVersion.equals(si.getMetaDataVersion())) {
+                    if (si.isMasterMetaData()) {
+                        refCache.clear();
+                        putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
+                    } else {
+                        putKey(key, Optional.of(new StoreInfo(si.getData(), metaData, si.getVersion(), newMetaDataVersion)));
+                    }
+                }
+            });
+        });
     }
 
     private Map<String, Optional<StoreInfo>> refreshFiles(final Set<String> files) {
@@ -252,22 +260,20 @@ public class RefHolder {
     }
 
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
-        Optional<StoreInfo> storeInfoContainer;
         final Map<String, Optional<StoreInfo>> refMap = refCache;
+        Optional<StoreInfo> storeInfoContainer;
         if (storeInfo != null) {
             if (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo)) {
-                storeInfoContainer = Optional.of(storeInfo);
-                refMap.putIfAbsent(key, storeInfoContainer);
+                storeInfoContainer = Optional.of(storeInfo);                
             } else {
                 /* StoreInfo could contain .metadata information but no key info */
                 storeInfoContainer = Optional.empty();
-                refMap.putIfAbsent(key, storeInfoContainer);
             }
         } else {
             storeInfoContainer = Optional.empty();
-            refMap.putIfAbsent(key, storeInfoContainer);
         }
-        return storeInfoContainer;
+        final Optional<StoreInfo> current = refMap.putIfAbsent(key, storeInfoContainer);
+        return current != null && current.isPresent() ? current : storeInfoContainer;
     }
 
     private boolean keyRequestedIsNormalKey(final String key, final StoreInfo storeInfo) {

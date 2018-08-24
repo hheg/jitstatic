@@ -41,11 +41,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.spencerwi.either.Either;
+
 import io.jitstatic.StorageData;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
-import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class RefHolderTest {
@@ -72,20 +73,17 @@ public class RefHolderTest {
         AtomicBoolean b = new AtomicBoolean(true);
         AtomicBoolean c = new AtomicBoolean(true);
         CompletableFuture<Void> async = CompletableFuture.runAsync(() -> {
-            try {
-                ref.lockWrite(() -> {
-                    c.set(false);
-                    while (b.get()) {
-                    }
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                    }
-                    return true;
-                }, "a");
-            } catch (FailedToLock e) {
-                throw new ShouldNeverHappenException("a", e);
-            }
+            Either<Boolean, FailedToLock> lockWrite = ref.lockWrite(() -> {
+                c.set(false);
+                while (b.get()) {
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                }
+                return true;
+            }, "a");
+            assertTrue(lockWrite.isLeft());
         });
         while (c.get()) {
         }
@@ -101,11 +99,8 @@ public class RefHolderTest {
     public void testLockTwiceOnKeys() throws FailedToLock {
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.lockWrite(() -> {
-            try {
-                ref.lockWrite(() -> true, "a");
-            } catch (FailedToLock e) {
-                throw new ShouldNeverHappenException("inner a");
-            }
+            Either<Boolean, FailedToLock> lockWrite = ref.lockWrite(() -> true, "a");
+            assertTrue(lockWrite.isLeft());
             return true;
         }, "a");
     }
@@ -115,12 +110,11 @@ public class RefHolderTest {
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         assertEquals(FailedToLock.class, assertThrows(RuntimeException.class, () -> ref.lockWrite(() -> {
             CompletableFuture.runAsync(() -> {
-                try {
-                    ref.lockWrite(() -> {
-                        return true;
-                    }, "a");
-                } catch (FailedToLock e) {
-                    throw new RuntimeException("a", e);
+                Either<Boolean, FailedToLock> lockWrite = ref.lockWrite(() -> {
+                    return true;
+                }, "a");
+                if (lockWrite.isRight()) {
+                    throw new RuntimeException("a", lockWrite.getRight());
                 }
             }).join();
             return true;
@@ -140,19 +134,15 @@ public class RefHolderTest {
     public void testReloadAll() {
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.write(() -> {
-            try {
-                ref.reloadAll(() -> {
-                });
-            } catch (FailedToLock e) {
-                throw new ShouldNeverHappenException("lock");
-            }
+            ref.reloadAll(() -> {
+            });
         });
     }
 
     @Test
     public void testReloadAllWithoutLock() {
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
-        assertThrows(FailedToLock.class, () -> ref.reloadAll(() -> {
+        assertFalse(ref.reloadAll(() -> {
         }));
     }
 
@@ -162,20 +152,21 @@ public class RefHolderTest {
         AtomicBoolean b = new AtomicBoolean(true);
         AtomicBoolean c = new AtomicBoolean(true);
         CompletableFuture<Boolean> async = CompletableFuture.supplyAsync(() -> {
-            try {
-                return ref.lockWriteAll(() -> {
-                    c.set(false);
-                    while (b.get()) {
-                    }
-                    return true;
-                });
-            } catch (FailedToLock e) {
-                throw new ShouldNeverHappenException("");
-            }
+            return ref.lockWriteAll(() -> {
+                c.set(false);
+                while (b.get()) {
+                }
+                return true;
+            }).getLeft();
         });
         while (c.get()) {
         }
-        assertThrows(FailedToLock.class, () -> ref.lockWriteAll(() -> "1"));
+        assertThrows(FailedToLock.class, () -> {
+            Either<String, FailedToLock> lock = ref.lockWriteAll(() -> "1");
+            if (lock.isRight()) {
+                throw lock.getRight();
+            }
+        });
         b.set(false);
         async.join();
     }
@@ -251,7 +242,7 @@ public class RefHolderTest {
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshMetaData(storageData, "key", "1", "2", "application/json");
+        ref.refreshMetaData(storageData, "key", "1", "2");
         assertEquals("2", ref.getKey("key").get().getMetaDataVersion());
     }
 

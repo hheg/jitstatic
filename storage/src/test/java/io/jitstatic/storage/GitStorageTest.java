@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,6 +56,7 @@ import com.spencerwi.either.Either;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.RefHolder;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
@@ -246,7 +246,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null); InputStream is = getInputStream(0); InputStream md = getMetaData()) {
 
             gs.reload(List.of(REF_HEADS_MASTER));
-            assertNull(gs.getKey("test3.json", null));
+            assertFalse(gs.getKey("test3.json", null).isPresent());
             assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
             Mockito.reset(source);
             SourceInfo info = mock(SourceInfo.class);
@@ -268,7 +268,7 @@ public class GitStorageTest {
         assertSame(cause, assertThrows(RuntimeException.class, () -> {
             try (GitStorage gs = new GitStorage(source, null);) {
                 gs.reload(List.of(REF_HEADS_MASTER));
-                assertNull(gs.getKey("key", null));
+                assertFalse(gs.getKey("key", null).isPresent());
                 assertEquals(cause.getLocalizedMessage(),
                         assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
                 gs.getKey("key", null);
@@ -468,10 +468,9 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            StoreInfo si = gs.addKey("somekey", "refs/heads/master", pretty,
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail");
-            assertArrayEquals(pretty, si.getData());
-            assertEquals("1", si.getVersion());
+            String si = gs.addKey("somekey", "refs/heads/master", pretty,
+                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail");            
+            assertEquals("1", si);
             gs.checkHealth();
         }
     }
@@ -544,10 +543,9 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            StoreInfo si = gs.addKey(key, branch, pretty, new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
+            String si = gs.addKey(key, branch, pretty, new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
                     "mail");
-            assertArrayEquals(pretty, si.getData());
-            assertEquals("1", si.getVersion());
+            assertEquals("1", si);
             gs.checkHealth();
             ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
             Mockito.verify(source).createRef(argument.capture());
@@ -564,8 +562,8 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail"));
+            assertSame(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
+                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail")).getCause().getClass());
         }
     }
 

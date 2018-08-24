@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -257,7 +258,7 @@ public class HostedGitRepositoryManager implements Source {
             if (!checkVersion(version, key, finalRef)) {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }
-            return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
+            return updater.updateKey(key, actualRef, data, message, userInfo, userMail); 
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -430,5 +431,12 @@ public class HostedGitRepositoryManager implements Source {
             throw new IllegalArgumentException("Cannot delete default ref " + defaultRef);
         }
         updater.deleteRef(ref);
+    }
+
+    @Override
+    public List<String> getList(final String key, String ref, boolean recursive) throws RefNotFoundException, IOException {
+        Objects.requireNonNull(key);
+        ref = checkRef(ref);
+        return extractor.getListForKey(key,ref, recursive).stream().filter(k -> !k.endsWith(JitStaticConstants.METADATA)).collect(Collectors.toList());
     }
 }

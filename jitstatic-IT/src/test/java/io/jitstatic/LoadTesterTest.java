@@ -126,7 +126,7 @@ public class LoadTesterTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+            ResourceHelpers.resourceFilePath("simpleserver_silent.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
 
     private String gitAdress;
     private String adminAdress;
@@ -243,7 +243,9 @@ public class LoadTesterTest {
                 clients.add(new JitStaticUpdater(buildKeyClient(data.cache)));
             }
             for (int i = 0; i < data.updaters; i++) {
-                updaters.add(new GitClientUpdater(gitAdress, hf.getUserName(), hf.getSecret()));
+                GitClientUpdater gitClientUpdater = new GitClientUpdater(gitAdress, hf.getUserName(), hf.getSecret());
+                gitClientUpdater.initRepo();
+                updaters.add(gitClientUpdater);
             }
             CompletableFuture<?>[] clientJobs = new CompletableFuture[data.clients];
             CompletableFuture<?>[] updaterJobs = new CompletableFuture[data.updaters];
@@ -268,7 +270,7 @@ public class LoadTesterTest {
             CompletableFuture<?>[] updaterJobs) {
         long start = System.currentTimeMillis();
         do {
-            if (Math.random() > 0.5) {
+            if (Math.random() >= 0.5) {
                 execClientJobs(clientPool, clientJobs, clients, data);
                 execUpdatersJobs(updaterPool, updaterJobs, updaters, data);
             } else {
@@ -551,14 +553,16 @@ public class LoadTesterTest {
         private final String pass;
         private final Counters counter;
 
-        public GitClientUpdater(final String gitAdress, String name, String pass)
-                throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+        public GitClientUpdater(final String gitAdress, String name, String pass) throws IOException {
             this.workingFolder = getFolderFile();
             this.name = name;
             this.pass = pass;
-            Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(getCredentials(name, pass)).call()
-                    .close();
             this.counter = new Counters(0, 0);
+        }
+        
+        public synchronized void initRepo() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+            Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(getCredentials(name, pass)).call()
+            .close();
         }
 
         public void updateClient(String key, String branch, TestData testData)

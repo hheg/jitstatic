@@ -1,5 +1,7 @@
 package io.jitstatic.utils;
 
+import java.util.Map;
+
 /*-
  * #%L
  * jitstatic
@@ -20,26 +22,26 @@ package io.jitstatic.utils;
  * #L%
  */
 
-public class Pair<T, U> {
+public class Pair<L, R> implements Map.Entry<L, R> {
     private static final Pair<?, ?> PAIR_OF_NOTHING = new Pair<>();
-    private final T left;
-    private final U right;
+    private final L left;
+    private final R right;
 
     public Pair() {
         this.left = null;
         this.right = null;
     }
 
-    public Pair(final T t, final U u) {
+    public Pair(final L t, final R u) {
         this.left = t;
         this.right = u;
     }
 
-    public T getLeft() {
+    public L getLeft() {
         return left;
     }
 
-    public U getRight() {
+    public R getRight() {
         return right;
     }
 
@@ -60,5 +62,20 @@ public class Pair<T, U> {
     @Override
     public String toString() {
         return "Pair [left=" + left + ", right=" + right + "]";
+    }
+
+    @Override
+    public L getKey() {
+        return left;
+    }
+
+    @Override
+    public R getValue() {
+        return right;
+    }
+
+    @Override
+    public R setValue(R value) {
+        throw new UnsupportedOperationException(String.format("Trying to set value %s in immutable %s", value, toString()));
     }
 }
