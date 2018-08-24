@@ -270,7 +270,7 @@ public class LoadTesterTest {
             CompletableFuture<?>[] updaterJobs) {
         long start = System.currentTimeMillis();
         do {
-            if (Math.random() > 0.5) {
+            if (Math.random() >= 0.5) {
                 execClientJobs(clientPool, clientJobs, clients, data);
                 execUpdatersJobs(updaterPool, updaterJobs, updaters, data);
             } else {
