@@ -99,7 +99,7 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     0.9.4
+remote:                                     0.13.0
 remote: Counting objects: 4, done
 remote: Finding sources: 100% (4/4)
 remote: Getting sizes: 100% (3/3)
@@ -131,7 +131,7 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     0.9.4
+remote:                                     0.13.0
 remote: Checking refs/heads/master branch.
 remote: refs/heads/master OK!
 To http://localhost:8085/app/jitstatic/jitstatic.git
@@ -266,9 +266,8 @@ Date: Sun, 04 Mar 2018 00:10:37 GMT
 ETag: "70990754f75e398b92f3b56d04b3bbd79fddc37b"
 Content-Type: application/json
 Content-Encoding: utf-8
-Content-Length: 19
+Content-Length: 0
 
-{"one" : "two"}
 ```
 You can now GET and PUT this endpoint with 
 ```
@@ -350,6 +349,52 @@ Content-Length: 0
 ```
 Deleting master metadata files is not supported, but is considered to be supported.
 
+### API for listing keys
+
+It's possible to list keys under a directory which looks like this:
+```
+root/dir1/file1
+root/dir1/file2
+root/dir3/file3
+root/dir1/dir2/file4
+file5
+```
+And making a query for all files in `root/dir1/` will result in the combined result of the content of keys `root/dir1/file1, root/dir1/file2`
+
+```
+curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/
+HTTP/1.1 200 OK
+Date: Fri, 24 Aug 2018 15:26:09 GMT
+Content-Type: application/json
+Vary: Accept-Encoding
+Content-Length: 279
+
+[{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]
+```
+It is possible to do a recursive search to include `root/dir1/dir2/file4` with:
+```
+curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/?recursive=true
+HTTP/1.1 200 OK
+Date: Fri, 24 Aug 2018 15:28:54 GMT
+Content-Type: application/json
+Vary: Accept-Encoding
+Content-Length: 423
+
+[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]
+```
+And if you want to just to get the keys and no payload you can do this:
+```
+curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/?recursive=true\&light=true
+HTTP/1.1 200 OK
+Date: Fri, 24 Aug 2018 16:53:19 GMT
+Content-Type: application/json
+Vary: Accept-Encoding
+Content-Length: 309
+
+[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"}]
+```
+
+
 ### MetaKeys
 
 Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` propterty.
@@ -367,7 +412,7 @@ You can find a Java client for JitStatic at
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.4.0</version>
+    <version>0.7.0</version>
 </dependency>
 ```
 

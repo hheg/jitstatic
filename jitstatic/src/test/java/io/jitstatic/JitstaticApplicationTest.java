@@ -44,7 +44,7 @@ import com.codahale.metrics.health.HealthCheckRegistry;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.api.MapResource;
+import io.jitstatic.api.KeyResource;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.Storage;
@@ -88,7 +88,7 @@ public class JitstaticApplicationTest {
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(any())).thenReturn(source);
         app.run(config, environment);
-        verify(jersey).register(isA(MapResource.class));
+        verify(jersey).register(isA(KeyResource.class));
     }
 
     @Test
@@ -120,7 +120,7 @@ public class JitstaticApplicationTest {
         assertThrows(RuntimeException.class, () -> {
             config.setHostedFactory(hostedFactory);
             when(hostedFactory.build(any())).thenReturn(source);
-            Mockito.doThrow(new RuntimeException()).when(jersey).register(any(MapResource.class));
+            Mockito.doThrow(new RuntimeException()).when(jersey).register(any(KeyResource.class));
             try {
                 app.run(config, environment);
             } catch (Exception e) {

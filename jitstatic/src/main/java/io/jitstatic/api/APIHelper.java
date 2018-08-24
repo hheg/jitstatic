@@ -37,7 +37,6 @@ import org.slf4j.Logger;
 
 import io.jitstatic.UpdateFailedException;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -49,7 +48,7 @@ class APIHelper {
         this.log = log;
     }
 
-    StoreInfo unwrapWithPOSTApi(final Supplier<StoreInfo> add) {
+    <T> T unwrapWithPOSTApi(final Supplier<T> add) {
         try {
             return add.get();
         } catch (final Exception e) {

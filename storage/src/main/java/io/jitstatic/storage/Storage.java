@@ -26,16 +26,19 @@ import java.util.Optional;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.StorageData;
+import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.CheckHealth;
+import io.jitstatic.utils.Pair;
 
 public interface Storage extends AutoCloseable, CheckHealth {
 	public Optional<StoreInfo> getKey(String key, String ref);
 	public void reload(List<String> refsToReload);
 	public void close();
 	public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
-    public StoreInfo addKey(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
+    public String addKey(String key, String branch, byte[] data, StorageData metaData, String message, String userInfo, String userMail);
     public Either<String, FailedToLock> putMetaData(String key, String ref, StorageData metaData, String metaDataVersion, String message, String userInfo, String userMail);
     public void delete(String key, String ref, String user, String message, String userMail);
+    public List<Pair<String, StoreInfo>> getList(String key, String ref, boolean recursive, Optional<User> user);
 }

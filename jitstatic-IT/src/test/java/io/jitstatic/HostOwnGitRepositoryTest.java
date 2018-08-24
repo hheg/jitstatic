@@ -417,10 +417,9 @@ public class HostOwnGitRepositoryTest {
                 }
             }
             for (int i = 10; i < 20; i++) {
-                Entity createKey = client.createKey(getData(i).getBytes(UTF_8),
-                        new CommitData(STORE + i, "master", "commit message", "user1", "user@mail"),
-                        new MetaData(new HashSet<>(), "application/json"), tf);
-                assertEquals(getData(i), createKey.data.toString());
+                client.createKey(getData(i).getBytes(UTF_8), new CommitData(STORE + i, "master", "commit message", "user1", "user@mail"),
+                        new MetaData(new HashSet<>(), "application/json"));
+                assertEquals(getData(i), updaterClient.getKey(STORE + i, tf).data.toString());
             }
             for (int i = 10; i < 20; i++) {
                 final int j = i;
@@ -428,7 +427,7 @@ public class HostOwnGitRepositoryTest {
                         assertThrows(APIException.class,
                                 () -> client.createKey(getData(j).getBytes(UTF_8),
                                         new CommitData(STORE + j, "master", "commit message", "user1", "user@mail"),
-                                        new MetaData(new HashSet<>(), "application/json"), tf)).getStatusCode());
+                                        new MetaData(new HashSet<>(), "application/json"))).getStatusCode());
 
             }
         }
