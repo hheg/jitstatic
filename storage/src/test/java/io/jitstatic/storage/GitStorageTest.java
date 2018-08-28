@@ -468,8 +468,8 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey("somekey", "refs/heads/master", pretty,
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail");            
+            String si = gs.addKey("somekey", "refs/heads/master", pretty, new StorageData(new HashSet<>(), null, false, false, List.of()),
+                    "msg", "user", "mail");
             assertEquals("1", si);
             gs.checkHealth();
         }
@@ -564,6 +564,54 @@ public class GitStorageTest {
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
                     new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail")).getCause().getClass());
+        }
+    }
+
+    @Test
+    public void testGetListForRef() throws RefNotFoundException, IOException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
+            SourceInfo si = mock(SourceInfo.class);
+            when(si.getSourceInputStream()).thenReturn(test3);
+            when(si.getMetadataInputStream()).thenReturn(mtest3);
+            when(si.getSourceVersion()).thenReturn(SHA_1);
+            when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            String key = "dir/";
+            String dirkey = "dir/key";
+            when(source.getSourceInfo(Mockito.eq(dirkey), Mockito.anyString())).thenReturn(si);
+
+            Mockito.when(source.getList(Mockito.eq(key), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
+            List<Pair<String, Boolean>> keys = List.of(Pair.of(key, false));
+            List<Pair<String, StoreInfo>> list = gs.getListForRef(keys, REF_HEADS_MASTER, Optional.of(new User("u", "p")));
+            assertEquals(0, list.size());
+            list = gs.getListForRef(keys, REF_HEADS_MASTER, Optional.of(new User("user", "1234")));
+            assertEquals(1, list.size());
+        }
+    }
+
+    @Test
+    public void testGetList() throws Exception {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
+            SourceInfo si = mock(SourceInfo.class);
+            when(si.getSourceInputStream()).thenReturn(test3);
+            when(si.getMetadataInputStream()).thenReturn(mtest3);
+            when(si.getSourceVersion()).thenReturn(SHA_1);
+            when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            String key = "dir/";
+            String dirkey = "dir/key";
+            when(source.getSourceInfo(Mockito.eq(dirkey), Mockito.anyString())).thenReturn(si);
+
+            Mockito.when(source.getList(Mockito.eq(key), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
+            List<Pair<List<Pair<String, Boolean>>, String>> keys = List.of(Pair.of(List.of(Pair.of(key, false)), REF_HEADS_MASTER));
+            List<Pair<List<Pair<String, StoreInfo>>, String>> list = gs.getList(keys, Optional.of(new User("u", "1")));
+            assertEquals(1, list.size());
+            Pair<List<Pair<String, StoreInfo>>, String> masterResult = list.get(0);
+            assertEquals(REF_HEADS_MASTER, masterResult.getRight());
+            assertTrue(masterResult.getLeft().isEmpty());
+            list = gs.getList(keys, Optional.of(new User("user", "1234")));
+            assertEquals(1, list.size());
+            masterResult = list.get(0);
+            assertEquals(REF_HEADS_MASTER, masterResult.getRight());
+            assertEquals(dirkey, masterResult.getLeft().get(0).getLeft());
         }
     }
 
