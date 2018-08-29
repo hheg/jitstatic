@@ -20,15 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,8 +40,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
@@ -81,10 +84,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
-import io.jitstatic.JitstaticApplication;
-import io.jitstatic.JitstaticConfiguration;
 import io.jitstatic.api.KeyData;
-import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticCreatorClient;
@@ -92,6 +92,7 @@ import io.jitstatic.client.JitStaticCreatorClientBuilder;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.client.MetaData;
+import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
@@ -459,9 +460,13 @@ public class KeyValueStorageWithHostedStorageTest {
         try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
                 JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1", "dir/key/d");
+            Map<String, Integer> map = new HashMap<>();
+            int i = 0;
             for (String key : list) {
-                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                client.createKey(getData(i).getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
                         new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
+                map.put(key, i);
+                i++;
             }
             client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("dir/key3", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), "application/json"));
@@ -475,12 +480,17 @@ public class KeyValueStorageWithHostedStorageTest {
                     throw new UncheckedIOException(e);
                 }
             });
+            System.out.println(result);
             assertNotNull(result);
             assertEquals(4, result.size());
             assertEquals("dir/dir/key1", result.get(0).getKey());
+            assertArrayEquals(getData(map.get("dir/dir/key1")).getBytes(StandardCharsets.UTF_8), result.get(0).getData());
             assertEquals("dir/key/d", result.get(1).getKey());
+            assertArrayEquals(getData(map.get("dir/key/d")).getBytes(StandardCharsets.UTF_8), result.get(1).getData());
             assertEquals("dir/key1", result.get(2).getKey());
+            assertArrayEquals(getData(map.get("dir/key1")).getBytes(StandardCharsets.UTF_8), result.get(2).getData());
             assertEquals("dir/key2", result.get(3).getKey());
+            assertArrayEquals(getData(map.get("dir/key2")).getBytes(StandardCharsets.UTF_8), result.get(3).getData());
         }
     }
 
@@ -541,13 +551,74 @@ public class KeyValueStorageWithHostedStorageTest {
                     throw new UncheckedIOException(e);
                 }
             });
+            System.out.println(result);
             assertNotNull(result);
             assertEquals(2, result.size(), result.toString());
             assertEquals("key1", result.get(0).getKey());
             assertEquals("key2", result.get(1).getKey());
             assertNull(result.get(0).getData());
             assertNull(result.get(1).getData());
-            
+
+        }
+    }
+
+    @Test
+    public void testAccessDirectoryKeyWithoutSlash() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String servletName = hostedFactory.getServletName();
+        String endpoint = hostedFactory.getHostedEndpoint();
+        String branch = "refs/heads/master";
+        String data = getData(3);
+
+        File workingDirectory = getFolderFile();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
+        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint)
+                .setCredentialsProvider(provider).call()) {
+            Path dst = workingDirectory.toPath().resolve("test1").resolve("test2");
+            dst.toFile().mkdirs();
+            Files.write(dst.resolve(".metadata"), getMetaData(Set.of(new User(USER, PASSWORD))).getBytes(UTF_8));
+            Files.write(dst.resolve("key1"), getData(1).getBytes(UTF_8));
+            Files.write(dst.resolve("key2"), getData(2).getBytes(UTF_8));
+            Path nxt = dst.resolve("test3");
+            nxt.toFile().mkdirs();
+            Files.write(nxt.resolve(".metadata"), getMetaData(Set.of(new User(USER, PASSWORD))).getBytes(UTF_8));
+            Files.write(nxt.resolve("key4"), getData(4).getBytes(UTF_8));
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Initial commit").call();
+            Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
+            assertTrue(StreamSupport.stream(call.spliterator(), false)
+                    .allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
+
+        }
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();
+                JitStaticCreatorClient clientNoCred = buildCreatorClient().build();
+                JitStaticUpdaterClient updaterClientNoCred = buildClient().build();) {
+            List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2");
+            for (String key : list) {
+                client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData(key, branch, "new key", "user", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
+            }
+
+            assertEquals(HttpStatus.NOT_FOUND_404,
+                    assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
+
+            List<KeyData> keyData = updaterClient.listAll("test1/test2/", (is) -> {
+                try {
+                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertNotNull(keyData);
+            assertFalse(keyData.isEmpty());
+            assertEquals(HttpStatus.NOT_FOUND_404,
+                    assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404,
+                    assertThrows(APIException.class, () -> updaterClientNoCred.getKey("test1/test2", tf)).getStatusCode());
         }
     }
 
@@ -588,6 +659,12 @@ public class KeyValueStorageWithHostedStorageTest {
     private static String getData(int c) {
         return "{\"key" + c
                 + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
+    }
+
+    private static String getMetaData(Set<User> users) {
+        String writtenUsers = users.stream().map(u -> String.format("{\"password\":\"%s\",\"user\":\"%s\"}", u.getPassword(), u.getUser()))
+                .collect(Collectors.joining(","));
+        return String.format("{\"users\":[%s]}", writtenUsers);
     }
 
     private TriFunction<InputStream, String, String, Entity<String>> stringFactory = (is, v, t) -> {
