@@ -258,7 +258,7 @@ public class HostedGitRepositoryManager implements Source {
             if (!checkVersion(version, key, finalRef)) {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }
-            return updater.updateKey(key, actualRef, data, message, userInfo, userMail); 
+            return updater.updateKey(key, actualRef, data, message, userInfo, userMail);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -437,6 +437,7 @@ public class HostedGitRepositoryManager implements Source {
     public List<String> getList(final String key, String ref, boolean recursive) throws RefNotFoundException, IOException {
         Objects.requireNonNull(key);
         ref = checkRef(ref);
-        return extractor.getListForKey(key,ref, recursive).stream().filter(k -> !k.endsWith(JitStaticConstants.METADATA)).collect(Collectors.toList());
+        return extractor.getListForKey(key, ref, recursive).stream().filter(k -> !k.endsWith(JitStaticConstants.METADATA))
+                .collect(Collectors.toList());
     }
 }
