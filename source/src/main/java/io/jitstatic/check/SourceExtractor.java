@@ -151,13 +151,18 @@ public class SourceExtractor {
         RepositoryDataError error = null;
         try (final TreeWalk treeWalker = new TreeWalk(repository)) {
             treeWalker.addTree(tree);
-            treeWalker.setRecursive(false);
-            treeWalker.setPostOrderTraversal(false);
             if (key != null) {
+                treeWalker.setRecursive(false);
                 treeWalker.setFilter(getTreeFilter(key));
+            } else {
+                treeWalker.setRecursive(true);
             }
             while (treeWalker.next()) {
-                if (!treeWalker.isSubtree()) {
+                if (treeWalker.isSubtree()) {
+                    if (key != null && key.startsWith(new String(treeWalker.getRawPath(), StandardCharsets.UTF_8) + "/")) {
+                        treeWalker.enterSubtree();
+                    }
+                } else {
                     final FileMode mode = treeWalker.getFileMode();
                     if (mode == FileMode.REGULAR_FILE || mode == FileMode.EXECUTABLE_FILE) {
                         final ObjectId objectId = treeWalker.getObjectId(0);
@@ -166,8 +171,6 @@ public class SourceExtractor {
                         final FileObjectIdStore fileObjectIdStore = new FileObjectIdStore(path, objectId);
                         matchKeys(metaFiles, dataFiles, path, inputStreamHolder, fileObjectIdStore);
                     }
-                } else {
-                    treeWalker.enterSubtree();
                 }
             }
         } catch (final IOException e) {
@@ -232,6 +235,9 @@ public class SourceExtractor {
     }
 
     public List<String> getListForKey(final String key, final String ref, boolean recursive) throws RefNotFoundException, IOException {
+        if (!key.endsWith("/")) {
+            throw new IllegalArgumentException(String.format("%s doesn't end with /", key));
+        }
         final Ref findBranch = findBranch(ref);
         final AnyObjectId reference = findBranch.getObjectId();
         final List<String> keys;
@@ -262,7 +268,6 @@ public class SourceExtractor {
                 if (rawPathLength > keyData.length) {
                     continue;
                 }
-
                 if (Arrays.compare(rawPath, 0, rawPathLength, keyData, 0, rawPathLength) == 0) {
                     treeWalker.enterSubtree();
                 }
