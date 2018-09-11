@@ -23,6 +23,7 @@ package io.jitstatic;
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import io.jitstatic.api.BulkResource;
 import io.jitstatic.api.JitstaticInfoResource;
 import io.jitstatic.api.KeyResource;
 import io.jitstatic.api.MetaKeyResource;
@@ -56,6 +57,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.jersey().register(new KeyResource(storage, authenticator));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator));
+            env.jersey().register(new BulkResource(storage));
         } catch (final Exception e) {
             closeSilently(source);
             closeSilently(storage);

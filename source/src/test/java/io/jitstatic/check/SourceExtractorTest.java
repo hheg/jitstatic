@@ -20,7 +20,6 @@ package io.jitstatic.check;
  * #L%
  */
 import static org.hamcrest.MatcherAssert.assertThat;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,7 +33,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -50,20 +50,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.AbortedByHookException;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -81,13 +72,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import io.jitstatic.JitStaticConstants;
-import io.jitstatic.check.BranchData;
-import io.jitstatic.check.FileObjectIdStore;
-import io.jitstatic.check.MetaFileData;
-import io.jitstatic.check.RepositoryDataError;
-import io.jitstatic.check.SourceChecker;
-import io.jitstatic.check.SourceExtractor;
-import io.jitstatic.check.SourceFileData;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
@@ -96,7 +80,7 @@ import io.jitstatic.utils.Pair;
 @ExtendWith(TemporaryFolderExtension.class)
 public class SourceExtractorTest {
 
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String METADATA = ".metadata";
     private Git git;
@@ -117,7 +101,7 @@ public class SourceExtractorTest {
     }
 
     @Test
-    public void testCheckRepositoryUniqueBlobs() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+    public void testCheckRepositoryUniqueBlobs() throws IOException, NoFilepatternException, GitAPIException {
         File tempGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
@@ -129,11 +113,14 @@ public class SourceExtractorTest {
             Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> allExtracted = se.extractAll();
             assertTrue(allExtracted.keySet().size() == 4);
             checkForErrors();
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
     @Test
-    public void testCheckRepositorySameBlobs() throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+    public void testCheckRepositorySameBlobs() throws IOException, NoFilepatternException, GitAPIException {
         File tempGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
@@ -172,8 +159,7 @@ public class SourceExtractorTest {
 
     // This shouldn't happen since it would be illegal to push this commit
     @Test
-    public void testCheckBranchWithRemovedObjects()
-            throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+    public void testCheckBranchWithRemovedObjects() throws IOException, NoFilepatternException, GitAPIException {
         final String key = "file";
         final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
@@ -512,12 +498,12 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         List<String> listForKey = se.getListForKey(key, REFS_HEADS_MASTER, false);
-        String[] values = result.isEmpty() ? new String[0] : result.split(",");        
+        String[] values = result.isEmpty() ? new String[0] : result.split(",");
         assertEquals(List.of(values), listForKey);
     }
 
     private void addFilesAndPush(final String key, File temporaryGitFolder, Git local)
-            throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+            throws IOException, NoFilepatternException, GitAPIException {
         final Path file = temporaryGitFolder.toPath().resolve(key);
         final Path mfile = temporaryGitFolder.toPath().resolve(key + METADATA);
         if (key.endsWith("/")) {
@@ -539,10 +525,7 @@ public class SourceExtractorTest {
     }
 
     private void createFileAndCommit(File tempGitFolder, Git local, final String key, int i)
-            throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
-            IOException, UnsupportedEncodingException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException,
-            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException,
-            TransportException {
+            throws Exception {
         final String round = (i == 0 ? "" : String.valueOf(i));
         final String branchName = "master" + round;
         if (i > 0) {

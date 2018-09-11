@@ -59,6 +59,6 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public void deleteRef(String ref) throws IOException;
 
-    public List<String> getList(String key, String ref, boolean recursive) throws RefNotFoundException, IOException;
+    public List<String> getList(String keys, String ref, boolean recursive) throws RefNotFoundException, IOException;
 
 }

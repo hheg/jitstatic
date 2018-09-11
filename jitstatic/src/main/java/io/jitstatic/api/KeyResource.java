@@ -142,7 +142,7 @@ public class KeyResource {
     public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref,
             @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
         helper.checkRef(ref);
-        final List<Pair<String, StoreInfo>> list = storage.getList(key, ref, recursive, user);
+        final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref, user);
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
         }
