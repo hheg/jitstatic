@@ -101,7 +101,7 @@ public class SourceExtractorTest {
     }
 
     @Test
-    public void testCheckRepositoryUniqueBlobs() throws IOException, NoFilepatternException, GitAPIException {
+    public void testCheckRepositoryUniqueBlobs() throws Exception {
         File tempGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
@@ -113,9 +113,6 @@ public class SourceExtractorTest {
             Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> allExtracted = se.extractAll();
             assertTrue(allExtracted.keySet().size() == 4);
             checkForErrors();
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
         }
     }
 
