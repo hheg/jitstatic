@@ -398,6 +398,7 @@ Content-Length: 309
 It's possible to fetch multiple keys from a repo like this:
 
 ```
+[master]
 root/dir1/file1
 root/dir1/file2
 root/dir3/file3
@@ -406,16 +407,16 @@ file5
 ```
 
 ```
-curl -i -H 'Content-Type: application/json' \ 
---user user1:1234 -X POST  \ 
--d '[{"ref":"refs/heads/master","paths":[{"path":"root/dir1/","recursively":false},{"path":"file5","recursively":true}]}]' \
-http://localhost:8085/app/bulk/fetch
+curl --user user1:1234 -i http://localhost:8085/app/bulk/fetch \
+-H 'Content-Type: application/json' \
+-X POST \
+-d '[{"ref":"refs/heads/master","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":true}]},{"ref":"refs/heads/develop","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":false}]}]'
 HTTP/1.1 200 OK
-Date: Sun, 02 Sep 2018 21:40:42 GMT
+Date: Tue, 11 Sep 2018 19:51:23 GMT
 Content-Type: application/json
-Content-Length: 516
+Content-Length: 526
 
-[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"file5","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]
+[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir3/file3","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]
 ```
 
 All keys are still protected by authorization. The keys are still protected by the correspoding access rules. 
