@@ -67,7 +67,7 @@ public class JitStaticReceivePack extends ReceivePack {
         this.errorReporter = errorReporter;
     }
 
-    // TODO do the checks the original code does
+    // TODO
     @Override
     protected void executeCommands() {
         ProgressMonitor updating = NullProgressMonitor.INSTANCE;

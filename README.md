@@ -393,6 +393,33 @@ Content-Length: 309
 
 [{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"}]
 ```
+### API for Fetching multiple keys
+
+It's possible to fetch multiple keys from a repo like this:
+
+```
+[master]
+root/dir1/file1
+root/dir1/file2
+root/dir3/file3
+root/dir1/dir2/file4
+file5
+```
+
+```
+curl --user user1:1234 -i http://localhost:8085/app/bulk/fetch \
+-H 'Content-Type: application/json' \
+-X POST \
+-d '[{"ref":"refs/heads/master","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":true}]},{"ref":"refs/heads/develop","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":false}]}]'
+HTTP/1.1 200 OK
+Date: Tue, 11 Sep 2018 19:51:23 GMT
+Content-Type: application/json
+Content-Length: 526
+
+[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir3/file3","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]
+```
+
+All keys are still protected by authorization. The keys are still protected by the correspoding access rules. 
 
 
 ### MetaKeys
@@ -412,7 +439,7 @@ You can find a Java client for JitStatic at
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.7.0</version>
+    <version>0.8.1</version>
 </dependency>
 ```
 

@@ -227,7 +227,7 @@ public class SourceExtractor {
                     .filter(ref -> ref.getName().startsWith(Constants.R_HEADS)).collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
         }).map(this::fileLoader)
-                .collect(Collectors.toConcurrentMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
+                .collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
     }
 
     public Ref getRef(final String ref) throws IOException {

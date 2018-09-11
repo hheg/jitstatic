@@ -1,7 +1,5 @@
 package io.jitstatic.storage;
 
-import java.io.IOException;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import java.io.IOException;
  * #L%
  */
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -321,25 +321,47 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getList(final String key, final String ref, boolean recursive, final Optional<User> user) {
+    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref,
+            final Optional<User> user) {
+        Objects.requireNonNull(keyPairs);
+        Objects.requireNonNull(user);
         final String finalRef = checkRef(ref);
-        try {
-            final List<String> keys = source.getList(key, finalRef, recursive);
-            return keys.stream().parallel().map(k -> Pair.of(k, getKey(k, finalRef))).filter(Pair::isPresent)
-                    .filter(p -> p.getRight().isPresent()).map(p -> Pair.of(p.getLeft(), p.getRight().get())).filter(p -> {
-                        final StoreInfo si = p.getRight();
-                        final Set<User> users = si.getStorageData().getUsers();
-                        if (user.isPresent()) {
-                            return users.contains(user.get());
-                        } else {
-                            return users.isEmpty();
-                        }
-                    }).collect(Collectors.toList());
-        } catch (final RefNotFoundException rnfe) {
-            return List.of();
-        } catch (final IOException e) {
-            consumeError(e);
-            return List.of();
-        }
+        return Tree.of(keyPairs).accept(new PathBuilderVisitor()).parallelStream().map(pair -> {
+            final String key = pair.getLeft();
+            if (key.endsWith("/")) {
+                try {
+                    return source.getList(key, finalRef, pair.getRight()).parallelStream().map(k -> Pair.of(k, getKey(k, finalRef)))
+                            .filter(Pair::isPresent).filter(pa -> pa.getRight().isPresent())
+                            .map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).filter(filterUser(user)).collect(Collectors.toList());
+                } catch (final RefNotFoundException rnfe) {
+                    return List.<Pair<String, StoreInfo>>of();
+                } catch (final IOException e) {
+                    consumeError(e);
+                    return List.<Pair<String, StoreInfo>>of();
+                }
+            }
+            final Optional<StoreInfo> keyContent = getKey(key, finalRef);
+            return keyContent.isPresent() ? List.of(Pair.of(key, keyContent.get())) : List.<Pair<String, StoreInfo>>of();
+        }).flatMap(List::stream).collect(Collectors.toList());
+    }
+
+    private Predicate<? super Pair<String, StoreInfo>> filterUser(final Optional<User> user) {
+        return pb -> {
+            final StoreInfo si = pb.getRight();
+            final Set<User> users = si.getStorageData().getUsers();
+            if (user.isPresent()) {
+                return users.contains(user.get());
+            } else {
+                return users.isEmpty();
+            }
+        };
+    }
+
+    @Override
+    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input,
+            final Optional<User> user) {
+        return input.stream().map(p -> {
+            return Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight());
+        }).collect(Collectors.toList());
     }
 }
