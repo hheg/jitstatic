@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -245,8 +246,10 @@ public class HostOwnGitRepositoryTest {
 
                 verifyOkPush(git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call(),
                         REFS_HEADS_NEWBRANCH);
+                assertEquals(HttpStatus.NOT_FOUND_404,
+                        assertThrows(APIException.class, () -> client.getKey(STORE, REFS_HEADS_NEWBRANCH, tf)).getStatusCode());
                 refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
-                assertEquals(ObjectId.zeroId(), refs.get(REFS_HEADS_NEWBRANCH).getObjectId());
+                assertNull(refs.get(REFS_HEADS_NEWBRANCH));
 
                 client.getKey(STORE, REFS_HEADS_NEWBRANCH, tf);
             }

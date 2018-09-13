@@ -97,6 +97,7 @@ import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(TemporaryFolderExtension.class)
@@ -296,6 +297,43 @@ public class HostedGitRepositoryManagerTest {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Error in branch " + REF_HEADS_MASTER));
+    }
+
+    @Test
+    public void testCheckVersion() throws Exception {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER) {
+            public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
+                return null;
+            };
+        }) {
+            final File localGitDir = getFolder().toFile();
+            try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {
+                final Path file = localGitDir.toPath().resolve(STORE);
+                final Path mfile = localGitDir.toPath().resolve(STORE + METADATA);
+                Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+                Files.write(mfile, getMetaData().substring(1).getBytes(UTF_8), StandardOpenOption.CREATE_NEW,
+                        StandardOpenOption.TRUNCATE_EXISTING);
+                git.add().addFilepattern(".").call();
+                git.commit().setMessage("Test commit").call();
+                // This works since there's no check done on the repository
+                verifyOkPush(git.push().call());
+            }
+            assertSame(VersionIsNotSame.class,
+                    assertThrows(WrappingAPIException.class, () -> grm.modifyKey("", "refs/heads/master", new byte[] {}, "", "", "", ""))
+                            .getCause().getClass());
+        }
+    }
+
+    @Test
+    public void testCheckVersionRefNotFound() throws Exception {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER) {
+            public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException {
+                throw new RefNotFoundException("test");
+            };
+        }) {
+            assertSame(RefNotFoundException.class,
+                    assertThrows(WrappingAPIException.class, () -> grm.modifyKey("", "master", new byte[] {}, "", "", "", "")).getCause().getClass());
+        }
     }
 
     private void addFilesAndPush(final File localGitDir, Git git) throws IOException, UnsupportedEncodingException, GitAPIException,

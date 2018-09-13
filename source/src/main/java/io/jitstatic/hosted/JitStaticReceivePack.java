@@ -192,7 +192,10 @@ public class JitStaticReceivePack extends ReceivePack {
                         updateRef.setPushCertificate(getPushCertificate());
                         if (test == null) { // Deleted branch
                             updateRef.setNewObjectId(orig.getNewId());
-                            orig.setResult(updateRef.forceUpdate());
+                            if (!ObjectId.zeroId().equals(orig.getOldId()))
+                                updateRef.setExpectedOldObjectId(orig.getOldId());
+                            updateRef.setForceUpdate(true);
+                            orig.setResult(updateRef.delete());
                         } else {
                             updateRef.setNewObjectId(test.getNewId());
                             checkResult(refName, updateRef.forceUpdate());

@@ -59,6 +59,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -257,7 +258,10 @@ public class JitStaticReceivePackTest {
     public void testRepositoryFailsIOException() throws Exception {
         Repository remoteRepository = Mockito.spy(remoteBareGit.getRepository());
         final String errormsg = "Triggered fault";
-        Mockito.doThrow(new IOException(errormsg)).when(remoteRepository).findRef(Mockito.any());
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
+
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
         ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
@@ -294,7 +298,7 @@ public class JitStaticReceivePackTest {
         clientGit.add().addFilepattern(STORE).call();
         ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
         RevCommit c = clientGit.commit().setMessage("New commit").call();
-
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
         ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
@@ -305,7 +309,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
         Mockito.when(ru.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
         Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
-        Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
 
         JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
@@ -337,7 +342,7 @@ public class JitStaticReceivePackTest {
         clientGit.add().addFilepattern(STORE).call();
         ObjectId oldRef = clientGit.getRepository().resolve(REF_HEADS_MASTER);
         RevCommit c = clientGit.commit().setMessage("New commit").call();
-
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
         ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
@@ -348,7 +353,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(ru.forceUpdate()).thenReturn(RefUpdate.Result.NEW);
         Mockito.when(ru.delete()).thenThrow(new RuntimeException(errormsg));
         Mockito.when(rc.getResult()).thenReturn(Result.OK).thenCallRealMethod();
-        Mockito.when(remoteRepository.findRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
         JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
@@ -485,12 +491,16 @@ public class JitStaticReceivePackTest {
             SourceChecker getSourceChecker() {
                 return sc;
             }
-
+       
             @Override
             public boolean isSideBand() throws RequestNotYetReadException {
                 return false;
             }
         });
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenReturn(master);
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
+
         Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
         Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(null);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
@@ -504,6 +514,7 @@ public class JitStaticReceivePackTest {
 
     @Test
     public void testBranchIsStaleWhenCommitting() throws Exception {
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         RemoteTestUtils.copy("/test3.json", storePath);
         Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.add().addFilepattern(STORE).call();
@@ -535,7 +546,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
-        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(master);
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenReturn(master);
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         Mockito.when(testUpdate.delete()).thenReturn(RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_NONFASTFORWARD, rc.getResult());
@@ -553,6 +565,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
@@ -575,6 +588,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD)
                 .thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.LOCK_FAILURE);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
+        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenReturn(master);
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(master);
         Mockito.when(rc.getOldId()).thenReturn(master.getObjectId());
@@ -587,6 +602,7 @@ public class JitStaticReceivePackTest {
 
     @Test
     public void testIOExceptionWhenCommitting() throws Exception {
+        RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         IOException e = new IOException("Test");
         RemoteTestUtils.copy("/test3.json", storePath);
         Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
@@ -619,7 +635,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
-        Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenThrow(e);
+        Mockito.when(refDatabase.getRef(Mockito.eq(REF_HEADS_MASTER))).thenThrow(e);
+        Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         Mockito.when(testUpdate.delete()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         rp.executeCommands();
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
