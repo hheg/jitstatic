@@ -246,8 +246,11 @@ public class GitStorage implements Storage {
         }
     }
 
-    private void removeCacheRef(final String finalRef) {
-        cache.computeIfPresent(finalRef, (a, b) -> b.isEmpty() ? null : b);
+    private void removeCacheRef(final String ref) {
+        if(ref == null) {
+            return;
+        }
+        cache.computeIfPresent(ref, (a, b) -> b.isEmpty() ? null : b);
     }
 
     @Override
