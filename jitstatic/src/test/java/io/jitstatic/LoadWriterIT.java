@@ -104,11 +104,11 @@ import io.jitstatic.tools.Utils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
-public class LoadWriterTest {
+public class LoadWriterIT {
 
     private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
     private static final boolean log = false;
-    private static final Logger LOG = LogManager.getLogger(LoadWriterTest.class);
+    private static final Logger LOG = LogManager.getLogger(LoadWriterIT.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -200,7 +200,7 @@ public class LoadWriterTest {
     private String setupRun(JitStaticUpdaterClient buildKeyClient, String branch, final String key) {
         String tag;
         try {
-            tag = buildKeyClient.getKey(key, branch, LoadWriterTest::read).tag;
+            tag = buildKeyClient.getKey(key, branch, LoadWriterIT::read).tag;
         } catch (URISyntaxException | IOException e1) {
             throw new RuntimeException(e1);
         }

@@ -113,13 +113,13 @@ import io.jitstatic.tools.Utils;
  */
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
-public class LoadTesterTest {
+public class LoadTesterIT {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");
     private static final String METADATA = ".metadata";
     private static final boolean log = false;
     static final String MASTER = "master";
-    private static final Logger LOG = LogManager.getLogger(LoadTesterTest.class);
+    private static final Logger LOG = LogManager.getLogger(LoadTesterIT.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -410,7 +410,7 @@ public class LoadTesterTest {
                 for (String name : testData.names) {
                     String ref = "refs/heads/" + branch;
                     try {
-                        Entity entity = client.getKey(name, ref, LoadTesterTest::read);
+                        Entity entity = client.getKey(name, ref, LoadTesterIT::read);
                         String readValue = entity.getValue().toString();
                         if (Math.random() < 0.5) {
                             client.modifyKey(testData, branch, name, ref, entity, readValue);
@@ -525,7 +525,7 @@ public class LoadTesterTest {
                 counter.updates++;
                 log(() -> LOG.info("Ok modified {};{} with {}", name, branch, c));
                 if (Math.random() < 0.5) {
-                    updater.getKey(name, branch, newTag, LoadTesterTest::read);
+                    updater.getKey(name, branch, newTag, LoadTesterIT::read);
                 }
             } catch (APIException e) {
                 log(() -> LOG.info("TestSuiteError: Failed to modify {} {}", c, e.getLocalizedMessage()));
