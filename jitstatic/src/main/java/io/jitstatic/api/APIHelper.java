@@ -150,4 +150,9 @@ class APIHelper {
         }
         return null;
     }
+
+    Response respondAuthenticationChallenge(final String realm) {
+        return Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"")
+                .build();
+    }
 }

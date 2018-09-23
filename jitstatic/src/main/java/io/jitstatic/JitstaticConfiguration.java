@@ -75,11 +75,12 @@ public class JitstaticConfiguration extends Configuration {
         this.hosted = hosted;
     }
 
-    public Source build(final Environment env) throws CorruptedSourceException, IOException {
+    public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         Objects.requireNonNull(env);
+        Objects.requireNonNull(gitRealm);
         final HostedFactory hostedFactory = getHostedFactory();
         getReportingFactory().build(env);
-        return hostedFactory.build(env);
+        return hostedFactory.build(env, gitRealm);
     }
 
     public AddKeyAuthenticator getAddKeyAuthenticator() {

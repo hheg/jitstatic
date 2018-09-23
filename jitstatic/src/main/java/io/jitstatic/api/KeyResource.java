@@ -58,6 +58,7 @@ import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.HeaderPair;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.StorageData;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
@@ -111,7 +112,7 @@ public class KeyResource {
 
         if (!user.isPresent()) {
             LOG.info("Resource {} needs a user", key);
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         checkIfAllowed(key, user, allowedUsers);
@@ -180,7 +181,7 @@ public class KeyResource {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         checkKey(key);
@@ -237,7 +238,7 @@ public class KeyResource {
     private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
         if (!allowedUsers.contains(user.get())) {
             LOG.info("Resource {} is denied for user {}", key, user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
 
@@ -250,15 +251,15 @@ public class KeyResource {
     public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
 
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
         }
         if (!addKeyAuthenticator.authenticate(user.get())) {
             LOG.info("Resource {} is denied for user {}", data.getKey(), user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            throw new WebApplicationException(Status.FORBIDDEN);
         }
 
         if (data.getKey().endsWith("/")) {
-            throw new WebApplicationException(Status.FORBIDDEN);
+            throw new WebApplicationException(data.getKey(), Status.FORBIDDEN);
         }
 
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
@@ -274,7 +275,7 @@ public class KeyResource {
     public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);

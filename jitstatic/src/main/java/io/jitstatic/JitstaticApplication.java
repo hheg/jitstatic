@@ -37,6 +37,10 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         new JitstaticApplication().run(args);
     }
 
+    public static final String GIT_REALM = "git";
+    public static final String JITSTATIC_STORAGE_REALM = "update";
+    public static final String JITSTATIC_METAKEY_REALM = "create";
+
     @Override
     public void initialize(final Bootstrap<JitstaticConfiguration> bootstrap) {
         super.initialize(bootstrap);
@@ -47,8 +51,8 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         Source source = null;
         Storage storage = null;
         try {
-            source = config.build(env);
-            storage = config.getStorageFactory().build(source, env);
+            source = config.build(env, GIT_REALM);
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_STORAGE_REALM);
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
