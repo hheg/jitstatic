@@ -23,7 +23,7 @@ package io.jitstatic.hosted;
 public class LoadException extends RuntimeException {
     private static final long serialVersionUID = 8301145459750779096L;
 
-    LoadException(final Exception e) {
+    public LoadException(final Exception e) {
         super(e);
     }
 

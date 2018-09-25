@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.storage;
 
 /*-
  * #%L
@@ -43,6 +43,12 @@ import com.spencerwi.either.Either;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.MetaData;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.KeyAlreadyExist;
+import io.jitstatic.hosted.LoadException;
+import io.jitstatic.hosted.RefHolderLock;
+import io.jitstatic.hosted.SourceHandler;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
@@ -50,7 +56,7 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
-public class RefHolder {
+public class RefHolder implements RefHolderLock {
 
     private static final Logger LOG = LogManager.getLogger(RefHolder.class);
     private static final SourceHandler HANDLER = new SourceHandler();

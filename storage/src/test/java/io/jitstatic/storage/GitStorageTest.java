@@ -57,7 +57,7 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.hosted.RefHolder;
+import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
@@ -177,7 +177,7 @@ public class GitStorageTest {
             StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new MetaData(users, null, false, false, List.of()),
                     SHA_1, SHA_1_MD);
             assertTrue(Arrays.equals(storage.getData(), gs.getKey("key", null).get().getData()));
-            RefHolder refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
+            RefHolderLock refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
             refHolderLock.lockWriteAll(() -> {
                 gs.reload(List.of(REF_HEADS_MASTER));
                 return true;

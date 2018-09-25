@@ -62,6 +62,7 @@ import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -415,7 +416,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void addRefHolderFactory(final Function<String, RefHolder> factory) {
+    public void addRefHolderFactory(final Function<String, RefHolderLock> factory) {
         this.repositoryBus.setRefHolderFactory(factory);
     }
 

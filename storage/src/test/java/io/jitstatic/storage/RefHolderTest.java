@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.storage;
 
 /*-
  * #%L
@@ -44,8 +44,12 @@ import org.mockito.Mockito;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.MetaData;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.LoadException;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.RefHolder;
 import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.WrappingAPIException;
 

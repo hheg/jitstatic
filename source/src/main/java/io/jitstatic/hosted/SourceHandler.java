@@ -34,7 +34,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.MetaData;
 
-class SourceHandler {
+public class SourceHandler {
     private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
 
     public byte[] readStorageData(final InputStream is) throws JsonParseException, JsonMappingException, IOException {

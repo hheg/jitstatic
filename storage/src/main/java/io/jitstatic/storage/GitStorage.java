@@ -45,7 +45,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
-import io.jitstatic.hosted.RefHolder;
+import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
@@ -67,7 +67,7 @@ public class GitStorage implements Storage {
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
     }
 
-    public RefHolder getRefHolderLock(final String ref) {
+    public RefHolderLock getRefHolderLock(final String ref) {
         return getRefHolder(ref);
     }
 

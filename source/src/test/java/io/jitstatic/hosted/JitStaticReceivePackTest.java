@@ -39,7 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
@@ -71,8 +71,8 @@ import org.eclipse.jgit.transport.ReceiveCommand.Type;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
-import org.eclipse.jgit.transport.RequestNotYetReadException;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.eclipse.jgit.transport.RequestNotYetReadException;
 import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
@@ -81,6 +81,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
+
+import com.spencerwi.either.Either;
 
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.test.TemporaryFolder;
@@ -123,9 +125,7 @@ public class JitStaticReceivePackTest {
 
         errorReporter = new ErrorReporter();
         bus = new RepositoryBus(errorReporter);
-        // We are not testing Source's capabilities here.
-        bus.setRefHolderFactory((ref) -> new RefHolder(ref, new ConcurrentHashMap<>(), null));
-
+        bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus);
             return receivePack;
@@ -202,6 +202,12 @@ public class JitStaticReceivePackTest {
 
     @Test
     public void testOnPreReceiveNewCommitValidJSON() throws Exception {
+        bus.setRefHolderFactory((ref) -> new RefHolderLock() {
+            @Override
+            public <T> Either<T, FailedToLock> lockWriteAll(Supplier<T> supplier) {
+                return Either.left(supplier.get());
+            }
+        });
         final Repository localRepository = clientGit.getRepository();
         final ObjectId oldId = localRepository.resolve(Constants.HEAD);
         RemoteTestUtils.copy("/test3.json", storePath);
@@ -491,7 +497,7 @@ public class JitStaticReceivePackTest {
             SourceChecker getSourceChecker() {
                 return sc;
             }
-       
+
             @Override
             public boolean isSideBand() throws RequestNotYetReadException {
                 return false;
@@ -643,6 +649,15 @@ public class JitStaticReceivePackTest {
         Exception fault = errorReporter.getFault();
         assertTrue(fault instanceof RepositoryException);
         assertSame(e, fault.getCause());
+    }
+
+    RefHolderLock refHolderFactory(String ref) {
+        return new RefHolderLock() {
+            @Override
+            public <T> Either<T, FailedToLock> lockWriteAll(Supplier<T> supplier) {
+                return Either.left(supplier.get());
+            }
+        };
     }
 
     Path getFolder() throws IOException {
