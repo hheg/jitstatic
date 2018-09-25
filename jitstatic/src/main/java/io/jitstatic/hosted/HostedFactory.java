@@ -22,6 +22,7 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.servlet.ServletException;
@@ -140,10 +141,10 @@ public class HostedFactory {
         this.secret = secret;
     }
 
-    public Source build(final Environment env) throws CorruptedSourceException, IOException {
+    public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
                 getBranch());
-
+        Objects.requireNonNull(gitRealm);
         final String baseServletPath = "/" + getServletName() + "/*";
         LOG.info("Configuring hosted GIT environment on " + baseServletPath);
         final GitServlet gs = new GitServlet();
@@ -169,7 +170,7 @@ public class HostedFactory {
 
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
-        sec.setRealmName("git");
+        sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
         sec.setLoginService(new SimpleLoginService(getUserName(), getSecret(), sec.getRealmName()));
         sec.setConstraintMappings(new ConstraintMapping[] { cm });

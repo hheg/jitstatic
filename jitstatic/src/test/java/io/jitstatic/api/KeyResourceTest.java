@@ -71,6 +71,7 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
 import io.jitstatic.MetaData;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
@@ -103,7 +104,10 @@ public class KeyResourceTest {
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm(JitstaticApplication.JITSTATIC_STORAGE_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+            .addProvider(
+                    new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
+                            .setRealm(JitstaticApplication.JITSTATIC_METAKEY_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new KeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
@@ -170,7 +174,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> expected = DATA.get("dog");
         when(storage.getKey("dog", null)).thenReturn(expected);
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
-        assertEquals("HTTP 401 Unauthorized", assertThrows(WebApplicationException.class, () -> {
+        assertEquals("HTTP 403 Forbidden", assertThrows(WebApplicationException.class, () -> {
             RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
         }).getLocalizedMessage());
     }
@@ -257,6 +261,7 @@ public class KeyResourceTest {
         Response response = target.request().header(HttpHeaders.IF_MATCH, "\"1\"").buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        assertEquals("Basic realm=\"update\", charset=\"UTF-8\"",response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }
 
@@ -391,7 +396,7 @@ public class KeyResourceTest {
         data.setUserInfo("user");
         Response response = target.request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
-        assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
         response.close();
     }
 
@@ -592,6 +597,7 @@ public class KeyResourceTest {
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "testmessage", "user",
                         "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        assertEquals("Basic realm=\"create\", charset=\"UTF-8\"",response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }
 
@@ -603,7 +609,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .post(Entity.json(new AddKeyData("test", REFS_HEADS_MASTER, data,
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of()), "test", "user", "test@test.com")));
-        assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
         response.close();
     }
 

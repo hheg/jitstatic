@@ -56,6 +56,7 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
 import io.jitstatic.MetaData;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
@@ -76,7 +77,7 @@ public class MetaKeyResourceTest {
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm(JitstaticApplication.JITSTATIC_METAKEY_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MetaKeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 

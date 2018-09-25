@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -50,6 +52,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
@@ -64,10 +67,9 @@ public class MetaKeyResource {
     private final Storage storage;
     private final AddKeyAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
-
     public MetaKeyResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
-        this.addKeyAuthenticator = addKeyAuthenticator;
-        this.storage = storage;
+        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+        this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
     }
 
@@ -80,7 +82,7 @@ public class MetaKeyResource {
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
         }
 
         authorize(user);
@@ -113,7 +115,7 @@ public class MetaKeyResource {
     public Response modifyUserKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Valid @NotNull ModifyMetaKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
         }
 
         authorize(user);

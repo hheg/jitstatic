@@ -289,7 +289,7 @@ public class KeyValueStorageWithHostedStorageTest {
                 secondUpdater.getKey(ACCEPT_STORAGE, tf);
                 fail();
             } catch (APIException e) {
-                assertEquals(HttpStatus.UNAUTHORIZED_401, e.getStatusCode());
+                assertEquals(HttpStatus.FORBIDDEN_403, e.getStatusCode());
             }
             Entity<JsonNode> metaKey = client.getMetaKey(ACCEPT_STORAGE, null, tf);
             String oldVersion = metaKey.getTag();
@@ -304,7 +304,7 @@ public class KeyValueStorageWithHostedStorageTest {
                 firstUpdater.getKey(ACCEPT_STORAGE, tf);
                 fail();
             } catch (APIException e) {
-                assertEquals(HttpStatus.UNAUTHORIZED_401, e.getStatusCode());
+                assertEquals(HttpStatus.FORBIDDEN_403, e.getStatusCode());
             }
         }
     }

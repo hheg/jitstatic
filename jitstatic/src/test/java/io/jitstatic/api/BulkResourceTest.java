@@ -50,6 +50,7 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
 import io.jitstatic.MetaData;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
@@ -69,12 +70,12 @@ public class BulkResourceTest {
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm(JitstaticApplication.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new BulkResource(storage)).build();
 
     @Test
-    public void testSearch() {
+    public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
         Mockito.when(storeInfoMock.getData()).thenReturn(new byte[] { 1 });
@@ -83,7 +84,7 @@ public class BulkResourceTest {
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
         Mockito.when(storage.getList(Mockito.any(), Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), "refs/heads/master")));
-        Response response = RESOURCES.target("/bulk/search").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+        Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(
                         List.of(new BulkSearch("refs/heads/master",
                                 List.of(new SearchPath("key1", false), new SearchPath("decoy/key1", false),
