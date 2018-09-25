@@ -32,16 +32,16 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.hosted.StoreInfo;
 
 public class StoreInfoTest {
 
 	@Test
 	public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1");
-		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "1", "1");
-		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new StorageData(new HashSet<>(), null, false, false, List.of()), "2", "2");
+		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "1", "1");
+		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "1", "1");
+		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "2", "2");
 
 		assertEquals(si1, si1);
 		assertEquals(si1.hashCode(), si2.hashCode());

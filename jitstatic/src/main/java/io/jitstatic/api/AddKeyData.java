@@ -31,7 +31,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class AddKeyData {
@@ -53,7 +53,7 @@ public class AddKeyData {
 
     @NotNull
     @Valid
-    private final StorageData metaData;
+    private final MetaData metaData;
 
     @NotNull
     @NotEmpty
@@ -69,7 +69,7 @@ public class AddKeyData {
 
     @JsonCreator
     public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch,
-            @JsonProperty("data") final byte[] data, @JsonProperty("metaData") final StorageData metaData,
+            @JsonProperty("data") final byte[] data, @JsonProperty("metaData") final MetaData metaData,
             @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
         this.key = key;
@@ -93,7 +93,7 @@ public class AddKeyData {
         return data;
     }
 
-    public StorageData getMetaData() {
+    public MetaData getMetaData() {
         return metaData;
     }
 

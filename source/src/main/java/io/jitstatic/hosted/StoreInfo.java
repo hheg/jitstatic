@@ -23,27 +23,27 @@ package io.jitstatic.hosted;
 import java.util.Objects;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 
 @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "It's exposed when exposed to client and it's serialized")
 public class StoreInfo {
-    private final StorageData metaData;
+    private final MetaData metaData;
     private final String version;
     private final byte[] data;
     private final String metaDataVersion;
 
-    public StoreInfo(final byte[] data, final StorageData metaData, final String version, final String metaDataVersion) {
+    public StoreInfo(final byte[] data, final MetaData metaData, final String version, final String metaDataVersion) {
         this.data = data;
         this.metaData = Objects.requireNonNull(metaData);
         this.version = version;
         this.metaDataVersion = Objects.requireNonNull(metaDataVersion);
     }
 
-    public StoreInfo(final StorageData metaData, final String metaDataVersion) {
+    public StoreInfo(final MetaData metaData, final String metaDataVersion) {
         this(null, metaData, null, metaDataVersion);
     }
 
-    public StorageData getStorageData() {
+    public MetaData getStorageData() {
         return metaData;
     }
 

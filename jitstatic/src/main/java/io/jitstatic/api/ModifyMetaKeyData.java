@@ -27,7 +27,7 @@ import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 
 public class ModifyMetaKeyData {
 
@@ -39,7 +39,7 @@ public class ModifyMetaKeyData {
     @JsonProperty
     @NotNull
     @Valid
-    private StorageData metaData;
+    private MetaData metaData;
 
     @JsonProperty
     @NotNull
@@ -59,11 +59,11 @@ public class ModifyMetaKeyData {
         this.message = message;
     }
 
-    public StorageData getMetaData() {
+    public MetaData getMetaData() {
         return metaData;
     }
 
-    public void setMetaData(final StorageData data) {
+    public void setMetaData(final MetaData data) {
         this.metaData = data;
     }
 

@@ -89,7 +89,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.RepositoryIsMissingIntendedBranch;
 import io.jitstatic.source.SourceEventListener;
@@ -437,7 +437,7 @@ public class HostedGitRepositoryManagerTest {
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call()) {
             addFilesAndPush(localGitDir, git);
             Pair<String, String> addKey = grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 },
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "message", "userinfo", "mail");
+                    new MetaData(new HashSet<>(), null, false, false, List.of()), "message", "userinfo", "mail");
             String version = addKey.getLeft();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -455,7 +455,7 @@ public class HostedGitRepositoryManagerTest {
     public void testAddKeyButNoBranch() throws Throwable {
         assertThat((RefNotFoundException) assertThrows(WrappingAPIException.class, () -> {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new StorageData(new HashSet<>(), null, false, false, List.of()),
+                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new MetaData(new HashSet<>(), null, false, false, List.of()),
                         "message", "userinfo", "mail");
             }
         }).getCause(), isA(RefNotFoundException.class));
@@ -471,19 +471,19 @@ public class HostedGitRepositoryManagerTest {
             addFilesAndPush(gitFolder, git);
             SourceInfo firstSourceInfo = grm.getSourceInfo(STORE, null);
             assertNotNull(firstSourceInfo);
-            StorageData firstValue;
+            MetaData firstValue;
             try (InputStream is = firstSourceInfo.getMetadataInputStream()) {
-                firstValue = MAPPER.readValue(is, StorageData.class);
+                firstValue = MAPPER.readValue(is, MetaData.class);
             }
 
             String firstVersion = firstSourceInfo.getMetaDataVersion();
-            StorageData newData = new StorageData(new HashSet<>(), "newcontent", false, false, List.of());
+            MetaData newData = new MetaData(new HashSet<>(), "newcontent", false, false, List.of());
             String newVersion = grm.modifyMetadata(newData, firstVersion, message, userInfo, "user@somewhere.org", STORE, null);
             assertNotEquals(firstVersion, newVersion);
             SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
-            StorageData secondValue;
+            MetaData secondValue;
             try (InputStream is = secondSourceInfo.getMetadataInputStream()) {
-                secondValue = MAPPER.readValue(is, StorageData.class);
+                secondValue = MAPPER.readValue(is, MetaData.class);
             }
             assertNotEquals(firstValue, secondValue);
             assertEquals(newVersion, secondSourceInfo.getMetaDataVersion());
@@ -502,9 +502,9 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
-            StorageData secondValue;
+            MetaData secondValue;
             try (InputStream is = grm.getSourceInfo(STORE, REF_HEADS_MASTER).getMetadataInputStream()) {
-                secondValue = MAPPER.readValue(is, StorageData.class);
+                secondValue = MAPPER.readValue(is, MetaData.class);
             }
             assertTrue(assertThrows(WrappingAPIException.class, () -> {
                 grm.addKey(STORE, REF_HEADS_MASTER, new byte[] { 1 }, secondValue, "mess", "ui", "mail");
@@ -516,7 +516,7 @@ public class HostedGitRepositoryManagerTest {
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
             assertThrows(UnsupportedOperationException.class,
-                    () -> grm.modifyMetadata(new StorageData(Set.of(), "", false, false, List.of()), "1", "msg", "ui", "mail", STORE,
+                    () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of()), "1", "msg", "ui", "mail", STORE,
                             "refs/tags/tag"));
         }
     }

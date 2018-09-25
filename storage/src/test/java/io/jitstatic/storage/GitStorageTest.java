@@ -53,7 +53,7 @@ import org.mockito.Mockito;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
@@ -125,7 +125,7 @@ public class GitStorageTest {
             when(si1.getSourceVersion()).thenReturn(null);
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
-            when(source.modifyMetadata(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(),
+            when(source.modifyMetadata(Mockito.<MetaData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(),
                     Mockito.any(), Mockito.any())).thenReturn((SHA_2_MD));
 
             Optional<StoreInfo> key = gs.getKey("root/", null);
@@ -134,7 +134,7 @@ public class GitStorageTest {
             assertThrows(IllegalStateException.class, () -> storeInfo.getData());
             assertNotNull(storeInfo.getStorageData());
 
-            StorageData sd = new StorageData(Set.of(new User("u", "p")), "text/plain", false, false, List.of());
+            MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of());
             Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, "msg", "info", "mail");
             assertEquals(SHA_2_MD, putMetaData.getLeft());
             Optional<StoreInfo> completableSupplier2 = gs.getKey("root/", null);
@@ -174,7 +174,7 @@ public class GitStorageTest {
             when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF_HEADS_MASTER))).thenReturn(si1).thenReturn(si2);
 
             gs.reload(List.of(REF_HEADS_MASTER));
-            StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new StorageData(users, null, false, false, List.of()),
+            StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new MetaData(users, null, false, false, List.of()),
                     SHA_1, SHA_1_MD);
             assertTrue(Arrays.equals(storage.getData(), gs.getKey("key", null).get().getData()));
             RefHolder refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
@@ -183,7 +183,7 @@ public class GitStorageTest {
                 return true;
             });
 
-            storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new StorageData(users, null, false, false, List.of()), SHA_2,
+            storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new MetaData(users, null, false, false, List.of()), SHA_2,
                     SHA_2_MD);
             assertArrayEquals(storage.getData(), gs.getKey("key", null).get().getData());
             gs.checkHealth();
@@ -468,7 +468,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey("somekey", "refs/heads/master", pretty, new StorageData(new HashSet<>(), null, false, false, List.of()),
+            String si = gs.addKey("somekey", "refs/heads/master", pretty, new MetaData(new HashSet<>(), null, false, false, List.of()),
                     "msg", "user", "mail");
             assertEquals("1", si);
             gs.checkHealth();
@@ -490,13 +490,13 @@ public class GitStorageTest {
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
 
             when(source.getSourceInfo(Mockito.eq("key3"), Mockito.anyString())).thenReturn(si);
-            when(source.modifyMetadata(Mockito.<StorageData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(),
+            when(source.modifyMetadata(Mockito.<MetaData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any(),
                     Mockito.any(), Mockito.any())).thenReturn((SHA_2_MD));
             Optional<StoreInfo> first = gs.getKey(key, null);
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
 
-            StorageData sd = new StorageData(storeInfo.getStorageData().getUsers(), "application/test", false, false, List.of());
+            MetaData sd = new MetaData(storeInfo.getStorageData().getUsers(), "application/test", false, false, List.of());
             Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(), message, userInfo, usermail);
             String newVersion = put.getLeft();
             assertEquals(SHA_2_MD, newVersion);
@@ -543,7 +543,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey(key, branch, pretty, new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
+            String si = gs.addKey(key, branch, pretty, new MetaData(new HashSet<>(), null, false, false, List.of()), "msg", "user",
                     "mail");
             assertEquals("1", si);
             gs.checkHealth();
@@ -563,7 +563,7 @@ public class GitStorageTest {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
-                    new StorageData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail")).getCause().getClass());
+                    new MetaData(new HashSet<>(), null, false, false, List.of()), "msg", "user", "mail")).getCause().getClass());
         }
     }
 

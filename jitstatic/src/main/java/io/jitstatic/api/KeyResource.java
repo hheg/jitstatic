@@ -58,7 +58,7 @@ import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.HeaderPair;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
@@ -103,7 +103,7 @@ public class KeyResource {
             return noChange;
         }
 
-        final StorageData data = storeInfo.getStorageData();
+        final MetaData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
         if (allowedUsers.isEmpty()) {
             return buildResponse(storeInfo, tag, data);
@@ -157,7 +157,7 @@ public class KeyResource {
         }
     }
 
-    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final StorageData data) {
+    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data) {
         final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
         final List<HeaderPair> headers = data.getHeaders();

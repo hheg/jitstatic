@@ -28,14 +28,14 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 
 public class StoreInfoTest {
     
     @Test
     public void testStoreInfo() {
-        StorageData sd = new StorageData(Set.of(new User("u", "p")), "t", false, false, List.of());
+        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of());
         StoreInfo s1 = new StoreInfo(new byte[] {0}, sd, "1", "1");
         StoreInfo s2 = new StoreInfo(new byte[] {0}, sd, "1", "1");
         StoreInfo s3 = new StoreInfo(new byte[] {0}, sd, "2", "1");

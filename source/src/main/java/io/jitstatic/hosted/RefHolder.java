@@ -42,7 +42,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import com.spencerwi.either.Either;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
@@ -167,7 +167,7 @@ public class RefHolder {
         });
     }
 
-    public void refreshMetaData(final StorageData metaData, final String key, final String oldMetaDataVersion,
+    public void refreshMetaData(final MetaData metaData, final String key, final String oldMetaDataVersion,
             final String newMetaDataVersion) {
         write(() -> {
             final Optional<StoreInfo> storeInfo = refCache.get(key);
@@ -234,7 +234,7 @@ public class RefHolder {
 
     private StoreInfo readStoreInfo(final SourceInfo source) {
         try {
-            final StorageData metaData = readMetaData(source);
+            final MetaData metaData = readMetaData(source);
             if (!metaData.isHidden()) {
                 try (final InputStream sourceStream = source.getSourceInputStream()) {
                     if (sourceStream != null) { // Implicitly an master .metadata SourceInfo instance...
@@ -251,7 +251,7 @@ public class RefHolder {
         }
     }
 
-    private StorageData readMetaData(final SourceInfo source) {
+    private MetaData readMetaData(final SourceInfo source) {
         try (final InputStream metaDataStream = source.getMetadataInputStream()) {
             return HANDLER.readStorage(metaDataStream);
         } catch (final IOException e) {

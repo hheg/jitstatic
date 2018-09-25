@@ -32,7 +32,7 @@ import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 
 class SourceHandler {
     private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
@@ -41,10 +41,10 @@ class SourceHandler {
         return readByteArray(is);
     }
 
-    public StorageData readStorage(final InputStream storageStream) throws IOException {
+    public MetaData readStorage(final InputStream storageStream) throws IOException {
         Objects.requireNonNull(storageStream);
         try (final JsonParser parser = MAPPER.createParser(storageStream);) {
-            return parser.readValueAs(StorageData.class);
+            return parser.readValueAs(MetaData.class);
         }
     }
 

@@ -54,7 +54,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.SourceUpdater;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
@@ -304,7 +304,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final StorageData metaData, final String message,
+    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(message);
@@ -338,7 +338,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyMetadata(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
+    public String modifyMetadata(final MetaData metaData, final String metaDataVersion, final String message, final String userInfo,
             final String userMail, final String key, String ref) {
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
@@ -377,7 +377,7 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private CompletableFuture<byte[]> convertMetaData(final StorageData metaData) {
+    private CompletableFuture<byte[]> convertMetaData(final MetaData metaData) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return MAPPER.writeValueAsBytes(metaData);

@@ -38,7 +38,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.auth.User;
 
 @SuppressFBWarnings(justification = "Equals used here is not dodgy code", value = { "EQ_UNUSUAL" })
-public class StorageData {
+public class MetaData {
     @NotNull
     @Valid
     private final Set<User> users;
@@ -51,7 +51,7 @@ public class StorageData {
     private final List<HeaderPair> headers;
 
     @JsonCreator
-    public StorageData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
+    public MetaData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
             final @JsonProperty("protected") boolean isProtected, final @JsonProperty("hidden") boolean hidden,
             final @JsonProperty("headers") List<HeaderPair> headers) {
         this.users = Objects.requireNonNull(users, "metadata is missing users field");
@@ -76,7 +76,7 @@ public class StorageData {
 
     @Override
     public boolean equals(final Object other) {
-        return Optional.ofNullable(other).filter(that -> that instanceof StorageData).map(that -> (StorageData) that)
+        return Optional.ofNullable(other).filter(that -> that instanceof MetaData).map(that -> (MetaData) that)
                 .filter(that -> Objects.equals(this.users, that.users)).filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
                 .isPresent();
     }

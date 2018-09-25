@@ -40,7 +40,7 @@ import org.eclipse.jgit.lib.Constants;
 
 import com.spencerwi.either.Either;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
@@ -175,7 +175,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public String addKey(final String key, String branch, final byte[] data, final StorageData metaData, final String message,
+    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
@@ -254,7 +254,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public Either<String, FailedToLock> putMetaData(final String key, String ref, final StorageData metaData,
+    public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData,
             final String oldMetaDataVersion, final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(userInfo, "userInfo cannot be null");

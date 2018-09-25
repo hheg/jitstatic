@@ -49,7 +49,7 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
@@ -76,7 +76,7 @@ public class BulkResourceTest {
     @Test
     public void testSearch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
-        StorageData storageData = mock(StorageData.class);
+        MetaData storageData = mock(MetaData.class);
         Mockito.when(storeInfoMock.getData()).thenReturn(new byte[] { 1 });
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
         Mockito.when(storeInfoMock.getStorageData()).thenReturn(storageData);
