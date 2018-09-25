@@ -162,16 +162,7 @@ public class GitStorage implements Storage {
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
-        return refHolder.lockWrite(() -> {
-            final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
-            if (storageIsForbidden(storeInfo)) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
-            }
-            final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
-
-            refHolder.refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
-            return newVersion;
-        }, key);
+        return refHolder.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
     }
 
     @Override
@@ -193,13 +184,12 @@ public class GitStorage implements Storage {
 
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             checkIfKeyIsPresent(key, finalRef, refStore);
-            final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
-            storeIfNotHidden(key, finalRef, refStore, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
-            return version.getLeft();
+            return refStore.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
         }, key);
         if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
+        CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
         return result.getLeft();
     }
 
@@ -209,7 +199,7 @@ public class GitStorage implements Storage {
         if (storeInfo != null && storeInfo.isPresent()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
-        try {
+        try {            
             sourceInfo = source.getSourceInfo(key, finalRef);
         } catch (final RefNotFoundException e) {
             if (!defaultRef.equals(finalRef)) {
@@ -237,25 +227,16 @@ public class GitStorage implements Storage {
         }
     }
 
-    private void storeIfNotHidden(final String key, final String ref, final RefHolder refStore, final StoreInfo newStoreInfo) {
-        if (newStoreInfo.getStorageData().isHidden()) {
-            refStore.putKey(key, Optional.empty());
-            CompletableFuture.runAsync(() -> removeCacheRef(ref));
-        } else {
-            refStore.putKey(key, Optional.of(newStoreInfo));
-        }
-    }
-
     private void removeCacheRef(final String ref) {
-        if(ref == null) {
+        if (ref == null) {
             return;
         }
         cache.computeIfPresent(ref, (a, b) -> b.isEmpty() ? null : b);
     }
 
     @Override
-    public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData,
-            final String oldMetaDataVersion, final String message, final String userInfo, final String userMail) {
+    public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
+            final String message, final String userInfo, final String userMail) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(userInfo, "userInfo cannot be null");
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -271,24 +252,7 @@ public class GitStorage implements Storage {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
 
-        return refHolder.lockWrite(() -> {
-            refHolder.checkIfPlainKeyExist(key);
-            final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
-            if (storageIsForbidden(storeInfo)) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
-            }
-            final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key,
-                    finalRef);
-
-            refHolder.refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
-            return newMetaDataVersion;
-
-        }, key);
-
-    }
-
-    private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
-        return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getStorageData().isProtected();
+        return refHolder.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key, finalRef);
     }
 
     @Override
@@ -306,14 +270,13 @@ public class GitStorage implements Storage {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
         final RefHolder refHolder = getRefHolder(finalRef);
-        refHolder.write(() -> {
+        if (refHolder != null) {
             try {
-                source.deleteKey(key, finalRef, user, message, userMail);
+                refHolder.deleteKey(key, finalRef, user, message, userMail);
             } catch (final UncheckedIOException ioe) {
                 consumeError(ioe);
             }
-            refHolder.putKey(key, Optional.empty());
-        });
+        }
         removeCacheRef(finalRef);
     }
 

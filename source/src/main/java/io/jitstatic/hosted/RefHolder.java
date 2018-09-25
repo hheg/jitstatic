@@ -135,7 +135,7 @@ public class RefHolder {
         }
     }
 
-    public <T> Either<T,FailedToLock> lockWriteAll(final Supplier<T> supplier) {
+    public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier) {
         if (refLock.writeLock().tryLock()) {
             try {
                 return Either.left(supplier.get());
@@ -154,8 +154,7 @@ public class RefHolder {
         return !refCache.values().stream().filter(Optional::isPresent).flatMap(Optional::stream).findAny().isPresent();
     }
 
-    public void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion,
-            final String contentType) {
+    void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion, final String contentType) {
         refCache.computeIfPresent(key, (k, si) -> {
             if (si.isPresent()) {
                 final StoreInfo storeInfo = si.get();
@@ -237,7 +236,7 @@ public class RefHolder {
             final MetaData metaData = readMetaData(source);
             if (!metaData.isHidden()) {
                 try (final InputStream sourceStream = source.getSourceInputStream()) {
-                    if (sourceStream != null) { // Implicitly an master .metadata SourceInfo instance...
+                    if (sourceStream != null) { // Implicitly a master .metadata SourceInfo instance...
                         return new StoreInfo(HANDLER.readStorageData(sourceStream), metaData, source.getSourceVersion(),
                                 source.getMetaDataVersion());
                     } else {
@@ -264,7 +263,7 @@ public class RefHolder {
         Optional<StoreInfo> storeInfoContainer;
         if (storeInfo != null) {
             if (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo)) {
-                storeInfoContainer = Optional.of(storeInfo);                
+                storeInfoContainer = Optional.of(storeInfo);
             } else {
                 /* StoreInfo could contain .metadata information but no key info */
                 storeInfoContainer = Optional.empty();
@@ -298,13 +297,67 @@ public class RefHolder {
     /*
      * This has to be checked when a user modifies a .metadata file for a directory
      */
-    public void checkIfPlainKeyExist(final String key) {
+    void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
             Optional<StoreInfo> optional = refCache.get(plainKey);
             if (optional != null && optional.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
+        }
+    }
+
+    public Either<String, FailedToLock> modifyKey(String key, String finalRef, byte[] data, String oldVersion, String message,
+            String userInfo, String userEmail) {
+        return lockWrite(() -> {
+            final Optional<StoreInfo> storeInfo = getKey(key);
+            if (storageIsForbidden(storeInfo)) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+            final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
+            refreshKey(data, key, oldVersion, newVersion, storeInfo.get().getStorageData().getContentType());
+            return newVersion;
+        }, key);
+
+    }
+
+    public void deleteKey(String key, String finalRef, String user, String message, String userMail) {
+        write(() -> {
+            source.deleteKey(key, finalRef, user, message, userMail);
+            putKey(key, Optional.empty());
+        });
+    }
+
+    public Either<String, FailedToLock> modifyMetadata(MetaData metaData, String oldMetaDataVersion, String message, String userInfo,
+            String userMail, String key, String finalRef) {
+        return lockWrite(() -> {
+            checkIfPlainKeyExist(key);
+            final Optional<StoreInfo> storeInfo = getKey(key);
+            if (storageIsForbidden(storeInfo)) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+            final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key,
+                    finalRef);
+            refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
+            return newMetaDataVersion;
+        }, key);
+    }
+
+    private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
+        return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getStorageData().isProtected();
+    }
+
+    public String addKey(String key, String finalRef, byte[] data, MetaData metaData, String message, String userInfo, String userMail) {
+        final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
+        storeIfNotHidden(key, finalRef, this, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
+        return version.getLeft();
+    }
+
+    private void storeIfNotHidden(final String key, final String ref, final RefHolder refStore, final StoreInfo newStoreInfo) {
+        if (newStoreInfo.getStorageData().isHidden()) {
+            refStore.putKey(key, Optional.empty());
+        } else {
+            refStore.putKey(key, Optional.of(newStoreInfo));
         }
     }
 }
