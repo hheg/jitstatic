@@ -67,7 +67,7 @@ public class JitStaticReceivePack extends ReceivePack {
         this.errorReporter = errorReporter;
     }
 
-    // TODO
+    // TODO Check branches format and refactor into its own xUpdate class
     @Override
     protected void executeCommands() {
         ProgressMonitor updating = NullProgressMonitor.INSTANCE;
@@ -77,12 +77,12 @@ public class JitStaticReceivePack extends ReceivePack {
             updating = pm;
         }
         final List<ReceiveCommand> commands = filterCommands(Result.NOT_ATTEMPTED);
-        if (commands.isEmpty())
+        if (Objects.requireNonNull(commands).isEmpty())
             return;
 
         final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted = new ArrayList<>(commands.size());
         updating.beginTask("Checking branches", cmdsToBeExecuted.size());
-        for (final ReceiveCommand rc : Objects.requireNonNull(commands)) {
+        for (final ReceiveCommand rc : commands) {
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
                 checkBranch(cmdsToBeExecuted, rc, updating);
             } else {
@@ -98,12 +98,13 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc,
-            ProgressMonitor monitor) {
+            final  ProgressMonitor monitor) {
         final String branch = rc.getRefName();
         final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
         try {
             createTmpBranch(testBranchName, branch);
             final ReceiveCommand testRc = new ReceiveCommand(rc.getOldId(), rc.getNewId(), testBranchName, rc.getType());
+            testRc.setRefLogMessage(rc.getRefLogMessage(), true);
             testRc.execute(this);
             cmdsToBeExecuted.add(Pair.of(rc, testRc));
             if (testRc.getResult() == Result.OK) {

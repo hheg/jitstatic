@@ -105,9 +105,6 @@ public class KeyResourceTest {
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
                             .setRealm(JitstaticApplication.JITSTATIC_STORAGE_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
-            .addProvider(
-                    new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm(JitstaticApplication.JITSTATIC_METAKEY_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new KeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 

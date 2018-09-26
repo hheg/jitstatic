@@ -202,12 +202,7 @@ public class JitStaticReceivePackTest {
 
     @Test
     public void testOnPreReceiveNewCommitValidJSON() throws Exception {
-        bus.setRefHolderFactory((ref) -> new RefHolderLock() {
-            @Override
-            public <T> Either<T, FailedToLock> lockWriteAll(Supplier<T> supplier) {
-                return Either.left(supplier.get());
-            }
-        });
+        bus.setRefHolderFactory(this::refHolderFactory);
         final Repository localRepository = clientGit.getRepository();
         final ObjectId oldId = localRepository.resolve(Constants.HEAD);
         RemoteTestUtils.copy("/test3.json", storePath);
