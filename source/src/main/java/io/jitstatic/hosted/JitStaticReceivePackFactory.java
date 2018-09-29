@@ -34,16 +34,20 @@ import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
+import io.jitstatic.check.SourceChecker;
+
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
     private final String defaultRef;
     private final ErrorReporter errorReporter;
     private final RepositoryBus bus;
+    private final UserExtractor userExtractor;
 
-    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RepositoryBus bus) {
+    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RepositoryBus bus, UserExtractor userExtractor) {
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.errorReporter = Objects.requireNonNull(reporter);
         this.bus = Objects.requireNonNull(bus);
+        this.userExtractor = userExtractor;
     }
 
     static class ServiceConfig {
@@ -58,8 +62,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     }
 
     @Override
-    public ReceivePack create(final HttpServletRequest req, final Repository db)
-            throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+    public ReceivePack create(final HttpServletRequest req, final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         final ServiceConfig cfg = db.getConfig().get(ServiceConfig::new);
         String user = req.getRemoteUser();
 
@@ -78,7 +81,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     }
 
     protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus);
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor);
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));

@@ -30,12 +30,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.auth.AddKeyAuthenticator;
+import io.jitstatic.auth.KeyAdminAuthenticator;
+import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.reporting.ReportingFactory;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StorageFactory;
 
 public class JitstaticConfiguration extends Configuration {
@@ -83,9 +85,9 @@ public class JitstaticConfiguration extends Configuration {
         return hostedFactory.build(env, gitRealm);
     }
 
-    public AddKeyAuthenticator getAddKeyAuthenticator() {
-        HostedFactory hf = getHostedFactory();
+    public KeyAdminAuthenticator getAddKeyAuthenticator(final Storage storage2) {
+        final HostedFactory hf = getHostedFactory();
         final User addUser = new User(hf.getUserName(), hf.getSecret());
-        return addUser::equals;
+        return new KeyAdminAuthenticatorImpl(storage2, (user, ref) -> addUser.equals(user), hf.getBranch());
     }
 }

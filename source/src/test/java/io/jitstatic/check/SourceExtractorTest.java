@@ -1,5 +1,8 @@
 package io.jitstatic.check;
 
+import static io.jitstatic.JitStaticConstants.USERS;
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 /*-
  * #%L
  * jitstatic
@@ -107,9 +110,9 @@ public class SourceExtractorTest {
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final String key = "file";
             for (int i = 0; i < 4; i++) {
-                createFileAndCommit(tempGitFolder, local, key, i);
+                createFileAndCommitOnDifferentBranches(tempGitFolder, local, key, i);
             }
-            createFileAndCommit(tempGitFolder, local, "." + key, 0);
+            createFileAndCommitOnDifferentBranches(tempGitFolder, local, "." + key, 0);
             SourceExtractor se = new SourceExtractor(git.getRepository());
             Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> allExtracted = se.extractAll();
             assertTrue(allExtracted.keySet().size() == 4);
@@ -144,12 +147,11 @@ public class SourceExtractorTest {
             }).map(p -> {
                 SourceFileData sdf = p.getRight();
                 return Pair.of(sdf.getFileInfo(), sdf.getInputStreamHolder());
-            }).map(m -> Pair.<ObjectId, Set<String>>of(m.getLeft().getObjectId(), new HashSet<>(Arrays.asList(m.getLeft().getFileName()))))
-                    .reduce((a, b) -> {
-                        assertEquals(a.getLeft(), b.getLeft());
-                        a.getRight().addAll(b.getRight());
-                        return a;
-                    });
+            }).map(m -> Pair.<ObjectId, Set<String>>of(m.getLeft().getObjectId(), new HashSet<>(Arrays.asList(m.getLeft().getFileName())))).reduce((a, b) -> {
+                assertEquals(a.getLeft(), b.getLeft());
+                a.getRight().addAll(b.getRight());
+                return a;
+            });
             assertTrue(reduce.isPresent());
             assertTrue(reduce.get().getRight().size() == 4);
         }
@@ -198,7 +200,7 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo branch = se.openBranch(REFS_HEADS_MASTER, key);
-        try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), "UTF-8"));) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), UTF_8));) {
             assertNotNull(is);
             String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
@@ -233,7 +235,7 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo tag = se.openTag(Constants.R_TAGS + "tag", key);
-        try (final BufferedReader is = new BufferedReader(new InputStreamReader(tag.getSourceInputStream(), "UTF-8"));) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(tag.getSourceInputStream(), UTF_8));) {
             assertNotNull(is);
             String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
@@ -247,14 +249,14 @@ public class SourceExtractorTest {
             File temporaryGitFolder = getFolder();
             try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
                 final Path file = temporaryGitFolder.toPath().resolve(key);
-                Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+                Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
                 local.add().addFilepattern(key).call();
                 local.commit().setMessage("Commit " + file.toString()).call();
                 local.push().call();
             }
             SourceExtractor se = new SourceExtractor(git.getRepository());
             SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
-            try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), "UTF-8"));) {
+            try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceInputStream(), UTF_8));) {
                 assertNotNull(is);
                 String parsed = is.lines().collect(Collectors.joining());
                 assertEquals(getData(), parsed);
@@ -357,7 +359,7 @@ public class SourceExtractorTest {
         final File tempGitFolder = getFolder();
         try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
             final Path file = tempGitFolder.toPath().resolve(key);
-            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
             local.add().addFilepattern(key).call();
             local.commit().setMessage("Init commit").call();
             local.push().call();
@@ -376,8 +378,8 @@ public class SourceExtractorTest {
             if (key.contains("/")) {
                 assertTrue(Objects.requireNonNull(file.getParent()).toFile().mkdirs());
             }
-            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(metadata, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(metadata, getMetaData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
             local.add().addFilepattern(".").call();
             local.commit().setMessage("Init commit").call();
             local.push().call();
@@ -402,13 +404,13 @@ public class SourceExtractorTest {
             Path file = tempGitFolder.toPath().resolve(key1);
             Objects.requireNonNull(file.getParent()).toFile().mkdirs();
             Path metadata = Objects.requireNonNull(file.getParent()).resolve(METADATA);
-            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(metadata, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(metadata, getMetaData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
 
             Path file2 = tempGitFolder.toPath().resolve(key2);
             Path metadata2 = file2.resolveSibling(key2 + METADATA);
-            Files.write(file2, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(metadata2, getMetaData(2).getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(file2, getData(2).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(metadata2, getMetaData(2).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
 
             local.add().addFilepattern(".").call();
             local.commit().setMessage("Init commit").call();
@@ -417,10 +419,67 @@ public class SourceExtractorTest {
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo keydata = se.openBranch(REFS_HEADS_MASTER, key1);
         assertNotNull(keydata);
-        assertEquals(getMetaData(), readData(keydata));
+        assertEquals(getData(), readData(keydata.getSourceInputStream()));
+        assertEquals(getMetaData(), readData(keydata.getMetadataInputStream()));
         SourceInfo keydata2 = se.openBranch(REFS_HEADS_MASTER, key2);
         assertNotNull(keydata2);
-        assertEquals(getMetaData(2), readData(keydata2));
+        assertEquals(getData(2), readData(keydata2.getSourceInputStream()));
+        assertEquals(getMetaData(2), readData(keydata2.getMetadataInputStream()));
+    }
+
+    @Test
+    public void testMetaDataOverrideWithHiddenUsers() throws Exception {
+        String key1 = "key1";
+        String key2 = "key2";
+        final File tempGitFolder = getFolder();
+        try (final Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(tempGitFolder).call()) {
+            Path file = tempGitFolder.toPath().resolve(key1);
+            Objects.requireNonNull(file.getParent()).toFile().mkdirs();
+
+            // key1 + .metadata
+            Path metadata = Objects.requireNonNull(file.getParent()).resolve(METADATA);
+            Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(metadata, getMetaData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+
+            // key2 + key2.metadata
+            Path file2 = tempGitFolder.toPath().resolve(key2);
+            Path metadata2 = file2.resolveSibling(key2 + METADATA);
+            Files.write(file2, getData(2).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(metadata2, getMetaData(2).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+
+            // .users/ + .users/key1 + ./users/key1.metadata
+            Path users = tempGitFolder.toPath().resolve(".users");
+            assertTrue(users.toFile().mkdirs());
+            Path usersKey = users.resolve(key1);
+            Files.write(usersKey, getData(3).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(users.resolve(key1 + METADATA), getMetaData(3).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+
+            // somedir/.users + somedir/.users/key1 + somedir/.users/key1.metadata
+            Path someDir = tempGitFolder.toPath().resolve("somedir").resolve(".users");
+            assertTrue(someDir.toFile().mkdirs());
+            Path someKey = someDir.resolve(key1);
+            Files.write(someKey, getData(4).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(someDir.resolve(key1 + METADATA), getMetaData(4).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+
+            local.add().addFilepattern(".").call();
+            local.commit().setMessage("Init commit").call();
+            local.push().call();
+        }
+        SourceExtractor se = new SourceExtractor(git.getRepository());
+        SourceInfo keydata = se.openBranch(REFS_HEADS_MASTER, key1);
+        assertNotNull(keydata);
+        assertEquals(getData(), readData(keydata.getSourceInputStream()));
+        assertEquals(getMetaData(), readData(keydata.getMetadataInputStream()));
+        SourceInfo keydata2 = se.openBranch(REFS_HEADS_MASTER, key2);
+        assertNotNull(keydata2);
+        assertEquals(getData(2), readData(keydata2.getSourceInputStream()));
+        assertEquals(getMetaData(2), readData(keydata2.getMetadataInputStream()));
+        SourceInfo usersKeydata = se.openBranch(REFS_HEADS_MASTER, ".users/key1");
+        assertNull(usersKeydata);
+        SourceInfo somedirKey = se.openBranch(REFS_HEADS_MASTER, "somedir/.users/key1");
+        assertNotNull(somedirKey);
+        assertEquals(getData(4), readData(somedirKey.getSourceInputStream()));
+        assertEquals(getMetaData(4), readData(somedirKey.getMetadataInputStream()));
     }
 
     @ParameterizedTest
@@ -491,8 +550,8 @@ public class SourceExtractorTest {
     public void testListFiles(String key, String result) throws Exception {
         File temporaryGitFolder = getFolder();
         try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
-            for (String k : List.of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2",
-                    "data/data/key3", "decoy/key1", "decoy/decoy/key1")) {
+            for (String k : List.of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2", "data/data/key3",
+                    "decoy/key1", "decoy/decoy/key1")) {
                 addFilesAndPush(k, temporaryGitFolder, local);
             }
         }
@@ -502,8 +561,22 @@ public class SourceExtractorTest {
         assertEquals(List.of(values), listForKey);
     }
 
-    private void addFilesAndPush(final String key, File temporaryGitFolder, Git local)
-            throws IOException, NoFilepatternException, GitAPIException {
+    @Test
+    public void testLitUsersFromExtractor() throws Exception {
+        String key = USERS;
+        File temporaryGitFolder = getFolder();
+        try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
+            for (String k : List.of(USERS + "key1", USERS + "key2", "key3", USERS + "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2",
+                    "data/data/key3", "decoy/key1", USERS + "decoy/decoy/key1")) {
+                addFilesAndPush(k, temporaryGitFolder, local);
+            }
+        }
+        SourceExtractor se = new SourceExtractor(git.getRepository());
+        List<String> listForKey = se.getListForKey(key, REFS_HEADS_MASTER, false);
+        assertTrue(listForKey.isEmpty());
+    }
+
+    private void addFilesAndPush(final String key, File temporaryGitFolder, Git local) throws IOException, NoFilepatternException, GitAPIException {
         final Path file = temporaryGitFolder.toPath().resolve(key);
         final Path mfile = temporaryGitFolder.toPath().resolve(key + METADATA);
         if (key.endsWith("/")) {
@@ -512,9 +585,9 @@ public class SourceExtractorTest {
             if (!Files.exists(Objects.requireNonNull(file.getParent()))) {
                 assertTrue(Objects.requireNonNull(file.getParent().toFile().mkdirs()));
             }
-            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE, TRUNCATE_EXISTING);
         }
-        Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE, TRUNCATE_EXISTING);
         local.add().addFilepattern(".").call();
         local.commit().setMessage("Commit " + file.toString()).call();
         local.push().call();
@@ -524,8 +597,7 @@ public class SourceExtractorTest {
         return tmpFolder.createTemporaryDirectory();
     }
 
-    private void createFileAndCommit(File tempGitFolder, Git local, final String key, int i)
-            throws Exception {
+    private void createFileAndCommitOnDifferentBranches(File tempGitFolder, Git local, final String key, int i) throws Exception {
         final String round = (i == 0 ? "" : String.valueOf(i));
         final String branchName = "master" + round;
         if (i > 0) {
@@ -534,20 +606,19 @@ public class SourceExtractorTest {
         final String fileName = key + round;
         final Path file = tempGitFolder.toPath().resolve(fileName);
         final Path mfile = tempGitFolder.toPath().resolve(fileName + METADATA);
-        Files.write(file, getData(i).getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
-        Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(file, getData(i).getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
+        Files.write(mfile, getMetaData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
         local.add().addFilepattern(".").call();
         local.commit().setMessage("Commit " + round).call();
         local.push().call();
     }
 
     private void checkForErrors() {
-        try (SourceChecker sc = new SourceChecker(git.getRepository())) {
-            List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check = sc.check();
-            List<Pair<FileObjectIdStore, Exception>> errors = check.stream().map(Pair::getRight).flatMap(List::stream)
-                    .filter(Pair::isPresent).filter(p -> p.getRight() != null).collect(Collectors.toList());
-            assertEquals(Arrays.asList(), errors);
-        }
+        SourceChecker sc = new SourceChecker(git.getRepository());
+        List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check = sc.check();
+        List<Pair<FileObjectIdStore, Exception>> errors = check.stream().map(Pair::getRight).flatMap(List::stream).filter(Pair::isPresent)
+                .filter(p -> p.getRight() != null).collect(Collectors.toList());
+        assertEquals(Arrays.asList(), errors);
     }
 
     private String getData() {
@@ -567,8 +638,8 @@ public class SourceExtractorTest {
                 + "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
     }
 
-    private String readData(SourceInfo openBranch) throws IOException {
-        try (InputStream is = openBranch.getMetadataInputStream(); Scanner s = new Scanner(is, "UTF-8")) {
+    private String readData(InputStream data) throws IOException {
+        try (data; Scanner s = new Scanner(data, UTF_8)) {
             s.useDelimiter("\\A");
             return s.hasNext() ? s.next() : "";
         }

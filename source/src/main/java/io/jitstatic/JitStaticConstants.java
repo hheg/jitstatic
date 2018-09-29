@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.util.Set;
+
 /*-
  * #%L
  * jitstatic
@@ -25,7 +27,12 @@ import org.eclipse.jgit.lib.Constants;
 public class JitStaticConstants {
 
 	public static final String REFS_JITSTATIC = Constants.R_REFS + "jitstatic/";
-	public static final String APPLICATION_JSON = "application/json";
-	public static final String METADATA = ".metadata";
+    public static final String APPLICATION_JSON = "application/json";
+    public static final String METADATA = ".metadata";
+    public static final String GIT_REALM = "git";
+    public static final String JITSTATIC_KEYUSER_REALM = "keyadmin";
+    public static final String JITSTATIC_KEYADMIN_REALM = "keyuser";
+    public static final String USERS = ".users/";
+    public static final Set<String> ROLES = Set.of("pull", "push", "forcepush");
 
 }

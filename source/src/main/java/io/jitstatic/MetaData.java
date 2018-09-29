@@ -49,16 +49,19 @@ public class MetaData {
     private final boolean hidden;
     @Valid
     private final List<HeaderPair> headers;
+    @Valid
+    private final Set<Role> roles;
 
     @JsonCreator
     public MetaData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
             final @JsonProperty("protected") boolean isProtected, final @JsonProperty("hidden") boolean hidden,
-            final @JsonProperty("headers") List<HeaderPair> headers) {
+            final @JsonProperty("headers") List<HeaderPair> headers, final @JsonProperty("roles") Set<Role> roles) {
         this.users = Objects.requireNonNull(users, "metadata is missing users field");
         this.contentType = contentType == null ? "application/json" : contentType;
         this.isProtected = isProtected;
         this.hidden = hidden;
         this.headers = headers;
+        this.roles = roles;
     }
 
     public Set<User> getUsers() {
@@ -77,8 +80,8 @@ public class MetaData {
     @Override
     public boolean equals(final Object other) {
         return Optional.ofNullable(other).filter(that -> that instanceof MetaData).map(that -> (MetaData) that)
-                .filter(that -> Objects.equals(this.users, that.users)).filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
-                .isPresent();
+                .filter(that -> Objects.equals(this.users, that.users))
+                .filter(that -> Objects.equals(this.getContentType(), that.getContentType())).isPresent();
     }
 
     public String getContentType() {
@@ -95,5 +98,9 @@ public class MetaData {
 
     public List<HeaderPair> getHeaders() {
         return headers;
+    }
+
+    public Set<Role> getRoles() {
+        return roles;
     }
 }

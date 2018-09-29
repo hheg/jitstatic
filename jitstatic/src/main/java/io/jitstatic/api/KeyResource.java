@@ -20,6 +20,9 @@ package io.jitstatic.api;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,11 +60,14 @@ import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.HeaderPair;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
-import io.jitstatic.JitstaticApplication;
-import io.jitstatic.auth.AddKeyAuthenticator;
+import io.jitstatic.Role;
+import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
@@ -70,6 +76,7 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class KeyResource {
+    private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} is denied for user {}";
     private static final String X_JITSTATIC = "X-jitstatic";
     private static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
     private static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
@@ -77,10 +84,10 @@ public class KeyResource {
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
-    private final AddKeyAuthenticator addKeyAuthenticator;
+    private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
 
-    public KeyResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
+    public KeyResource(final Storage storage, final KeyAdminAuthenticator addKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
         this.helper = new APIHelper(LOG);
@@ -92,36 +99,34 @@ public class KeyResource {
     @ExceptionMetered(name = "get_storage_exception")
     @Path("{key : .+}")
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-            final @Context Request request, final @Context HttpHeaders headers) {
+            final @Context HttpHeaders headers) {
 
         helper.checkRef(ref);
 
-        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
+        final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
-
         final Response noChange = helper.checkETag(headers, tag);
-        if (noChange != null) {
-            return noChange;
-        }
 
         final MetaData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
-        if (allowedUsers.isEmpty()) {
+        final Set<Role> roles = data.getRoles();
+        if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
+            if (noChange != null) {
+                return noChange;
+            }
             return buildResponse(storeInfo, tag, data);
         }
 
         if (!user.isPresent()) {
             LOG.info("Resource {} needs a user", key);
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
-        checkIfAllowed(key, user, allowedUsers);
+        checkIfAllowed(key, user.get(), allowedUsers, ref, storeInfo.getStorageData().getRoles());
+        if (noChange != null) {
+            return noChange;
+        }
         return buildResponse(storeInfo, tag, data);
-    }
-
-    private StoreInfo checkIfKeyExist(final String key, final String ref) {
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        return si.orElseThrow(() -> new WebApplicationException(key + " in " + ref, Status.NOT_FOUND));
     }
 
     @GET
@@ -171,13 +176,14 @@ public class KeyResource {
     @ExceptionMetered(name = "put_storage_exception")
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+    public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userholder,
             final @Valid @NotNull ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
-        if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
+        if (!userholder.isPresent()) {
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
+        final User user = userholder.get();
 
         checkKey(key);
 
@@ -185,7 +191,18 @@ public class KeyResource {
 
         helper.checkValidRef(ref);
 
-        final StoreInfo storeInfo = checkAccess(key, ref, user);
+        final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
+        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
+        final Set<Role> roles = storeInfo.getStorageData().getRoles();
+        boolean isAuthenticated = addKeyAuthenticator.authenticate(user, ref);
+        if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty()) && !isAuthenticated) {
+            throw new WebApplicationException(Status.BAD_REQUEST);
+        }
+
+        if (!isAuthenticated && !allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, roles)) {
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
 
         final String currentVersion = storeInfo.getVersion();
         final EntityTag entityTag = new EntityTag(currentVersion);
@@ -195,8 +212,8 @@ public class KeyResource {
             return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
         }
 
-        final Either<String, FailedToLock> result = helper
-                .unwrapWithPUTApi(() -> storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
+                () -> storage.put(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
 
         if (result == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -211,25 +228,27 @@ public class KeyResource {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-
     }
 
-    private StoreInfo checkAccess(final String key, final String ref, final Optional<User> user) {
-        final StoreInfo storeInfo = helper.unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND));
-        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        if (allowedUsers.isEmpty()) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
-        }
-        checkIfAllowed(key, user, allowedUsers);
-        return storeInfo;
-    }
-
-    private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
-        if (user.isPresent() && !allowedUsers.contains(user.get())) {
-            LOG.info("Resource {} is denied for user {}", key, user.get());
+    void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
+        if (!allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, keyRoles) && !addKeyAuthenticator.authenticate(user, ref)) {
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
+
+    boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
+        keyRoles = keyRoles == null ? Set.of() : keyRoles;
+        final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+        if (userData == null) {
+            return false;
+        }
+        final Set<Role> userRoles = userData.getRoles();
+        return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+    }
+
+    // TODO addKey should use ref like all other endpoints,
+    // TODO addKey should use the full endpoint key and post it.
 
     @POST
     @Timed(name = "post_storage_time")
@@ -237,22 +256,36 @@ public class KeyResource {
     @ExceptionMetered(name = "post_storage_exception")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
+    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> userHolder) {
 
-        if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
+        if (!userHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
-        if (!addKeyAuthenticator.authenticate(user.get())) {
-            LOG.info("Resource {} is denied for user {}", data.getKey(), user.get());
-            throw new WebApplicationException(Status.FORBIDDEN);
+        final String key = data.getKey();
+        final String ref = data.getBranch();
+        helper.checkValidRef(ref);
+
+        if (key.endsWith("/")) {
+            throw new WebApplicationException(key, Status.FORBIDDEN);
         }
 
-        if (data.getKey().endsWith("/")) {
-            throw new WebApplicationException(data.getKey(), Status.FORBIDDEN);
+        final User user = userHolder.get();
+        if (!addKeyAuthenticator.authenticate(user, ref)) {
+            final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
+            if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
+                LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+                throw new WebApplicationException(Status.FORBIDDEN);
+            }
         }
 
-        final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
-                data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
+
+        if (storeInfo.isPresent()) {
+            throw new WebApplicationException(key + " already exist", Status.CONFLICT);
+        }
+
+        final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
+                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -261,10 +294,10 @@ public class KeyResource {
     @Timed(name = "delete_storage_time")
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
-    public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+    public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userHolder,
             final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
-        if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
+        if (!userHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);
@@ -274,10 +307,22 @@ public class KeyResource {
         checkKey(key);
 
         helper.checkValidRef(ref);
+        final User user = userHolder.get();
+        final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
+        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
 
-        checkAccess(key, ref, user);
+        if (!allowedUsers.contains(user) && !addKeyAuthenticator.authenticate(user, ref)
+                && !isKeyUserAllowed(user, ref, storeInfo.getStorageData().getRoles())) {
+            final Set<Role> roles = storeInfo.getStorageData().getRoles();
+            if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
+                throw new WebApplicationException(Status.BAD_REQUEST);
+            }
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
+
         try {
-            storage.delete(key, ref, userHeader, message, userMail);
+            storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message));
         } catch (final WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof UnsupportedOperationException) {

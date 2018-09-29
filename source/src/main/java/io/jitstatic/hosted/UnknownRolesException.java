@@ -1,6 +1,4 @@
-package io.jitstatic.auth;
-
-import io.jitstatic.auth.User;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
@@ -22,6 +20,28 @@ import io.jitstatic.auth.User;
  * #L%
  */
 
-public interface AddKeyAuthenticator {
-    boolean authenticate(User user);
+import java.util.Set;
+
+import io.jitstatic.Role;
+
+public class UnknownRolesException extends Exception {
+
+    private static final long serialVersionUID = 1L;
+    private final String fileName;
+    private final Set<Role> roles;
+
+    public UnknownRolesException(final String fileName, final Set<Role> roles) {
+        this.fileName = fileName;
+        this.roles = roles;
+    }
+
+    @Override
+    public String toString() {
+        return "User in " + fileName + " has not known roles " + roles;
+    }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

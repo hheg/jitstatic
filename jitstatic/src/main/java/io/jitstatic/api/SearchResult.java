@@ -34,15 +34,15 @@ public class SearchResult {
     private final String ref;
     private final String tag;
     private final String contentType;
-    private final byte[] content;    
-    
+    private final byte[] content;
+
     public SearchResult(final Pair<String, StoreInfo> data, final String ref) {
-        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getStorageData().getContentType(), data.getRight().getData(),ref);
+        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getStorageData().getContentType(), data.getRight().getData(), ref);
     }
 
     @JsonCreator
-    public SearchResult(@JsonProperty("key") final String key, @JsonProperty("tag") final String tag,
-            @JsonProperty("contentType") final String contentType, @JsonProperty("content") final byte[] content, @JsonProperty("ref") final String ref) {
+    public SearchResult(@JsonProperty("key") final String key, @JsonProperty("tag") final String tag, @JsonProperty("contentType") final String contentType,
+            @JsonProperty("content") final byte[] content, @JsonProperty("ref") final String ref) {
         this.tag = tag;
         this.contentType = contentType;
         this.content = content;

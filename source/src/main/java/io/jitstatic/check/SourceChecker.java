@@ -1,5 +1,7 @@
 package io.jitstatic.check;
 
+import static io.jitstatic.JitStaticConstants.APPLICATION_JSON;
+
 /*-
  * #%L
  * jitstatic
@@ -37,12 +39,11 @@ import org.eclipse.jgit.lib.Repository;
 
 import com.spencerwi.either.Either;
 
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.SourceJSONParser;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.utils.Pair;
 
-public class SourceChecker implements AutoCloseable {
+public class SourceChecker {
 
     private static final SourceJSONParser PARSER = new SourceJSONParser();
     private final Repository repository;
@@ -55,7 +56,6 @@ public class SourceChecker implements AutoCloseable {
     SourceChecker(final Repository repository, final SourceExtractor extractor) {
         this.repository = Objects.requireNonNull(repository);
         this.extractor = extractor;
-        repository.incrementOpen();
     }
 
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkTestBranchForErrors(final String branch)
@@ -78,17 +78,15 @@ public class SourceChecker implements AutoCloseable {
         final List<BranchData> branchData = branchSource.getRight();
         final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData).flatMap(List::stream)
                 .filter(Pair::isPresent).collect(Collectors.toList());
+        if (branchErrors.isEmpty()) {
+            return List.of();
+        }
         return List.of(Pair.of(revCommit.getRight(), branchErrors));
-    }
-
-    @Override
-    public void close() {
-        this.repository.close();
     }
 
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
         final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
-        return sources.entrySet().stream().parallel()
+        return sources.entrySet().parallelStream()
                 .map(e -> Pair.of(e.getKey().getRight(),
                         e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream).filter(Pair::isPresent).collect(Collectors.toList())))
                 .filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
@@ -131,7 +129,7 @@ public class SourceChecker implements AutoCloseable {
         final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
         if (inputStreamHolder.isPresent()) {
             try (InputStream is = inputStreamHolder.inputStream()) {
-                if (JitStaticConstants.APPLICATION_JSON.equals(contentType)) {
+                if (APPLICATION_JSON.equals(contentType)) {
                     PARSER.parseJson(is);
                 }
             } catch (final IOException e) {

@@ -38,7 +38,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 
 import org.eclipse.jgit.api.Git;
@@ -87,7 +86,6 @@ import com.spencerwi.either.Either;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.utils.Pair;
 
 @ExtendWith(TemporaryFolderExtension.class)
 public class JitStaticReceivePackTest {
@@ -113,8 +111,7 @@ public class JitStaticReceivePackTest {
     public void setup() throws IllegalStateException, GitAPIException, IOException {
         remoteBareGit = Git.init().setDirectory(getFolder().toFile()).setBare(true).call();
         File workingFolder = getFolder().toFile();
-        clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder)
-                .call();
+        clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder).call();
         storePath = workingFolder.toPath().resolve(STORE);
         storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
         Files.write(storePath, data, StandardOpenOption.CREATE);
@@ -127,7 +124,7 @@ public class JitStaticReceivePackTest {
         bus = new RepositoryBus(errorReporter);
         bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
-            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus);
+            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db));
             return receivePack;
 
         });
@@ -147,8 +144,8 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
-    public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException,
-            RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
+    public void testNewBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, RevisionSyntaxException,
+            AmbiguousObjectException, IncorrectObjectTypeException, IOException {
         Repository localRepository = clientGit.getRepository();
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
@@ -178,8 +175,8 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
-    public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException,
-            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, GitAPIException {
+    public void testPushCommand() throws IOException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
+            WrongRepositoryStateException, AbortedByHookException, GitAPIException {
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("New commit").call();
@@ -248,8 +245,7 @@ public class JitStaticReceivePackTest {
         assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
         assertEquals(null, errorReporter.getFault());
         final File newFolder = getFolder().toFile();
-        try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath())
-                .call()) {
+        try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
             byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
             assertArrayEquals(data, readAllBytes);
         }
@@ -270,7 +266,8 @@ public class JitStaticReceivePackTest {
 
         ReceiveCommand rc = new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE);
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(remoteRepository),
+                new UserExtractor(remoteRepository)) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -313,7 +310,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
         Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(remoteRepository),
+                new UserExtractor(remoteRepository)) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -357,7 +355,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         Mockito.when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
 
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(remoteRepository),
+                new UserExtractor(remoteRepository)) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -391,7 +390,8 @@ public class JitStaticReceivePackTest {
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
 
         ReceiveCommand rc = Mockito.spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus,
+                new SourceChecker(remoteRepository), new UserExtractor(remoteRepository)) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -419,15 +419,15 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
-    public void testDeleteDefaultBranch()
-            throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
+    public void testDeleteDefaultBranch() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
         clientGit.branchCreate().setName("other").call();
         Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.checkout().setName("other").call();
         clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
         ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
+        Repository repository = remoteBareGit.getRepository();
         JitStaticReceivePack rp = Mockito
-                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, errorReporter, bus) {
+                .spy(new JitStaticReceivePack(repository, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(repository), new UserExtractor(repository)) {
                     @Override
                     protected List<ReceiveCommand> filterCommands(Result want) {
                         return Arrays.asList(rc);
@@ -445,15 +445,15 @@ public class JitStaticReceivePackTest {
     }
 
     @Test
-    public void testDeleteDefaultBranchMessage()
-            throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
+    public void testDeleteDefaultBranchMessage() throws RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, GitAPIException, IOException {
         clientGit.branchCreate().setName("other").call();
         Ref ref = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.checkout().setName("other").call();
         clientGit.branchDelete().setBranchNames(REF_HEADS_MASTER).call();
         ReceiveCommand rc = new ReceiveCommand(ref.getObjectId(), ObjectId.zeroId(), REF_HEADS_MASTER, Type.DELETE);
+        Repository repository = remoteBareGit.getRepository();
         JitStaticReceivePack rp = Mockito
-                .spy(new JitStaticReceivePack(remoteBareGit.getRepository(), REF_HEADS_MASTER, errorReporter, bus) {
+                .spy(new JitStaticReceivePack(repository, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(repository), new UserExtractor(repository)) {
                     @Override
                     protected List<ReceiveCommand> filterCommands(Result want) {
                         return Arrays.asList(rc);
@@ -482,15 +482,12 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        UserExtractor ue = Mockito.mock(UserExtractor.class);
+        Mockito.when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
-            }
-
-            @Override
-            SourceChecker getSourceChecker() {
-                return sc;
             }
 
             @Override
@@ -502,7 +499,7 @@ public class JitStaticReceivePackTest {
         Mockito.when(refDatabase.getRef(Mockito.anyString())).thenReturn(master);
         Mockito.when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
 
-        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of());
         Mockito.when(remoteRepository.findRef(REF_HEADS_MASTER)).thenReturn(null);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
@@ -526,15 +523,12 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        UserExtractor ue = Mockito.mock(UserExtractor.class);
+        Mockito.when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
-            }
-
-            @Override
-            SourceChecker getSourceChecker() {
-                return sc;
             }
 
             @Override
@@ -542,7 +536,7 @@ public class JitStaticReceivePackTest {
                 return false;
             }
         });
-        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of());
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
@@ -567,15 +561,12 @@ public class JitStaticReceivePackTest {
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
         RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        UserExtractor ue = Mockito.mock(UserExtractor.class);
+        Mockito.when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
-            }
-
-            @Override
-            SourceChecker getSourceChecker() {
-                return sc;
             }
 
             @Override
@@ -584,7 +575,7 @@ public class JitStaticReceivePackTest {
             }
         });
 
-        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of());
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);
         Mockito.when(testUpdate.forceUpdate()).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD)
                 .thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.LOCK_FAILURE);
@@ -606,7 +597,6 @@ public class JitStaticReceivePackTest {
         RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
         IOException e = new IOException("Test");
         RemoteTestUtils.copy("/test3.json", storePath);
-        Ref master = clientGit.getRepository().findRef(REF_HEADS_MASTER);
         clientGit.add().addFilepattern(STORE).call();
         RevCommit c = clientGit.commit().setMessage("New commit").call();
         ReceiveCommand rc = Mockito.spy(new ReceiveCommand(c.getId(), ObjectId.fromString(SHA_1), REF_HEADS_MASTER, Type.UPDATE));
@@ -615,15 +605,12 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = Mockito.mock(Repository.class);
         Mockito.when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = Mockito.mock(SourceChecker.class);
-        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus) {
+        UserExtractor ue = Mockito.mock(UserExtractor.class);
+        Mockito.when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        JitStaticReceivePack rp = Mockito.spy(new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
-            }
-
-            @Override
-            SourceChecker getSourceChecker() {
-                return sc;
             }
 
             @Override
@@ -631,7 +618,7 @@ public class JitStaticReceivePackTest {
                 return false;
             }
         });
-        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of(Pair.of(Set.of(master), List.of())));
+        Mockito.when(sc.checkTestBranchForErrors(Mockito.anyString())).thenReturn(List.of());
         Mockito.when(remoteRepository.updateRef(Mockito.anyString(), Mockito.anyBoolean())).thenReturn(ru);
         Mockito.when(ru.update(Mockito.any())).thenReturn(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD);
         Mockito.when(remoteRepository.updateRef(Mockito.anyString())).thenReturn(testUpdate);

@@ -75,7 +75,8 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactory() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
-        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter));
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter),
+                new UserExtractor(git.getRepository()));
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);
         ReceivePack create = jsrpf.create(req, git.getRepository());
@@ -91,7 +92,8 @@ public class JitStaticReceivePackFactoryTest {
     public void testJitStaticReceivePackFactoryNoUser() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String host = "remotehost";
         assertThat(assertThrows(ServiceNotAuthorizedException.class, () -> {
-            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter));
+            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter),
+                    new UserExtractor(git.getRepository()));
             when(req.getRemoteHost()).thenReturn(host);
             jsrpf.create(req, git.getRepository());
         }).getLocalizedMessage(), CoreMatchers.containsString("Unauthorized"));
@@ -101,7 +103,8 @@ public class JitStaticReceivePackFactoryTest {
     public void testJitStaticReceivePackFactoryReceivePackTurnedOff() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
         assertThat(assertThrows(ServiceNotEnabledException.class, () -> {
-            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter));
+            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter),
+                    new UserExtractor(git.getRepository()));
             git.getRepository().getConfig().setString("http", null, "receivepack", "false");
             when(req.getRemoteUser()).thenReturn(user);
             when(req.getRemoteHost()).thenReturn(host);
@@ -112,7 +115,8 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactoryReceivePackTurnedOn() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
-        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter));
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter),
+                new UserExtractor(git.getRepository()));
         git.getRepository().getConfig().setString("http", null, "receivepack", "true");
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);

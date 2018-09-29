@@ -21,7 +21,6 @@ package io.jitstatic.api;
  */
 
 import java.util.Arrays;
-import java.util.Objects;
 
 import org.hibernate.validator.constraints.NotBlank;
 
@@ -52,9 +51,9 @@ public class KeyData {
     @JsonCreator
     public KeyData(@JsonProperty("key") final String key, @JsonProperty("type") final String type, @JsonProperty("tag") final String tag,
             @JsonProperty("data") final byte[] data) {
-        this.type = Objects.requireNonNull(type);
-        this.tag = Objects.requireNonNull(tag);
-        this.key = Objects.requireNonNull(key);
+        this.type = type;
+        this.tag = tag;
+        this.key = key;
         this.data = data;
     }
 

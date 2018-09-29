@@ -58,12 +58,17 @@ public class JitStaticReceivePack extends ReceivePack {
     private final String defaultRef;
     private final RepositoryBus bus;
     private final ErrorReporter errorReporter;
+    private final SourceChecker sourceChecker;
+    private final UserExtractor userExtractor;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RepositoryBus bus) {
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RepositoryBus bus,
+            final SourceChecker sourceChecker, final UserExtractor userExtractor) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
-        this.errorReporter = errorReporter;
+        this.errorReporter = Objects.requireNonNull(errorReporter);
+        this.sourceChecker = Objects.requireNonNull(sourceChecker);
+        this.userExtractor = Objects.requireNonNull(userExtractor);
     }
 
     // TODO Check branches format and refactor into its own xUpdate class
@@ -120,13 +125,14 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void checkBranchData(final String branch, final String testBranchName, final ReceiveCommand testRc) {
-        try (final SourceChecker sc = getSourceChecker()) {
+        try {
             sendMessage("Checking " + branch + " branch.");
-            final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> foundErrors = sc.checkTestBranchForErrors(testBranchName);
-            // Only one branch
-            final Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> branchErrors = foundErrors.get(0);
-            if (!branchErrors.getRight().isEmpty()) {
-                final String[] message = CorruptedSourceException.compileMessage(foundErrors).split(System.lineSeparator());
+            var errors = new ArrayList<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>>();
+            errors.addAll(sourceChecker.checkTestBranchForErrors(testBranchName));
+            errors.addAll(userExtractor.checkOnTestBranch(testBranchName, branch));
+
+            if (!errors.isEmpty()) {
+                final String[] message = CorruptedSourceException.compileMessage(errors).split(System.lineSeparator());
                 message[0] = message[0].replace(testBranchName, branch);
                 for (String s : message) {
                     sendError(s);
@@ -149,10 +155,6 @@ public class JitStaticReceivePack extends ReceivePack {
             testRc.setResult(Result.REJECTED_OTHER_REASON, msg);
             setFault(new RepositoryException(msg, unexpected));
         }
-    }
-
-    SourceChecker getSourceChecker() {
-        return new SourceChecker(getRepository());
     }
 
     private void tryAndCommit(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {

@@ -37,6 +37,8 @@ import org.slf4j.Logger;
 
 import io.jitstatic.UpdateFailedException;
 import io.jitstatic.hosted.KeyAlreadyExist;
+import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -153,5 +155,9 @@ class APIHelper {
 
     Response respondAuthenticationChallenge(final String realm) {
         return Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build();
+    }
+
+    StoreInfo checkIfKeyExist(final String key, final String ref, Storage storage) {
+        return unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(key + " in " + ref, Status.NOT_FOUND));
     }
 }

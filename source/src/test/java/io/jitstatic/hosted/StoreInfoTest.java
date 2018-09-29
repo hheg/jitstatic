@@ -40,7 +40,7 @@ public class StoreInfoTest {
 
     @Test
     public void testStoreInfo() {
-        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of());
+        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of(), null);
         StoreInfo s1 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
         StoreInfo s2 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
         StoreInfo s3 = new StoreInfo(new byte[] { 0 }, sd, "2", "1");
@@ -58,7 +58,7 @@ public class StoreInfoTest {
 
     @Test
     public void testStoreInfoMasterMetaData() {
-        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of());
+        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of(), null);
         StoreInfo s1 = new StoreInfo(sd, "1");
         StoreInfo s2 = new StoreInfo(sd, "1");
 

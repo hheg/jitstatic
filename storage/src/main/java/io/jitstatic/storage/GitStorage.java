@@ -40,8 +40,10 @@ import org.eclipse.jgit.lib.Constants;
 
 import com.spencerwi.either.Either;
 
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
@@ -57,8 +59,6 @@ import io.jitstatic.utils.WrappingAPIException;
 public class GitStorage implements Storage {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
-    private static final String USER_INFO_CANNOT_BE_NULL = "userInfo cannot be null";
-    private static final String MESSAGE_CANNOT_BE_NULL = "message cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
     private static final Logger LOG = LogManager.getLogger(GitStorage.class);
     private final Map<String, RefHolder> cache = new ConcurrentHashMap<>();
@@ -98,11 +98,8 @@ public class GitStorage implements Storage {
         LOG.warn("Error occourred ", e);
     }
 
-    private String checkRef(String ref) {
-        if (ref == null) {
-            ref = defaultRef;
-        }
-        return ref;
+    private String checkRef(final String ref) {
+        return ref == null ? defaultRef : ref;
     }
 
     @Override
@@ -151,36 +148,23 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public Either<String, FailedToLock> put(final String key, String ref, final byte[] data, final String oldVersion, final String message,
-            final String userInfo, final String userEmail) {
+    public Either<String, FailedToLock> put(final String key, String ref, final byte[] data, final String oldVersion, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
-        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
-
-        if (Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL).isEmpty()) {
-            throw new IllegalArgumentException("message cannot be empty");
-        }
         final String finalRef = checkRef(ref);
         final RefHolder refHolder = cache.get(finalRef);
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
-        return refHolder.modifyKey(key, finalRef, data, oldVersion, message, userInfo, userEmail);
+        return refHolder.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
     }
 
     @Override
-    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final String message, final String userInfo,
-            final String userMail) {
+    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
-        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
-        Objects.requireNonNull(userMail, "userMail cannot be null");
-
-        if (Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL).isEmpty()) {
-            throw new IllegalArgumentException("message cannot be empty");
-        }
 
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
@@ -188,7 +172,7 @@ public class GitStorage implements Storage {
 
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             checkIfKeyIsPresent(key, finalRef, refStore);
-            return refStore.addKey(key, finalRef, data, metaData, message, userInfo, userMail);
+            return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
         }, key);
         if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
@@ -240,13 +224,10 @@ public class GitStorage implements Storage {
 
     @Override
     public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
-            final String message, final String userInfo, final String userMail) {
+            final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
-        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
-        Objects.requireNonNull(userMail, "userMail cannot be null");
         Objects.requireNonNull(oldMetaDataVersion, "metaDataVersion cannot be null");
-        Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL);
 
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
@@ -256,16 +237,12 @@ public class GitStorage implements Storage {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
 
-        return refHolder.modifyMetadata(metaData, oldMetaDataVersion, message, userInfo, userMail, key, finalRef);
+        return refHolder.modifyMetadata(metaData, oldMetaDataVersion, commitMetaData, key, finalRef);
     }
 
     @Override
-    public void delete(final String key, final String ref, final String user, final String message, final String userMail) {
+    public void delete(final String key, final String ref, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
-        Objects.requireNonNull(user);
-        Objects.requireNonNull(user);
-        Objects.requireNonNull(message);
-        Objects.requireNonNull(userMail);
 
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
@@ -276,7 +253,7 @@ public class GitStorage implements Storage {
         final RefHolder refHolder = getRefHolder(finalRef);
         if (refHolder != null) {
             try {
-                refHolder.deleteKey(key, finalRef, user, message, userMail);
+                refHolder.deleteKey(key, finalRef, commitMetaData);
             } catch (final UncheckedIOException ioe) {
                 consumeError(ioe);
             }
@@ -336,5 +313,23 @@ public class GitStorage implements Storage {
     @Override
     public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input, final Optional<User> user) {
         return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight())).collect(Collectors.toList());
+    }
+
+    @Override
+    public UserData getUser(final String username, String ref, String realm) {
+        ref = checkRef(ref);
+        final RefHolder refHolder = getRefHolder(ref);
+        try {
+            return refHolder.getUser(realm + "/" + username);
+        } catch (WrappingAPIException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof RefNotFoundException) {
+                throw new RepoIsNotInitialized("Default ref " + ref + " is not found ");
+            }
+            if (cause instanceof IOException) {
+                throw new UncheckedIOException((IOException) cause);
+            }
+            throw e;
+        }
     }
 }

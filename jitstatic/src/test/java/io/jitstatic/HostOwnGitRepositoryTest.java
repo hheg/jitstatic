@@ -33,8 +33,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,20 +43,12 @@ import java.nio.file.StandardOpenOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.AbortedByHookException;
-import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.TransportException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.PushResult;
@@ -77,6 +70,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticCreatorClient;
@@ -92,7 +86,7 @@ import io.jitstatic.tools.Utils;
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class HostOwnGitRepositoryTest {
 
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String METADATA = ".metadata";
     private static final String STORE = "store";
     private static final String REFS_HEADS_NEWBRANCH = "refs/heads/newbranch";
@@ -177,18 +171,14 @@ public class HostOwnGitRepositoryTest {
             Path path = createData(localFilePath, git);
             originalSHA = git.getRepository().resolve(Constants.MASTER).getName();
             assertTrue(Files.exists(path));
-
             Files.write(path.resolveSibling(path.getFileName() + METADATA), "{".getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Test commit").call();
             Iterable<PushResult> push = git.push().setCredentialsProvider(provider).call();
             PushResult pushResult = push.iterator().next();
             RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(REFS_HEADS_MASTER);
             assertEquals(Status.REJECTED_OTHER_REASON, remoteUpdate.getStatus());
-            assertTrue(remoteUpdate.getMessage().startsWith("Error in branch " + REFS_HEADS_MASTER),
-                    () -> "Was '" + remoteUpdate.getMessage() + "'");
-
+            assertTrue(remoteUpdate.getMessage().startsWith("Error in branch " + REFS_HEADS_MASTER), () -> "Was '" + remoteUpdate.getMessage() + "'");
         }
         try (Git git = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             assertNotNull(readSource(Paths.get(getRepopath(git), STORE)));
@@ -223,8 +213,8 @@ public class HostOwnGitRepositoryTest {
     @Test
     public void testPushToOwnHostedRepositoryWithNewBranchAndThenDelete() throws Exception {
         assertThat(assertThrows(APIException.class, () -> {
-            try (Git git = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress).setCredentialsProvider(provider)
-                    .call(); JitStaticUpdaterClient client = buildClient()) {
+            try (Git git = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                    JitStaticUpdaterClient client = buildClient()) {
                 Path path = createData(STORE, git);
 
                 git.checkout().setCreateBranch(true).setName("newbranch").call();
@@ -243,10 +233,8 @@ public class HostOwnGitRepositoryTest {
                 List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
                 assertTrue(call.stream().allMatch(b -> b.equals(REFS_HEADS_NEWBRANCH)));
 
-                verifyOkPush(git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call(),
-                        REFS_HEADS_NEWBRANCH);
-                assertEquals(HttpStatus.NOT_FOUND_404,
-                        assertThrows(APIException.class, () -> client.getKey(STORE, REFS_HEADS_NEWBRANCH, tf)).getStatusCode());
+                verifyOkPush(git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call(), REFS_HEADS_NEWBRANCH);
+                assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(STORE, REFS_HEADS_NEWBRANCH, tf)).getStatusCode());
                 refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
                 assertNull(refs.get(REFS_HEADS_NEWBRANCH));
 
@@ -258,8 +246,8 @@ public class HostOwnGitRepositoryTest {
     @Test
     public void testRemoveKey() throws Exception {
         assertThat(assertThrows(APIException.class, () -> {
-            try (Git git = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress).setCredentialsProvider(provider)
-                    .call(); JitStaticUpdaterClient client = buildClient()) {
+            try (Git git = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                    JitStaticUpdaterClient client = buildClient()) {
                 createData(STORE, git);
                 Entity key = client.getKey(STORE, REFS_HEADS_MASTER, tf);
                 String version = key.getTag();
@@ -372,14 +360,13 @@ public class HostOwnGitRepositoryTest {
     }
 
     @Test
-    public void testReloadedAfterManualPush()
-            throws IOException, InvalidRemoteException, TransportException, GitAPIException, URISyntaxException {
+    public void testReloadedAfterManualPush() throws Exception {
         File workingFolder = getFolder().toFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call();
                 JitStaticUpdaterClient client = buildClient()) {
             createData(STORE, git);
             Entity first = client.getKey(STORE, REFS_HEADS_MASTER, tf);
-            Files.write(workingFolder.toPath().resolve(STORE), getData(2).getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(workingFolder.toPath().resolve(STORE), getData(2).getBytes(UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
             git.add().addFilepattern(".").call();
             git.commit().setMessage("New file data").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call());
@@ -414,8 +401,7 @@ public class HostOwnGitRepositoryTest {
             for (int j = 0; j < 2; j++) {
                 for (int i = 10; i < 20; i++) {
                     final int p = i;
-                    assertEquals(HttpStatus.NOT_FOUND_404,
-                            assertThrows(APIException.class, () -> updaterClient.getKey(STORE + p, tf)).getStatusCode());
+                    assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClient.getKey(STORE + p, tf)).getStatusCode());
                 }
             }
             for (int i = 10; i < 20; i++) {
@@ -426,12 +412,102 @@ public class HostOwnGitRepositoryTest {
             for (int i = 10; i < 20; i++) {
                 final int j = i;
                 assertEquals(HttpStatus.CONFLICT_409,
-                        assertThrows(APIException.class,
-                                () -> client.createKey(getData(j).getBytes(UTF_8),
-                                        new CommitData(STORE + j, "master", "commit message", "user1", "user@mail"),
-                                        new MetaData(new HashSet<>(), "application/json"))).getStatusCode());
+                        assertThrows(APIException.class, () -> client.createKey(getData(j).getBytes(UTF_8),
+                                new CommitData(STORE + j, "master", "commit message", "user1", "user@mail"), new MetaData(new HashSet<>(), "application/json")))
+                                        .getStatusCode());
 
             }
+        }
+    }
+
+    @Test
+    public void testUserOnlyPullRights() throws Exception {
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticUpdaterClient client = buildClient()) {
+            Path users = working.resolve(JitStaticConstants.USERS);
+            Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+            Path user = gitRealm.resolve("blipp");
+            assertTrue(gitRealm.toFile().mkdirs());
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
+
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("msg").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+        }
+        try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+        }
+        assertTrue(assertThrows(TransportException.class, () -> {
+            try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "2")).call()) {
+            }
+        }).getMessage().contains("not authorized"));
+        Path workingFolder = getFolder();
+        try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+            Files.write(workingFolder.resolve(STORE), getData(2).getBytes("UTF-8"), StandardOpenOption.CREATE);
+            git2.add().addFilepattern(".").call();
+            git2.commit().setMessage("New file data").call();
+            verifyOkPush(git2.push().setCredentialsProvider(provider).call());
+        }
+    }
+
+    @Test
+    public void testGetKeyWithValidUser() throws Exception {
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticUpdaterClient client = buildClient()) {
+            Path users = working.resolve(JitStaticConstants.USERS);
+            Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+            Path user = gitRealm.resolve("blipp");
+            assertTrue(gitRealm.toFile().mkdirs());
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
+
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("msg").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+        }
+        try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+        }
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticUpdaterClient client = buildClient()) {
+                client.getKey(JitStaticConstants.USERS + JitStaticConstants.GIT_REALM + "/blipp", tf);
+            }
+        }).getStatusCode());
+        try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+        }
+    }
+
+    @Test
+    public void testGetKeyWithValidUserRole() throws Exception {
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticUpdaterClient client = buildClient();) {
+            Path users = working.resolve(JitStaticConstants.USERS);
+            Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
+            Path user = gitRealm.resolve("blipp");
+            assertTrue(gitRealm.toFile().mkdirs());
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("create")), "1234")), StandardOpenOption.CREATE);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("msg").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+        }
+        assertTrue(assertThrows(TransportException.class, () -> {
+            try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
+                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+            }
+        }).getMessage().contains("not authorized"));
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticUpdaterClient client = buildClient()) {
+                client.getKey(JitStaticConstants.USERS + JitStaticConstants.JITSTATIC_KEYADMIN_REALM + "/blipp", tf);
+            }
+        }).getStatusCode());
+        try (JitStaticCreatorClient cclient = buildCreatorClient().setPassword("1234").setUser("blipp").build()) {
+            assertNotNull(cclient.createKey(new byte[] { 1 }, new CommitData("string/key", "msg", "user", "mail"),
+                    new MetaData(Set.of(new MetaData.User("news", "1234")), "application/json")));
         }
     }
 
@@ -449,9 +525,7 @@ public class HostOwnGitRepositoryTest {
         assertEquals(Status.OK, remoteUpdate.getStatus());
     }
 
-    private Path createData(String localFilePath, Git git) throws IOException, UnsupportedEncodingException, GitAPIException,
-            NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+    private Path createData(String localFilePath, Git git) throws Exception {
         String repopath = getRepopath(git);
         Path path = Paths.get(repopath, localFilePath);
         Path mpath = Paths.get(repopath, localFilePath + METADATA);
@@ -485,9 +559,13 @@ public class HostOwnGitRepositoryTest {
         }
     }
 
+    private JitStaticUpdaterClient buildClient(String altPasswd) throws URISyntaxException {
+        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setScheme("http").setUser(USER).setPassword(altPasswd)
+                .setAppContext("/application/").build();
+    }
+
     private JitStaticUpdaterClient buildClient() throws URISyntaxException {
-        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setScheme("http").setUser(USER)
-                .setPassword(PASSWORD).setAppContext("/application/").build();
+        return buildClient(PASSWORD);
     }
 
     private static String getRepopath(Git git) {

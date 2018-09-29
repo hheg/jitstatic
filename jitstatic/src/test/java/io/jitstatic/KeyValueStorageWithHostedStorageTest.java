@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,6 +77,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.codahale.metrics.health.HealthCheck.Result;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -102,7 +104,7 @@ import io.jitstatic.test.TemporaryFolderExtension;
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class KeyValueStorageWithHostedStorageTest {
 
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String ACCEPT_STORAGE = "accept/storage";
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
@@ -124,13 +126,13 @@ public class KeyValueStorageWithHostedStorageTest {
         setupRepo(user, pass, servletName, endpoint);
     }
 
-    private void setupRepo(String user, String pass, String servletName, String endpoint) throws IOException, GitAPIException,
-            NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException,
-            WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
+    private void setupRepo(String user, String pass, String servletName, String endpoint)
+            throws IOException, GitAPIException, NoFilepatternException, NoHeadException, NoMessageException, UnmergedPathsException,
+            ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, InvalidRemoteException, TransportException {
         File workingDirectory = getFolderFile();
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
-        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint)
-                .setCredentialsProvider(provider).call()) {
+        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint).setCredentialsProvider(provider)
+                .call()) {
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + ".metadata");
 
@@ -144,16 +146,14 @@ public class KeyValueStorageWithHostedStorageTest {
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
             Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-            assertTrue(StreamSupport.stream(call.spliterator(), false)
-                    .allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
+            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
         }
     }
 
     @AfterEach
     public void after() {
         SortedMap<String, Result> healthChecks = DW.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull).collect(Collectors.toList());
         errors.stream().forEach(e -> e.printStackTrace());
         assertThat(errors.toString(), errors.isEmpty(), Matchers.is(true));
     }
@@ -212,8 +212,7 @@ public class KeyValueStorageWithHostedStorageTest {
             assertEquals(getData(), key.data.toString());
             String oldVersion = key.getTag();
             byte[] newData = "{\"one\":\"two\"}".getBytes(UTF_8);
-            String modifyKey = client.modifyKey(newData, new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"),
-                    key.getTag());
+            String modifyKey = client.modifyKey(newData, new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, tf);
             assertEquals(new String(newData, "UTF-8"), key.data.toString());
@@ -227,8 +226,7 @@ public class KeyValueStorageWithHostedStorageTest {
             assertEquals(getData(), key.data.toString());
             String oldVersion = key.getTag();
             byte[] prettyData = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(getData()));
-            String modifyKey = client.modifyKey(prettyData,
-                    new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
+            String modifyKey = client.modifyKey(prettyData, new CommitData(ACCEPT_STORAGE, "master", "commit message", "user1", "user@mail"), key.getTag());
             assertNotEquals(oldVersion, modifyKey);
             key = client.getKey(ACCEPT_STORAGE, null, stringFactory);
             assertEquals(new String(prettyData, "UTF-8"), key.data);
@@ -240,12 +238,11 @@ public class KeyValueStorageWithHostedStorageTest {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         String user = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
-        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/").setUser(user).setPassword(pass);
+        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/")
+                .setUser(user).setPassword(pass);
 
         try (JitStaticCreatorClient client = builder.build(); JitStaticUpdaterClient getter = buildClient().build()) {
-            String createKey = client.createKey(getData().getBytes(UTF_8),
-                    new CommitData("base/newkey", "master", "commit message", "user1", "user@mail"),
+            String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("base/newkey", "master", "commit message", "user1", "user@mail"),
                     new MetaData(new HashSet<>(), "application/json"));
             Entity<String> key = getter.getKey("base/newkey", stringFactory);
             assertArrayEquals(getData().getBytes(UTF_8), key.data.getBytes(UTF_8));
@@ -258,35 +255,35 @@ public class KeyValueStorageWithHostedStorageTest {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         String user = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
-        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort())
-                .setAppContext("/application/").setUser(user).setPassword(pass);
+        JitStaticCreatorClientBuilder builder = JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/")
+                .setUser(user).setPassword(pass);
 
         try (JitStaticCreatorClient client = builder.build(); JitStaticUpdaterClient getter = buildClient().build()) {
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> getter.getKey("base/mid/newkey", stringFactory)).getStatusCode());
-            String createKey = client.createKey(getData().getBytes(UTF_8),
-                    new CommitData("base/mid/new key", "master", "commit message", "user1", "user@mail"),
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/newkey", stringFactory)).getStatusCode());
+            String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("base/mid/new key", "master", "commit message", "user1", "user@mail"),
                     new MetaData(new HashSet<>(), "application/json"));
             Entity<String> key = getter.getKey("base/mid/new%20key", stringFactory);
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> getter.getKey("base/mid/new", stringFactory)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/new", stringFactory)).getStatusCode());
             assertArrayEquals(getData().getBytes(UTF_8), key.data.getBytes(UTF_8));
             assertEquals(createKey, key.getTag());
         }
     }
 
     @Test
-    public void testModifyUserKey() throws Exception {
+    public void testModifyUserKey() throws Exception {        
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
+        String root = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
-        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
+        try (JitStaticCreatorClient client = buildCreatorClient().setUser(root).setPassword(pass).build();                
                 JitStaticUpdaterClient firstUpdater = buildClient().setUser(USER).setPassword(PASSWORD).build();
-                JitStaticUpdaterClient secondUpdater = buildClient().setUser(user).setPassword(pass).build()) {
+                JitStaticUpdaterClient secondUpdater = buildClient().setUser(root).setPassword(pass).build();
+                JitStaticUpdaterClient thirdUpdater = buildClient().setUser("random").setPassword("randompass").build()) {
             Entity<JsonNode> key = firstUpdater.getKey(ACCEPT_STORAGE, tf);
             assertNotNull(key);
+            key = secondUpdater.getKey(ACCEPT_STORAGE, tf);
+            assertNotNull(key);
             try {
-                secondUpdater.getKey(ACCEPT_STORAGE, tf);
+                thirdUpdater.getKey(ACCEPT_STORAGE, tf);
                 fail();
             } catch (APIException e) {
                 assertEquals(HttpStatus.FORBIDDEN_403, e.getStatusCode());
@@ -294,7 +291,7 @@ public class KeyValueStorageWithHostedStorageTest {
             Entity<JsonNode> metaKey = client.getMetaKey(ACCEPT_STORAGE, null, tf);
             String oldVersion = metaKey.getTag();
             String modifyKey = client.modifyMetaKey(ACCEPT_STORAGE, null, metaKey.getTag(),
-                    new ModifyUserKeyData(new MetaData(Set.of(new User(user, pass)), "plain/text"), "msg", "mail", "info"));
+                    new ModifyUserKeyData(new MetaData(Set.of(new User(root, pass)), "plain/text"), "msg", "mail", "info"));
             assertNotEquals(oldVersion, modifyKey);
             metaKey = client.getMetaKey(ACCEPT_STORAGE, null, tf);
             assertEquals("plain/text", metaKey.data.get("contentType").asText());
@@ -322,8 +319,8 @@ public class KeyValueStorageWithHostedStorageTest {
             assertNotNull(key);
             Entity<JsonNode> metaKey = client.getMetaKey("accept/", null, tf);
 
-            String modifyMetaKey = client.modifyMetaKey("accept/", null, metaKey.tag, new ModifyUserKeyData(
-                    new MetaData(Set.of(new User(user, pass)), "application/json", true, false, List.of()), "msg", "mail", "info"));
+            String modifyMetaKey = client.modifyMetaKey("accept/", null, metaKey.tag,
+                    new ModifyUserKeyData(new MetaData(Set.of(new User(user, pass)), "application/json", true, false, List.of()), "msg", "mail", "info"));
             assertNotEquals(metaKey.tag, modifyMetaKey);
             Entity<JsonNode> key2 = secondUpdater.getKey("accept/genkey", tf);
             assertNotNull(key2);
@@ -338,8 +335,7 @@ public class KeyValueStorageWithHostedStorageTest {
             assertNotNull(key.getTag());
             client.delete(new CommitData(ACCEPT_STORAGE, "message", "user", "mail"));
             Thread.sleep(100);
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> client.getKey(ACCEPT_STORAGE, null, tf)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(ACCEPT_STORAGE, null, tf)).getStatusCode());
         }
     }
 
@@ -352,8 +348,8 @@ public class KeyValueStorageWithHostedStorageTest {
         String data = getData(3);
         String createdKeyTag;
         try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();) {
-            createdKeyTag = client.createKey(data.getBytes(StandardCharsets.UTF_8),
-                    new CommitData("key", branch, "new key", "user", "mail"), new MetaData("application/json"));
+            createdKeyTag = client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key", branch, "new key", "user", "mail"),
+                    new MetaData("application/json"));
         }
         try (JitStaticUpdaterClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             Entity<JsonNode> key = client.getKey("key", branch, tf);
@@ -378,12 +374,11 @@ public class KeyValueStorageWithHostedStorageTest {
             assertEquals(data, key.data.toString());
             updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"));
             assertEquals(404, assertThrows(APIException.class, () -> updaterClient.getKey("key", branch, tf)).getStatusCode());
-            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key", branch, "new key", "user", "mail"),
-                    new MetaData("application/json"));
+            client.createKey(data.getBytes(StandardCharsets.UTF_8), new CommitData("key", branch, "new key", "user", "mail"), new MetaData("application/json"));
             key = updaterClient.getKey("key", branch, tf);
             assertEquals(data, key.data.toString());
-            assertEquals(400, assertThrows(APIException.class,
-                    () -> updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"))).getStatusCode());
+            assertEquals(400,
+                    assertThrows(APIException.class, () -> updaterClient.delete(new CommitData("key", branch, "delete key", "user", "mail"))).getStatusCode());
         }
     }
 
@@ -574,8 +569,8 @@ public class KeyValueStorageWithHostedStorageTest {
 
         File workingDirectory = getFolderFile();
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
-        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint)
-                .setCredentialsProvider(provider).call()) {
+        try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint).setCredentialsProvider(provider)
+                .call()) {
             Path dst = workingDirectory.toPath().resolve("test1").resolve("test2");
             dst.toFile().mkdirs();
             Files.write(dst.resolve(".metadata"), getMetaData(Set.of(new User(USER, PASSWORD))).getBytes(UTF_8));
@@ -588,8 +583,7 @@ public class KeyValueStorageWithHostedStorageTest {
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
             Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-            assertTrue(StreamSupport.stream(call.spliterator(), false)
-                    .allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
+            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate("refs/heads/master").getStatus() == Status.OK));
 
         }
         try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
@@ -602,8 +596,7 @@ public class KeyValueStorageWithHostedStorageTest {
                         new MetaData(Set.of(new User(USER, PASSWORD)), "application/json"));
             }
 
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
 
             List<KeyData> keyData = updaterClient.listAll("test1/test2/", (is) -> {
                 try {
@@ -615,10 +608,8 @@ public class KeyValueStorageWithHostedStorageTest {
             });
             assertNotNull(keyData);
             assertFalse(keyData.isEmpty());
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
-            assertEquals(HttpStatus.NOT_FOUND_404,
-                    assertThrows(APIException.class, () -> updaterClientNoCred.getKey("test1/test2", tf)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClientNoCred.getKey("test1/test2", tf)).getStatusCode());
         }
     }
 
@@ -661,10 +652,9 @@ public class KeyValueStorageWithHostedStorageTest {
                 + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
 
-    private static String getMetaData(Set<User> users) {
-        String writtenUsers = users.stream().map(u -> String.format("{\"password\":\"%s\",\"user\":\"%s\"}", u.getPassword(), u.getUser()))
-                .collect(Collectors.joining(","));
-        return String.format("{\"users\":[%s]}", writtenUsers);
+    private static String getMetaData(Set<User> users) throws JsonProcessingException {
+        MetaData data = new MetaData(users, "application/json");
+        return MAPPER.writeValueAsString(data);
     }
 
     private TriFunction<InputStream, String, String, Entity<String>> stringFactory = (is, v, t) -> {

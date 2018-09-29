@@ -26,7 +26,9 @@ import java.util.function.Function;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
@@ -42,15 +44,13 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public String modifyKey(String key, String ref, byte[] data, String version, String message, String userInfo, String userMail);
+    public String modifyKey(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
 
-    public Pair<String, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, String message, String userInfo,
-            String userMail);
+    public Pair<String, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
 
-    public String modifyMetadata(MetaData metaData, String metaDataVersion, String message, String userInfo, String userMail, String key,
-            String finalRef);
+    public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String finalRef, CommitMetaData commitMetaData);
 
-    public void deleteKey(String key, String ref, String user, String message, String userMail);
+    public void deleteKey(String key, String ref, CommitMetaData commitMetaData);
 
     public void addRefHolderFactory(Function<String, RefHolderLock> factory);
 
@@ -59,5 +59,7 @@ public interface Source extends AutoCloseable, CheckHealth {
     public void deleteRef(String ref) throws IOException;
 
     public List<String> getList(String keys, String ref, boolean recursive) throws RefNotFoundException, IOException;
+
+    Pair<String, UserData> getUser(String userKey, String ref) throws RefNotFoundException, IOException;
 
 }

@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.storage;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,24 +20,11 @@ package io.jitstatic;
  * #L%
  */
 
-import io.dropwizard.lifecycle.Managed;
+public class RepoIsNotInitialized extends RuntimeException {
 
-public class AutoCloseableLifeCycleManager<T extends AutoCloseable> implements Managed {
+    private static final long serialVersionUID = 1L;
 
-	private T object;
-
-	public AutoCloseableLifeCycleManager(T object) {
-		this.object = object;
-	}
-	
-	@Override
-	public void start() throws Exception {
-	    // NOOP
-	}
-
-	@Override
-	public void stop() throws Exception {
-		this.object.close();
-	}
-
+    public RepoIsNotInitialized(final String msg) {
+        super(msg);
+    }
 }

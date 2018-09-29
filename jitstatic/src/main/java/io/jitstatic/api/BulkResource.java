@@ -21,6 +21,7 @@ package io.jitstatic.api;
  */
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -52,7 +53,7 @@ public class BulkResource {
     private final Storage storage;
 
     public BulkResource(final Storage storage) {
-        this.storage = storage;
+        this.storage = Objects.requireNonNull(storage);
     }
 
     @POST

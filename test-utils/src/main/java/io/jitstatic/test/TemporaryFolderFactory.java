@@ -67,7 +67,7 @@ public class TemporaryFolderFactory {
                     if (!directory.equals(rootFolder)) {
                         return delete(directory);
                     }
-                    return FileVisitResult.CONTINUE;
+                    return CONTINUE;
                 }
 
                 private FileVisitResult delete(Path file) throws IOException {

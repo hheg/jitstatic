@@ -23,6 +23,7 @@ import java.util.Objects;
  */
 
 import java.util.Optional;
+import java.util.Set;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -52,9 +53,12 @@ import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
-import io.jitstatic.JitstaticApplication;
-import io.jitstatic.auth.AddKeyAuthenticator;
+import io.jitstatic.CommitMetaData;
+import io.jitstatic.JitStaticConstants;
+import io.jitstatic.Role;
+import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
@@ -65,11 +69,11 @@ public class MetaKeyResource {
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
-    private final AddKeyAuthenticator addKeyAuthenticator;
+    private final KeyAdminAuthenticator keyAdminAuthenticator;
     private final APIHelper helper;
 
-    public MetaKeyResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
-        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator addKeyAuthenticator) {
+        this.keyAdminAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
         this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
     }
@@ -83,27 +87,44 @@ public class MetaKeyResource {
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
+            return helper.respondAuthenticationChallenge(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
         }
-
-        authorize(user);
 
         helper.checkRef(ref);
 
-        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
-        final EntityTag tag = new EntityTag(storeInfo.getMetaDataVersion());
-        final Response noChange = helper.checkETag(headers, tag);
-        if (noChange != null) {
-            return noChange;
-        }
+        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
 
-        return Response.ok(storeInfo.getStorageData()).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+        final Set<Role> roles = (si.isPresent() ? si.get().getStorageData().getRoles() : null);
+        authorize(user.get(), ref, roles);
+
+        if (si.isPresent()) {
+            final StoreInfo storeInfo = si.get();
+
+            final EntityTag tag = new EntityTag(storeInfo.getMetaDataVersion());
+            final Response noChange = helper.checkETag(headers, tag);
+            if (noChange != null) {
+                return noChange;
+            }
+            return Response.ok(storeInfo.getStorageData()).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+                    .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+        }
+        throw new WebApplicationException(Status.NOT_FOUND);
     }
 
-    private void authorize(final Optional<User> user) {
-        if (!addKeyAuthenticator.authenticate(user.get())) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+    private void authorize(final User user, final String ref, final Set<Role> roles) {
+        if (!keyAdminAuthenticator.authenticate(user, ref) && !isKeyUserAllowed(user, ref, roles)) {
+            throw new WebApplicationException(Status.FORBIDDEN);
         }
+    }
+
+    private boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
+        keyRoles = keyRoles == null ? Set.of() : keyRoles;
+        final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+        if (userData == null) {
+            return false;
+        }
+        final Set<Role> userRoles = userData.getRoles();
+        return keyRoles.stream().allMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword());
     }
 
     @PUT
@@ -113,20 +134,20 @@ public class MetaKeyResource {
     @Path("/{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response modifyUserKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+    public Response modifyMetaKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Valid @NotNull ModifyMetaKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
+            return helper.respondAuthenticationChallenge(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
         }
-
-        authorize(user);
 
         helper.checkHeaders(headers);
 
         helper.checkRef(ref);
 
-        final StoreInfo storeInfo = checkIfKeyExist(key, ref);
+        final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
+        authorize(user.get(), ref, storeInfo.getStorageData().getRoles());
         final String currentVersion = storeInfo.getMetaDataVersion();
+        
         final EntityTag tag = new EntityTag(currentVersion);
         final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
 
@@ -134,8 +155,8 @@ public class MetaKeyResource {
             return noChangeBuilder.tag(tag).build();
         }
 
-        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
-                () -> storage.putMetaData(key, ref, data.getMetaData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.putMetaData(key, ref, data.getMetaData(), currentVersion,
+                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
 
         if (result.isRight()) {
             return Response.status(Status.PRECONDITION_FAILED).tag(tag).build();
@@ -145,10 +166,6 @@ public class MetaKeyResource {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-    }
-
-    private StoreInfo checkIfKeyExist(final String key, final String ref) {
-        return helper.unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND));
     }
 
 }
