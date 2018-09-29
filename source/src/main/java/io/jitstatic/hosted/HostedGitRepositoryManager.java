@@ -30,7 +30,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -81,8 +80,7 @@ public class HostedGitRepositoryManager implements Source {
     private final SourceUpdater updater;
     private final JitStaticUploadPackFactory uploadPackFactory;
 
-    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final Executor repoExecutor,
-            final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
+    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
                 throw new IllegalArgumentException(String.format("Path %s is a file", workingDirectory));
@@ -96,7 +94,7 @@ public class HostedGitRepositoryManager implements Source {
         this.endPointName = Objects.requireNonNull(endPointName).trim();
 
         if (this.endPointName.isEmpty()) {
-            throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
+            throw new IllegalArgumentException("Parameter endPointName cannot be empty");
         }
 
         try {
@@ -120,11 +118,6 @@ public class HostedGitRepositoryManager implements Source {
         this.errorReporter = errorReporter;
     }
 
-    private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
-            final ErrorReporter reporter) throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef, null, reporter);
-    }
-
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
             throws CorruptedSourceException, IOException {
         this(workingDirectory, endPointName, defaultRef, new ErrorReporter());
@@ -146,8 +139,8 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
-        LOG.info("Mounting repository on " + repositoryBase);
+    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, GitAPIException {
+        LOG.info("Mounting repository on {}", repositoryBase);
         Repository repo = getRepository(repositoryBase);
         if (repo == null) {
             Files.createDirectories(repositoryBase);
@@ -161,8 +154,8 @@ public class HostedGitRepositoryManager implements Source {
         try {
             return Git.open(baseDirectory.toFile()).getRepository();
         } catch (final IOException ignore) {
-        }
-        return null;
+        	return null;
+        }        
     }
 
     @Override

@@ -28,8 +28,7 @@ public class LoadException extends RuntimeException {
     }
 
     @Override
-    public Throwable initCause(Throwable cause) {
+    public Throwable fillInStackTrace() {
         return this;
     }
-
 }

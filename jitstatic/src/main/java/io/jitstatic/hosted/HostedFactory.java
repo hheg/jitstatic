@@ -146,7 +146,7 @@ public class HostedFactory {
                 getBranch());
         Objects.requireNonNull(gitRealm);
         final String baseServletPath = "/" + getServletName() + "/*";
-        LOG.info("Configuring hosted GIT environment on " + baseServletPath);
+        LOG.info("Configuring hosted GIT environment on {}", baseServletPath);
         final GitServlet gs = new GitServlet();
         
         gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());

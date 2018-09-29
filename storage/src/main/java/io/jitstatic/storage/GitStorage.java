@@ -56,6 +56,10 @@ import io.jitstatic.utils.WrappingAPIException;
 
 public class GitStorage implements Storage {
 
+    private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
+    private static final String USER_INFO_CANNOT_BE_NULL = "userInfo cannot be null";
+    private static final String MESSAGE_CANNOT_BE_NULL = "message cannot be null";
+    private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
     private static final Logger LOG = LogManager.getLogger(GitStorage.class);
     private final Map<String, RefHolder> cache = new ConcurrentHashMap<>();
     private final AtomicReference<Exception> fault = new AtomicReference<>();
@@ -127,7 +131,7 @@ public class GitStorage implements Storage {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.computeIfAbsent(finalRef, (r) -> new RefHolder(r, new ConcurrentHashMap<>(), source));
+        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, new ConcurrentHashMap<>(), source));
     }
 
     @Override
@@ -149,12 +153,12 @@ public class GitStorage implements Storage {
     @Override
     public Either<String, FailedToLock> put(final String key, String ref, final byte[] data, final String oldVersion, final String message,
             final String userInfo, final String userEmail) {
-        Objects.requireNonNull(key, "key cannot be null");
-        Objects.requireNonNull(data, "data cannot be null");
+        Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
+        Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
-        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
 
-        if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
+        if (Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL).isEmpty()) {
             throw new IllegalArgumentException("message cannot be empty");
         }
         final String finalRef = checkRef(ref);
@@ -168,13 +172,13 @@ public class GitStorage implements Storage {
     @Override
     public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final String message,
             final String userInfo, final String userMail) {
-        Objects.requireNonNull(key, "key cannot be null");
-        Objects.requireNonNull(data, "data cannot be null");
-        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
+        Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
+        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
         Objects.requireNonNull(userMail, "userMail cannot be null");
 
-        if (Objects.requireNonNull(message, "message cannot be null").isEmpty()) {
+        if (Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL).isEmpty()) {
             throw new IllegalArgumentException("message cannot be empty");
         }
 
@@ -237,12 +241,12 @@ public class GitStorage implements Storage {
     @Override
     public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
             final String message, final String userInfo, final String userMail) {
-        Objects.requireNonNull(key, "key cannot be null");
-        Objects.requireNonNull(userInfo, "userInfo cannot be null");
+        Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
+        Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
         Objects.requireNonNull(userMail, "userMail cannot be null");
         Objects.requireNonNull(oldMetaDataVersion, "metaDataVersion cannot be null");
-        Objects.requireNonNull(message, "message cannot be null");
+        Objects.requireNonNull(message, MESSAGE_CANNOT_BE_NULL);
 
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
@@ -326,8 +330,6 @@ public class GitStorage implements Storage {
     @Override
     public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input,
             final Optional<User> user) {
-        return input.stream().map(p -> {
-            return Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight());
-        }).collect(Collectors.toList());
+        return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight())).collect(Collectors.toList());
     }
 }

@@ -48,7 +48,7 @@ public class AddKeyData {
     private final String branch;
 
     @NotNull
-    @Size(min=1)
+    @Size(min = 1)
     private final byte[] data;
 
     @NotNull
@@ -68,9 +68,8 @@ public class AddKeyData {
     private final String userInfo;
 
     @JsonCreator
-    public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch,
-            @JsonProperty("data") final byte[] data, @JsonProperty("metaData") final MetaData metaData,
-            @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
+    public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch, @JsonProperty("data") final byte[] data,
+            @JsonProperty("metaData") final MetaData metaData, @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
         this.key = key;
         this.branch = (branch == null ? REFS_HEADS_MASTER : branch);

@@ -78,7 +78,6 @@ public class SourceChecker implements AutoCloseable {
         final List<BranchData> branchData = branchSource.getRight();
         final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData).flatMap(List::stream)
                 .filter(Pair::isPresent).collect(Collectors.toList());
-
         return List.of(Pair.of(revCommit.getRight(), branchErrors));
     }
 
@@ -89,15 +88,15 @@ public class SourceChecker implements AutoCloseable {
 
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
         final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
-        return sources.entrySet().stream().parallel().map(e -> {
-            return Pair.of(e.getKey().getRight(),
-                    e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream).filter(Pair::isPresent).collect(Collectors.toList()));
-        }).filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
+        return sources.entrySet().stream().parallel()
+                .map(e -> Pair.of(e.getKey().getRight(),
+                        e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream).filter(Pair::isPresent).collect(Collectors.toList())))
+                .filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
     }
 
     private List<Pair<FileObjectIdStore, Exception>> readRepositoryData(final BranchData data) {
         final List<Pair<FileObjectIdStore, Exception>> fileErrors = data.pair().stream().map(this::parseErrors).flatMap(s -> s)
-                .collect(Collectors.toCollection(() -> new ArrayList<>()));
+                .collect(Collectors.toCollection(ArrayList::new));
         final RepositoryDataError fileDataError = data.getFileDataError();
         if (fileDataError != null) {
             fileErrors.add(Pair.of(fileDataError.getFileInfo(), fileDataError.getInputStreamHolder().exception()));
@@ -112,13 +111,11 @@ public class SourceChecker implements AutoCloseable {
             final FileObjectIdStore fileInfo = sourceFileData.getFileInfo();
             return Stream.of(Pair.of(fileInfo, new FileIsMissingMetaData(fileInfo.getFileName())));
         }
-        if (sourceFileData == null) {
-            if (!metaFileData.isMasterMetaData()) {
-                final FileObjectIdStore fileInfo = metaFileData.getFileInfo();
-                return Stream.of(Pair.of(fileInfo, new MetaDataFileIsMissingSourceFile(fileInfo.getFileName())));
-            }
+        if (!metaFileData.isMasterMetaData() && sourceFileData == null) {
+            final FileObjectIdStore fileInfo = metaFileData.getFileInfo();
+            return Stream.of(Pair.of(fileInfo, new MetaDataFileIsMissingSourceFile(fileInfo.getFileName())));
         }
-        final Pair<FileObjectIdStore, Either<String, Exception>> check = readAndCheckMetaFileData(data.getLeft());
+        final Pair<FileObjectIdStore, Either<String, Exception>> check = readAndCheckMetaFileData(metaFileData);
         final Either<String, Exception> fileMetaDataResult = check.getRight();
         if (fileMetaDataResult.isLeft()) {
             if (metaFileData.isMasterMetaData()) {

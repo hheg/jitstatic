@@ -59,8 +59,7 @@ public class JitStaticReceivePack extends ReceivePack {
     private final RepositoryBus bus;
     private final ErrorReporter errorReporter;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter,
-            final RepositoryBus bus) {
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RepositoryBus bus) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
@@ -84,7 +83,7 @@ public class JitStaticReceivePack extends ReceivePack {
         updating.beginTask("Checking branches", cmdsToBeExecuted.size());
         for (final ReceiveCommand rc : commands) {
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
-                checkBranch(cmdsToBeExecuted, rc, updating);
+                checkBranch(cmdsToBeExecuted, rc);
             } else {
                 if (defaultRef.equals(rc.getRefName())) {
                     rc.setResult(Result.REJECTED_NODELETE, "Cannot delete default branch " + defaultRef);
@@ -97,10 +96,9 @@ public class JitStaticReceivePack extends ReceivePack {
         tryAndCommit(cmdsToBeExecuted, updating);
     }
 
-    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc,
-            final  ProgressMonitor monitor) {
+    private void checkBranch(final List<Pair<ReceiveCommand, ReceiveCommand>> cmdsToBeExecuted, final ReceiveCommand rc) {
         final String branch = rc.getRefName();
-        final String testBranchName = JitStaticConstants.REFS_JISTSTATIC + UUID.randomUUID();
+        final String testBranchName = JitStaticConstants.REFS_JITSTATIC + UUID.randomUUID();
         try {
             createTmpBranch(testBranchName, branch);
             final ReceiveCommand testRc = new ReceiveCommand(rc.getOldId(), rc.getNewId(), testBranchName, rc.getType());
@@ -137,11 +135,13 @@ public class JitStaticReceivePack extends ReceivePack {
             } else {
                 sendMessage(branch + " OK!");
             }
+        } catch (final MissingObjectException storageIsCorrupt) {
+            sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
+            testRc.setResult(Result.REJECTED_MISSING_OBJECT, storageIsCorrupt.getMessage());
+            setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final IOException storageIsCorrupt) {
             sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
-            final Result result = (storageIsCorrupt instanceof MissingObjectException ? Result.REJECTED_MISSING_OBJECT
-                    : Result.REJECTED_OTHER_REASON);
-            testRc.setResult(result, storageIsCorrupt.getMessage());
+            testRc.setResult(Result.REJECTED_OTHER_REASON, storageIsCorrupt.getMessage());
             setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final Exception unexpected) {
             final String msg = "General error " + unexpected.getMessage();
@@ -166,11 +166,12 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void signalReload(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(p -> p.getLeft()).map(ref -> {
-            final String refName = ref.getRefName();
-            sendMessage("Reloading " + refName);
-            return refName;
-        }).collect(Collectors.toList());
+        final List<String> refsToUpdate = cmds.stream().filter(p -> p.getLeft().getResult() == Result.OK).map(Pair<ReceiveCommand, ReceiveCommand>::getLeft)
+                .map(ref -> {
+                    final String refName = ref.getRefName();
+                    sendMessage("Reloading " + refName);
+                    return refName;
+                }).collect(Collectors.toList());
         bus.process(refsToUpdate);
     }
 
@@ -180,8 +181,7 @@ public class JitStaticReceivePack extends ReceivePack {
         cmds.stream().map(cmd -> {
             final String refName = cmd.getLeft().getRefName();
             try {
-                final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName)
-                        .lockWriteAll(() -> commitBranch(refName, cmd, repository, monitor));
+                final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> commitBranch(refName, cmd, repository, monitor));
                 if (lock.isRight()) {
                     FailedToLock ftl = lock.getRight();
                     cmd.getLeft().setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
@@ -268,8 +268,7 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private boolean ifAllOk(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds) {
-        return cmds.stream().allMatch(
-                p -> (p.getRight() == null ? p.getLeft().getResult() == Result.NOT_ATTEMPTED : p.getRight().getResult() == Result.OK));
+        return cmds.stream().allMatch(p -> (p.getRight() == null ? p.getLeft().getResult() == Result.NOT_ATTEMPTED : p.getRight().getResult() == Result.OK));
     }
 
     private void setFault(final Exception e) {
@@ -294,8 +293,7 @@ public class JitStaticReceivePack extends ReceivePack {
         checkResult(testBranchName, updateRef.forceUpdate());
     }
 
-    private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result)
-            throws IOException, UpdateResultException {
+    private void checkResult(final String testBranchName, final org.eclipse.jgit.lib.RefUpdate.Result result) throws IOException, UpdateResultException {
         switch (result) {
         case FAST_FORWARD:
         case FORCED:

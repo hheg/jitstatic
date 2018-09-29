@@ -29,7 +29,7 @@ public class FailedToLock extends Exception {
     }
 
     @Override
-    public Throwable initCause(Throwable cause) {
+    public Throwable fillInStackTrace() {
         return this;
     }
 }

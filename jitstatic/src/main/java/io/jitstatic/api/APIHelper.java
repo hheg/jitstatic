@@ -42,6 +42,7 @@ import io.jitstatic.utils.WrappingAPIException;
 
 class APIHelper {
 
+    private static final String UNHANDLED_ERROR = "Unhandled error";
     private final Logger log;
 
     public APIHelper(final Logger log) {
@@ -51,22 +52,22 @@ class APIHelper {
     <T> T unwrapWithPOSTApi(final Supplier<T> add) {
         try {
             return add.get();
-        } catch (final Exception e) {
-            if (e instanceof WrappingAPIException) {
-                final Throwable apiException = e.getCause();
-                if (apiException instanceof KeyAlreadyExist) {
-                    throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
-                } else if (apiException instanceof RefNotFoundException) {
-                    // Error message here means that the branch is not found.
-                    throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
-                } else if (apiException instanceof IOException) {
-                    log.error("IO Error while executing command", e);
-                    throw new WebApplicationException("Data is malformed", 422);
-                }
+        } catch (final WrappingAPIException e) {
+            final Throwable apiException = e.getCause();
+            if (apiException instanceof KeyAlreadyExist) {
+                throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+            } else if (apiException instanceof RefNotFoundException) {
+                // Error message here means that the branch is not found.
+                throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
+            } else if (apiException instanceof IOException) {
+                log.error("IO Error while executing command", e);
+                throw new WebApplicationException("Data is malformed", 422);
             }
-            log.error("Error while unwrapping future", e);
-            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+            log.error(UNHANDLED_ERROR, e);
+        } catch (final Exception e) {
+            log.error(UNHANDLED_ERROR, e);
         }
+        throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
     }
 
     void checkHeaders(final HttpHeaders headers) {
@@ -95,25 +96,26 @@ class APIHelper {
     <T> T unwrapWithPUTApi(final Supplier<T> supplier) {
         try {
             return supplier.get();
-        } catch (final Exception e) {
-            if (e instanceof WrappingAPIException) {
-                final Throwable apiException = e.getCause();
-                if (apiException instanceof UnsupportedOperationException) {
-                    throw new WebApplicationException(Status.NOT_FOUND);
-                }
-                if (apiException instanceof RefNotFoundException) {
-                    return null;
-                }
-                if (apiException instanceof VersionIsNotSame) {
-                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.PRECONDITION_FAILED);
-                }
-                if (apiException instanceof KeyAlreadyExist) {
-                    throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
-                }
-            } else if (e instanceof UpdateFailedException) {
-                throw new WebApplicationException("Key is being updated", Status.PRECONDITION_FAILED);
+        } catch (final WrappingAPIException e) {
+            final Throwable apiException = e.getCause();
+            if (apiException instanceof UnsupportedOperationException) {
+                throw new WebApplicationException(Status.NOT_FOUND);
             }
-            log.error("Error while unwrapping future", e);
+            if (apiException instanceof RefNotFoundException) {
+                return null;
+            }
+            if (apiException instanceof VersionIsNotSame) {
+                throw new WebApplicationException(apiException.getLocalizedMessage(), Status.PRECONDITION_FAILED);
+            }
+            if (apiException instanceof KeyAlreadyExist) {
+                throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
+            }
+            log.error(UNHANDLED_ERROR, e);
+            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+        } catch (final UpdateFailedException e) {
+            throw new WebApplicationException("Key is being updated", Status.PRECONDITION_FAILED);
+        } catch (final Exception e) {
+            log.error(UNHANDLED_ERROR, e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
     }
@@ -122,16 +124,14 @@ class APIHelper {
         try {
             return supplier.get();
         } catch (final Exception e) {
-            log.error("Error while unwrapping future", e);
+            log.error(UNHANDLED_ERROR, e);
             return Optional.empty();
         }
     }
 
     void checkRef(final String ref) {
-        if (ref != null) {
-            if (!(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
+        if (ref != null && !(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+            throw new WebApplicationException(Status.NOT_FOUND);
         }
     }
 
@@ -152,7 +152,6 @@ class APIHelper {
     }
 
     Response respondAuthenticationChallenge(final String realm) {
-        return Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"")
-                .build();
+        return Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build();
     }
 }

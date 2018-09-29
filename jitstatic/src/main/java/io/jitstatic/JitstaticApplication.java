@@ -21,7 +21,6 @@ package io.jitstatic;
  */
 
 import io.dropwizard.Application;
-import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.api.BulkResource;
 import io.jitstatic.api.JitstaticInfoResource;
@@ -40,11 +39,6 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
     public static final String GIT_REALM = "git";
     public static final String JITSTATIC_STORAGE_REALM = "update";
     public static final String JITSTATIC_METAKEY_REALM = "create";
-
-    @Override
-    public void initialize(final Bootstrap<JitstaticConfiguration> bootstrap) {
-        super.initialize(bootstrap);
-    }
 
     @Override
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {

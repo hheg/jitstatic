@@ -70,7 +70,7 @@ public class Tree implements TreeVisitable {
         if (parts.contains(ALL)) {
             return Set.of();
         }
-        final Set<Tree> leafs = new HashSet<>();
+        final Set<Tree> tmpLeafs = new HashSet<>();
         boolean clearLeafs = false;
         for (Pair<String, Boolean> part : parts) {
             if (part.equals(LEVEL)) {
@@ -93,13 +93,13 @@ public class Tree implements TreeVisitable {
                     });
                 }
             } else {
-                leafs.add(new Leaf(this, element));
+                tmpLeafs.add(new Leaf(this, element));
             }
         }
         if (clearLeafs) {
-            leafs.clear();
+            tmpLeafs.clear();
         }
-        return Collections.unmodifiableSet(leafs);
+        return Collections.unmodifiableSet(tmpLeafs);
     }
 
     private HashSet<Tree> extractBranches(final Map<String, Set<Pair<String, Boolean>>> map) {
@@ -120,9 +120,7 @@ public class Tree implements TreeVisitable {
                 }
                 set.add(new Branch(this, value, entry.getKey(), false));
             }
-        }, (a, b) -> {
-            a.addAll(b);
-        });
+        }, HashSet<Tree>::addAll);
     }
 
     private String extractTail(String s, int firstSlash) {
@@ -216,9 +214,7 @@ public class Tree implements TreeVisitable {
             return false;
         if (branches.size() != other.branches.size())
             return false;
-        if (leafs.size() != other.leafs.size())
-            return false;
-        return true;
+        return (leafs.size() == other.leafs.size());
     }
 
     protected String getName() {

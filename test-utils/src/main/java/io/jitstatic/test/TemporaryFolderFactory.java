@@ -32,14 +32,14 @@ import java.nio.file.attribute.BasicFileAttributes;
 
 public class TemporaryFolderFactory {
     private final Path rootFolder;
-    private static final String baseName = "junit";
+    private static final String BASENAME = "junit";
 
     public TemporaryFolderFactory() throws IOException {
-        rootFolder = Files.createTempDirectory(baseName);
+        rootFolder = Files.createTempDirectory(BASENAME);
     }
 
     public File getTemporaryDirectory() throws IOException {
-        return Files.createTempDirectory(rootFolder, baseName).toFile();
+        return Files.createTempDirectory(rootFolder, BASENAME).toFile();
     }
 
     public File getTemporaryFile() throws IOException {

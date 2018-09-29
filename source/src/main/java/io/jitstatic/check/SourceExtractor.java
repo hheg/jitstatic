@@ -82,11 +82,10 @@ public class SourceExtractor {
         if (ObjectId.zeroId().equals(branchRef.getObjectId())) {
             return null;
         }
-        final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> source = fileLoader(Pair.of(branchRef.getObjectId(), Set.of(branchRef)),
-                key);
+        final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> source = fileLoader(Pair.of(branchRef.getObjectId(), Set.of(branchRef)), key);
         final List<BranchData> sourceInfo = source.getRight();
         final BranchData repositoryData = sourceInfo.get(0);
-        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair(key);
+        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair();
         if (repositoryData.getFileDataError() != null) {
             throw new RuntimeException(repositoryData.getFileDataError().getInputStreamHolder().exception());
         }
@@ -107,30 +106,26 @@ public class SourceExtractor {
         return branchRef;
     }
 
-    public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceTestBranchExtractor(final String branchName)
-            throws IOException, RefNotFoundException {
-        if (!Objects.requireNonNull(branchName).startsWith(JitStaticConstants.REFS_JISTSTATIC)) {
+    public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceTestBranchExtractor(final String branchName) throws IOException, RefNotFoundException {
+        if (!Objects.requireNonNull(branchName).startsWith(JitStaticConstants.REFS_JITSTATIC)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceGeneralExtractor(branchName);
     }
 
-    private Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceGeneralExtractor(final String branchName)
-            throws IOException, RefNotFoundException {
+    private Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceGeneralExtractor(final String branchName) throws IOException, RefNotFoundException {
         final Ref branchRef = findBranch(branchName);
         return fileLoader(Pair.of(branchRef.getObjectId(), Set.of(branchRef)));
     }
 
-    public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceBranchExtractor(final String branchName)
-            throws IOException, RefNotFoundException {
+    public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceBranchExtractor(final String branchName) throws IOException, RefNotFoundException {
         if (!Objects.requireNonNull(branchName).startsWith(Constants.R_HEADS)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceGeneralExtractor(branchName);
     }
 
-    private Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> fileLoader(final Pair<AnyObjectId, Set<Ref>> referencePoint,
-            final String key) {
+    private Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> fileLoader(final Pair<AnyObjectId, Set<Ref>> referencePoint, final String key) {
         final List<BranchData> files = new ArrayList<>();
         final AnyObjectId reference = referencePoint.getLeft();
         try (final RevWalk rev = new RevWalk(repository)) {
@@ -139,8 +134,7 @@ public class SourceExtractor {
             files.add(walkTree(currentTree, key));
             rev.dispose();
         } catch (final IOException e) {
-            files.add(
-                    new BranchData(new RepositoryDataError(new FileObjectIdStore(key, reference.toObjectId()), new InputStreamHolder(e))));
+            files.add(new BranchData(new RepositoryDataError(new FileObjectIdStore(key, reference.toObjectId()), new InputStreamHolder(e))));
         }
         return Pair.of(referencePoint, files);
     }
@@ -187,8 +181,7 @@ public class SourceExtractor {
                 if (p.getLastElement().equals(JitStaticConstants.METADATA)) {
                     metaFiles.put(path, new MetaFileData(fileObjectIdStore, inputStreamHolder));
                 } else {
-                    metaFiles.put(path.substring(0, path.length() - METADATA_LENGTH),
-                            new MetaFileData(fileObjectIdStore, inputStreamHolder, true));
+                    metaFiles.put(path.substring(0, path.length() - METADATA_LENGTH), new MetaFileData(fileObjectIdStore, inputStreamHolder, true));
                 }
             } else {
                 dataFiles.put(path, new SourceFileData(fileObjectIdStore, inputStreamHolder));
@@ -202,8 +195,7 @@ public class SourceExtractor {
         if (path.isDirectory()) {
             pfg = PathFilterGroup.createFromStrings(key + JitStaticConstants.METADATA);
         } else {
-            pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA,
-                    path.getParentElements() + JitStaticConstants.METADATA);
+            pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA, path.getParentElements() + JitStaticConstants.METADATA);
         }
         return pfg;
     }
@@ -223,11 +215,10 @@ public class SourceExtractor {
     public Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> extractAll() {
         final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
         return allRefs.entrySet().stream().map(e -> {
-            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic())
-                    .filter(ref -> ref.getName().startsWith(Constants.R_HEADS)).collect(Collectors.toSet());
+            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic()).filter(ref -> ref.getName().startsWith(Constants.R_HEADS))
+                    .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
-        }).map(this::fileLoader)
-                .collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
+        }).map(this::fileLoader).collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
     }
 
     public Ref getRef(final String ref) throws IOException {

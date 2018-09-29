@@ -37,7 +37,7 @@ public class TemporaryFolder {
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
-            };
+            }
         };
     }
 

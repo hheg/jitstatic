@@ -183,7 +183,7 @@ public class SourceExtractorTest {
 
             sourceBranchExtractor = se.sourceBranchExtractor(REFS_HEADS_MASTER);
             BranchData first = sourceBranchExtractor.getRight().get(0);
-            Pair<MetaFileData, SourceFileData> firstPair = first.getFirstPair(null);
+            Pair<MetaFileData, SourceFileData> firstPair = first.getFirstPair();
             assertFalse(firstPair.isPresent());
             assertNull(firstPair.getLeft());
         }
@@ -280,7 +280,7 @@ public class SourceExtractorTest {
             List<BranchData> branchData = branch.getRight();
             assertTrue(branchData.size() == 1);
             BranchData onlyBranchData = branchData.stream().findFirst().get();
-            Exception actual = onlyBranchData.getFirstPair(null).getRight().getInputStreamHolder().exception();
+            Exception actual = onlyBranchData.getFirstPair().getRight().getInputStreamHolder().exception();
             assertSame(exception, actual);
         }
     }
@@ -305,7 +305,7 @@ public class SourceExtractorTest {
 
     @Test
     public void testSourceTestBranchExtractorWrongRefName() {
-        final String branch = JitStaticConstants.REFS_JISTSTATIC + "something";
+        final String branch = JitStaticConstants.REFS_JITSTATIC + "something";
         assertThat(assertThrows(RefNotFoundException.class, () -> {
             final String key = "file";
             File temporaryGitFolder = getFolder();

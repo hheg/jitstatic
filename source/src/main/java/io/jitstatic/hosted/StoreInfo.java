@@ -1,3 +1,4 @@
+
 package io.jitstatic.hosted;
 
 /*-
@@ -73,7 +74,7 @@ public class StoreInfo {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((metaDataVersion == null) ? 0 : metaDataVersion.hashCode());
+        result = prime * result + metaDataVersion.hashCode();
         result = prime * result + ((version == null) ? 0 : version.hashCode());
         return result;
     }

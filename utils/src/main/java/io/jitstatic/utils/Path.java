@@ -47,7 +47,7 @@ public class Path {
     }
 
     public String getParentElements() {
-        return Arrays.stream(pathElements).limit(pathElements.length - 1).map(s -> s + "/").collect(Collectors.joining(""));
+        return Arrays.stream(pathElements).limit(pathElements.length - 1L).map(s -> s + "/").collect(Collectors.joining(""));
     }
 
 }

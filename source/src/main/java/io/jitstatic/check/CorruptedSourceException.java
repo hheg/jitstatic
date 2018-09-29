@@ -46,7 +46,7 @@ public class CorruptedSourceException extends Exception {
 				sb.append("es");
 			}
 			sb.append(" ");
-			sb.append(branchFileErrors.stream().map(r -> r.getName()).collect(Collectors.joining(", ")))
+			sb.append(branchFileErrors.stream().map(Ref::getName).collect(Collectors.joining(", ")))
 					.append(System.lineSeparator());
 			for (final Pair<FileObjectIdStore, Exception> fileError : branchErrors.getRight()) {
 				final FileObjectIdStore fileInfo = fileError.getLeft();

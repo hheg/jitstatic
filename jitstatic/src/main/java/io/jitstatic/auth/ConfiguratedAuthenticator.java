@@ -29,9 +29,6 @@ import io.jitstatic.auth.User;
 
 public class ConfiguratedAuthenticator implements Authenticator<BasicCredentials, User> {
 
-	public ConfiguratedAuthenticator() {
-	}
-
 	@Override
 	public Optional<User> authenticate(final BasicCredentials credentials) throws AuthenticationException {
 		return Optional.of(new User(credentials.getUsername(), credentials.getPassword()));

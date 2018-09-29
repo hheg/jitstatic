@@ -27,7 +27,7 @@ import java.util.Properties;
 @SuppressWarnings("unused")
 public class ProjectVersion {
 
-	public final static ProjectVersion INSTANCE = new ProjectVersion();
+	public static final ProjectVersion INSTANCE = new ProjectVersion();
 
 	private final String tags;
 	private final String branch;

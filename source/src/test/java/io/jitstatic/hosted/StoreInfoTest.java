@@ -1,5 +1,7 @@
 package io.jitstatic.hosted;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -21,7 +23,10 @@ package io.jitstatic.hosted;
  */
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Set;
@@ -32,19 +37,37 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 
 public class StoreInfoTest {
-    
+
     @Test
     public void testStoreInfo() {
         MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of());
-        StoreInfo s1 = new StoreInfo(new byte[] {0}, sd, "1", "1");
-        StoreInfo s2 = new StoreInfo(new byte[] {0}, sd, "1", "1");
-        StoreInfo s3 = new StoreInfo(new byte[] {0}, sd, "2", "1");
-        assertEquals(s1,s1);
-        assertEquals(s1,s2);
-        assertNotEquals(s1,s3);
-        assertNotEquals(s1,null);
-        assertNotEquals(s1,new Object());
-        s1.hashCode();
+        StoreInfo s1 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
+        StoreInfo s2 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
+        StoreInfo s3 = new StoreInfo(new byte[] { 0 }, sd, "2", "1");
+        assertEquals(s1, s1);
+        assertEquals(s1, s2);
+        assertNotEquals(s1, s3);
+        assertNotEquals(s1, null);
+        assertNotEquals(s1, new Object());
+        assertEquals(s1.hashCode(), s2.hashCode());
+        assertEquals("1", s1.getVersion());
+        assertArrayEquals(new byte[] { 0 }, s1.getData());
+        assertTrue(s1.isNormalKey());
+        assertFalse(s1.isMasterMetaData());
+    }
+
+    @Test
+    public void testStoreInfoMasterMetaData() {
+        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of());
+        StoreInfo s1 = new StoreInfo(sd, "1");
+        StoreInfo s2 = new StoreInfo(sd, "1");
+
+        assertTrue(s1.isMasterMetaData());
+        assertFalse(s1.isNormalKey());
+        assertThrows(IllegalStateException.class, () -> s1.getData());
+        assertThrows(IllegalStateException.class, () -> s1.getVersion());
+        assertEquals("1", s1.getMetaDataVersion());
+        assertEquals(s1, s2);
     }
 
 }

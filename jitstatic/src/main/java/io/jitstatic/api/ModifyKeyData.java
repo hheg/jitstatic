@@ -39,14 +39,14 @@ public class ModifyKeyData {
 
     @JsonProperty
     @NotNull
-    @Size(min=1)
+    @Size(min = 1)
     private byte[] data;
 
     @JsonProperty
     @NotNull
     @NotEmpty
     private String userMail;
-    
+
     @JsonProperty
     @NotNull
     @NotEmpty

@@ -86,6 +86,6 @@ public class JitstaticConfiguration extends Configuration {
     public AddKeyAuthenticator getAddKeyAuthenticator() {
         HostedFactory hf = getHostedFactory();
         final User addUser = new User(hf.getUserName(), hf.getSecret());
-        return (user) -> addUser.equals(user);
+        return addUser::equals;
     }
 }

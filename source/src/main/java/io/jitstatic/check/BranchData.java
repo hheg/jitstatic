@@ -76,9 +76,9 @@ class BranchData {
         }).map(e -> Pair.of(e.getValue(), (SourceFileData) null))).collect(Collectors.toList());
     }
 
-    public Pair<MetaFileData, SourceFileData> getFirstPair(final String key) {
+    public Pair<MetaFileData, SourceFileData> getFirstPair() {
         final List<Pair<MetaFileData, SourceFileData>> data = pair();
-        if (data.size() == 0) {
+        if (data.isEmpty()) {
             return Pair.ofNothing();
         }
         Optional<Pair<MetaFileData, SourceFileData>> firstPair = data.stream().filter(Pair::isPresent).findFirst();

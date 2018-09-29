@@ -67,6 +67,7 @@ public class MetaKeyResource {
     private final Storage storage;
     private final AddKeyAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
+
     public MetaKeyResource(final Storage storage, final AddKeyAuthenticator addKeyAuthenticator) {
         this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
         this.storage = Objects.requireNonNull(storage);
@@ -133,8 +134,8 @@ public class MetaKeyResource {
             return noChangeBuilder.tag(tag).build();
         }
 
-        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.putMetaData(key, ref, data.getMetaData(),
-                currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
+                () -> storage.putMetaData(key, ref, data.getMetaData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
 
         if (result.isRight()) {
             return Response.status(Status.PRECONDITION_FAILED).tag(tag).build();
@@ -147,11 +148,7 @@ public class MetaKeyResource {
     }
 
     private StoreInfo checkIfKeyExist(final String key, final String ref) {
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        return si.get();
+        return helper.unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND));
     }
 
 }

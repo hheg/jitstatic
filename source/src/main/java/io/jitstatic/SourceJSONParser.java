@@ -47,7 +47,7 @@ public class SourceJSONParser {
         final MetaData metaData = parseStream(bc);
 
         final Set<ConstraintViolation<MetaData>> violations = validator.validate(metaData);
-        if (violations.size() > 0) {
+        if (!violations.isEmpty()) {
             throw new StorageParseException(violations);
         }
         return metaData.getContentType();
@@ -78,7 +78,6 @@ public class SourceJSONParser {
             return violations.stream()
                     .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
                     .collect(Collectors.joining(System.lineSeparator()));
-
         }
 
         @Override

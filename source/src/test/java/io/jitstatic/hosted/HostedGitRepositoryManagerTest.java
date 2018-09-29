@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jgit.api.Git;
@@ -112,7 +111,6 @@ public class HostedGitRepositoryManagerTest {
     private TemporaryFolder tmpFolder;
     private Path tempFile;
     private Path tempDir;
-    private Executor service;
 
     @BeforeEach
     public void setup() throws IOException {
@@ -386,7 +384,7 @@ public class HostedGitRepositoryManagerTest {
         NullPointerException npe = new NullPointerException();
         assertSame(npe, assertThrows(RuntimeException.class, () -> {
             ErrorReporter reporter = new ErrorReporter();
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service, reporter);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, reporter);) {
                 reporter.setFault(npe);
                 grm.checkHealth();
             }

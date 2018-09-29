@@ -1,5 +1,6 @@
 package io.jitstatic.hosted;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /*-
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,7 +51,7 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadPack() throws IOException {
-        
+
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -72,7 +74,6 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadFailsWithStaleBaseline() throws IOException {
-        
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -97,7 +98,6 @@ public class JitStaticUploadPackTest {
 
     @Test
     public void testUploadFailsWithUnknownError() throws IOException {
-        
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
@@ -110,38 +110,38 @@ public class JitStaticUploadPackTest {
         InputStream is = new ByteArrayInputStream(new byte[] { 1 });
         OutputStream os = mock(OutputStream.class);
         OutputStream messages = mock(OutputStream.class);
-        Mockito.doThrow(new UploadPackInternalServerErrorException(new RuntimeException())).when(os).write(Mockito.any(), Mockito.anyInt(),
-                Mockito.anyInt());
+        Mockito.doThrow(new UploadPackInternalServerErrorException(new RuntimeException())).when(os).write(Mockito.any(), Mockito.anyInt(), Mockito.anyInt());
         ErrorReporter errorReporter = new ErrorReporter();
         JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter);
         up.setBiDirectionalPipe(true);
         up.setTransferConfig(tc);
         up.setAdvertisedRefs(new HashMap<>());
         up.upload(is, os, messages);
-        assertNull(errorReporter.getFault());        
+        assertNull(errorReporter.getFault());
     }
-    
+
     @Test
-    public void testInternalUpload() throws IOException {
+    public void testUploadFailsWithUnknown() {
         Repository copyFrom = mock(Repository.class);
         ObjectReader or = mock(ObjectReader.class);
         RefFilter rf = mock(RefFilter.class);
         TransferConfig tc = mock(TransferConfig.class);
         StoredConfig sc = mock(StoredConfig.class);
+
         when(tc.getRefFilter()).thenReturn(rf);
         when(copyFrom.newObjectReader()).thenReturn(or);
         when(copyFrom.getConfig()).thenReturn(sc);
- 
-        ErrorReporter errorReporter = new ErrorReporter();
-        InputStream input = mock(InputStream.class);
-        OutputStream output = mock(OutputStream.class);
-        OutputStream messages = mock(OutputStream.class);
-        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, errorReporter) {
+        when(sc.getBoolean(Mockito.any(), Mockito.any(), Mockito.anyBoolean())).thenReturn(false);
+        when(sc.getString(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("");
+        when(sc.getStringList(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(new String[] {});
+
+        JitStaticUploadPack up = new JitStaticUploadPack(copyFrom, new ErrorReporter()) {
+            @Override
             void internalupload(InputStream input, OutputStream output, OutputStream messages) throws IOException {
                 throw new RuntimeException("Test");
-            };
+            }
         };
-        up.upload(input, output, messages);
-        assertNotNull(errorReporter.getFault());
+
+        assertEquals("Test", assertThrows(RuntimeException.class, () -> up.upload(null, null, null)).getMessage());
     }
 }

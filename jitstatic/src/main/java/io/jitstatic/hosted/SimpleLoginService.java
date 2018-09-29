@@ -28,7 +28,7 @@ import org.eclipse.jetty.util.security.Password;
 
 class SimpleLoginService extends AbstractLoginService {
 
-	private final String[] roles = new String[] { "gitrole" };
+	private static final String[] ROLES = new String[] { "gitrole" };
 	private UserPrincipal principal;
 
 	public SimpleLoginService(final String userName, final String secret, final String realm) {
@@ -39,7 +39,7 @@ class SimpleLoginService extends AbstractLoginService {
 	@Override
 	protected String[] loadRoleInfo(final UserPrincipal user) {
 		if (principal.getName().equals(user.getName())) {
-			return Arrays.copyOf(roles, 1);
+			return Arrays.copyOf(ROLES, 1);
 		}
 		return new String[] {};
 	}
