@@ -51,6 +51,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,14 +103,14 @@ public class KeyResource {
             final @Context HttpHeaders headers) {
 
         helper.checkRef(ref);
-
+        
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
         final Response noChange = helper.checkETag(headers, tag);
 
         final MetaData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
-        final Set<Role> roles = data.getRoles();
+        final Set<Role> roles = data.getRead();
         if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
             if (noChange != null) {
                 return noChange;
@@ -122,7 +123,7 @@ public class KeyResource {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
-        checkIfAllowed(key, user.get(), allowedUsers, ref, storeInfo.getStorageData().getRoles());
+        checkIfAllowed(key, user.get(), allowedUsers, ref, storeInfo.getStorageData().getRead());
         if (noChange != null) {
             return noChange;
         }
@@ -143,12 +144,27 @@ public class KeyResource {
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
-            @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
+            @QueryParam("light") final boolean light, final @Auth Optional<User> userHolder) {
         helper.checkRef(ref);
-        final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref, user);
+
+        final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref).stream().filter(data -> {
+            final MetaData storageData = data.getRight().getStorageData();
+            final Set<User> allowedUsers = storageData.getUsers();
+            final Set<Role> keyRoles = storageData.getRead();
+            if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                return true;
+            }
+            if (!userHolder.isPresent()) {
+                return false;
+            }
+            final User user = userHolder.get();
+            return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref);
+        }).collect(Collectors.toList());
+
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
         }
+
         return Response.ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())).build();
     }
 
@@ -193,13 +209,13 @@ public class KeyResource {
 
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
         final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        final Set<Role> roles = storeInfo.getStorageData().getRoles();
+        final Set<Role> roles = storeInfo.getStorageData().getWrite();
         boolean isAuthenticated = addKeyAuthenticator.authenticate(user, ref);
         if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty()) && !isAuthenticated) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
 
-        if (!isAuthenticated && !allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, roles)) {
+        if (!allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, roles) && !isAuthenticated) {
             LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
@@ -239,12 +255,17 @@ public class KeyResource {
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
-        if (userData == null) {
+        UserData userData;
+        try {
+            userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            if (userData == null) {
+                return false;
+            }
+            final Set<Role> userRoles = userData.getRoles();
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+        } catch (RefNotFoundException e) {
             return false;
-        }
-        final Set<Role> userRoles = userData.getRoles();
-        return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+        }        
     }
 
     // TODO addKey should use ref like all other endpoints,
@@ -271,11 +292,16 @@ public class KeyResource {
 
         final User user = userHolder.get();
         if (!addKeyAuthenticator.authenticate(user, ref)) {
-            final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
-            if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
-                LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            UserData userData;
+            try {
+                userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
+                if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
+                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+                    throw new WebApplicationException(Status.FORBIDDEN);
+                }
+            } catch (RefNotFoundException e) {
                 throw new WebApplicationException(Status.FORBIDDEN);
-            }
+            }            
         }
 
         final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
@@ -310,10 +336,9 @@ public class KeyResource {
         final User user = userHolder.get();
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
         final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
+        final Set<Role> roles = storeInfo.getStorageData().getWrite();
 
-        if (!allowedUsers.contains(user) && !addKeyAuthenticator.authenticate(user, ref)
-                && !isKeyUserAllowed(user, ref, storeInfo.getStorageData().getRoles())) {
-            final Set<Role> roles = storeInfo.getStorageData().getRoles();
+        if (!allowedUsers.contains(user) && !addKeyAuthenticator.authenticate(user, ref) && !isKeyUserAllowed(user, ref, roles)) {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
                 throw new WebApplicationException(Status.BAD_REQUEST);
             }

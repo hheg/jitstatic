@@ -44,6 +44,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +95,7 @@ public class MetaKeyResource {
 
         final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
 
-        final Set<Role> roles = (si.isPresent() ? si.get().getStorageData().getRoles() : null);
+        final Set<Role> roles = (si.isPresent() ? si.get().getStorageData().getRead() : null);
         authorize(user.get(), ref, roles);
 
         if (si.isPresent()) {
@@ -119,12 +120,17 @@ public class MetaKeyResource {
 
     private boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
-        if (userData == null) {
+        UserData userData;
+        try {
+            userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            if (userData == null) {
+                return false;
+            }
+            final Set<Role> userRoles = userData.getRoles();
+            return keyRoles.stream().allMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword());
+        } catch (RefNotFoundException e) {
             return false;
         }
-        final Set<Role> userRoles = userData.getRoles();
-        return keyRoles.stream().allMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword());
     }
 
     @PUT
@@ -145,9 +151,9 @@ public class MetaKeyResource {
         helper.checkRef(ref);
 
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
-        authorize(user.get(), ref, storeInfo.getStorageData().getRoles());
+        authorize(user.get(), ref, storeInfo.getStorageData().getWrite());
         final String currentVersion = storeInfo.getMetaDataVersion();
-        
+
         final EntityTag tag = new EntityTag(currentVersion);
         final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
 

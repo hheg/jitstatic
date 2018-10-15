@@ -26,11 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -42,7 +40,6 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
@@ -268,17 +265,15 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref, final Optional<User> user) {
+    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
         Objects.requireNonNull(keyPairs);
-        Objects.requireNonNull(user);
         final String finalRef = checkRef(ref);
         return Tree.of(keyPairs).accept(new PathBuilderVisitor()).parallelStream().map(pair -> {
             final String key = pair.getLeft();
             if (key.endsWith("/")) {
                 try {
                     return source.getList(key, finalRef, pair.getRight()).parallelStream().map(k -> Pair.of(k, getKey(k, finalRef))).filter(Pair::isPresent)
-                            .filter(pa -> pa.getRight().isPresent()).map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).filter(filterUser(user))
-                            .collect(Collectors.toList());
+                            .filter(pa -> pa.getRight().isPresent()).map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).collect(Collectors.toList());
                 } catch (final RefNotFoundException rnfe) {
                     return List.<Pair<String, StoreInfo>>of();
                 } catch (final IOException e) {
@@ -288,35 +283,19 @@ public class GitStorage implements Storage {
             }
             final Optional<StoreInfo> keyContent = getKey(key, finalRef);
             if (keyContent.isPresent()) {
-                StoreInfo storeInfo = keyContent.get();
-                final Set<User> users = storeInfo.getStorageData().getUsers();
-                if (users.isEmpty() && !user.isPresent() || (user.isPresent() && users.contains(user.get()))) {
-                    return List.of(Pair.of(key, keyContent.get()));
-                }
+                return List.of(Pair.of(key, keyContent.get()));
             }
             return List.<Pair<String, StoreInfo>>of();
         }).flatMap(List::stream).collect(Collectors.toList());
     }
 
-    private Predicate<? super Pair<String, StoreInfo>> filterUser(final Optional<User> user) {
-        return pb -> {
-            final StoreInfo si = pb.getRight();
-            final Set<User> users = si.getStorageData().getUsers();
-            if (user.isPresent()) {
-                return users.contains(user.get());
-            } else {
-                return users.isEmpty();
-            }
-        };
+    @Override
+    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input) {
+        return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight()), p.getRight())).collect(Collectors.toList());
     }
 
     @Override
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input, final Optional<User> user) {
-        return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight())).collect(Collectors.toList());
-    }
-
-    @Override
-    public UserData getUser(final String username, String ref, String realm) {
+    public UserData getUser(final String username, String ref, final String realm) throws RefNotFoundException {
         ref = checkRef(ref);
         final RefHolder refHolder = getRefHolder(ref);
         try {
@@ -324,7 +303,7 @@ public class GitStorage implements Storage {
         } catch (WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof RefNotFoundException) {
-                throw new RepoIsNotInitialized("Default ref " + ref + " is not found ");
+                throw (RefNotFoundException) cause;
             }
             if (cause instanceof IOException) {
                 throw new UncheckedIOException((IOException) cause);

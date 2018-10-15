@@ -24,6 +24,8 @@ import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 
 import java.util.Objects;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.storage.Storage;
@@ -42,17 +44,22 @@ public class KeyAdminAuthenticatorImpl implements KeyAdminAuthenticator {
 
     @Override
     public boolean authenticate(final User user, String ref) {
-        if(ref == null) {
+        if (ref == null) {
             ref = defaultRef;
         }
         if (legacyKeyAuthenticator.authenticate(user, ref)) {
             return true;
         }
-        final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYADMIN_REALM);
-        if (userData == null) {
+
+        try {
+            UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYADMIN_REALM);
+            if (userData == null) {
+                return false;
+            }
+            return userData.getBasicPassword().equals(user.getPassword());
+        } catch (final RefNotFoundException e) {
             return false;
         }
-        return userData.getBasicPassword().equals(user.getPassword());
     }
 
 }

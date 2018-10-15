@@ -23,6 +23,7 @@ package io.jitstatic.api;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.validation.Valid;
@@ -35,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.codahale.metrics.annotation.ExceptionMetered;
@@ -42,7 +44,12 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import io.jitstatic.JitStaticConstants;
+import io.jitstatic.MetaData;
+import io.jitstatic.Role;
+import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
@@ -51,9 +58,11 @@ import io.jitstatic.utils.Pair;
 public class BulkResource {
 
     private final Storage storage;
+    private final KeyAdminAuthenticator addKeyAuthenticator;
 
-    public BulkResource(final Storage storage) {
+    public BulkResource(final Storage storage, KeyAdminAuthenticator addKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
+        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
     }
 
     @POST
@@ -63,17 +72,42 @@ public class BulkResource {
     @ExceptionMetered(name = "fetch_storage_exception")
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> user) {
+    public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> userHolder) {
         final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream()
-                .map(bs -> Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()), bs.getRef())).collect(Collectors.toList()), user);
-
-        if (searchResults.isEmpty()) {
+                .map(bs -> Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()), bs.getRef()))
+                .collect(Collectors.toList()));
+        final List<SearchResult> result = searchResults.stream().map(p -> p.getKey().stream().filter(data -> {
+            final String ref = p.getRight();
+            final MetaData storageData = data.getRight().getStorageData();
+            final Set<User> allowedUsers = storageData.getUsers();
+            final Set<Role> keyRoles = storageData.getRead();
+            if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                return true;
+            }
+            if (!userHolder.isPresent()) {
+                return false;
+            }
+            final User user = userHolder.get();
+            return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref);
+        }).map(ps -> new SearchResult(ps, p.getRight()))).flatMap(s -> s).collect(Collectors.toList());
+        if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();
         }
+        return Response.ok(result).build();
+    }
 
-        return Response.ok(searchResults.stream()
-                .map(p -> p.getKey().stream().map(ps -> new SearchResult(ps, p.getRight())).collect(Collectors.toList()))
-                .flatMap(List::stream).collect(Collectors.toList())).build();
+    boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
+        keyRoles = keyRoles == null ? Set.of() : keyRoles;
+        try {
+            UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            if (userData == null) {
+                return false;
+            }
+            final Set<Role> userRoles = userData.getRoles();
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+        } catch (RefNotFoundException e) {
+            return false;
+        }
     }
 
 }

@@ -112,7 +112,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testGetAKey() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
         Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
         Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
@@ -125,7 +125,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithoutuser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -138,7 +138,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -154,7 +154,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongVersion() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -170,7 +170,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKey() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -189,7 +189,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithMalformedKeyData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
@@ -204,7 +204,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testGetMasterMetaData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
         Mockito.when(storage.getKey("dog/", null)).thenReturn(Optional.of(sd));
         Response response = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
@@ -217,7 +217,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAMasterMetaData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");

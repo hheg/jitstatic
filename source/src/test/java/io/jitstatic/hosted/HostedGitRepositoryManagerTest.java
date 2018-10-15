@@ -430,7 +430,7 @@ public class HostedGitRepositoryManagerTest {
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call()) {
             addFilesAndPush(localGitDir, git);
             Pair<String, String> addKey = grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 },
-                    new MetaData(new HashSet<>(), null, false, false, List.of(), null), new CommitMetaData("user", "mail", "msg"));
+                    new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg"));
             String version = addKey.getLeft();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -448,7 +448,7 @@ public class HostedGitRepositoryManagerTest {
     public void testAddKeyButNoBranch() throws Throwable {
         assertThat((RefNotFoundException) assertThrows(WrappingAPIException.class, () -> {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new MetaData(new HashSet<>(), null, false, false, List.of(), null),
+                grm.addKey("key", REF_HEADS_MASTER, new byte[] { 1 }, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                         new CommitMetaData("user", "mail", "msg"));
             }
         }).getCause(), isA(RefNotFoundException.class));
@@ -469,7 +469,7 @@ public class HostedGitRepositoryManagerTest {
             }
 
             String firstVersion = firstSourceInfo.getMetaDataVersion();
-            MetaData newData = new MetaData(new HashSet<>(), "newcontent", false, false, List.of(), null);
+            MetaData newData = new MetaData(new HashSet<>(), "newcontent", false, false, List.of(), null, null);
             String newVersion = grm.modifyMetadata(newData, firstVersion, STORE, null, cmd);
             assertNotNull(newVersion);
             assertNotEquals(firstVersion, newVersion);
@@ -508,7 +508,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null), "1", STORE,
+            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null, null), "1", STORE,
                     "refs/tags/tag", new CommitMetaData("user", "mail", "msg")));
         }
     }

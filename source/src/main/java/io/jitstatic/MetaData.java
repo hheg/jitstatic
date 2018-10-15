@@ -50,18 +50,29 @@ public class MetaData {
     @Valid
     private final List<HeaderPair> headers;
     @Valid
-    private final Set<Role> roles;
+    private final Set<Role> read;
+    @Valid
+    private final Set<Role> write;
 
     @JsonCreator
     public MetaData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
             final @JsonProperty("protected") boolean isProtected, final @JsonProperty("hidden") boolean hidden,
-            final @JsonProperty("headers") List<HeaderPair> headers, final @JsonProperty("roles") Set<Role> roles) {
+            final @JsonProperty("headers") List<HeaderPair> headers, final @JsonProperty("read") Set<Role> read, final @JsonProperty("write") Set<Role> write) {
         this.users = Objects.requireNonNull(users, "metadata is missing users field");
         this.contentType = contentType == null ? "application/json" : contentType;
         this.isProtected = isProtected;
         this.hidden = hidden;
         this.headers = headers;
-        this.roles = roles;
+        this.read = read;
+        this.write = write;
+    }
+
+    public MetaData(final Set<Role> read, final Set<Role> write) {
+        this(Set.of(), null, false, false, List.of(), read, write);
+    }
+
+    public MetaData(final Set<User> users) {
+        this(users, null, false, false, List.of(), null, null);
     }
 
     public Set<User> getUsers() {
@@ -80,8 +91,8 @@ public class MetaData {
     @Override
     public boolean equals(final Object other) {
         return Optional.ofNullable(other).filter(that -> that instanceof MetaData).map(that -> (MetaData) that)
-                .filter(that -> Objects.equals(this.users, that.users))
-                .filter(that -> Objects.equals(this.getContentType(), that.getContentType())).isPresent();
+                .filter(that -> Objects.equals(this.users, that.users)).filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
+                .isPresent();
     }
 
     public String getContentType() {
@@ -100,7 +111,11 @@ public class MetaData {
         return headers;
     }
 
-    public Set<Role> getRoles() {
-        return roles;
+    public Set<Role> getRead() {
+        return read;
+    }
+
+    public Set<Role> getWrite() {
+        return write;
     }
 }

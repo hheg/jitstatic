@@ -98,8 +98,8 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
-import io.jitstatic.client.JitStaticUpdaterClient;
-import io.jitstatic.client.JitStaticUpdaterClientBuilder;
+import io.jitstatic.client.JitStaticClient;
+import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
@@ -449,9 +449,9 @@ public class LoadTesterIT {
         return false;
     }
 
-    private JitStaticUpdaterClient buildKeyClient(boolean cache) throws URISyntaxException {
+    private JitStaticClient buildKeyClient(boolean cache) throws URISyntaxException {
         int localPort = DW.getLocalPort();
-        JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(localPort)
+        JitStaticClientBuilder builder = JitStaticClient.create().setHost("localhost").setPort(localPort)
                 .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
         if (cache) {
             builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())
@@ -506,9 +506,9 @@ public class LoadTesterIT {
 
     private class JitStaticUpdater implements AutoCloseable {
         private final Counters counter;
-        private final JitStaticUpdaterClient updater;
+        private final JitStaticClient updater;
 
-        public JitStaticUpdater(JitStaticUpdaterClient updater) {
+        public JitStaticUpdater(JitStaticClient updater) {
             this.updater = updater;
             this.counter = new Counters(0, 0);
         }

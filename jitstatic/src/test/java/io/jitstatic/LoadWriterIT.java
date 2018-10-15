@@ -96,8 +96,8 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
-import io.jitstatic.client.JitStaticUpdaterClient;
-import io.jitstatic.client.JitStaticUpdaterClientBuilder;
+import io.jitstatic.client.JitStaticClient;
+import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
@@ -152,7 +152,7 @@ public class LoadWriterIT {
             for (String branch : data.branches) {
                 for (String key : data.names) {
                     jobs[j] = CompletableFuture.supplyAsync(() -> {
-                        try (JitStaticUpdaterClient buildKeyClient = buildKeyClient(false);) {
+                        try (JitStaticClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
                             ResultData resultData = execute(buildKeyClient, branch, key, tag);
                             printStats(resultData);
@@ -181,7 +181,7 @@ public class LoadWriterIT {
         return nominator / (double) (denominator / 1000);
     }
 
-    private ResultData execute(final JitStaticUpdaterClient buildKeyClient, final String branch, final String key, String tag) {
+    private ResultData execute(final JitStaticClient buildKeyClient, final String branch, final String key, String tag) {
         int bytes = 0;
         long stop = 0;
         int i = 1;
@@ -199,7 +199,7 @@ public class LoadWriterIT {
         return new ResultData(i, (stop - start), bytes);
     }
 
-    private String setupRun(JitStaticUpdaterClient buildKeyClient, String branch, final String key) {
+    private String setupRun(JitStaticClient buildKeyClient, String branch, final String key) {
         String tag;
         try {
             tag = buildKeyClient.getKey(key, branch, LoadWriterIT::read).tag;
@@ -298,9 +298,9 @@ public class LoadWriterIT {
         }
     }
 
-    private JitStaticUpdaterClient buildKeyClient(boolean cache) {
+    private JitStaticClient buildKeyClient(boolean cache) {
         int localPort = DW.getLocalPort();
-        JitStaticUpdaterClientBuilder builder = JitStaticUpdaterClient.create().setHost("localhost").setPort(localPort)
+        JitStaticClientBuilder builder = JitStaticClient.create().setHost("localhost").setPort(localPort)
                 .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
         if (cache) {
             builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())

@@ -134,7 +134,7 @@ public class GitStorageTest {
             assertThrows(IllegalStateException.class, () -> storeInfo.getData());
             assertNotNull(storeInfo.getStorageData());
 
-            MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of(), null);
+            MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of(), null, null);
             Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, new CommitMetaData("user", "mail", "msg"));
             assertEquals(SHA_2_MD, putMetaData.getLeft());
             Optional<StoreInfo> completableSupplier2 = gs.getKey("root/", null);
@@ -174,7 +174,8 @@ public class GitStorageTest {
             when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF_HEADS_MASTER))).thenReturn(si1).thenReturn(si2);
 
             gs.reload(List.of(REF_HEADS_MASTER));
-            StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new MetaData(users, null, false, false, List.of(), null), SHA_1, SHA_1_MD);
+            StoreInfo storage = new StoreInfo(readData("{\"data\":\"value1\"}"), new MetaData(users, null, false, false, List.of(), null, null), SHA_1,
+                    SHA_1_MD);
             assertTrue(Arrays.equals(storage.getData(), gs.getKey("key", null).get().getData()));
             RefHolderLock refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
             refHolderLock.lockWriteAll(() -> {
@@ -182,7 +183,7 @@ public class GitStorageTest {
                 return true;
             });
 
-            storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new MetaData(users, null, false, false, List.of(), null), SHA_2, SHA_2_MD);
+            storage = new StoreInfo(readData("{\"data\":\"value2\"}"), new MetaData(users, null, false, false, List.of(), null, null), SHA_2, SHA_2_MD);
             assertArrayEquals(storage.getData(), gs.getKey("key", null).get().getData());
             gs.checkHealth();
         }
@@ -450,7 +451,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey("somekey", "refs/heads/master", pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null),
+            String si = gs.addKey("somekey", "refs/heads/master", pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg"));
             assertEquals("1", si);
             gs.checkHealth();
@@ -473,7 +474,7 @@ public class GitStorageTest {
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
 
-            MetaData sd = new MetaData(storeInfo.getStorageData().getUsers(), "application/test", false, false, List.of(), null);
+            MetaData sd = new MetaData(storeInfo.getStorageData().getUsers(), "application/test", false, false, List.of(), null, null);
             Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(), new CommitMetaData("user", "mail", "msg"));
             String newVersion = put.getLeft();
             assertEquals(SHA_2_MD, newVersion);
@@ -515,7 +516,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey(key, branch, pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null),
+            String si = gs.addKey(key, branch, pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg"));
             assertEquals("1", si);
             gs.checkHealth();
@@ -536,7 +537,7 @@ public class GitStorageTest {
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class,
                     assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
-                            new MetaData(new HashSet<>(), null, false, false, List.of(), null), new CommitMetaData("user", "mail", "msg"))).getCause()
+                            new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg"))).getCause()
                                     .getClass());
         }
     }
@@ -555,9 +556,9 @@ public class GitStorageTest {
 
             Mockito.when(source.getList(Mockito.eq(key), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<String, Boolean>> keys = List.of(Pair.of(key, false));
-            List<Pair<String, StoreInfo>> list = gs.getListForRef(keys, REF_HEADS_MASTER, Optional.of(new User("u", "p")));
-            assertEquals(0, list.size());
-            list = gs.getListForRef(keys, REF_HEADS_MASTER, Optional.of(new User("user", "1234")));
+            List<Pair<String, StoreInfo>> list = gs.getListForRef(keys, REF_HEADS_MASTER);
+            assertEquals(1, list.size());
+            list = gs.getListForRef(keys, REF_HEADS_MASTER);
             assertEquals(1, list.size());
         }
     }
@@ -576,12 +577,12 @@ public class GitStorageTest {
 
             Mockito.when(source.getList(Mockito.eq(key), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<List<Pair<String, Boolean>>, String>> keys = List.of(Pair.of(List.of(Pair.of(key, false)), REF_HEADS_MASTER));
-            List<Pair<List<Pair<String, StoreInfo>>, String>> list = gs.getList(keys, Optional.of(new User("u", "1")));
+            List<Pair<List<Pair<String, StoreInfo>>, String>> list = gs.getList(keys);
             assertEquals(1, list.size());
             Pair<List<Pair<String, StoreInfo>>, String> masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());
-            assertTrue(masterResult.getLeft().isEmpty());
-            list = gs.getList(keys, Optional.of(new User("user", "1234")));
+            assertFalse(masterResult.getLeft().isEmpty());
+            list = gs.getList(keys);
             assertEquals(1, list.size());
             masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());

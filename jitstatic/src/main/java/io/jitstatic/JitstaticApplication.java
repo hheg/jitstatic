@@ -57,7 +57,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.jersey().register(new KeyResource(storage, authenticator));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator));
-            env.jersey().register(new BulkResource(storage));
+            env.jersey().register(new BulkResource(storage, authenticator));
         } catch (final Exception e) {
             closeSilently(source);
             closeSilently(storage);

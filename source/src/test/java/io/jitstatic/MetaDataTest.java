@@ -41,9 +41,9 @@ public class MetaDataTest {
     public void testMetaData() {
         Set<User> users = new HashSet<>();
         users.add(new User("name", "pass"));
-        MetaData sd1 = new MetaData(users, null, false, false, List.of(), null);
-        MetaData sd2 = new MetaData(users, null, false, false, List.of(), null);
-        MetaData sd3 = new MetaData(users, "text/plain", false, false, List.of(), null);
+        MetaData sd1 = new MetaData(users);
+        MetaData sd2 = new MetaData(users);
+        MetaData sd3 = new MetaData(users, "text/plain", false, false, List.of(), null, null);
 
         assertEquals(sd1, sd2);
         assertNotEquals(sd1, sd3);
@@ -55,7 +55,7 @@ public class MetaDataTest {
     public void testMetaDataJSON() throws JsonProcessingException {
         Set<User> users = new HashSet<>();
         users.add(new User("name", "pass"));
-        MetaData sd1 = new MetaData(users, null, false, false, List.of(HeaderPair.of("tag", "1234"), HeaderPair.of("header", "value")), null);
+        MetaData sd1 = new MetaData(users, null, false, false, List.of(HeaderPair.of("tag", "1234"), HeaderPair.of("header", "value")), null, null);
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(mapper.writeValueAsString(sd1));
     }

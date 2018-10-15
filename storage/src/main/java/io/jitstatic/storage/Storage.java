@@ -23,11 +23,12 @@ package io.jitstatic.storage;
 import java.util.List;
 import java.util.Optional;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+
 import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
@@ -49,9 +50,9 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public void delete(String key, String ref, CommitMetaData commitMetaData);
 
-    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref, Optional<User> user);
+    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
 
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input, Optional<User> user);
+    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
-    public UserData getUser(String username, String defaultRef, String realm);
+    public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
 }

@@ -21,7 +21,7 @@ package io.jitstatic.check;
  */
 
 import static io.jitstatic.JitStaticConstants.METADATA;
-import static io.jitstatic.JitStaticConstants.REFS_JISTSTATIC;
+import static io.jitstatic.JitStaticConstants.REFS_JITSTATIC;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
@@ -114,7 +114,7 @@ public class SourceExtractor {
     }
 
     public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceTestBranchExtractor(final String branchName) throws IOException, RefNotFoundException {
-        if (!Objects.requireNonNull(branchName).startsWith(REFS_JISTSTATIC)) {
+        if (!Objects.requireNonNull(branchName).startsWith(REFS_JITSTATIC)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceGeneralExtractor(branchName);

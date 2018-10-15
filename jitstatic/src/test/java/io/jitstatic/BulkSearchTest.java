@@ -56,8 +56,8 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.SearchResult;
 import io.jitstatic.client.BulkSearch;
-import io.jitstatic.client.JitStaticUpdaterClient;
-import io.jitstatic.client.JitStaticUpdaterClientBuilder;
+import io.jitstatic.client.JitStaticClient;
+import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.client.SearchPath;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
@@ -87,8 +87,8 @@ public class BulkSearchTest {
 
         try (Git local = Git.cloneRepository().setURI(adress + "/" + servletName + "/" + endpoint).setDirectory(temporaryGitFolder)
                 .setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call()) {
-            for (String k : List.of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2",
-                    "data/data/key3", "decoy/key1", "decoy/decoy/key1")) {
+            for (String k : List.of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2", "data/data/key3",
+                    "decoy/key1", "decoy/decoy/key1")) {
                 addFilesAndPush(k, temporaryGitFolder, local, user, pass);
             }
         }
@@ -96,22 +96,22 @@ public class BulkSearchTest {
 
     @Test
     public void testSearch() throws Exception {
-        try (JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
-            List<SearchResult> search = updaterClient
-                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
+        try (JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
+            List<SearchResult> search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
+                    parse());
             assertNotNull(search);
             assertTrue(search.size() == 1);
             assertEquals("data/key3", search.get(0).getKey());
         }
     }
-    
+
     @Test
     public void testSearchNoUser() throws Exception {
-        try (JitStaticUpdaterClient updaterClient = buildClient().build()) {
-            List<SearchResult> search = updaterClient
-                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
+        try (JitStaticClient updaterClient = buildClient().build()) {
+            List<SearchResult> search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
+                    parse());
             assertNotNull(search);
-            assertTrue(search.size() == 0);           
+            assertTrue(search.size() == 0);
         }
     }
 
@@ -171,8 +171,8 @@ public class BulkSearchTest {
         };
     }
 
-    private JitStaticUpdaterClientBuilder buildClient() {
-        return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
+    private JitStaticClientBuilder buildClient() {
+        return JitStaticClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
     }
 
 }
