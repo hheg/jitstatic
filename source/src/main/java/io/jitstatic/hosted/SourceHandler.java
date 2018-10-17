@@ -26,25 +26,23 @@ import java.io.InputStream;
 import java.util.Objects;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 
-class SourceHandler {
+public class SourceHandler {
     private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
 
-    public byte[] readStorageData(final InputStream is) throws JsonParseException, JsonMappingException, IOException {
+    public byte[] readStorageData(final InputStream is) throws IOException {
         return readByteArray(is);
     }
 
-    public StorageData readStorage(final InputStream storageStream) throws IOException {
+    public MetaData readStorage(final InputStream storageStream) throws IOException {
         Objects.requireNonNull(storageStream);
         try (final JsonParser parser = MAPPER.createParser(storageStream);) {
-            return parser.readValueAs(StorageData.class);
+            return parser.readValueAs(MetaData.class);
         }
     }
 

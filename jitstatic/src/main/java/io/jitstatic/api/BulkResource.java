@@ -55,18 +55,6 @@ public class BulkResource {
         this.storage = storage;
     }
 
-    @Deprecated
-    @POST
-    @Path("search")
-    @Timed(name = "search_storage_time")
-    @Metered(name = "search_storage_counter")
-    @ExceptionMetered(name = "search_storage_exception")
-    @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public Response search(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> user) {
-        return fetch(searches, user);
-    }
-
     @POST
     @Path("fetch")
     @Timed(name = "fetch_storage_time")
@@ -75,10 +63,8 @@ public class BulkResource {
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> user) {
-        final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream().map(bs -> {
-            return Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()),
-                    bs.getRef());
-        }).collect(Collectors.toList()), user);
+        final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream()
+                .map(bs -> Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()), bs.getRef())).collect(Collectors.toList()), user);
 
         if (searchResults.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();

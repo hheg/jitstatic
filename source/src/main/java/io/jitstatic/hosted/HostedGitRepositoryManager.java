@@ -30,7 +30,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -54,7 +53,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.SourceUpdater;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
@@ -62,6 +61,7 @@ import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -80,8 +80,7 @@ public class HostedGitRepositoryManager implements Source {
     private final SourceUpdater updater;
     private final JitStaticUploadPackFactory uploadPackFactory;
 
-    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final Executor repoExecutor,
-            final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
+    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter) throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
                 throw new IllegalArgumentException(String.format("Path %s is a file", workingDirectory));
@@ -95,7 +94,7 @@ public class HostedGitRepositoryManager implements Source {
         this.endPointName = Objects.requireNonNull(endPointName).trim();
 
         if (this.endPointName.isEmpty()) {
-            throw new IllegalArgumentException(String.format("Parameter endPointName cannot be empty"));
+            throw new IllegalArgumentException("Parameter endPointName cannot be empty");
         }
 
         try {
@@ -119,11 +118,6 @@ public class HostedGitRepositoryManager implements Source {
         this.errorReporter = errorReporter;
     }
 
-    private HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef,
-            final ErrorReporter reporter) throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef, null, reporter);
-    }
-
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
             throws CorruptedSourceException, IOException {
         this(workingDirectory, endPointName, defaultRef, new ErrorReporter());
@@ -145,8 +139,8 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, IllegalStateException, GitAPIException {
-        LOG.info("Mounting repository on " + repositoryBase);
+    private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, GitAPIException {
+        LOG.info("Mounting repository on {}", repositoryBase);
         Repository repo = getRepository(repositoryBase);
         if (repo == null) {
             Files.createDirectories(repositoryBase);
@@ -160,8 +154,8 @@ public class HostedGitRepositoryManager implements Source {
         try {
             return Git.open(baseDirectory.toFile()).getRepository();
         } catch (final IOException ignore) {
-        }
-        return null;
+        	return null;
+        }        
     }
 
     @Override
@@ -304,7 +298,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final StorageData metaData, final String message,
+    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final String message,
             final String userInfo, final String userMail) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(message);
@@ -338,7 +332,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyMetadata(final StorageData metaData, final String metaDataVersion, final String message, final String userInfo,
+    public String modifyMetadata(final MetaData metaData, final String metaDataVersion, final String message, final String userInfo,
             final String userMail, final String key, String ref) {
         Objects.requireNonNull(message);
         Objects.requireNonNull(userInfo);
@@ -377,7 +371,7 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private CompletableFuture<byte[]> convertMetaData(final StorageData metaData) {
+    private CompletableFuture<byte[]> convertMetaData(final MetaData metaData) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return MAPPER.writeValueAsBytes(metaData);
@@ -415,7 +409,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void addRefHolderFactory(final Function<String, RefHolder> factory) {
+    public void addRefHolderFactory(final Function<String, RefHolderLock> factory) {
         this.repositoryBus.setRefHolderFactory(factory);
     }
 

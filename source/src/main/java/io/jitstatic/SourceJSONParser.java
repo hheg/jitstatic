@@ -44,18 +44,18 @@ public class SourceJSONParser {
     }
 
     public String parseMetaData(final InputStream bc) throws IOException {
-        final StorageData metaData = parseStream(bc);
+        final MetaData metaData = parseStream(bc);
 
-        final Set<ConstraintViolation<StorageData>> violations = validator.validate(metaData);
-        if (violations.size() > 0) {
+        final Set<ConstraintViolation<MetaData>> violations = validator.validate(metaData);
+        if (!violations.isEmpty()) {
             throw new StorageParseException(violations);
         }
         return metaData.getContentType();
     }
 
-    private StorageData parseStream(final InputStream bc) throws StorageParseException {
+    private MetaData parseStream(final InputStream bc) throws StorageParseException {
         try {
-            return MAPPER.readValue(bc, StorageData.class);
+            return MAPPER.readValue(bc, MetaData.class);
         } catch (final IOException e) {
             final Throwable cause = e.getCause();
             throw new StorageParseException((cause != null ? cause.getLocalizedMessage() : "Unknown error"), e);
@@ -70,15 +70,14 @@ public class SourceJSONParser {
             super(message, e);
         }
 
-        public StorageParseException(Set<ConstraintViolation<StorageData>> violations) {
+        public StorageParseException(Set<ConstraintViolation<MetaData>> violations) {
             super(compile(violations));
         }
 
-        private static String compile(Set<ConstraintViolation<StorageData>> violations) {
+        private static String compile(Set<ConstraintViolation<MetaData>> violations) {
             return violations.stream()
                     .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
                     .collect(Collectors.joining(System.lineSeparator()));
-
         }
 
         @Override

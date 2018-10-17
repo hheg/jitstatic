@@ -26,14 +26,14 @@ import java.util.function.Function;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
-import io.jitstatic.StorageData;
-import io.jitstatic.hosted.RefHolder;
+import io.jitstatic.MetaData;
+import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
 public interface Source extends AutoCloseable, CheckHealth {
     public void close();
-    
+
     public void addListener(SourceEventListener listener);
 
     public void start();
@@ -42,18 +42,17 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public String modifyKey(String key, String ref, byte[] data, String version, String message,
-            String userInfo, String userMail);
+    public String modifyKey(String key, String ref, byte[] data, String version, String message, String userInfo, String userMail);
 
-    public Pair<String, String> addKey(String key, String finalRef, byte[] data, StorageData metaData,
-            String message, String userInfo, String userMail);
+    public Pair<String, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, String message, String userInfo,
+            String userMail);
 
-    public String modifyMetadata(StorageData metaData, String metaDataVersion, String message, String userInfo,
-            String userMail, String key, String finalRef);
+    public String modifyMetadata(MetaData metaData, String metaDataVersion, String message, String userInfo, String userMail, String key,
+            String finalRef);
 
     public void deleteKey(String key, String ref, String user, String message, String userMail);
 
-    public void addRefHolderFactory(Function<String,RefHolder> factory);
+    public void addRefHolderFactory(Function<String, RefHolderLock> factory);
 
     public void createRef(String ref) throws IOException;
 

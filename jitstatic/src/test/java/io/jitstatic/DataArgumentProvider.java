@@ -30,16 +30,16 @@ public class DataArgumentProvider implements ArgumentsProvider {
 
     @Override
     public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-        return Stream.of(new TestData(new String[] { "a" }, new String[] { LoadTesterTest.MASTER }, false, 10, 10),
-                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterTest.MASTER, "develop", "something" }, false, 10, 10),
-                new TestData(new String[] { "a" }, new String[] { LoadTesterTest.MASTER }, true, 10, 10),
-                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterTest.MASTER, "develop", "something" }, true, 10, 10),
-                new TestData(new String[] { "a" }, new String[] { LoadTesterTest.MASTER }, false, 50, 1),
-                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterTest.MASTER, "develop", "something" }, false, 50, 1),
-                new TestData(new String[] { "a" }, new String[] { LoadTesterTest.MASTER }, true, 50, 1),
-                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterTest.MASTER, "develop", "something" }, true, 50, 1),
+        return Stream.of(new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 10, 10),
+                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, false, 10, 10),
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, true, 10, 10),
+                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, true, 10, 10),
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 50, 1),
+                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, false, 50, 1),
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, true, 50, 1),
+                new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, true, 50, 1),
                 new TestData(new String[] { "a", "b", "c", "d", "e", "f", "g" },
-                        new String[] { LoadTesterTest.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 1))
+                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 1))
                 .map(Arguments::of);
     }
 

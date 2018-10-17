@@ -22,6 +22,7 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.servlet.ServletException;
@@ -46,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
+import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedGitRepositoryManager;
 import io.jitstatic.source.Source;
@@ -91,6 +93,18 @@ public class HostedFactory {
 
     @JsonProperty
     private boolean exposeAll;
+
+    @JsonProperty
+    private String adminName = "admin";
+
+    @JsonProperty
+    private String adminPass;
+
+    @JsonProperty
+    private boolean protectMetrics;
+
+    @JsonProperty
+    private boolean protectHealthChecks;
 
     public String getServletName() {
         return servletName;
@@ -140,18 +154,49 @@ public class HostedFactory {
         this.secret = secret;
     }
 
-    public Source build(final Environment env) throws CorruptedSourceException, IOException {
-        final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(),
-                getBranch());
+    public String getAdminName() {
+        return adminName;
+    }
 
+    public void setAdminName(String adminName) {
+        this.adminName = adminName;
+    }
+
+    public String getAdminPass() {
+        return adminPass;
+    }
+
+    public void setAdminPass(String adminPass) {
+        this.adminPass = adminPass;
+    }
+
+    public boolean isProtectMetrics() {
+        return protectMetrics;
+    }
+
+    public void setProtectMetrics(boolean protectMetrics) {
+        this.protectMetrics = protectMetrics;
+    }
+
+    public boolean isProtectHealthChecks() {
+        return protectHealthChecks;
+    }
+
+    public void setProtectHealthChecks(boolean protectHealthChecks) {
+        this.protectHealthChecks = protectHealthChecks;
+    }
+
+    public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
+        final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
+        Objects.requireNonNull(gitRealm);
         final String baseServletPath = "/" + getServletName() + "/*";
-        LOG.info("Configuring hosted GIT environment on " + baseServletPath);
+        LOG.info("Configuring hosted GIT environment on {}", baseServletPath);
         final GitServlet gs = new GitServlet();
-        
+
         gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
 
         gs.setReceivePackFactory(hostedGitRepositoryManager.getReceivePackFactory());
-        
+
         gs.setUploadPackFactory(hostedGitRepositoryManager.getUploadPackFactory());
 
         final Dynamic servlet = env.servlets().addServlet(getServletName(), gs);
@@ -169,19 +214,26 @@ public class HostedFactory {
 
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
-        sec.setRealmName("git");
+        sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
         sec.setLoginService(new SimpleLoginService(getUserName(), getSecret(), sec.getRealmName()));
         sec.setConstraintMappings(new ConstraintMapping[] { cm });
 
         sec.setHandler(new DropWizardHandlerWrapper(env.getApplicationContext()));
-        final Set<String> pathsWithUncoveredHttpMethods = sec.getPathsWithUncoveredHttpMethods();
+        Set<String> pathsWithUncoveredHttpMethods = sec.getPathsWithUncoveredHttpMethods();
 
         if (!pathsWithUncoveredHttpMethods.isEmpty()) {
             throw new RuntimeException("Following paths are uncovered " + pathsWithUncoveredHttpMethods);
         }
 
         env.servlets().setSecurityHandler(sec);
+        if (isProtectHealthChecks() || isProtectMetrics()) {
+            AdminConstraintSecurityHandler adminConstraintSecurityHandler = new AdminConstraintSecurityHandler(getAdminName(), getAdminPass(),
+                    isProtectHealthChecks(), isProtectMetrics());
+            env.admin().setSecurityHandler(adminConstraintSecurityHandler);
+            pathsWithUncoveredHttpMethods = adminConstraintSecurityHandler.getPathsWithUncoveredHttpMethods();
+            pathsWithUncoveredHttpMethods.stream().forEach(p -> LOG.info("Not protecting {}", p));
+        }
 
         return hostedGitRepositoryManager;
     }
@@ -245,8 +297,7 @@ public class HostedFactory {
         }
 
         @Override
-        public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
-                throws IOException, ServletException {
+        public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
             handler.handle(target, baseRequest, request, response);
         }
 

@@ -43,6 +43,7 @@ import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.storage.Storage;
@@ -59,7 +60,7 @@ public class StorageFactoryTest {
     @Test
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage storage = sf.build(source, env);) {
+        try (Storage storage = sf.build(source, env, JitstaticApplication.JITSTATIC_STORAGE_REALM);) {
             storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null));
         }
@@ -72,7 +73,7 @@ public class StorageFactoryTest {
     public void testEmptyStoragePath() {
         when(env.jersey()).thenReturn(jersey);
         assertEquals(assertThrows(NullPointerException.class, () -> {
-            try (Storage storage = sf.build(null, env);) {
+            try (Storage storage = sf.build(null, env, JitstaticApplication.JITSTATIC_STORAGE_REALM);) {
             }
         }).getLocalizedMessage(), "Source cannot be null");
     }
@@ -80,7 +81,7 @@ public class StorageFactoryTest {
     @Test
     public void testListener() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env);) {
+        try (Storage build = sf.build(source, env, JitstaticApplication.JITSTATIC_STORAGE_REALM);) {
             ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
             verify(source).addListener(c.capture());
             c.getValue().onEvent(Collections.emptyList());
@@ -90,7 +91,7 @@ public class StorageFactoryTest {
     @Test
     public void testListenerWithNullArgument() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env);) {
+        try (Storage build = sf.build(source, env, JitstaticApplication.JITSTATIC_STORAGE_REALM);) {
             ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
             verify(source).addListener(c.capture());
             c.getValue().onEvent(null);

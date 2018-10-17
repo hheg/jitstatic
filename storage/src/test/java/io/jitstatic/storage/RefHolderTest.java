@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.storage;
 
 /*-
  * #%L
@@ -43,9 +43,13 @@ import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
+import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.LoadException;
+import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.RefHolder;
 import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -224,19 +228,19 @@ public class RefHolderTest {
     @Test
     public void testRefreshKey() throws IOException {
         StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        Mockito.when(storeInfo.getStorageData()).thenReturn(Mockito.mock(StorageData.class));
+        Mockito.when(storeInfo.getStorageData()).thenReturn(Mockito.mock(MetaData.class));
         Mockito.when(storeInfo.getVersion()).thenReturn("1");
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshKey(asStream(getData()).readAllBytes(), "key", "1", "2", "application/json");
+        ref.refreshKey(asStream(getData()).readAllBytes(), "key", "1", "2");
         assertEquals("2", ref.getKey("key").get().getVersion());
     }
 
     @Test
     public void testRefreshMetaData() throws IOException {
         StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        StorageData storageData = Mockito.mock(StorageData.class);
+        MetaData storageData = Mockito.mock(MetaData.class);
         Mockito.when(storeInfo.getStorageData()).thenReturn(storageData);
         Mockito.when(storeInfo.getVersion()).thenReturn("1");
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");

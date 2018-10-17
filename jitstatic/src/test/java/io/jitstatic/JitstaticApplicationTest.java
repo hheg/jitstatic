@@ -80,13 +80,13 @@ public class JitstaticApplicationTest {
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);
-        when(storageFactory.build(any(), isA(Environment.class))).thenReturn(storage);
+        when(storageFactory.build(any(), isA(Environment.class), any())).thenReturn(storage);
     }
 
     @Test
     public void buildsAMapResource() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any())).thenReturn(source);
+        when(hostedFactory.build(any(), any())).thenReturn(source);
         app.run(config, environment);
         verify(jersey).register(isA(KeyResource.class));
     }
@@ -94,7 +94,7 @@ public class JitstaticApplicationTest {
     @Test
     public void buildsAstorageHealthCheck() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any())).thenReturn(source);
+        when(hostedFactory.build(any(), any())).thenReturn(source);
         app.run(config, environment);
         verify(hcr).register(eq("storagechecker"), isA(HealthCheck.class));
     }
@@ -102,7 +102,7 @@ public class JitstaticApplicationTest {
     @Test
     public void testRemoteManagerLifeCycleManagerIsRegistered() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any())).thenReturn(source);
+        when(hostedFactory.build(any(), any())).thenReturn(source);
         app.run(config, environment);
         verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
     }
@@ -110,7 +110,7 @@ public class JitstaticApplicationTest {
     @Test
     public void testStorageLifeCycleManagerIsRegisterd() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any())).thenReturn(source);
+        when(hostedFactory.build(any(), any())).thenReturn(source);
         app.run(config, environment);
         verify(lifecycle, times(1)).manage(isA(AutoCloseableLifeCycleManager.class));
     }
@@ -119,7 +119,7 @@ public class JitstaticApplicationTest {
     public void testResourcesAreGettingClosed() throws Exception {
         assertThrows(RuntimeException.class, () -> {
             config.setHostedFactory(hostedFactory);
-            when(hostedFactory.build(any())).thenReturn(source);
+            when(hostedFactory.build(any(), any())).thenReturn(source);
             Mockito.doThrow(new RuntimeException()).when(jersey).register(any(KeyResource.class));
             try {
                 app.run(config, environment);
@@ -137,7 +137,7 @@ public class JitstaticApplicationTest {
         assertSame(r, assertThrows(TestException.class, () -> {
             HostedFactory hf = mock(HostedFactory.class);
             config.setHostedFactory(hf);
-            doThrow(r).when(hf).build(environment);
+            doThrow(r).when(hf).build(environment, JitstaticApplication.GIT_REALM);
             app.run(config, environment);
         }));
     }
@@ -146,8 +146,8 @@ public class JitstaticApplicationTest {
     public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(environment)).thenReturn(source);
-        when(storageFactory.build(source, environment)).thenReturn(storage);
+        when(hostedFactory.build(environment, JitstaticApplication.GIT_REALM)).thenReturn(source);
+        when(storageFactory.build(source, environment, JitstaticApplication.JITSTATIC_STORAGE_REALM)).thenReturn(storage);
         app.run(config, environment);
     }
 
@@ -159,8 +159,8 @@ public class JitstaticApplicationTest {
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
             when(config.getAddKeyAuthenticator()).thenThrow(new TestException("Test exception3"));
-            when(hostedFactory.build(environment)).thenReturn(source);
-            when(storageFactory.build(source, environment)).thenReturn(storage);
+            when(hostedFactory.build(environment, JitstaticApplication.GIT_REALM)).thenReturn(source);
+            when(storageFactory.build(source, environment, JitstaticApplication.JITSTATIC_STORAGE_REALM)).thenReturn(storage);
             app.run(config, environment);
         });
     }

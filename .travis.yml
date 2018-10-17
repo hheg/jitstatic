@@ -18,12 +18,10 @@ matrix:
 
 install: true
 script:
-- mvn clean install -B -V -DskipTests=true
-- cp jitstatic/target/binary/jitstatic.jar $FILE
-- mvn test jacoco:report coveralls:report
+- "cp .travis.settings.xml $HOME/.m2/settings.xml"
+- "chmod +x build.sh && ./build.sh"
 after_success:
-- chmod +x docker_deploy.sh && chmod +x docker_build.sh
-- "./docker_deploy.sh $USERNAME $DOCKER_PASSWORD"
+
 deploy:
   provider: releases
   skip_cleanup: true

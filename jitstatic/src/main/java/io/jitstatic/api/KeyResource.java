@@ -58,7 +58,8 @@ import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.HeaderPair;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.AddKeyAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
@@ -103,7 +104,7 @@ public class KeyResource {
             return noChange;
         }
 
-        final StorageData data = storeInfo.getStorageData();
+        final MetaData data = storeInfo.getStorageData();
         final Set<User> allowedUsers = data.getUsers();
         if (allowedUsers.isEmpty()) {
             return buildResponse(storeInfo, tag, data);
@@ -111,7 +112,7 @@ public class KeyResource {
 
         if (!user.isPresent()) {
             LOG.info("Resource {} needs a user", key);
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         checkIfAllowed(key, user, allowedUsers);
@@ -120,16 +121,13 @@ public class KeyResource {
 
     private StoreInfo checkIfKeyExist(final String key, final String ref) {
         final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(key + " in " + ref, Status.NOT_FOUND);
-        }
-        return si.get();
+        return si.orElseThrow(() -> new WebApplicationException(key + " in " + ref, Status.NOT_FOUND));
     }
 
     @GET
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response getRootList(final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
-            @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
+    public Response getRootList(final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light,
+            final @Auth Optional<User> user) {
         return getList("/", ref, recursive, light, user);
     }
 
@@ -139,16 +137,14 @@ public class KeyResource {
     @ExceptionMetered(name = "get_list_exception")
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
+    public Response getList(final @PathParam("key") String key, final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
+            @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
         helper.checkRef(ref);
         final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref, user);
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
         }
-        return Response
-                .ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList()))
-                .build();
+        return Response.ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())).build();
     }
 
     private void checkKey(final String key) {
@@ -157,7 +153,7 @@ public class KeyResource {
         }
     }
 
-    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final StorageData data) {
+    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data) {
         final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
         final List<HeaderPair> headers = data.getHeaders();
@@ -180,7 +176,7 @@ public class KeyResource {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         checkKey(key);
@@ -199,8 +195,8 @@ public class KeyResource {
             return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
         }
 
-        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
-                () -> storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        final Either<String, FailedToLock> result = helper
+                .unwrapWithPUTApi(() -> storage.put(key, ref, data.getData(), currentVersion, data.getMessage(), data.getUserInfo(), data.getUserMail()));
 
         if (result == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -219,25 +215,19 @@ public class KeyResource {
     }
 
     private StoreInfo checkAccess(final String key, final String ref, final Optional<User> user) {
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-
-        if (si == null || !si.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final StoreInfo storeInfo = si.get();
+        final StoreInfo storeInfo = helper.unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND));
         final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
         if (allowedUsers.isEmpty()) {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
-
         checkIfAllowed(key, user, allowedUsers);
         return storeInfo;
     }
 
     private void checkIfAllowed(final String key, final Optional<User> user, final Set<User> allowedUsers) {
-        if (!allowedUsers.contains(user.get())) {
+        if (user.isPresent() && !allowedUsers.contains(user.get())) {
             LOG.info("Resource {} is denied for user {}", key, user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
 
@@ -250,19 +240,19 @@ public class KeyResource {
     public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> user) {
 
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_METAKEY_REALM);
         }
         if (!addKeyAuthenticator.authenticate(user.get())) {
             LOG.info("Resource {} is denied for user {}", data.getKey(), user.get());
-            throw new WebApplicationException(Status.UNAUTHORIZED);
-        }
-
-        if (data.getKey().endsWith("/")) {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
-        final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(),
-                data.getMetaData(), data.getMessage(), data.getUserInfo(), data.getUserMail()));
+        if (data.getKey().endsWith("/")) {
+            throw new WebApplicationException(data.getKey(), Status.FORBIDDEN);
+        }
+
+        final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(data.getKey(), data.getBranch(), data.getData(), data.getMetaData(),
+                data.getMessage(), data.getUserInfo(), data.getUserMail()));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -274,7 +264,7 @@ public class KeyResource {
     public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            throw new WebApplicationException(Status.UNAUTHORIZED);
+            return helper.respondAuthenticationChallenge(JitstaticApplication.JITSTATIC_STORAGE_REALM);
         }
 
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);

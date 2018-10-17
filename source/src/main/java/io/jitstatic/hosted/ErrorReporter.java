@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 public class ErrorReporter {
 	private static final Logger LOG = LoggerFactory.getLogger(ErrorReporter.class);
-	private final AtomicReference<Exception> fault = new AtomicReference<Exception>();
+	private final AtomicReference<Exception> fault = new AtomicReference<>();
 
 	public Exception getFault() {
 		return fault.getAndSet(null);

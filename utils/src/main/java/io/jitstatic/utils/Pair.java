@@ -67,12 +67,12 @@ public class Pair<L, R> implements Map.Entry<L, R> {
 
     @Override
     public L getKey() {
-        return left;
+        return getLeft();
     }
 
     @Override
     public R getValue() {
-        return right;
+        return getRight();
     }
 
     @Override

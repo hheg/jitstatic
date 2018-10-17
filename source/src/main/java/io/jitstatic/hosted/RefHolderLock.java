@@ -20,16 +20,10 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-public class FailedToLock extends Exception {
+import java.util.function.Supplier;
 
-    private static final long serialVersionUID = 2393164769037426630L;
+import com.spencerwi.either.Either;
 
-    public FailedToLock(final String ref) {
-        super(ref);
-    }
-
-    @Override
-    public Throwable fillInStackTrace() {
-        return this;
-    }
+public interface RefHolderLock {
+    public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier);
 }

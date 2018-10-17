@@ -55,7 +55,8 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
+import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
@@ -76,7 +77,7 @@ public class MetaKeyResourceTest {
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm("jitstatic").setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm(JitstaticApplication.JITSTATIC_METAKEY_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MetaKeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
 
@@ -110,20 +111,20 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testGetAKey() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
         Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
         Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
         assertThat(MediaType.APPLICATION_JSON_TYPE, Matchers.is(response.getMediaType()));
-        assertThat(storageData, Matchers.is(response.readEntity(StorageData.class)));
+        assertThat(storageData, Matchers.is(response.readEntity(MetaData.class)));
         response.close();
     }
 
     @Test
     public void testModifyAKeyWithoutuser() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -136,7 +137,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -150,7 +151,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongVersion() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -166,7 +167,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKey() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -174,7 +175,7 @@ public class MetaKeyResourceTest {
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
         Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.isNull(), Mockito.isA(StorageData.class), Mockito.eq("2"),
+        Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"),
                 Mockito.eq("message"), Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(Either.left("3"));
         Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));
@@ -185,7 +186,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithMalformedKeyData() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
@@ -200,20 +201,20 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testGetMasterMetaData() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
         Mockito.when(storage.getKey("dog/", null)).thenReturn(Optional.of(sd));
         Response response = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
         assertThat(MediaType.APPLICATION_JSON_TYPE, Matchers.is(response.getMediaType()));
-        assertThat(storageData, Matchers.is(response.readEntity(StorageData.class)));
+        assertThat(storageData, Matchers.is(response.readEntity(MetaData.class)));
         response.close();
     }
 
     @Test
     public void testModifyAMasterMetaData() {
-        StorageData storageData = new StorageData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -221,7 +222,7 @@ public class MetaKeyResourceTest {
         mukd.setMetaData(storageData);
         StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
         Mockito.when(storage.getKey("dog/", null)).thenReturn(Optional.of(sd));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(StorageData.class), Mockito.eq("2"),
+        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"),
                 Mockito.eq("message"), Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(Either.left("3"));
         Response put = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));

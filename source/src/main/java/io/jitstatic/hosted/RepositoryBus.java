@@ -30,18 +30,18 @@ import io.jitstatic.source.SourceEventListener;
 public class RepositoryBus {
 
     private final List<SourceEventListener> sourceEventListeners = Collections.synchronizedList(new ArrayList<>());
-    private volatile Function<String, RefHolder> refSource;
+    private volatile Function<String, RefHolderLock> refSource;
     private final ErrorReporter reporter;
 
     public RepositoryBus(final ErrorReporter reporter) {
         this.reporter = reporter;
     }
 
-    public void setRefHolderFactory(final Function<String, RefHolder> factory) {
+    public void setRefHolderFactory(final Function<String, RefHolderLock> factory) {
         refSource = factory;
     }
 
-    public RefHolder getRefHolder(final String ref) {
+    public RefHolderLock getRefHolder(final String ref) {
         return refSource.apply(ref);
     }
 

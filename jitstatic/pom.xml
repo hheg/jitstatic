@@ -4,9 +4,13 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.14.4</version>
+        <version>0.14.5</version>
     </parent>
     <artifactId>jitstatic</artifactId>
+
+    <properties>
+        <docker.repo>hheg/jitstatic-snapshot</docker.repo>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>io.dropwizard</groupId>
@@ -87,22 +91,22 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.14.4</version>
+            <version>0.14.5</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>storage</artifactId>
-            <version>0.14.4</version>
+            <version>0.14.5</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>version</artifactId>
-            <version>0.14.4</version>
+            <version>0.14.5</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.14.4</version>
+            <version>0.14.5</version>
         </dependency>
         <dependency>
             <groupId>javax.activation</groupId>
@@ -182,6 +186,11 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>io.dropwizard</groupId>
+            <artifactId>dropwizard-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
@@ -215,8 +224,36 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.14.4</version>
+            <version>0.14.5</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jitstatic</groupId>
+            <artifactId>jitstatic-client</artifactId>
+            <version>0.8.1</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.mashape.unirest</groupId>
+            <artifactId>unirest-java</artifactId>
+            <version>1.4.9</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpcore</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
     <build>
@@ -229,14 +266,6 @@
         <plugins>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <includes>
-                        <include>**/Test*.java</include>
-                        <include>**/*Test.java</include>
-                        <include>**/*Tests.java</include>
-                        <include>**/*TestCase.java</include>
-                    </includes>
-                </configuration>
                 <dependencies>
                     <dependency>
                         <groupId>org.junit.platform</groupId>
@@ -244,6 +273,18 @@
                         <version>${junit.platform.version}</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>integration-test</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -269,10 +310,8 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Implementation-Version>${git.commit.id}</Implementation-Version>
                                         <Specification-Version>${project.version}</Specification-Version>
@@ -327,6 +366,70 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>dockerfile-maven-plugin</artifactId>
+                <version>${dockerfile-maven-version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>activation</artifactId>
+                        <version>1.1.1</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <repository>${docker.repo}</repository>
+                    <tag>${project.version}</tag>
+                    <buildArgs>
+                        <JAR_FILE>target/${project.build.finalName}.jar</JAR_FILE>
+                    </buildArgs>
+                    <useMavenSettingsForAuth>true</useMavenSettingsForAuth>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>docker-pkg</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>build</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>docker-deploy</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>push</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>docker-tag</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>tag</goal>
+                        </goals>
+                        <configuration>
+                            <tag>latest</tag>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>docker-tag-deploy</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>push</goal>
+                        </goals>
+                        <configuration>
+                            <tag>latest</tag>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>release</id>
+            <properties>
+                <docker.repo>hheg/jitstatic</docker.repo>
+            </properties>
+        </profile>
+    </profiles>
 </project>

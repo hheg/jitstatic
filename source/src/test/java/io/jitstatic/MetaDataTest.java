@@ -32,18 +32,18 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.StorageData;
+import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 
-public class StorageDataTest {
+public class MetaDataTest {
 
     @Test
-    public void testStorageData() {
+    public void testMetaData() {
         Set<User> users = new HashSet<>();
         users.add(new User("name", "pass"));
-        StorageData sd1 = new StorageData(users, null, false, false, List.of());
-        StorageData sd2 = new StorageData(users, null, false, false, List.of());
-        StorageData sd3 = new StorageData(users, "text/plain", false, false, List.of());
+        MetaData sd1 = new MetaData(users, null, false, false, List.of());
+        MetaData sd2 = new MetaData(users, null, false, false, List.of());
+        MetaData sd3 = new MetaData(users, "text/plain", false, false, List.of());
 
         assertEquals(sd1, sd2);
         assertNotEquals(sd1, sd3);
@@ -52,10 +52,10 @@ public class StorageDataTest {
     }
 
     @Test
-    public void testStorageDataJSON() throws JsonProcessingException {
+    public void testMetaDataJSON() throws JsonProcessingException {
         Set<User> users = new HashSet<>();
         users.add(new User("name", "pass"));
-        StorageData sd1 = new StorageData(users, null, false, false, List.of(HeaderPair.of("tag", "1234"), HeaderPair.of("header", "value")));
+        MetaData sd1 = new MetaData(users, null, false, false, List.of(HeaderPair.of("tag", "1234"), HeaderPair.of("header", "value")));
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(mapper.writeValueAsString(sd1));
     }

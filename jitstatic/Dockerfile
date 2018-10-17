@@ -2,17 +2,18 @@ FROM openjdk:10.0.2-13-jre-slim-sid
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 
-ARG version
-ENV JITSTATIC_VERSION ${version}
+ARG JAR_FILE
 ENV WORK_DIR /home/jitstatic
 ENV VOL ${WORK_DIR}/db
-ENV JITSTATIC_FILE jitstatic-${JITSTATIC_VERSION}.jar
+ENV JITSTATIC_FILE $JAR_FILE
 ENV JITSTATIC_CONF config.yml
 ENV JAVA_OPTS=
 
+RUN apt update && apt-mark hold dash && apt upgrade -y && apt install less
+
 WORKDIR ${WORK_DIR}
 
-ADD jitstatic/target/${JITSTATIC_FILE} ${JITSTATIC_FILE}
+ADD $JITSTATIC_FILE $JITSTATIC_FILE
 
 ADD docker_dw_setup.yml ${JITSTATIC_CONF}
 

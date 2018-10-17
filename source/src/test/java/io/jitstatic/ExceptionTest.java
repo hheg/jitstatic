@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import io.jitstatic.UpdateFailedException;
 import io.jitstatic.check.MetaDataFileIsMissingSourceFile;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.LoadException;
 
 public class ExceptionTest {
 
@@ -41,6 +42,8 @@ public class ExceptionTest {
         assertEquals(String.format("Got error %s when updating %s", Result.REJECTED.name(), branch), up.getLocalizedMessage());
         FailedToLock ftl = new FailedToLock("ref");
         ftl.fillInStackTrace();
+        LoadException le = new LoadException(new Exception());
+        le.fillInStackTrace();
     }
 
 }
