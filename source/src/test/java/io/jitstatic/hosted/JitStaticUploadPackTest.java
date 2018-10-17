@@ -1,11 +1,7 @@
 package io.jitstatic.hosted;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 /*-
  * #%L
-
  * jitstatic
  * %%
  * Copyright (C) 2017 - 2018 H.Hegardt
@@ -24,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * #L%
  */
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;

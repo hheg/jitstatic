@@ -26,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -35,6 +37,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.eclipse.jgit.api.Git;
@@ -96,25 +99,34 @@ public class BulkSearchTest {
 
     @Test
     public void testSearch() throws Exception {
-        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
-        try (JitStaticCreatorClient client = buildCreatorClient().setUser(user).setPassword(pass).build();
-                JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
+        try (JitStaticUpdaterClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
             List<SearchResult> search = updaterClient
-                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), (is) -> {
-                        try {
-                            return MAPPER.readValue(is, new TypeReference<List<SearchResult>>() {
-                            });
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
+                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
             assertNotNull(search);
             assertTrue(search.size() == 1);
             assertEquals("data/key3", search.get(0).getKey());
         }
+    }
+    
+    @Test
+    public void testSearchNoUser() throws Exception {
+        try (JitStaticUpdaterClient updaterClient = buildClient().build()) {
+            List<SearchResult> search = updaterClient
+                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
+            assertNotNull(search);
+            assertTrue(search.size() == 0);           
+        }
+    }
 
+    private Function<InputStream, List<SearchResult>> parse() {
+        return (is) -> {
+            try {
+                return MAPPER.readValue(is, new TypeReference<List<SearchResult>>() {
+                });
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
     }
 
     private void addFilesAndPush(final String key, File temporaryGitFolder, Git local, String user, String pass)

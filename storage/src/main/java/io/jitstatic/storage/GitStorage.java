@@ -170,8 +170,8 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final String message,
-            final String userInfo, final String userMail) {
+    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final String message, final String userInfo,
+            final String userMail) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(userInfo, USER_INFO_CANNOT_BE_NULL);
@@ -203,7 +203,7 @@ public class GitStorage implements Storage {
         if (storeInfo != null && storeInfo.isPresent()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
-        try {            
+        try {
             sourceInfo = source.getSourceInfo(key, finalRef);
         } catch (final RefNotFoundException e) {
             if (!defaultRef.equals(finalRef)) {
@@ -291,8 +291,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref,
-            final Optional<User> user) {
+    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref, final Optional<User> user) {
         Objects.requireNonNull(keyPairs);
         Objects.requireNonNull(user);
         final String finalRef = checkRef(ref);
@@ -300,9 +299,9 @@ public class GitStorage implements Storage {
             final String key = pair.getLeft();
             if (key.endsWith("/")) {
                 try {
-                    return source.getList(key, finalRef, pair.getRight()).parallelStream().map(k -> Pair.of(k, getKey(k, finalRef)))
-                            .filter(Pair::isPresent).filter(pa -> pa.getRight().isPresent())
-                            .map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).filter(filterUser(user)).collect(Collectors.toList());
+                    return source.getList(key, finalRef, pair.getRight()).parallelStream().map(k -> Pair.of(k, getKey(k, finalRef))).filter(Pair::isPresent)
+                            .filter(pa -> pa.getRight().isPresent()).map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).filter(filterUser(user))
+                            .collect(Collectors.toList());
                 } catch (final RefNotFoundException rnfe) {
                     return List.<Pair<String, StoreInfo>>of();
                 } catch (final IOException e) {
@@ -311,7 +310,14 @@ public class GitStorage implements Storage {
                 }
             }
             final Optional<StoreInfo> keyContent = getKey(key, finalRef);
-            return keyContent.isPresent() ? List.of(Pair.of(key, keyContent.get())) : List.<Pair<String, StoreInfo>>of();
+            if (keyContent.isPresent()) {
+                StoreInfo storeInfo = keyContent.get();
+                final Set<User> users = storeInfo.getStorageData().getUsers();
+                if (users.isEmpty() && !user.isPresent() || (user.isPresent() && users.contains(user.get()))) {
+                    return List.of(Pair.of(key, keyContent.get()));
+                }
+            }
+            return List.<Pair<String, StoreInfo>>of();
         }).flatMap(List::stream).collect(Collectors.toList());
     }
 
@@ -328,8 +334,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input,
-            final Optional<User> user) {
+    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input, final Optional<User> user) {
         return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight(), user), p.getRight())).collect(Collectors.toList());
     }
 }
