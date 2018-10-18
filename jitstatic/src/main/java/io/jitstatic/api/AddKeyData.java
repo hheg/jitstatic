@@ -38,12 +38,9 @@ public class AddKeyData {
     @Deprecated
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     @Deprecated
-    @NotNull
-    @NotEmpty
     private final String key;
 
     @Deprecated
-    @NotEmpty
     @Pattern(regexp = "^refs/heads/.+$")
     private final String branch;
 

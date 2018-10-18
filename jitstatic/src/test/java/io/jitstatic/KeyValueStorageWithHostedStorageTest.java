@@ -252,7 +252,7 @@ public class KeyValueStorageWithHostedStorageTest {
 
         try (JitStaticClient client = builder.build(); JitStaticClient getter = buildClient().build()) {
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/newkey", stringFactory)).getStatusCode());
-            String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("base/mid/new key", "master", "commit message", "user1", "user@mail"),
+            String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("base/mid/new%20key", "master", "commit message", "user1", "user@mail"),
                     new MetaData(new HashSet<>(), APPLICATION_JSON));
             Entity<String> key = getter.getKey("base/mid/new%20key", stringFactory);
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/new", stringFactory)).getStatusCode());

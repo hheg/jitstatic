@@ -16,7 +16,7 @@ The use case could be used for is business configuration data where the data is 
 Uses Dropwizards simple configuration.
 
 Example configuration:
-```
+```yaml
 server:
   applicationContextPath: /app
   type: simple
@@ -258,8 +258,8 @@ You can create a key by just POSTing the content to the server. Since there are 
 ```
 curl -i -H 'Content-Type: application/json' \
 --user huser:hseCr3t -X POST \
--d '{"key":"test","branch":"refs/heads/master","data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
-http://localhost:8085/app/storage
+-d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
+http://localhost:8085/app/storage/test?ref=refs%2Fheads%2Fmaster
 
 HTTP/1.1 200 OK
 Date: Sun, 04 Mar 2018 00:10:37 GMT
@@ -424,8 +424,8 @@ All keys are still protected by authorization. The keys are still protected by t
 
 ### MetaKeys
 
-Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` propterty.
-You could if you want create a master .metadata in the directory root and all keys in that directory (not subfolders) will have that key. If you need you can override that by sepecifying a specific metadata file for a particular file in that folder.
+Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` property.
+You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder.
 Example:
 ```json
 {"users":[{"user":"name","password":"pass"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}]}

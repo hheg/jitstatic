@@ -52,6 +52,7 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -265,25 +266,33 @@ public class KeyResource {
             return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
         } catch (RefNotFoundException e) {
             return false;
-        }        
+        }
     }
 
-    // TODO addKey should use ref like all other endpoints,
-    // TODO addKey should use the full endpoint key and post it.
+    @POST
+    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
+    public Response addKeyOld(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> userHolder) {
+        if (data.getKey() == null) {
+            throw new WebApplicationException("key is null", 422);
+        }
+        return addKey(data.getKey(), data.getBranch(), data, userHolder);
+    }
 
     @POST
     @Timed(name = "post_storage_time")
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
+    @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public Response addKey(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> userHolder) {
+    public Response addKey(@NotNull final @PathParam("key") String key, final @QueryParam("ref") String ref, @Valid @NotNull final AddKeyData data,
+            final @Auth Optional<User> userHolder) {
 
         if (!userHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
-        final String key = data.getKey();
-        final String ref = data.getBranch();
+
         helper.checkValidRef(ref);
 
         if (key.endsWith("/")) {
@@ -292,16 +301,15 @@ public class KeyResource {
 
         final User user = userHolder.get();
         if (!addKeyAuthenticator.authenticate(user, ref)) {
-            UserData userData;
             try {
-                userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
+                final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
                 if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
                     LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
                     throw new WebApplicationException(Status.FORBIDDEN);
                 }
             } catch (RefNotFoundException e) {
                 throw new WebApplicationException(Status.FORBIDDEN);
-            }            
+            }
         }
 
         final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
