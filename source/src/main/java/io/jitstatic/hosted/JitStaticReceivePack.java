@@ -60,20 +60,23 @@ public class JitStaticReceivePack extends ReceivePack {
     private final ErrorReporter errorReporter;
     private final SourceChecker sourceChecker;
     private final UserExtractor userExtractor;
+    private final boolean canForceUpdate;
 
     public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RepositoryBus bus,
-            final SourceChecker sourceChecker, final UserExtractor userExtractor) {
+            final SourceChecker sourceChecker, final UserExtractor userExtractor, boolean canForceUpdate) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.bus = Objects.requireNonNull(bus);
         this.errorReporter = Objects.requireNonNull(errorReporter);
         this.sourceChecker = Objects.requireNonNull(sourceChecker);
         this.userExtractor = Objects.requireNonNull(userExtractor);
+        this.canForceUpdate = canForceUpdate;
     }
 
     // TODO Check branches format and refactor into its own xUpdate class
     @Override
     protected void executeCommands() {
+        
         ProgressMonitor updating = NullProgressMonitor.INSTANCE;
         if (isSideBand()) {
             SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
@@ -216,7 +219,9 @@ public class JitStaticReceivePack extends ReceivePack {
                 orig.setResult(updateRef.delete());
             } else {
                 updateRef.setNewObjectId(test.getNewId());
-                checkResult(refName, updateRef.forceUpdate());
+                // TODO Fix the granularity and match with request
+                updateRef.setForceUpdate(canForceUpdate);
+                checkResult(refName, updateRef.update());
                 orig.setResult(test.getResult(), test.getMessage());
             }
             signalReload(List.of(p));

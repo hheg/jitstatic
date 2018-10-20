@@ -48,6 +48,7 @@ import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
@@ -85,6 +86,7 @@ import io.jitstatic.tools.Utils;
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class HostOwnGitRepositoryTest {
 
+    private static final String TEST_USER = "testuser";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String METADATA = ".metadata";
     private static final String STORE = "store";
@@ -424,27 +426,30 @@ public class HostOwnGitRepositoryTest {
         Path working = getFolder();
         try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
                 JitStaticClient client = buildClient()) {
+            git.commit().setMessage("initial commit").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
             Path users = working.resolve(JitStaticConstants.USERS);
             Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
-            Path user = gitRealm.resolve("blipp");
+            Path user = gitRealm.resolve(TEST_USER);
+            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
 
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
-            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            verifyOkPush(git.push().setCredentialsProvider(provider).call(), "refs/heads/" + JitStaticConstants.SECRETS);
         }
         try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "1234")).call()) {
         }
         assertTrue(assertThrows(TransportException.class, () -> {
             try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "2")).call()) {
+                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "2")).call()) {
             }
         }).getMessage().contains("not authorized"));
         Path workingFolder = getFolder();
         try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "1234")).call()) {
             Files.write(workingFolder.resolve(STORE), getData(2).getBytes("UTF-8"), StandardOpenOption.CREATE);
             git2.add().addFilepattern(".").call();
             git2.commit().setMessage("New file data").call();
@@ -457,18 +462,20 @@ public class HostOwnGitRepositoryTest {
         Path working = getFolder();
         try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
                 JitStaticClient client = buildClient()) {
+            git.commit().setMessage("initial commit").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
             Path users = working.resolve(JitStaticConstants.USERS);
             Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
-            Path user = gitRealm.resolve("blipp");
+            Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
-
+            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
-            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            verifyOkPush(git.push().setCredentialsProvider(provider).call(), "refs/heads/" + JitStaticConstants.SECRETS);
         }
         try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "1234")).call()) {
         }
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient()) {
@@ -476,7 +483,7 @@ public class HostOwnGitRepositoryTest {
             }
         }).getStatusCode());
         try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "1234")).call()) {
         }
     }
 
@@ -487,7 +494,7 @@ public class HostOwnGitRepositoryTest {
                 JitStaticClient client = buildClient();) {
             Path users = working.resolve(JitStaticConstants.USERS);
             Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
-            Path user = gitRealm.resolve("blipp");
+            Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("create")), "1234")), StandardOpenOption.CREATE);
             git.add().addFilepattern(".").call();
@@ -496,7 +503,7 @@ public class HostOwnGitRepositoryTest {
         }
         assertTrue(assertThrows(TransportException.class, () -> {
             try (Git git2 = Git.cloneRepository().setDirectory(getFolder().toFile()).setURI(gitAdress)
-                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider("blipp", "1234")).call()) {
+                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider(TEST_USER, "1234")).call()) {
             }
         }).getMessage().contains("not authorized"));
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
@@ -504,7 +511,7 @@ public class HostOwnGitRepositoryTest {
                 client.getKey(JitStaticConstants.USERS + JitStaticConstants.JITSTATIC_KEYADMIN_REALM + "/blipp", tf);
             }
         }).getStatusCode());
-        try (JitStaticClient cclient = buildCreatorClient().setPassword("1234").setUser("blipp").build()) {
+        try (JitStaticClient cclient = buildCreatorClient().setPassword("1234").setUser(TEST_USER).build()) {
             assertNotNull(cclient.createKey(new byte[] { 1 }, new CommitData("string/key", "msg", "user", "mail"),
                     new MetaData(Set.of(new MetaData.User("news", "1234")), "application/json")));
         }

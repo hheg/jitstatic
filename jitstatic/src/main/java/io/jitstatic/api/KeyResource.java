@@ -52,7 +52,6 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,7 +103,7 @@ public class KeyResource {
             final @Context HttpHeaders headers) {
 
         helper.checkRef(ref);
-        
+
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
         final Response noChange = helper.checkETag(headers, tag);
@@ -169,12 +168,6 @@ public class KeyResource {
         return Response.ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())).build();
     }
 
-    private void checkKey(final String key) {
-        if (key.endsWith("/")) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-    }
-
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data) {
         final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
@@ -201,8 +194,6 @@ public class KeyResource {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
         final User user = userholder.get();
-
-        checkKey(key);
 
         helper.checkHeaders(headers);
 
@@ -295,10 +286,6 @@ public class KeyResource {
 
         helper.checkValidRef(ref);
 
-        if (key.endsWith("/")) {
-            throw new WebApplicationException(key, Status.FORBIDDEN);
-        }
-
         final User user = userHolder.get();
         if (!addKeyAuthenticator.authenticate(user, ref)) {
             try {
@@ -337,8 +324,6 @@ public class KeyResource {
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);
         final String message = notEmpty(headers.getHeaderString(X_JITSTATIC_MESSAGE), X_JITSTATIC_MESSAGE);
         final String userMail = notEmpty(headers.getHeaderString(X_JITSTATIC_MAIL), X_JITSTATIC_MAIL);
-
-        checkKey(key);
 
         helper.checkValidRef(ref);
         final User user = userHolder.get();

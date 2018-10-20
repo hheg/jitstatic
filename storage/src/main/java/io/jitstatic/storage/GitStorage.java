@@ -49,7 +49,6 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.Path;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -102,26 +101,47 @@ public class GitStorage implements Storage {
     @Override
     public Optional<StoreInfo> getKey(final String key, final String ref) {
         try {
-            if (checkKeyIsDotFile(key)) {
-                return Optional.empty();
+            if (key.endsWith("/")) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String finalRef = checkRef(ref);
-            final RefHolder refHolder = getRefHolder(finalRef);
-            final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
-            if (storeInfo == null) {
-                return refHolder.loadAndStore(key);
-            }
-            return storeInfo;
-        } catch (final LoadException e) {
+            return getKeyDirect(key, ref);
+        } catch (LoadException e) {
             removeCacheRef(ref);
-        } catch (final Exception e) {
+        } catch (WrappingAPIException e) {
+            throw e;
+        } catch (Exception e) {
             consumeError(e);
         }
         return Optional.empty();
     }
 
+    private Optional<StoreInfo> getKeyDirect(final String key, final String ref) {
+        if (checkKeyIsDotFile(key)) {
+            return Optional.empty();
+        }
+
+        final String finalRef = checkRef(ref);
+        final RefHolder refHolder = getRefHolder(finalRef);
+        final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
+        if (storeInfo == null) {
+            return refHolder.loadAndStore(key);
+        }
+        return storeInfo;
+    }
+
+    @Override
+    public Pair<MetaData, String> getMetaKey(final String key, final String ref) {
+        final Optional<StoreInfo> keyDirect = getKeyDirect(key, ref);
+
+        if (!keyDirect.isPresent()) {
+            return Pair.ofNothing();
+        }
+        final StoreInfo storeInfo = keyDirect.get();
+        return Pair.of(storeInfo.getStorageData(), storeInfo.getMetaDataVersion());
+    }
+
     private boolean checkKeyIsDotFile(final String key) {
-        return Path.of(key).getLastElement().startsWith(".");
+        return Tree.of(List.of(Pair.of(key, false))).accept(new DotFinderVisitor());
     }
 
     private RefHolder getRefHolder(final String finalRef) {
@@ -162,6 +182,14 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
+
+        if (checkKeyIsDotFile(key)) {
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
+        }
+
+        if (key.endsWith("/")) {
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
+        }
 
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
@@ -226,6 +254,10 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(metaData, "metaData cannot be null");
         Objects.requireNonNull(oldMetaDataVersion, "metaDataVersion cannot be null");
 
+        if (checkKeyIsDotFile(key)) {
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
+        }
+
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
 
@@ -240,6 +272,11 @@ public class GitStorage implements Storage {
     @Override
     public void delete(final String key, final String ref, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
+        Objects.requireNonNull(commitMetaData);
+
+        if (checkKeyIsDotFile(key)) {
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
+        }
 
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);

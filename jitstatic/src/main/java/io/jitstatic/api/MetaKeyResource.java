@@ -1,7 +1,5 @@
 package io.jitstatic.api;
 
-import java.util.Objects;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import java.util.Objects;
  * #L%
  */
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -56,13 +55,14 @@ import com.spencerwi.either.Either;
 import io.dropwizard.auth.Auth;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.JitStaticConstants;
+import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
-import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.Pair;
 
 @Path("metakey")
 public class MetaKeyResource {
@@ -93,23 +93,20 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final Optional<StoreInfo> si = helper.unwrap(() -> storage.getKey(key, ref));
-
-        final Set<Role> roles = (si.isPresent() ? si.get().getStorageData().getRead() : null);
+        final Pair<MetaData, String> metaDataInfo = helper.unwrapPair(() -> storage.getMetaKey(key, ref));
+        if (!metaDataInfo.isPresent()) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+        final MetaData metaData = metaDataInfo.getLeft();
+        final Set<Role> roles = metaData.getRead();
         authorize(user.get(), ref, roles);
 
-        if (si.isPresent()) {
-            final StoreInfo storeInfo = si.get();
-
-            final EntityTag tag = new EntityTag(storeInfo.getMetaDataVersion());
-            final Response noChange = helper.checkETag(headers, tag);
-            if (noChange != null) {
-                return noChange;
-            }
-            return Response.ok(storeInfo.getStorageData()).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-                    .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+        final EntityTag tag = new EntityTag(metaDataInfo.getRight());
+        final Response noChange = helper.checkETag(headers, tag);
+        if (noChange != null) {
+            return noChange;
         }
-        throw new WebApplicationException(Status.NOT_FOUND);
+        return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
     }
 
     private void authorize(final User user, final String ref, final Set<Role> roles) {
@@ -150,9 +147,12 @@ public class MetaKeyResource {
 
         helper.checkRef(ref);
 
-        final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
-        authorize(user.get(), ref, storeInfo.getStorageData().getWrite());
-        final String currentVersion = storeInfo.getMetaDataVersion();
+        Pair<MetaData, String> metaKeyData = storage.getMetaKey(key, ref);
+        if(!metaKeyData.isPresent()) {
+            throw new WebApplicationException(key, Status.NOT_FOUND);
+        }
+        authorize(user.get(), ref, metaKeyData.getLeft().getWrite());
+        final String currentVersion = metaKeyData.getRight();
 
         final EntityTag tag = new EntityTag(currentVersion);
         final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);

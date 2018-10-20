@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -35,7 +36,8 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -54,8 +56,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
+import io.jitstatic.Role;
 import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.RefHolderLock;
@@ -67,7 +72,7 @@ import io.jitstatic.utils.WrappingAPIException;
 
 public class GitStorageTest {
 
-    private static final String UTF_8 = "UTF-8";
+    private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
     private static final String SHA_1 = "67adef5dab64f8f4cb50712ab24bda6605befa79";
     private static final String SHA_2 = "67adef5dab64f8f4cb50712ab24bda6605befa80";
@@ -99,46 +104,29 @@ public class GitStorageTest {
 
     @Test
     public void testGetARootKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getMetaData();) {
-            SourceInfo si1 = mock(SourceInfo.class);
-            when(si1.getSourceInputStream()).thenReturn(null);
-            when(si1.getMetadataInputStream()).thenReturn(mtest1);
-            when(si1.getSourceVersion()).thenReturn(null);
-            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
-            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
-
-            Optional<StoreInfo> key = gs.getKey("root/", null);
-            gs.checkHealth();
-            StoreInfo storeInfo = key.get();
-            assertNotNull(storeInfo);
-            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
-            assertNotNull(storeInfo.getStorageData());
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> gs.getKey("root/", null)).getCause().getClass());
             gs.checkHealth();
         }
     }
 
     @Test
     public void testPutARootKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getMetaData();) {
-            SourceInfo si1 = mock(SourceInfo.class);
-            when(si1.getSourceInputStream()).thenReturn(null);
-            when(si1.getMetadataInputStream()).thenReturn(mtest1);
-            when(si1.getSourceVersion()).thenReturn(null);
-            when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
-            when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si1);
-            when(source.modifyMetadata(Mockito.<MetaData>any(), Mockito.eq(SHA_1_MD), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn((SHA_2_MD));
-
-            Optional<StoreInfo> key = gs.getKey("root/", null);
-            StoreInfo storeInfo = key.get();
-            assertNotNull(storeInfo);
-            assertThrows(IllegalStateException.class, () -> storeInfo.getData());
-            assertNotNull(storeInfo.getStorageData());
+        try (GitStorage gs = new GitStorage(source, null); InputStream mtest1 = getMetaData(); InputStream mtest2 = getMetaData()) {
+            Mockito.when(source.modifyMetadata(Mockito.any(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                    .thenReturn(SHA_2_MD);
+            SourceInfo si = Mockito.mock(SourceInfo.class);
+            Mockito.when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            Mockito.when(si.getMetadataInputStream()).thenReturn(mtest1).thenReturn(mtest2);
+            Mockito.when(source.getSourceInfo(Mockito.eq("root/"), Mockito.anyString())).thenReturn(si);
+            Mockito.when(source.getSourceInfo(Mockito.eq("root"), Mockito.anyString())).thenReturn(null);
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> gs.getKey("root/", null)).getCause().getClass());
+            assertTrue(gs.getMetaKey("root/", null).isPresent());
 
             MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of(), null, null);
             Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, new CommitMetaData("user", "mail", "msg"));
+            assertTrue(putMetaData.isLeft());
             assertEquals(SHA_2_MD, putMetaData.getLeft());
-            Optional<StoreInfo> completableSupplier2 = gs.getKey("root/", null);
-            assertEquals(completableSupplier2.get().getMetaDataVersion(), SHA_2_MD);
             gs.checkHealth();
         }
     }
@@ -189,7 +177,7 @@ public class GitStorageTest {
         }
     }
 
-    private byte[] readData(String content) throws UnsupportedEncodingException {
+    private byte[] readData(String content) {
         return content.getBytes(UTF_8);
     }
 
@@ -590,23 +578,42 @@ public class GitStorageTest {
         }
     }
 
-    private byte[] getByteArray(int c) throws UnsupportedEncodingException {
+    @Test
+    public void testAddDotFile() {
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertThrows(WrappingAPIException.class,
+                    () -> gs.addKey("dot/.dot", null, new byte[] { 1 }, new MetaData(Set.of()), new CommitMetaData("d", "d", "d")));
+        }
+    }
+
+    
+    @Test
+    public void testGetUser() throws RefNotFoundException, IOException {
+        Mockito.when(source.getUser(Mockito.anyString(), Mockito.anyString())).thenReturn(Pair.of("1",new UserData(Set.of(new Role("role")),"1234")));
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertNotNull(gs.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+    }
+    private byte[] getByteArray(int c) {
         return ("{\"data\":\"value" + c + "\"}").getBytes(UTF_8);
     }
 
-    private InputStream getInputStream(int c) throws UnsupportedEncodingException {
+    private InputStream getInputStream(int c) {
         return new ByteArrayInputStream(getByteArray(c));
     }
 
-    private InputStream getMetaData() throws UnsupportedEncodingException {
+    private InputStream getMetaData() {
         return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}]}".getBytes(UTF_8));
     }
 
-    private InputStream getMetaDataHiddenInputStream() throws UnsupportedEncodingException {
+    private InputStream getMetaDataHiddenInputStream() {
         return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}],\"hidden\":true}".getBytes(UTF_8));
     }
 
-    private InputStream getMetaDataProtectedInputStream() throws UnsupportedEncodingException {
+    private InputStream getMetaDataProtectedInputStream() {
         return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}],\"protected\":true}".getBytes(UTF_8));
     }
 }

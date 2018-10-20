@@ -27,6 +27,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PreReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;
@@ -34,6 +35,7 @@ import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.SourceChecker;
 
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
@@ -80,11 +82,21 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
         throw new ServiceNotAuthorizedException();
     }
 
-    protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {
-        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor);
+    protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {        
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req.isUserInRole(JitStaticConstants.FORCEPUSH));
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));
+        rp.setRefFilter(refs -> {
+                if (refs != null && !req.isUserInRole(JitStaticConstants.SECRETS)) {
+                    Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
+                    Ref head = refs.get("HEAD");
+                    if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
+                        refs.remove("HEAD");
+                    }
+                }
+                return refs;
+            });
         return rp;
     }
 

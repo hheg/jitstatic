@@ -1,5 +1,8 @@
 package io.jitstatic;
 
+import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.USERS;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 
@@ -57,6 +60,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.apache.http.client.ClientProtocolException;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
@@ -252,8 +256,8 @@ public class KeyValueStorageWithHostedStorageTest {
 
         try (JitStaticClient client = builder.build(); JitStaticClient getter = buildClient().build()) {
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/newkey", stringFactory)).getStatusCode());
-            String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData("base/mid/new%20key", "master", "commit message", "user1", "user@mail"),
-                    new MetaData(new HashSet<>(), APPLICATION_JSON));
+            String createKey = client.createKey(getData().getBytes(UTF_8),
+                    new CommitData("base/mid/new%20key", "master", "commit message", "user1", "user@mail"), new MetaData(new HashSet<>(), APPLICATION_JSON));
             Entity<String> key = getter.getKey("base/mid/new%20key", stringFactory);
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> getter.getKey("base/mid/new", stringFactory)).getStatusCode());
             assertArrayEquals(getData().getBytes(UTF_8), key.data.getBytes(UTF_8));
@@ -601,6 +605,27 @@ public class KeyValueStorageWithHostedStorageTest {
         }
     }
 
+    @Test
+    public void testGetAndAddSecretUser() throws Exception {
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build()) {
+            final String key = USERS + "/" + GIT_REALM + "/user";
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+            assertEquals(HttpStatus.FORBIDDEN_403,
+                    assertThrows(APIException.class, () -> client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"),
+                            new MetaData(Set.of(new User(USER, PASSWORD)), APPLICATION_JSON, false, false, List.of()))).getStatusCode());
+            assertThrows(APIException.class, () -> client.getKey(key, tf));
+            assertThrows(APIException.class, () -> client.getKey(key, SECRETS, tf));
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+                client.createKey(getData().getBytes(UTF_8), new CommitData(key, SECRETS, "msg", "info", "mail"),
+                        new MetaData(Set.of(new User(USER, PASSWORD)), APPLICATION_JSON, false, false, List.of()));
+            }).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+        }
+    }
+    
     private Supplier<String> getFolder() {
         return () -> {
             try {

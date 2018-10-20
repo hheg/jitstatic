@@ -107,7 +107,7 @@ public class LoginServiceTest {
     public void testLoadRoleInfo() {
         LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         String[] loadRoleInfo = sls.loadRoleInfo(new AbstractLoginService.UserPrincipal(new String(user), new Password(new String(secret))));
-        assertTrue(loadRoleInfo.length == 3);
+        assertTrue(loadRoleInfo.length == 4);
         Arrays.asList(loadRoleInfo).containsAll(List.of("push", "pull", "forcepush"));
     }
 

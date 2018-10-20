@@ -25,12 +25,15 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PreUploadHookChain;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
+
+import io.jitstatic.JitStaticConstants;
 
 public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServletRequest> {
 
@@ -50,11 +53,20 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
 
     /** {@inheritDoc} */
     @Override
-    public UploadPack create(final HttpServletRequest req, final Repository db)
-            throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+    public UploadPack create(final HttpServletRequest req, final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         if (db.getConfig().get(ServiceConfig::new).enabled) {
             final JitStaticUploadPack jitStaticUploadPack = new JitStaticUploadPack(db, errorReporter);
             jitStaticUploadPack.setPreUploadHook(PreUploadHookChain.newChain(List.of(new LogoPoster())));
+            jitStaticUploadPack.setRefFilter(refs -> {
+                if (refs != null && !req.isUserInRole(JitStaticConstants.SECRETS)) {
+                    Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
+                    Ref head = refs.get("HEAD");
+                    if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
+                        refs.remove("HEAD");
+                    }
+                }
+                return refs;
+            });
             return jitStaticUploadPack;
         } else
             throw new ServiceNotEnabledException();

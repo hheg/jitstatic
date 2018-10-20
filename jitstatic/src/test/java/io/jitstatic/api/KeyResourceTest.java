@@ -206,14 +206,10 @@ public class KeyResourceTest {
 
     @Test
     public void testKeyIsFoundWithTags() throws InterruptedException {
-        try {
-            Optional<StoreInfo> expected = DATA.get("horse");
-            when(storage.getKey(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
-            JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
-            assertEquals(returnedHorse, response.toString());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Optional<StoreInfo> expected = DATA.get("horse");
+        when(storage.getKey(Mockito.matches("horse"), Mockito.matches("refs/tags/branch"))).thenReturn(expected);
+        JsonNode response = RESOURCES.target("/storage/horse").queryParam("ref", "refs/tags/branch").request().get(JsonNode.class);
+        assertEquals(returnedHorse, response.toString());
     }
 
     @Test
@@ -563,6 +559,7 @@ public class KeyResourceTest {
 
     @Test
     public void testAddRootKey() {
+        Mockito.when(storage.getKey(Mockito.anyString(), Mockito.anyString())).thenThrow(new WrappingAPIException(new UnsupportedOperationException("test/")));
         AddKeyData addKeyData = new AddKeyData("test/", REFS_HEADS_MASTER, new byte[] { 1 },
                 new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST).post(Entity.json(addKeyData));
@@ -732,22 +729,18 @@ public class KeyResourceTest {
 
     @Test
     public void testListAll() {
-        try {
-            StoreInfo dogInfo = DATA.get("dog").get();
-            StoreInfo bookInfo = DATA.get("book").get();
-            Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
-            Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
-            when(storage.getListForRef(Mockito.any(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
-            List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                    .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
-                    });
-            assertNotNull(list);
-            assertEquals(2, list.size());
-            assertEquals(new KeyData(dogPair), list.get(0));
-            assertEquals(new KeyData(bookPair), list.get(1));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        StoreInfo dogInfo = DATA.get("dog").get();
+        StoreInfo bookInfo = DATA.get("book").get();
+        Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
+        Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
+        when(storage.getListForRef(Mockito.any(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
+        List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
+                });
+        assertNotNull(list);
+        assertEquals(2, list.size());
+        assertEquals(new KeyData(dogPair), list.get(0));
+        assertEquals(new KeyData(bookPair), list.get(1));
     }
 
     @Test

@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedGitRepositoryManager;
@@ -210,21 +211,21 @@ public class HostedFactory {
         infoPath.setConstraint(new Constraint());
         infoPath.getConstraint().setAuthenticate(true);
         infoPath.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        infoPath.getConstraint().setRoles(new String[] { "pull" });
+        infoPath.getConstraint().setRoles(new String[] { JitStaticConstants.PULL });
         infoPath.setPathSpec(base + getHostedEndpoint() + "/info/*");
 
         final ConstraintMapping receivePath = new ConstraintMapping();
         receivePath.setConstraint(new Constraint());
         receivePath.getConstraint().setAuthenticate(true);
         receivePath.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        receivePath.getConstraint().setRoles(new String[] { "push" });
+        receivePath.getConstraint().setRoles(new String[] { JitStaticConstants.PUSH });
         receivePath.setPathSpec(base + getHostedEndpoint() + "/git-receive-pack");
 
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
         sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
-        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), getBranch());
+        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS);
         sec.setLoginService(gitLoginService);
         sec.setConstraintMappings(new ConstraintMapping[] { infoPath, receivePath });
 

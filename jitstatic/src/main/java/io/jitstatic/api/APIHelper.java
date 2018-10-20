@@ -39,6 +39,7 @@ import io.jitstatic.UpdateFailedException;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -60,7 +61,10 @@ class APIHelper {
                 throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
             } else if (apiException instanceof RefNotFoundException) {
                 // Error message here means that the branch is not found.
-                throw new WebApplicationException("Branch is not found", Status.NOT_FOUND);
+                RefNotFoundException rnfe = (RefNotFoundException) apiException;
+                throw new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.NOT_FOUND);
+            } else if (apiException instanceof UnsupportedOperationException) {
+                throw new WebApplicationException(Status.FORBIDDEN);
             } else if (apiException instanceof IOException) {
                 log.error("IO Error while executing command", e);
                 throw new WebApplicationException("Data is malformed", 422);
@@ -125,9 +129,32 @@ class APIHelper {
     <T> Optional<T> unwrap(final Supplier<Optional<T>> supplier) {
         try {
             return supplier.get();
-        } catch (final Exception e) {
+        } catch (WrappingAPIException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof UnsupportedOperationException) {
+                throw new WebApplicationException(Status.FORBIDDEN);
+            }
+            log.error("Unknown api error", e);
+            return Optional.empty();
+        } catch (Exception e) {
             log.error(UNHANDLED_ERROR, e);
             return Optional.empty();
+        }
+    }
+
+    <T, V> Pair<T, V> unwrapPair(final Supplier<Pair<T, V>> supplier) {
+        try {
+            return supplier.get();
+        } catch (WrappingAPIException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof UnsupportedOperationException) {
+                throw new WebApplicationException(Status.FORBIDDEN);
+            }
+            log.error("Unknown api error", e);
+            return Pair.ofNothing();
+        } catch (Exception e) {
+            log.error(UNHANDLED_ERROR, e);
+            return Pair.ofNothing();
         }
     }
 
@@ -158,6 +185,6 @@ class APIHelper {
     }
 
     StoreInfo checkIfKeyExist(final String key, final String ref, Storage storage) {
-        return unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(key + " in " + ref, Status.NOT_FOUND));
+        return unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND));
     }
 }

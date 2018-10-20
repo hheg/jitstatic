@@ -55,4 +55,6 @@ public interface Storage extends AutoCloseable, CheckHealth {
     public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
     public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
+
+    public Pair<MetaData,String> getMetaKey(String key, String ref);
 }

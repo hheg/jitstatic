@@ -125,6 +125,19 @@ public class RefHolder implements RefHolderLock {
         }
     }
 
+    private <T, V extends Exception> T readThrow(ThrowingSupplier<T, V> supplier) throws V {
+        refLock.readLock().lock();
+        try {
+            return supplier.get();
+        } finally {
+            refLock.readLock().unlock();
+        }
+    }
+
+    private static interface ThrowingSupplier<S, E extends Exception> {
+        S get() throws E;
+    }
+
     private boolean tryLock(final String key) {
         if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null || activeKeys.get(key) == Thread.currentThread()) {
             refLock.writeLock().lock();
@@ -223,20 +236,18 @@ public class RefHolder implements RefHolderLock {
     public Optional<StoreInfo> loadAndStore(final String key) {
         Optional<StoreInfo> storeInfoContainer = getKey(key);
         if (storeInfoContainer == null) {
-            final StoreInfo storeInfo = read(() -> {
-                try {
-                    return load(key);
-                } catch (final RefNotFoundException e) {
-                    throw new LoadException(e);
-                }
-            });
-            storeInfoContainer = store(key, storeInfo);
+            try {
+                final StoreInfo storeInfo = load(key);
+                storeInfoContainer = store(key, storeInfo);
+            } catch (RefNotFoundException e) {
+                throw new LoadException(e);
+            }
         }
         return storeInfoContainer;
     }
 
     private StoreInfo load(final String key) throws RefNotFoundException {
-        final SourceInfo sourceInfo = source.getSourceInfo(key, ref);
+        final SourceInfo sourceInfo = readThrow(() -> source.getSourceInfo(key, ref));
         if (sourceInfo != null) {
             return readStoreInfo(sourceInfo);
         }
@@ -283,7 +294,6 @@ public class RefHolder implements RefHolderLock {
             }
             return v;
         });
-
         return computed != null && computed.isLeft() ? computed.getLeft() : storeInfoContainer;
     }
 
@@ -312,8 +322,17 @@ public class RefHolder implements RefHolderLock {
     void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
-            Either<Optional<StoreInfo>, UserData> optional = refCache.get(plainKey);
-            if (optional != null && optional.getLeft().isPresent()) {
+            Either<Optional<StoreInfo>, UserData> compute = refCache.compute(plainKey, (k, v) -> {
+                if (v == null) {
+                    try {
+                        return Either.left(Optional.ofNullable(load(k)));
+                    } catch (RefNotFoundException fnfe) {
+                        return null;
+                    }
+                }
+                return v;
+            });
+            if (compute != null && compute.getLeft().isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
         }
@@ -388,7 +407,7 @@ public class RefHolder implements RefHolderLock {
             } catch (RefNotFoundException | IOException e) {
                 throw new WrappingAPIException(e);
             }
-            if (user.isPresent()) {
+            if (user !=null && user.isPresent()) {
                 return Either.right(user.getRight());
             }
         }

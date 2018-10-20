@@ -38,6 +38,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -61,6 +66,7 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
+import io.jitstatic.StorageParseException;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.RepositoryDataError;
@@ -71,6 +77,7 @@ public class UserExtractor {
     private static final Set<String> REALMS = Set.of(GIT_REALM, JITSTATIC_KEYADMIN_REALM, JITSTATIC_KEYUSER_REALM);
     private static final Logger LOG = LoggerFactory.getLogger(UserExtractor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
     private final Repository repository;
 
     UserExtractor(final Repository repository) {
@@ -127,7 +134,12 @@ public class UserExtractor {
                     InputStreamHolder inputStream = p.getRight();
                     if (inputStream.isPresent()) {
                         try (InputStream is = inputStream.inputStream()) {
-                            return Pair.of(p.getLeft(), Either.<UserData, Exception>left(MAPPER.readValue(is, UserData.class)));
+                            final UserData readValue = MAPPER.readValue(is, UserData.class);
+                            final Set<ConstraintViolation<UserData>> validationErrors = validator.validate(readValue);
+                            if(!validationErrors.isEmpty()) {                                
+                                return Pair.of(p.getLeft(),Either.<UserData,Exception>right(new StorageParseException(validationErrors)));
+                            }
+                            return Pair.of(p.getLeft(), Either.<UserData, Exception>left(readValue));
                         } catch (IOException e1) {
                             return Pair.of(p.getLeft(), Either.<UserData, Exception>right(e1));
                         }
