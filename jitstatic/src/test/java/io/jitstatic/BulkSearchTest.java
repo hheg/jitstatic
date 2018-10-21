@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
-import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -57,8 +56,6 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.SearchResult;
 import io.jitstatic.client.BulkSearch;
-import io.jitstatic.client.JitStaticCreatorClient;
-import io.jitstatic.client.JitStaticCreatorClientBuilder;
 import io.jitstatic.client.JitStaticUpdaterClient;
 import io.jitstatic.client.JitStaticUpdaterClientBuilder;
 import io.jitstatic.client.SearchPath;
@@ -176,10 +173,6 @@ public class BulkSearchTest {
 
     private JitStaticUpdaterClientBuilder buildClient() {
         return JitStaticUpdaterClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
-    }
-
-    private JitStaticCreatorClientBuilder buildCreatorClient() {
-        return JitStaticCreatorClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
     }
 
 }
