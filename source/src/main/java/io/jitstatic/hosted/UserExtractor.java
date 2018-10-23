@@ -23,7 +23,6 @@ package io.jitstatic.hosted;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -41,7 +40,6 @@ import java.util.stream.Stream;
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.CorruptObjectException;

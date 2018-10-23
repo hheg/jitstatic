@@ -28,7 +28,6 @@ import static io.jitstatic.JitStaticConstants.PULL;
 import static io.jitstatic.JitStaticConstants.PUSH;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -86,7 +85,6 @@ import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticClient;
 import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.client.MetaData;
-import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.SearchPath;
 import io.jitstatic.client.TriFunction;
