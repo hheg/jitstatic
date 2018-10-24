@@ -114,7 +114,6 @@ import io.jitstatic.tools.Utils;
  */
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
-@Disabled
 public class LoadTesterIT {
 
     private static final Pattern PAT = Pattern.compile("^\\w:\\w:\\d+$");

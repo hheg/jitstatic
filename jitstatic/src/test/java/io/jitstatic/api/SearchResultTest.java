@@ -42,6 +42,8 @@ public class SearchResultTest {
         assertFalse(sr1.equals(sr4));
         assertTrue(sr1.equals(sr5));
         assertFalse(sr1.equals(sr6));
+        assertFalse(sr1.equals(null));
+        assertTrue(sr1.equals(sr1));
     }
     
 }

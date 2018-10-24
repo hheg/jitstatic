@@ -467,9 +467,6 @@ public class UserManagementTest {
                     assertThrows(APIException.class, () -> noUser.delete(new CommitData(key, "msg", "userinfo", "mail"))).getStatusCode());
             client.delete(new CommitData(key, "msg", "userinfo", "mail"));
             assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
         }
     }
 

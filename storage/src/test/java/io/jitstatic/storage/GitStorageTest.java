@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
@@ -586,17 +587,53 @@ public class GitStorageTest {
         }
     }
 
-    
     @Test
     public void testGetUser() throws RefNotFoundException, IOException {
-        Mockito.when(source.getUser(Mockito.anyString(), Mockito.anyString())).thenReturn(Pair.of("1",new UserData(Set.of(new Role("role")),"1234")));
+        Mockito.when(source.getUser(Mockito.anyString(), Mockito.anyString())).thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "1234")));
         try (GitStorage gs = new GitStorage(source, null)) {
             assertNotNull(gs.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
         }
     }
+
+    @Test
+    public void testGetListForNoKey() throws RefNotFoundException {
+        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq("refs/heads/master"))).thenReturn(null);
+        try (GitStorage gs = new GitStorage(source, null)) {
+            gs.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+        }
+    }
+
+    @Test
+    public void testGetListNoRef() throws RefNotFoundException, IOException {
+        Mockito.when(source.getList(Mockito.eq("key/"), Mockito.eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new RefNotFoundException("test"));
+        try (GitStorage gs = new GitStorage(source, null)) {
+            List<Pair<String, StoreInfo>> listForRef = gs.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+            assertTrue(listForRef.isEmpty());
+        }
+    }
+
+    @Test
+    public void testGetListIOException() throws RefNotFoundException, IOException {
+        Mockito.when(source.getList(Mockito.eq("key/"), Mockito.eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new IOException("test"));
+        try (GitStorage gs = new GitStorage(source, null)) {
+            List<Pair<String, StoreInfo>> listForRef = gs.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+            assertTrue(listForRef.isEmpty());
+        }
+    }
+
+    @Test
+    public void testGetListForAKey() throws RefNotFoundException, IOException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
+            SourceInfo si = mock(SourceInfo.class);
+            when(si.getSourceInputStream()).thenReturn(test3);
+            when(si.getMetadataInputStream()).thenReturn(mtest3);
+            when(si.getSourceVersion()).thenReturn(SHA_1);
+            when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
+            Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq("refs/heads/master"))).thenReturn(si);
+            gs.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+        }
+    }
+
     private byte[] getByteArray(int c) {
         return ("{\"data\":\"value" + c + "\"}").getBytes(UTF_8);
     }

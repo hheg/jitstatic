@@ -158,7 +158,7 @@ public class KeyResource {
                 return false;
             }
             final User user = userHolder.get();
-            return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref);
+            return isUserAllowed(ref, user, allowedUsers, keyRoles);
         }).collect(Collectors.toList());
 
         if (list.isEmpty()) {
@@ -207,7 +207,7 @@ public class KeyResource {
             throw new WebApplicationException(Status.BAD_REQUEST);
         }
 
-        if (!allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, roles) && !isAuthenticated) {
+        if (!(isAuthenticated || allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles))) {
             LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
@@ -239,7 +239,7 @@ public class KeyResource {
     }
 
     void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
-        if (!allowedUsers.contains(user) && !isKeyUserAllowed(user, ref, keyRoles) && !addKeyAuthenticator.authenticate(user, ref)) {
+        if (!isUserAllowed(ref, user, allowedUsers, keyRoles)) {
             LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
@@ -331,7 +331,7 @@ public class KeyResource {
         final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
         final Set<Role> roles = storeInfo.getStorageData().getWrite();
 
-        if (!allowedUsers.contains(user) && !addKeyAuthenticator.authenticate(user, ref) && !isKeyUserAllowed(user, ref, roles)) {
+        if (!isUserAllowed(ref, user, allowedUsers, roles)) {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
                 throw new WebApplicationException(Status.BAD_REQUEST);
             }
@@ -349,6 +349,10 @@ public class KeyResource {
         }
 
         return Response.ok().build();
+    }
+
+    private boolean isUserAllowed(final String ref, final User user, final Set<User> allowedUsers, final Set<Role> roles) {
+        return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles) || addKeyAuthenticator.authenticate(user, ref);
     }
 
     private String notEmpty(final String headerString, final String headerName) {

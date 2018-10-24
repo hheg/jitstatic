@@ -36,6 +36,7 @@ import java.util.Set;
 import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -65,6 +66,7 @@ import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class MetaKeyResourceTest {
@@ -232,6 +234,27 @@ public class MetaKeyResourceTest {
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_OK));
         assertThat(put.getEntityTag().getValue(), Matchers.equalTo("3"));
         put.close();
+    }
+    
+    @Test
+    public void testGetMetaKeyUnsupported() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new WrappingAPIException(new UnsupportedOperationException("Test")));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();        
+        assertEquals(HttpStatus.SC_FORBIDDEN,response.getStatus());
+    }
+    
+    @Test
+    public void testGetMetaKeyUnknownAPIException() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new WrappingAPIException(new RuntimeException("Test")));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertEquals(HttpStatus.SC_NOT_FOUND,response.getStatus());
+    }
+    
+    @Test
+    public void testGetMetaKeyUnknown() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new RuntimeException("Test"));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertEquals(HttpStatus.SC_NOT_FOUND,response.getStatus());
     }
 
     private static String createCreds(String user, String secret) {

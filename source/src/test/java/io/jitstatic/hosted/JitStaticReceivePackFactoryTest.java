@@ -24,20 +24,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.hamcrest.CoreMatchers;
@@ -45,10 +51,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import io.jitstatic.hosted.ErrorReporter;
 import io.jitstatic.hosted.JitStaticReceivePackFactory;
 import io.jitstatic.hosted.RepositoryBus;
+import io.jitstatic.hosted.JitStaticUploadPackFactory.ServiceConfig;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
@@ -127,6 +136,27 @@ public class JitStaticReceivePackFactoryTest {
         assertEquals(user, refLogIdent.getName());
         assertEquals(user + "@" + host, refLogIdent.getEmailAddress());
         assertTrue(create.isAtomic());
+    }
+
+    @Test
+    public void testSecretsFilterFunction() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+        String user = "user";
+        Ref secrets = mock(Ref.class);
+        Ref head = mock(Ref.class);
+        ObjectId oid = ObjectId.fromString("5f12e3846fef8c259efede1a55e12667effcc461");
+        when(secrets.getObjectId()).thenReturn(oid);
+        when(head.getObjectId()).thenReturn(oid);
+        when(req.getRemoteUser()).thenReturn(user);
+
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RepositoryBus(reporter),
+                new UserExtractor(git.getRepository()));
+
+        ReceivePack up = jsrpf.create(req, git.getRepository());
+        Map<String, Ref> map = new HashMap<>();
+        map.put("refs/heads/secrets", secrets);
+        map.put("HEAD", head);
+        Map<String, Ref> filtered = up.getRefFilter().filter(map);
+        assertTrue(filtered.isEmpty());
     }
 
     Path getFolder() throws IOException {

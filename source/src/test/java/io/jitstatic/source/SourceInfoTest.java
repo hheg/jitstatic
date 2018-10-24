@@ -1,7 +1,5 @@
 package io.jitstatic.source;
 
-
-
 /*-
  * #%L
  * jitstatic
@@ -24,6 +22,7 @@ package io.jitstatic.source;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -34,6 +33,7 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import io.jitstatic.MetaData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.MetaFileData;
 import io.jitstatic.check.SourceFileData;
@@ -122,5 +122,13 @@ public class SourceInfoTest {
         MetaFileData mfd = new MetaFileData(fois2, ish2);
         SourceInfo si = new SourceInfo(mfd, sdf);
         assertThrows(RuntimeException.class, () -> si.getSourceInputStream());
+    }
+
+    @Test
+    public void testNotMasterdata() {
+        MetaFileData meta = Mockito.mock(MetaFileData.class);
+        Mockito.when(meta.isMasterMetaData()).thenReturn(false).thenReturn(true);
+        assertThrows(IllegalArgumentException.class, () -> new SourceInfo(meta, null));
+        assertNull(new SourceInfo(meta, null).getSourceVersion());
     }
 }
