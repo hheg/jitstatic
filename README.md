@@ -435,7 +435,7 @@ Example:
 {"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]}
 ```
 
-## <a name="#users"></a> Users
+## <a name="users"></a> Users
 
 A user is stored in the repository with the following format:
 ```bash
