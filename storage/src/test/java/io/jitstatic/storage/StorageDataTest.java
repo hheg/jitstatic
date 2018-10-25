@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -46,8 +45,8 @@ public class StorageDataTest {
 
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
-		MetaData sd2 = new MetaData(users2, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
+		MetaData sd2 = new MetaData(users2);
 		assertEquals(sd1, sd2);
 	}
 
@@ -57,8 +56,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
-		MetaData sd2 = new MetaData(users2, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
+		MetaData sd2 = new MetaData(users2);
 		assertNotEquals(sd1, sd2);
 	}
 
@@ -68,8 +67,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
-		MetaData sd2 = new MetaData(users2, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
+		MetaData sd2 = new MetaData(users2);
 		assertEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -79,8 +78,8 @@ public class StorageDataTest {
 		users1.add(new User("user1", "p"));
 		Set<User> users2 = new HashSet<>();
 		users2.add(new User("user2", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
-		MetaData sd2 = new MetaData(users2, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
+		MetaData sd2 = new MetaData(users2);
 		assertNotEquals(sd1.hashCode(), sd2.hashCode());
 	}
 
@@ -88,7 +87,7 @@ public class StorageDataTest {
 	public void testEqualsInstance() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
 		assertTrue(sd1.equals(sd1));
 	}
 
@@ -96,7 +95,7 @@ public class StorageDataTest {
 	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
 		assertFalse(sd1.equals(null));
 	}
 
@@ -104,7 +103,7 @@ public class StorageDataTest {
 	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
 		assertFalse(sd1.equals(new Object()));
 	}
 
@@ -112,10 +111,10 @@ public class StorageDataTest {
 	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
 		Set<User> users1 = new HashSet<>();
 		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1, null, false, false, List.of());
+		MetaData sd1 = new MetaData(users1);
 		Set<User> users2 = new HashSet<>();
 		users1.add(new User("user2", "p"));
-		MetaData sd2 = new MetaData(users2, null, false, false, List.of());
+		MetaData sd2 = new MetaData(users2);
 		assertFalse(sd1.equals(sd2));
 	}
 }

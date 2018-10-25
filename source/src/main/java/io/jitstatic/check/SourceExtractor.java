@@ -20,8 +20,14 @@ package io.jitstatic.check;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.METADATA;
+import static io.jitstatic.JitStaticConstants.REFS_JITSTATIC;
+import static io.jitstatic.JitStaticConstants.USERS;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.lib.Constants.R_HEADS;
+import static org.eclipse.jgit.lib.Constants.R_TAGS;
+
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -36,7 +42,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -45,10 +50,12 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
+import org.eclipse.jgit.treewalk.filter.NotTreeFilter;
+import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
@@ -56,22 +63,22 @@ import io.jitstatic.utils.Path;
 
 public class SourceExtractor {
 
-    private static final int METADATA_LENGTH = JitStaticConstants.METADATA.length();
+    private static final int METADATA_LENGTH = METADATA.length();
     private final Repository repository;
 
     public SourceExtractor(final Repository repository) {
-        this.repository = repository;
+        this.repository = Objects.requireNonNull(repository);
     }
 
     public SourceInfo openTag(final String tagName, final String key) throws RefNotFoundException, IOException {
-        if (!Objects.requireNonNull(tagName).startsWith(Constants.R_TAGS)) {
+        if (!Objects.requireNonNull(tagName).startsWith(R_TAGS)) {
             throw new RefNotFoundException(tagName);
         }
         return sourceExtractor(tagName, key);
     }
 
     public SourceInfo openBranch(final String branchName, final String key) throws RefNotFoundException, IOException {
-        if (!Objects.requireNonNull(branchName).startsWith(Constants.R_HEADS)) {
+        if (!Objects.requireNonNull(branchName).startsWith(R_HEADS)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceExtractor(branchName, key);
@@ -107,7 +114,7 @@ public class SourceExtractor {
     }
 
     public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceTestBranchExtractor(final String branchName) throws IOException, RefNotFoundException {
-        if (!Objects.requireNonNull(branchName).startsWith(JitStaticConstants.REFS_JITSTATIC)) {
+        if (!Objects.requireNonNull(branchName).startsWith(REFS_JITSTATIC)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceGeneralExtractor(branchName);
@@ -119,7 +126,7 @@ public class SourceExtractor {
     }
 
     public Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sourceBranchExtractor(final String branchName) throws IOException, RefNotFoundException {
-        if (!Objects.requireNonNull(branchName).startsWith(Constants.R_HEADS)) {
+        if (!Objects.requireNonNull(branchName).startsWith(R_HEADS)) {
             throw new RefNotFoundException(branchName);
         }
         return sourceGeneralExtractor(branchName);
@@ -150,17 +157,18 @@ public class SourceExtractor {
                 treeWalker.setFilter(getTreeFilter(key));
             } else {
                 treeWalker.setRecursive(true);
+                treeWalker.setFilter(NotTreeFilter.create(PathFilter.create(USERS)));
             }
             while (treeWalker.next()) {
                 if (treeWalker.isSubtree()) {
-                    if (key != null && key.startsWith(new String(treeWalker.getRawPath(), StandardCharsets.UTF_8) + "/")) {
+                    if (key != null && isDirectoryOf(key, treeWalker.getRawPath())) {
                         treeWalker.enterSubtree();
                     }
                 } else {
                     final FileMode mode = treeWalker.getFileMode();
                     if (mode == FileMode.REGULAR_FILE || mode == FileMode.EXECUTABLE_FILE) {
                         final ObjectId objectId = treeWalker.getObjectId(0);
-                        final String path = new String(treeWalker.getRawPath(), StandardCharsets.UTF_8);
+                        final String path = new String(treeWalker.getRawPath(), UTF_8);
                         final InputStreamHolder inputStreamHolder = getInputStreamFor(objectId);
                         final FileObjectIdStore fileObjectIdStore = new FileObjectIdStore(path, objectId);
                         matchKeys(metaFiles, dataFiles, path, inputStreamHolder, fileObjectIdStore);
@@ -173,12 +181,17 @@ public class SourceExtractor {
         return new BranchData(metaFiles, dataFiles, error);
     }
 
+    private boolean isDirectoryOf(final String key, final byte[] rawPath) {
+        return key.startsWith(new String(rawPath, UTF_8) + "/");
+    }
+
     private void matchKeys(final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> dataFiles, final String path,
             final InputStreamHolder inputStreamHolder, final FileObjectIdStore fileObjectIdStore) {
         final Path p = Path.of(path);
-        if (p.getLastElement().equals(JitStaticConstants.METADATA) || !p.getLastElement().startsWith(".")) {
-            if (path.endsWith(JitStaticConstants.METADATA)) {
-                if (p.getLastElement().equals(JitStaticConstants.METADATA)) {
+        final String lastElement = p.getLastElement();
+        if (lastElement.equals(METADATA) || !lastElement.startsWith(".")) {
+            if (path.endsWith(METADATA)) {
+                if (lastElement.equals(METADATA)) {
                     metaFiles.put(path, new MetaFileData(fileObjectIdStore, inputStreamHolder));
                 } else {
                     metaFiles.put(path.substring(0, path.length() - METADATA_LENGTH), new MetaFileData(fileObjectIdStore, inputStreamHolder, true));
@@ -191,13 +204,9 @@ public class SourceExtractor {
 
     private TreeFilter getTreeFilter(final String key) {
         final Path path = Path.of(key);
-        final TreeFilter pfg;
-        if (path.isDirectory()) {
-            pfg = PathFilterGroup.createFromStrings(key + JitStaticConstants.METADATA);
-        } else {
-            pfg = PathFilterGroup.createFromStrings(key, key + JitStaticConstants.METADATA, path.getParentElements() + JitStaticConstants.METADATA);
-        }
-        return pfg;
+        final TreeFilter pfg = (path.isDirectory() ? PathFilterGroup.createFromStrings(key + METADATA)
+                : PathFilterGroup.createFromStrings(key, key + METADATA, path.getParentElements() + METADATA));
+        return AndTreeFilter.create(pfg, NotTreeFilter.create(PathFilter.create(USERS)));
     }
 
     private InputStreamHolder getInputStreamFor(final ObjectId objectId) {
@@ -215,7 +224,7 @@ public class SourceExtractor {
     public Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> extractAll() {
         final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
         return allRefs.entrySet().stream().map(e -> {
-            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic()).filter(ref -> ref.getName().startsWith(Constants.R_HEADS))
+            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic()).filter(ref -> ref.getName().startsWith(R_HEADS))
                     .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
         }).map(this::fileLoader).collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));
@@ -226,9 +235,6 @@ public class SourceExtractor {
     }
 
     public List<String> getListForKey(final String key, final String ref, boolean recursive) throws RefNotFoundException, IOException {
-        if (!key.endsWith("/")) {
-            throw new IllegalArgumentException(String.format("%s doesn't end with /", key));
-        }
         final Ref findBranch = findBranch(ref);
         final AnyObjectId reference = findBranch.getObjectId();
         final List<String> keys;
@@ -238,8 +244,11 @@ public class SourceExtractor {
             try (final TreeWalk treeWalker = new TreeWalk(repository)) {
                 treeWalker.addTree(currentTree);
                 treeWalker.setRecursive(recursive);
+                final TreeFilter noUsers = NotTreeFilter.create(PathFilter.create(USERS));
                 if (!key.equals("/")) {
-                    treeWalker.setFilter(PathFilterGroup.createFromStrings(key));
+                    treeWalker.setFilter(AndTreeFilter.create(PathFilterGroup.createFromStrings(key), noUsers));
+                } else {
+                    treeWalker.setFilter(noUsers);
                 }
                 keys = walkTree(key, treeWalker);
             }
@@ -251,7 +260,7 @@ public class SourceExtractor {
     private List<String> walkTree(final String key, final TreeWalk treeWalker)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
         final List<String> keys = new ArrayList<>();
-        final byte[] keyData = key.getBytes(StandardCharsets.UTF_8);
+        final byte[] keyData = key.getBytes(UTF_8);
         while (treeWalker.next()) {
             if (treeWalker.isSubtree()) {
                 byte[] rawPath = treeWalker.getRawPath();
@@ -265,7 +274,7 @@ public class SourceExtractor {
             } else {
                 final FileMode mode = treeWalker.getFileMode();
                 if (mode == FileMode.REGULAR_FILE || mode == FileMode.EXECUTABLE_FILE) {
-                    keys.add(new String(treeWalker.getRawPath(), StandardCharsets.UTF_8));
+                    keys.add(new String(treeWalker.getRawPath(), UTF_8));
                 }
             }
         }

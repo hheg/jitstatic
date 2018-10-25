@@ -23,6 +23,7 @@ package io.jitstatic.api;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
 import java.nio.charset.Charset;
@@ -30,9 +31,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
+
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -55,12 +59,14 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
-import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
+import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
-import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class MetaKeyResourceTest {
@@ -75,11 +81,12 @@ public class MetaKeyResourceTest {
     private Storage storage = mock(Storage.class);
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(
-                    new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm(JitstaticApplication.JITSTATIC_METAKEY_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
+                    .setRealm(JitStaticConstants.JITSTATIC_KEYADMIN_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
-            .addResource(new MetaKeyResource(storage, (user) -> new User(PUSER, PSECRET).equals(user))).build();
+            .addResource(new MetaKeyResource(storage,
+                    new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), "refs/heads/master")))
+            .build();
 
     @AfterEach
     public void tearDown() {
@@ -88,32 +95,29 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testUserKeyWithoutUser() {
-        assertEquals(assertThrows(NotAuthorizedException.class, () -> RESOURCES.target("/metakey/dog").request().get(JsonNode.class))
-                .getLocalizedMessage(), "HTTP 401 Unauthorized");
+        assertEquals("HTTP 401 Unauthorized",
+                assertThrows(NotAuthorizedException.class, () -> RESOURCES.target("/metakey/dog").request().get(JsonNode.class)).getLocalizedMessage());
     }
 
     @Test
     public void testUserKeyWithUser() {
-        assertEquals(
-                assertThrows(NotAuthorizedException.class, () -> RESOURCES.target("/metakey/dog").request()
-                        .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2).get(JsonNode.class)).getLocalizedMessage(),
-                "HTTP 401 Unauthorized");
+        Mockito.when(storage.getMetaKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(Pair.of(new MetaData(Set.of(new User("name","pass"))),"1"));
+        assertEquals("HTTP 403 Forbidden",
+                assertThrows(ForbiddenException.class,
+                        () -> RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2).get(JsonNode.class))
+                                .getLocalizedMessage());
     }
 
     @Test
     public void testGetUserKeyWithWrongRef() {
-        assertEquals(
-                assertThrows(NotFoundException.class,
-                        () -> RESOURCES.target("/metakey/dog").queryParam("ref", "master").request()
-                                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(JsonNode.class)).getLocalizedMessage(),
-                "HTTP 404 Not Found");
+        assertEquals("HTTP 404 Not Found", assertThrows(NotFoundException.class, () -> RESOURCES.target("/metakey/dog").queryParam("ref", "master").request()
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(JsonNode.class)).getLocalizedMessage());
     }
 
     @Test
     public void testGetAKey() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData,"metadataversion"));
         Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
@@ -124,7 +128,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithoutuser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -137,48 +141,52 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        try {
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
-        mukd.setMetaData(storageData);
+        mukd.setMetaData(storageData);        
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData,"metadataversion"));
         Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2)
-                .put(Entity.json(mukd));
-        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_UNAUTHORIZED));
+                .header(HttpHeaders.IF_MATCH, "\"version\"").put(Entity.json(mukd));
+        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_FORBIDDEN));
         put.close();
+        }catch(Exception e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
     @Test
     public void testModifyAKeyWithWrongVersion() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
-        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData,"metadataversion"));
+        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+                .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_PRECONDITION_FAILED));
         put.close();
     }
 
     @Test
     public void testModifyAKey() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
-        mukd.setMetaData(storageData);
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
-        Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"),
-                Mockito.eq("message"), Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(Either.left("3"));
-        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));
+        mukd.setMetaData(storageData);        
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData,"2"));
+        Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"), Mockito.any()))
+                .thenReturn(Either.left("3"));
+        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+                .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_OK));
         assertThat(put.getEntityTag().getValue(), Matchers.equalTo("3"));
         put.close();
@@ -186,24 +194,22 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithMalformedKeyData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.getKey("dog", null)).thenReturn(Optional.of(sd));
-        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData,"metadataversion"));
+        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+                .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(422));
         put.close();
     }
 
     @Test
     public void testGetMasterMetaData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "metadataversion");
-        Mockito.when(storage.getKey("dog/", null)).thenReturn(Optional.of(sd));
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);        
+        Mockito.when(storage.getMetaKey("dog/", null)).thenReturn(Pair.of(storageData,"metadataversion"));
         Response response = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertThat("metadataversion", Matchers.is(response.getEntityTag().getValue()));
         assertThat(HttpStatus.SC_OK, Matchers.is(response.getStatus()));
@@ -214,21 +220,41 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAMasterMetaData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of());
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
-        StoreInfo sd = new StoreInfo(new byte[] { 1 }, storageData, "version", "2");
-        Mockito.when(storage.getKey("dog/", null)).thenReturn(Optional.of(sd));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"),
-                Mockito.eq("message"), Mockito.eq("userinfo"), Mockito.eq("usermail"))).thenReturn(Either.left("3"));
-        Response put = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"2\"").put(Entity.json(mukd));
+        Mockito.when(storage.getMetaKey("dog/", null)).thenReturn(Pair.of(storageData,"2"));
+        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.isNull(), Mockito.isA(MetaData.class), Mockito.eq("2"), Mockito.any()))
+                .thenReturn(Either.left("3"));
+        Response put = RESOURCES.target("/metakey/dog/").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).header(HttpHeaders.IF_MATCH, "\"2\"")
+                .put(Entity.json(mukd));
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_OK));
         assertThat(put.getEntityTag().getValue(), Matchers.equalTo("3"));
         put.close();
+    }
+    
+    @Test
+    public void testGetMetaKeyUnsupported() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new WrappingAPIException(new UnsupportedOperationException("Test")));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();        
+        assertEquals(HttpStatus.SC_FORBIDDEN,response.getStatus());
+    }
+    
+    @Test
+    public void testGetMetaKeyUnknownAPIException() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new WrappingAPIException(new RuntimeException("Test")));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertEquals(HttpStatus.SC_NOT_FOUND,response.getStatus());
+    }
+    
+    @Test
+    public void testGetMetaKeyUnknown() {
+        Mockito.when(storage.getMetaKey("dog", null)).thenThrow(new RuntimeException("Test"));
+        Response response = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+        assertEquals(HttpStatus.SC_NOT_FOUND,response.getStatus());
     }
 
     private static String createCreds(String user, String secret) {

@@ -46,8 +46,7 @@ public class Tree implements TreeVisitable {
         this(null, parts, "/", parts.contains(ALL), parts.contains(LEVEL));
     }
 
-    private Tree(final Tree parent, final Collection<Pair<String, Boolean>> parts, final String name, final boolean recursive,
-            final boolean exlusive) {
+    private Tree(final Tree parent, final Collection<Pair<String, Boolean>> parts, final String name, final boolean recursive, final boolean exlusive) {
         this.trunk = parent;
         this.name = Objects.requireNonNull(name);
         this.recursive = recursive;
@@ -58,7 +57,7 @@ public class Tree implements TreeVisitable {
         }
 
         final Map<String, Set<Pair<String, Boolean>>> mappedParts = new HashMap<>();
-        this.leafs = debone(parts, mappedParts);
+        this.leafs = Collections.unmodifiableSet(debone(parts, mappedParts));
         branches = Collections.unmodifiableSet(extractBranches(mappedParts));
     }
 
@@ -70,12 +69,9 @@ public class Tree implements TreeVisitable {
         if (parts.contains(ALL)) {
             return Set.of();
         }
+        boolean containsLevel = parts.contains(LEVEL);
         final Set<Tree> tmpLeafs = new HashSet<>();
-        boolean clearLeafs = false;
         for (Pair<String, Boolean> part : parts) {
-            if (part.equals(LEVEL)) {
-                clearLeafs |= true;
-            }
             final String element = part.getLeft();
             final int firstSlash = element.indexOf('/');
             if (firstSlash != -1) {
@@ -92,14 +88,11 @@ public class Tree implements TreeVisitable {
                         return set;
                     });
                 }
-            } else {
+            } else if (!containsLevel) {
                 tmpLeafs.add(new Leaf(this, element));
             }
         }
-        if (clearLeafs) {
-            tmpLeafs.clear();
-        }
-        return Collections.unmodifiableSet(tmpLeafs);
+        return tmpLeafs;
     }
 
     private HashSet<Tree> extractBranches(final Map<String, Set<Pair<String, Boolean>>> map) {
@@ -123,7 +116,7 @@ public class Tree implements TreeVisitable {
         }, HashSet<Tree>::addAll);
     }
 
-    private String extractTail(String s, int firstSlash) {
+    private String extractTail(final String s, final int firstSlash) {
         String tail = s.substring(firstSlash + 1, s.length());
         return (tail.isEmpty() ? "/" : tail);
     }
@@ -146,8 +139,7 @@ public class Tree implements TreeVisitable {
         @Override
         public String toString() {
             final String parent = (getTrunk() instanceof Branch ? "pBranch=" : "trunk=");
-            return "Branch [" + parent + getTrunk().getName() + ", name=" + getName() + ", branches=" + getBranches() + ", leafs="
-                    + getLeafs() + "]";
+            return "Branch [" + parent + getTrunk().getName() + ", name=" + getName() + ", branches=" + getBranches() + ", leafs=" + getLeafs() + "]";
         }
 
         @Override

@@ -1,7 +1,5 @@
 package io.jitstatic;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * #L%
  */
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.util.Set;
+
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +32,7 @@ import io.jitstatic.UpdateFailedException;
 import io.jitstatic.check.MetaDataFileIsMissingSourceFile;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoadException;
+import io.jitstatic.hosted.UnknownRolesException;
 
 public class ExceptionTest {
 
@@ -44,6 +48,8 @@ public class ExceptionTest {
         ftl.fillInStackTrace();
         LoadException le = new LoadException(new Exception());
         le.fillInStackTrace();
+        UnknownRolesException ure = new UnknownRolesException("name", Set.of());
+        assertNotNull(ure.toString());
     }
 
 }

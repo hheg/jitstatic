@@ -16,7 +16,7 @@ The use case could be used for is business configuration data where the data is 
 Uses Dropwizards simple configuration.
 
 Example configuration:
-```
+```yaml
 server:
   applicationContextPath: /app
   type: simple
@@ -56,36 +56,40 @@ To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
-INFO  [2018-05-21 20:30:22,133] org.eclipse.jetty.util.log: Logging initialized @1573ms to org.eclipse.jetty.util.log.Slf4jLog
-INFO  [2018-05-21 20:30:22,207] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-05-21 20:30:22,209] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-05-21 20:30:22,213] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
-INFO  [2018-05-21 20:30:22,375] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/*
-INFO  [2018-05-21 20:30:22,406] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-05-21 20:30:22,407] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-05-21 20:30:22,408] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-05-21 20:30:22,489] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@14d1737a{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-05-21 20:30:22,491] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT, build timestamp: 2017-11-21T22:27:37+01:00, git hash: 82b8fb23f757335bb3329d540ce37a2a2615f0a8
-INFO  [2018-05-21 20:30:23,034] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
+INFO  [2018-10-23 18:01:12,141] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-10-23 18:01:12,145] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-10-23 18:01:12,150] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
+INFO  [2018-10-23 18:01:12,258] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/git
+INFO  [2018-10-23 18:01:12,298] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-10-23 18:01:12,298] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-10-23 18:01:12,300] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
+INFO  [2018-10-23 18:01:12,386] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@27898e13{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-10-23 18:01:12,388] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT; built: 2018-06-05T18:24:03.829Z; git: d5fc0523cfa96bfebfbda19606cad384d772f04c; jvm 10.0.2+13
+INFO  [2018-10-23 18:01:13,054] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
+    POST    /bulk/fetch (io.jitstatic.api.BulkResource)
     GET     /info/commitid (io.jitstatic.api.JitstaticInfoResource)
     GET     /info/version (io.jitstatic.api.JitstaticInfoResource)
     GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     PUT     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
-    POST    /storage (io.jitstatic.api.MapResource)
-    DELETE  /storage/{key : .+} (io.jitstatic.api.MapResource)
-    GET     /storage/{key : .+} (io.jitstatic.api.MapResource)
-    PUT     /storage/{key : .+} (io.jitstatic.api.MapResource)
+    GET     /storage (io.jitstatic.api.KeyResource)
+    POST    /storage (io.jitstatic.api.KeyResource)
+    GET     /storage/{key : .+/} (io.jitstatic.api.KeyResource)
+    DELETE  /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    GET     /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    POST    /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    PUT     /storage/{key : .+} (io.jitstatic.api.KeyResource)
 
-INFO  [2018-05-21 20:30:23,042] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@1607d391{/app,null,AVAILABLE}
-INFO  [2018-05-21 20:30:23,049] io.dropwizard.setup.AdminEnvironment: tasks = 
+INFO  [2018-10-23 18:01:13,061] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@30228de7{/app,null,AVAILABLE}
+INFO  [2018-10-23 18:01:13,065] io.dropwizard.setup.AdminEnvironment: tasks = 
 
     POST    /tasks/log-level (io.dropwizard.servlets.tasks.LogConfigurationTask)
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
-INFO  [2018-05-21 20:30:23,054] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@1bb4c431{/admin,null,AVAILABLE}
-INFO  [2018-05-21 20:30:23,066] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@14d1737a{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-05-21 20:30:23,067] org.eclipse.jetty.server.Server: Started @2509ms
+INFO  [2018-10-23 18:01:13,071] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@e49437{/admin,null,AVAILABLE}
+INFO  [2018-10-23 18:01:13,079] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@27898e13{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-10-23 18:01:13,079] org.eclipse.jetty.server.Server: Started @2714ms
+
 
 ```
 This should start JitStatic on port 8085.
@@ -99,7 +103,7 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     0.13.0
+remote:                                     0.20.0
 remote: Counting objects: 4, done
 remote: Finding sources: 100% (4/4)
 remote: Getting sizes: 100% (3/3)
@@ -131,7 +135,7 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     0.13.0
+remote:                                     0.20.0
 remote: Checking refs/heads/master branch.
 remote: refs/heads/master OK!
 To http://localhost:8085/app/jitstatic/jitstatic.git
@@ -160,9 +164,9 @@ The repository contains files which contains the data. Each of these files are a
 ```
 Each file on the repo will be the access point for getting the object. This example is the content of a file called `hello_world`.
 
-There must be a file which contains metadata about the `hello_world` file and it's name is `hello_world.metadata`. It must be a JSON file and right now must contain which users that can access the key.
+There must be a file which contains metadata about the `hello_world` file and it's name is `hello_world.metadata`. It must be a JSON file and contains information for each key. There can be a master .metadata that specifies for all keys in the folder, except those with their own metadata file. A metadata file could contain a direct user or a set of read and write roles for corresponding users. How users and roles work is specified in the [Users](#users) section.
 ```json
-{"users" : [{"password": "1234", "user" : "user1"}]}
+{"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[],"read":[{"role":"read"}],"write":[{"role":"write"}]}
 ```
 
 To reach the `hello_world` data the address could look like the command below. The user and password for the endpoint will be what you have specified in the `key.metadata` file. Each key can be protected so only one or several users can access that particular key
@@ -173,11 +177,11 @@ curl --user user1:1234 http://localhost:8085/app/storage/hello_world
 
 If you leave an metadata file with an empty 'users' entry anyone can access the key. If you there's no user restriction you can't modify the key through the modify API.
 
-At the moment the application only allows basic authentication so be sure you secure it with HTTPS by using standard Dropwizard HTTPS configuration.
+At the moment the application only allows basic authentication so be sure you secure it with HTTPS by using standard Dropwizard HTTPS configuration or some external SSL terminator.
 
 ## Cloning the hosted repository
 
-To clone the repo you just type (the username and password defined in the Dropwizard configuration file)
+To clone the repo you just type (the user name and password defined in the Dropwizard configuration file)
 ```bash
 git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/git
 ```
@@ -187,13 +191,13 @@ It's also possible to reach keys (files) through refs so if you make a call like
 curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/heads/somebranch
 ``` 
 
-Or speficifying a tag it's possible to do this:
+Or specifying a tag it's possible to do this:
 
 ```bash
 curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/tags/sometag
 ``` 
 
-## API for modyfying a key
+## API for modifying a key
 
 Now there's an API for modifying a `hello_world` from an application. You do it with in three simple steps:
 
@@ -258,8 +262,8 @@ You can create a key by just POSTing the content to the server. Since there are 
 ```
 curl -i -H 'Content-Type: application/json' \
 --user huser:hseCr3t -X POST \
--d '{"key":"test","branch":"refs/heads/master","data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
-http://localhost:8085/app/storage
+-d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
+http://localhost:8085/app/storage/test?ref=refs%2Fheads%2Fmaster
 
 HTTP/1.1 200 OK
 Date: Sun, 04 Mar 2018 00:10:37 GMT
@@ -424,22 +428,82 @@ All keys are still protected by authorization. The keys are still protected by t
 
 ### MetaKeys
 
-Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` propterty.
-You could if you want create a master .metadata in the directory root and all keys in that directory (not subfolders) will have that key. If you need you can override that by sepecifying a specific metadata file for a particular file in that folder.
+Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` property.
+You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder.
 Example:
 ```json
-{"users":[{"user":"name","password":"pass"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}]}
+{"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]}
+```
+
+## <a name="users"></a> Users
+
+A user is stored in the repository with the following format:
+```bash
+.users/<realm>/<username>
+```
+The format of the file <username> is in the format 
+```
+{"roles":[{"role":"role"}],"basicPassword":"pass"}
+```
+The `.user` folder not a valid key so this can't be reached from the normal endpoints.
+
+#### ACL
+
+There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password.
+
+#### Public keys
+
+A key which does specify an empty users field and the read role as empty means that this key is readable by all. The write role specifies who can write to the same key.
+
+### Realms
+
+There are four security realms in JitStatic which covers parts of the functionality.
+* Git realm
+* KeyAdmin realm
+* KeyUser realm
+* Admin realm
+
+#### The Git realm .users/git/
+
+This realm covers the user management for accessing the Git repository with ACL for who can `pull`, `push`, force push a branch (`forcepush`) or read the `secrets`. This information is stored in a special branch called `refs/heads/secrets` which is clonable only if you have the role `secrets`. This branch shouldn't be merged into any other branch and if the folder `.users/git/`is in an another branch it will be ignored.
+
+By having this separation each repository can create their own secrets branch, so the information can be protected and sites can have more protection.
+
+#### The KeyAdmin realm .users/keyadmin/
+
+A user defined this realm has full admin (create/read/write/delete) rights to all keys in that branch the user is defined. These users have no roles but the branch is the role. They can read both key and metadatakey.
+
+#### The KeyUser realm .users/keyuser/
+
+A user defined in this realm can only manage their (exclusively) own keys by defining their role to the `write` role of the key. A shared key can't be deleted by a `keyuser`. A `keyuser` can create a key if the key doesn't exist. They can allow other roles to read and write to the file but then they can't delete the file. A user in this realm can read both key and metadatakey if they belong to the read roles and write roles.
+
+#### The admin realm
+
+This special realm is only for protecting the urls `/admin/healthcheck`and `/admin/metrics` if these can't be protected by other means.
+This is done by adding the following to the configuration
+
+```yaml
+hosted:
+    ...
+    adminName: admin
+    adminPass: pass
+    protectMetrics: true
+    protectHealthcheck: true
+```
+or by specifying arguments to the application or to `JAVA_OPT` 
+
+```
+-Ddw.hosted.adminName=admin -Ddw.hosted.adminPass=pass -Ddw.hosted.protectMetrics=true -Ddw.hosted.protectHealhcheck=true
 ```
 
 ## Java client
-
-You can find a Java client for JitStatic at 
+You can find a Java client for JitStatic in Maven Central with coordinates 
 
 ```xml
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.8.1</version>
+    <version>0.9.0</version>
 </dependency>
 ```
 

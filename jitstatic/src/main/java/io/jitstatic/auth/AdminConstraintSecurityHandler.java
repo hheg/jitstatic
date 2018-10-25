@@ -49,7 +49,7 @@ public class AdminConstraintSecurityHandler extends ConstraintSecurityHandler {
         constraint.setAuthenticate(true);
         constraint.setRoles(new String[] { ADMIN_ROLE });
         final ConstraintMapping cm = new ConstraintMapping();
-        cm.setMethod("GET");
+        cm.setMethod("*");
         cm.setConstraint(constraint);
         cm.setPathSpec(url);
         setAuthenticator(new BasicAuthenticator());

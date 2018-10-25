@@ -49,9 +49,10 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
-import io.jitstatic.JitstaticApplication;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
+import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
@@ -70,9 +71,9 @@ public class BulkResourceTest {
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm(JitstaticApplication.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+                            .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
-            .addResource(new BulkResource(storage)).build();
+            .addResource(new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), "refs/heads/master") )).build();
 
     @Test
     public void testFetch() {
@@ -82,7 +83,7 @@ public class BulkResourceTest {
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
         Mockito.when(storeInfoMock.getStorageData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
-        Mockito.when(storage.getList(Mockito.any(), Mockito.any()))
+        Mockito.when(storage.getList(Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), "refs/heads/master")));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(

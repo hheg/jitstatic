@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -37,18 +35,18 @@ import io.jitstatic.hosted.StoreInfo;
 
 public class StoreInfoTest {
 
-	@Test
-	public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-		StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "1", "1");
-		StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "1", "1");
-		StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(new HashSet<>(), null, false, false, List.of()), "2", "2");
+    @Test
+    public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
+        StoreInfo si1 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(null, null), "1", "1");
+        StoreInfo si2 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(null, null), "1", "1");
+        StoreInfo si3 = new StoreInfo("{\"one\":\"two\"}".getBytes("UTF-8"), new MetaData(null, null), "2", "2");
 
-		assertEquals(si1, si1);
-		assertEquals(si1.hashCode(), si2.hashCode());
-		assertEquals(si1, si2);
-		assertNotEquals(si1, si3);
+        assertEquals(si1, si1);
+        assertEquals(si1.hashCode(), si2.hashCode());
+        assertEquals(si1, si2);
+        assertNotEquals(si1, si3);
 
-		assertNotEquals(si1, null);
-		assertNotEquals(si1, new Object());
-	}
+        assertNotEquals(si1, null);
+        assertNotEquals(si1, new Object());
+    }
 }

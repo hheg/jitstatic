@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.check;
 
 /*-
  * #%L
@@ -26,11 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -42,9 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import io.jitstatic.check.FileIsMissingMetaData;
-import io.jitstatic.check.FileObjectIdStore;
-import io.jitstatic.check.SourceChecker;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.hosted.RemoteTestUtils;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
@@ -73,7 +77,7 @@ public class SourceCheckerTest {
     }
 
     private File createTempFiles() throws IOException {
-       return tmpFolder.createTemporaryDirectory();
+        return tmpFolder.createTemporaryDirectory();
     }
 
     @AfterEach
@@ -85,33 +89,49 @@ public class SourceCheckerTest {
     @Test
     public void testCheckSourceFileOnBareRepo()
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
-        try (SourceChecker sc = new SourceChecker(bareGit.getRepository())) {
-            List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
-            Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
-            Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
-            assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
-            List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
-            assertTrue(exceptions.size() == 1);
-            Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
-            assertEquals(store, fileExPair.getLeft().getFileName());
-            assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
-        }
+        SourceChecker sc = new SourceChecker(bareGit.getRepository());
+        List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+        Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
+        Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
+        assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
+        List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
+        assertTrue(exceptions.size() == 1);
+        Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
+        assertEquals(store, fileExPair.getLeft().getFileName());
+        assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
+    }
+
+    @Test
+    public void testCheckSourceRepoWithUsers() throws IOException, NoFilepatternException, GitAPIException {
+        Path workingPath = workingGit.getRepository().getWorkTree().toPath();
+        Path users = workingPath.resolve(JitStaticConstants.USERS);
+        Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+        Path user = gitRealm.resolve("auser");
+        assertTrue(gitRealm.toFile().mkdirs());
+        Files.write(user, new byte[] { 0, 1, 2, 3 }, StandardOpenOption.CREATE);
+        Files.write(workingPath.resolve("data.metadata"), getMetaData().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE);
+        workingGit.add().addFilepattern(".").call();
+        workingGit.commit().setMessage("msg").call();
+        workingGit.push().call();
+        SourceChecker sc = new SourceChecker(bareGit.getRepository());
+        List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+        
+        assertTrue(errors.isEmpty());        
     }
 
     @Test
     public void testCheckSourceFileOnNormalRepo()
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
-        try (SourceChecker sc = new SourceChecker(workingGit.getRepository())) {
-            List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
-            Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
-            Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
-            assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
-            List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
-            assertTrue(exceptions.size() == 1);
-            Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
-            assertEquals(store, fileExPair.getLeft().getFileName());
-            assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
-        }
+        SourceChecker sc = new SourceChecker(workingGit.getRepository());
+        List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+        Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
+        Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
+        assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
+        List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
+        assertTrue(exceptions.size() == 1);
+        Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
+        assertEquals(store, fileExPair.getLeft().getFileName());
+        assertTrue(fileExPair.getRight() instanceof FileIsMissingMetaData);
     }
 
     @Test
@@ -119,9 +139,8 @@ public class SourceCheckerTest {
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
         final String branch = Constants.R_HEADS + "other";
         assertEquals(branch, assertThrows(RefNotFoundException.class, () -> {
-            try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
-                sc.checkBranchForErrors(branch);
-            }
+            SourceChecker sc = new SourceChecker(bareGit.getRepository());
+            sc.checkBranchForErrors(branch);
         }).getLocalizedMessage());
     }
 
@@ -130,9 +149,17 @@ public class SourceCheckerTest {
             throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefNotFoundException {
         final String branch = "other";
         assertEquals(branch, assertThrows(RefNotFoundException.class, () -> {
-            try (SourceChecker sc = new SourceChecker(bareGit.getRepository());) {
-                sc.checkBranchForErrors(branch);
-            }
+            SourceChecker sc = new SourceChecker(bareGit.getRepository());
+            sc.checkBranchForErrors(branch);
         }).getLocalizedMessage());
     }
+
+    private String getMetaData(int i) {
+        return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}]}";
+    }
+
+    private String getMetaData() {
+        return getMetaData(0);
+    }
+
 }

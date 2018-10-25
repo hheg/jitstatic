@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.setup.Environment;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedGitRepositoryManager;
@@ -189,8 +190,9 @@ public class HostedFactory {
     public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
         Objects.requireNonNull(gitRealm);
-        final String baseServletPath = "/" + getServletName() + "/*";
-        LOG.info("Configuring hosted GIT environment on {}", baseServletPath);
+        final String base = "/" + getServletName() + "/";
+        final String baseServletPath = base + "*";
+        LOG.info("Configuring hosted GIT environment on {}{}", base, getHostedEndpoint());
         final GitServlet gs = new GitServlet();
 
         gs.setRepositoryResolver(hostedGitRepositoryManager.getRepositoryResolver());
@@ -205,19 +207,27 @@ public class HostedFactory {
         servlet.setInitParameter(SERVLET_NAME, getServletName());
         servlet.addMapping(baseServletPath);
 
-        final ConstraintMapping cm = new ConstraintMapping();
-        cm.setConstraint(new Constraint());
-        cm.getConstraint().setAuthenticate(true);
-        cm.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        cm.getConstraint().setRoles(new String[] { "gitrole" });
-        cm.setPathSpec(baseServletPath);
+        final ConstraintMapping infoPath = new ConstraintMapping();
+        infoPath.setConstraint(new Constraint());
+        infoPath.getConstraint().setAuthenticate(true);
+        infoPath.getConstraint().setDataConstraint(Constraint.DC_NONE);
+        infoPath.getConstraint().setRoles(new String[] { JitStaticConstants.PULL });
+        infoPath.setPathSpec(base + getHostedEndpoint() + "/info/*");
+
+        final ConstraintMapping receivePath = new ConstraintMapping();
+        receivePath.setConstraint(new Constraint());
+        receivePath.getConstraint().setAuthenticate(true);
+        receivePath.getConstraint().setDataConstraint(Constraint.DC_NONE);
+        receivePath.getConstraint().setRoles(new String[] { JitStaticConstants.PUSH });
+        receivePath.setPathSpec(base + getHostedEndpoint() + "/git-receive-pack");
 
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
         sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
-        sec.setLoginService(new SimpleLoginService(getUserName(), getSecret(), sec.getRealmName()));
-        sec.setConstraintMappings(new ConstraintMapping[] { cm });
+        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS);
+        sec.setLoginService(gitLoginService);
+        sec.setConstraintMappings(new ConstraintMapping[] { infoPath, receivePath });
 
         sec.setHandler(new DropWizardHandlerWrapper(env.getApplicationContext()));
         Set<String> pathsWithUncoveredHttpMethods = sec.getPathsWithUncoveredHttpMethods();
@@ -225,7 +235,7 @@ public class HostedFactory {
         if (!pathsWithUncoveredHttpMethods.isEmpty()) {
             throw new RuntimeException("Following paths are uncovered " + pathsWithUncoveredHttpMethods);
         }
-
+        env.getApplicationContext().addBean(gitLoginService);
         env.servlets().setSecurityHandler(sec);
         if (isProtectHealthChecks() || isProtectMetrics()) {
             AdminConstraintSecurityHandler adminConstraintSecurityHandler = new AdminConstraintSecurityHandler(getAdminName(), getAdminPass(),
@@ -240,9 +250,9 @@ public class HostedFactory {
 
     private static class DropWizardHandlerWrapper implements Handler {
 
-        private Handler handler;
+        private final Handler handler;
 
-        public DropWizardHandlerWrapper(Handler handler) {
+        public DropWizardHandlerWrapper(final Handler handler) {
             this.handler = handler;
         }
 

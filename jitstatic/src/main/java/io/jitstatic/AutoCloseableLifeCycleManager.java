@@ -32,6 +32,7 @@ public class AutoCloseableLifeCycleManager<T extends AutoCloseable> implements M
 	
 	@Override
 	public void start() throws Exception {
+	    // NOOP
 	}
 
 	@Override

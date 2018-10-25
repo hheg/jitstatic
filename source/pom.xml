@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.14.5</version>
+        <version>0.20.0</version>
     </parent>
     <artifactId>source</artifactId>
 
@@ -12,12 +12,12 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.14.5</version>
+            <version>0.20.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>version</artifactId>
-            <version>0.14.5</version>
+            <version>0.20.0</version>
         </dependency>
         <dependency>
             <groupId>org.hibernate</groupId>
@@ -66,7 +66,7 @@
             <artifactId>Either.java</artifactId>
             <version>2.0.0</version>
         </dependency>
-		<!-- TODO Don't want this dependency -->
+        <!-- TODO Don't want this dependency -->
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
@@ -122,7 +122,12 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.14.5</version>
+            <version>0.20.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -138,10 +143,9 @@
                         <include>**/*TestCase.java</include>
                     </includes>
                     <properties>
-						<!-- <includeTags>fast</includeTags> -->
+                        <!-- <includeTags>fast</includeTags> -->
                         <excludeTags>slow</excludeTags>
-						<!-- <configurationParameters> junit.jupiter.conditions.deactivate 
-							= * </configurationParameters> -->
+                        <!-- <configurationParameters> junit.jupiter.conditions.deactivate = * </configurationParameters> -->
                     </properties>
                 </configuration>
                 <dependencies>

@@ -23,7 +23,6 @@ package io.jitstatic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
@@ -59,30 +58,6 @@ public class SourceJSONParser {
         } catch (final IOException e) {
             final Throwable cause = e.getCause();
             throw new StorageParseException((cause != null ? cause.getLocalizedMessage() : "Unknown error"), e);
-        }
-    }
-
-    private static class StorageParseException extends IOException {
-
-        private static final long serialVersionUID = 1774575933983877566L;
-
-        public StorageParseException(final String message, final IOException e) {
-            super(message, e);
-        }
-
-        public StorageParseException(Set<ConstraintViolation<MetaData>> violations) {
-            super(compile(violations));
-        }
-
-        private static String compile(Set<ConstraintViolation<MetaData>> violations) {
-            return violations.stream()
-                    .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
-                    .collect(Collectors.joining(System.lineSeparator()));
-        }
-
-        @Override
-        public Throwable fillInStackTrace() {
-            return this;
         }
     }
 

@@ -35,15 +35,12 @@ import io.jitstatic.MetaData;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class AddKeyData {
-
+    @Deprecated
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
-
-    @NotNull
-    @NotEmpty
+    @Deprecated
     private final String key;
 
-    @NotNull
-    @NotEmpty
+    @Deprecated
     @Pattern(regexp = "^refs/heads/.+$")
     private final String branch;
 
@@ -79,11 +76,11 @@ public class AddKeyData {
         this.userMail = userMail;
         this.userInfo = userInfo;
     }
-
+    @Deprecated
     public String getKey() {
         return key;
     }
-
+    @Deprecated
     public String getBranch() {
         return branch;
     }

@@ -23,23 +23,38 @@ package io.jitstatic.storage;
 import java.util.List;
 import java.util.Optional;
 
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+
 import com.spencerwi.either.Either;
 
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
 public interface Storage extends AutoCloseable, CheckHealth {
-	public Optional<StoreInfo> getKey(String key, String ref);
-	public void reload(List<String> refsToReload);
-	public void close();
-	public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, String message, String userInfo, String userEmail);
-    public String addKey(String key, String branch, byte[] data, MetaData metaData, String message, String userInfo, String userMail);
-    public Either<String, FailedToLock> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion, String message, String userInfo, String userMail);
-    public void delete(String key, String ref, String user, String message, String userMail);
-    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref, Optional<User> user);
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input, Optional<User> user);
+    public Optional<StoreInfo> getKey(String key, String ref);
+
+    public void reload(List<String> refsToReload);
+
+    public void close();
+
+    public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
+
+    public String addKey(String key, String branch, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
+
+    public Either<String, FailedToLock> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion, CommitMetaData commitMetaData);
+
+    public void delete(String key, String ref, CommitMetaData commitMetaData);
+
+    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
+
+    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
+
+    public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
+
+    public Pair<MetaData,String> getMetaKey(String key, String ref);
 }

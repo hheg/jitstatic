@@ -61,7 +61,7 @@ public class AdminUrlTest {
         assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
         
         response = Unirest.post(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.METHOD_NOT_ALLOWED_405, response.getStatus());
+        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
 
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort()))

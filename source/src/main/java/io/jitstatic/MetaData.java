@@ -49,16 +49,30 @@ public class MetaData {
     private final boolean hidden;
     @Valid
     private final List<HeaderPair> headers;
+    @Valid
+    private final Set<Role> read;
+    @Valid
+    private final Set<Role> write;
 
     @JsonCreator
     public MetaData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
             final @JsonProperty("protected") boolean isProtected, final @JsonProperty("hidden") boolean hidden,
-            final @JsonProperty("headers") List<HeaderPair> headers) {
+            final @JsonProperty("headers") List<HeaderPair> headers, final @JsonProperty("read") Set<Role> read, final @JsonProperty("write") Set<Role> write) {
         this.users = Objects.requireNonNull(users, "metadata is missing users field");
         this.contentType = contentType == null ? "application/json" : contentType;
         this.isProtected = isProtected;
         this.hidden = hidden;
         this.headers = headers;
+        this.read = read;
+        this.write = write;
+    }
+
+    public MetaData(final Set<Role> read, final Set<Role> write) {
+        this(Set.of(), null, false, false, List.of(), read, write);
+    }
+
+    public MetaData(final Set<User> users) {
+        this(users, null, false, false, List.of(), null, null);
     }
 
     public Set<User> getUsers() {
@@ -95,5 +109,13 @@ public class MetaData {
 
     public List<HeaderPair> getHeaders() {
         return headers;
+    }
+
+    public Set<Role> getRead() {
+        return read;
+    }
+
+    public Set<Role> getWrite() {
+        return write;
     }
 }
