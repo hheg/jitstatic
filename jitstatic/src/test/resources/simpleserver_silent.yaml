@@ -11,6 +11,8 @@ server:
       []
 logging:
   level: INFO
+  loggers: 
+    "io.jitstatic.api": WARN
   appenders:
     - type: console
 hosted:
