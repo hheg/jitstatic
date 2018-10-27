@@ -29,7 +29,7 @@ public class CommitMetaData {
 
     public CommitMetaData(final String userInfo, final String userMail, final String message) {
         this.userInfo = checkNonNullNotEmpty(userInfo, "userInfo");
-        this.userMail = checkNonNullNotEmpty(userInfo, "userMail");
+        this.userMail = checkNonNullNotEmpty(userMail, "userMail");
         this.message = checkNonNullNotEmpty(message, "message");
     }
 
