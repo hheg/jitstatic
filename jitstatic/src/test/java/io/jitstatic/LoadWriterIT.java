@@ -54,8 +54,6 @@ import javax.ws.rs.core.Response;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.impl.client.cache.CacheConfig;
 import org.apache.http.impl.client.cache.CachingHttpClients;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
@@ -81,6 +79,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -109,7 +109,7 @@ public class LoadWriterIT {
 
     private static final Pattern PAT = Pattern.compile("^\\w+:\\w+:\\d+$");
     private static final boolean log = false;
-    private static final Logger LOG = LogManager.getLogger(LoadWriterIT.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LoadWriterIT.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;

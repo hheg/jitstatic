@@ -44,14 +44,6 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
             <exclusions>
@@ -65,8 +57,7 @@
             <groupId>com.spencerwi</groupId>
             <artifactId>Either.java</artifactId>
             <version>2.0.0</version>
-        </dependency>
-        <!-- TODO Don't want this dependency -->
+        </dependency>       
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>

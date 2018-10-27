@@ -25,15 +25,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Objects;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
 import org.eclipse.jgit.transport.WantNotValidException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JitStaticUploadPack extends UploadPack {
-    private static final Logger LOG = LogManager.getLogger(JitStaticUploadPack.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JitStaticUploadPack.class);
 
     private final ErrorReporter errorReporter;
 

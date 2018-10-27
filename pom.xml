@@ -21,7 +21,6 @@
         <project.build.fileEncoding>UTF-8</project.build.fileEncoding>
         <jackson.version>2.9.5</jackson.version>
         <jetty.version>9.4.11.v20180605</jetty.version>
-        <log4j.version>2.11.0</log4j.version>
         <metrics.version>4.0.2</metrics.version>
         <maven.compiler.release>10</maven.compiler.release>
         <junit.jupiter.version>5.2.0</junit.jupiter.version>
@@ -120,16 +119,6 @@
                 <groupId>org.javassist</groupId>
                 <artifactId>javassist</artifactId>
                 <version>3.22.0-GA</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-api</artifactId>
-                <version>${log4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-core</artifactId>
-                <version>${log4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jgit</groupId>
