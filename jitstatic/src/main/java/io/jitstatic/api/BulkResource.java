@@ -38,6 +38,8 @@ import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.hibernate.validator.constraints.NotEmpty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
@@ -57,6 +59,7 @@ import io.jitstatic.utils.Pair;
 @Path("bulk")
 public class BulkResource {
 
+    private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
 
@@ -82,13 +85,18 @@ public class BulkResource {
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                LOG.info("{} logged in and accessed key {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
                 return true;
             }
             if (!userHolder.isPresent()) {
                 return false;
             }
             final User user = userHolder.get();
-            return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref);
+            if(allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
+                LOG.info("{} logged in and accessed key {}", user, p.getLeft());
+                return true;
+            }
+            return false;
         }).map(ps -> new SearchResult(ps, p.getRight()))).flatMap(s -> s).collect(Collectors.toList());
         if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();

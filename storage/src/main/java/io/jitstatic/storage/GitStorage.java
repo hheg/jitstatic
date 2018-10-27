@@ -31,10 +31,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.spencerwi.either.Either;
 
@@ -56,7 +56,7 @@ public class GitStorage implements Storage {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
-    private static final Logger LOG = LogManager.getLogger(GitStorage.class);
+    private static final Logger LOG = LoggerFactory.getLogger(GitStorage.class);
     private final Map<String, RefHolder> cache = new ConcurrentHashMap<>();
     private final AtomicReference<Exception> fault = new AtomicReference<>();
     private final Source source;

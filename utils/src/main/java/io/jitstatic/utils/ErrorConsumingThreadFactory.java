@@ -24,12 +24,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class ErrorConsumingThreadFactory implements ThreadFactory {
 
-	private static final Logger LOG = LogManager.getLogger(ErrorConsumingThreadFactory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ErrorConsumingThreadFactory.class);
 	private final java.util.concurrent.ThreadFactory defaultThreadFactory;
 	private final String name;
 	private final Consumer<Exception> errorConsumer;

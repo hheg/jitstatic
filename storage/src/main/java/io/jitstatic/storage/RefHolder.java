@@ -34,9 +34,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.spencerwi.either.Either;
 
@@ -60,7 +60,7 @@ import io.jitstatic.utils.WrappingAPIException;
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
 public class RefHolder implements RefHolderLock {
 
-    private static final Logger LOG = LogManager.getLogger(RefHolder.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
     private static final SourceHandler HANDLER = new SourceHandler();
 
     private volatile Map<String, Either<Optional<StoreInfo>, UserData>> refCache;

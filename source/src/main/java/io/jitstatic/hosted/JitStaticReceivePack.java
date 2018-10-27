@@ -29,8 +29,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -42,6 +40,8 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.ReceivePack;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.spencerwi.either.Either;
 
@@ -53,7 +53,7 @@ import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePack extends ReceivePack {
 
-    private static final Logger LOG = LogManager.getLogger(JitStaticReceivePack.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JitStaticReceivePack.class);
 
     private final String defaultRef;
     private final RepositoryBus bus;

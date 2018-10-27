@@ -467,6 +467,15 @@ public class UserManagementTest {
                     assertThrows(APIException.class, () -> noUser.delete(new CommitData(key, "msg", "userinfo", "mail"))).getStatusCode());
             client.delete(new CommitData(key, "msg", "userinfo", "mail"));
             assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+            createKey = client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"),
+                    new MetaData("application/json", Set.of(new MetaData.Role("role")), Set.of()));
+            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, tf)).getStatusCode());
+            assertEquals(HttpStatus.BAD_REQUEST_400,
+                    assertThrows(APIException.class, () -> client.delete(new CommitData(key, "msg", "userinfo", "mail"))).getStatusCode());
+            String tag2 = key2.tag;
+            assertEquals(HttpStatus.BAD_REQUEST_400,
+                    assertThrows(APIException.class, () -> client.modifyKey(getData(5).getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), tag2))
+                            .getStatusCode());
         }
     }
 
