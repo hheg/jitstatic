@@ -77,6 +77,7 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class KeyResource {
+    private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {}";
     private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} is denied for user {}";
     private static final String X_JITSTATIC = "X-jitstatic";
     private static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
@@ -127,6 +128,7 @@ public class KeyResource {
         if (noChange != null) {
             return noChange;
         }
+        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key);
         return buildResponse(storeInfo, tag, data);
     }
 
@@ -152,13 +154,18 @@ public class KeyResource {
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
                 return true;
             }
             if (!userHolder.isPresent()) {
                 return false;
             }
             final User user = userHolder.get();
-            return isUserAllowed(ref, user, allowedUsers, keyRoles);
+            if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
+                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft());
+                return true;
+            }
+            return false;
         }).collect(Collectors.toList());
 
         if (list.isEmpty()) {
@@ -235,6 +242,7 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
+        LOG.info("{} logged in and modified key {}", user, key);
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -307,6 +315,7 @@ public class KeyResource {
 
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
                 new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
+        LOG.info("{} logged in and added key {}", user, key);
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -346,8 +355,10 @@ public class KeyResource {
             if (cause instanceof UnsupportedOperationException) {
                 throw new WebApplicationException(key, Status.METHOD_NOT_ALLOWED);
             }
+            LOG.error("Unknown API error", e);
+            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
-
+        LOG.info("{} logged in and deleted key {}", user, key);
         return Response.ok().build();
     }
 
