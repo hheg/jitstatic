@@ -60,7 +60,7 @@ public class StorageFactoryTest {
     @Test
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYUSER_REALM);) {
+        try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null));
         }
@@ -73,7 +73,7 @@ public class StorageFactoryTest {
     public void testEmptyStoragePath() {
         when(env.jersey()).thenReturn(jersey);
         assertEquals(assertThrows(NullPointerException.class, () -> {
-            try (Storage storage = sf.build(null, env, JitStaticConstants.JITSTATIC_KEYUSER_REALM);) {
+            try (Storage storage = sf.build(null, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             }
         }).getLocalizedMessage(), "Source cannot be null");
     }
@@ -81,7 +81,7 @@ public class StorageFactoryTest {
     @Test
     public void testListener() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYUSER_REALM);) {
+        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
             verify(source).addListener(c.capture());
             c.getValue().onEvent(Collections.emptyList());
@@ -91,7 +91,7 @@ public class StorageFactoryTest {
     @Test
     public void testListenerWithNullArgument() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYUSER_REALM);) {
+        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
             verify(source).addListener(c.capture());
             c.getValue().onEvent(null);

@@ -21,8 +21,8 @@ package io.jitstatic.hosted;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -151,8 +151,8 @@ public class UserExtractorTest {
     public void testValidateAll() throws Exception {
         Path gitRealm = users.resolve(GIT_REALM);
 
-        Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
-        Path updaterRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
+        Path creatorRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
+        Path updaterRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
         mkdirs(gitRealm, creatorRealm, updaterRealm);
 
         String gitUserKey = "gituser";

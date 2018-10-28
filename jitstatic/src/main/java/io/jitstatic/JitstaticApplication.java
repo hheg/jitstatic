@@ -21,7 +21,7 @@ package io.jitstatic;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 
 import io.dropwizard.Application;
 import io.dropwizard.setup.Environment;
@@ -46,7 +46,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         Storage storage = null;
         try {
             source = config.build(env, GIT_REALM);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYUSER_REALM);
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM);
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             loginService.setUserStorage(storage);
             env.lifecycle().manage(new ManagedObject<>(source));

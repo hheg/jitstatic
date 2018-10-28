@@ -21,8 +21,8 @@ package io.jitstatic.hosted;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -72,7 +72,7 @@ import io.jitstatic.utils.Pair;
 
 public class UserExtractor {
     private static final Set<Role> ROLES = JitStaticConstants.ROLES.stream().map(Role::new).collect(Collectors.toSet());
-    private static final Set<String> REALMS = Set.of(GIT_REALM, JITSTATIC_KEYADMIN_REALM, JITSTATIC_KEYUSER_REALM);
+    private static final Set<String> REALMS = Set.of(GIT_REALM, JITSTATIC_KEYUSER_REALM, JITSTATIC_KEYADMIN_REALM);
     private static final Logger LOG = LoggerFactory.getLogger(UserExtractor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
