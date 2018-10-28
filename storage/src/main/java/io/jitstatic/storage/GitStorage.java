@@ -137,7 +137,7 @@ public class GitStorage implements Storage {
             return Pair.ofNothing();
         }
         final StoreInfo storeInfo = keyDirect.get();
-        return Pair.of(storeInfo.getStorageData(), storeInfo.getMetaDataVersion());
+        return Pair.of(storeInfo.getMetaData(), storeInfo.getMetaDataVersion());
     }
 
     private boolean checkKeyIsDotFile(final String key) {

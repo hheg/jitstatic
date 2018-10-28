@@ -37,7 +37,7 @@ public class SearchResult {
     private final byte[] content;
 
     public SearchResult(final Pair<String, StoreInfo> data, final String ref) {
-        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getStorageData().getContentType(), data.getRight().getData(), ref);
+        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getMetaData().getContentType(), data.getRight().getData(), ref);
     }
 
     @JsonCreator

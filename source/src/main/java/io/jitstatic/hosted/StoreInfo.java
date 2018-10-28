@@ -44,7 +44,7 @@ public class StoreInfo {
         this(null, metaData, null, metaDataVersion);
     }
 
-    public MetaData getStorageData() {
+    public MetaData getMetaData() {
         return metaData;
     }
 

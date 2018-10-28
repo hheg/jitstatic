@@ -461,14 +461,14 @@ public class GitStorageTest {
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
 
-            MetaData sd = new MetaData(storeInfo.getStorageData().getUsers(), "application/test", false, false, List.of(), null, null);
+            MetaData sd = new MetaData(storeInfo.getMetaData().getUsers(), "application/test", false, false, List.of(), null, null);
             Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(), new CommitMetaData("user", "mail", "msg"));
             String newVersion = put.getLeft();
             assertEquals(SHA_2_MD, newVersion);
             first = gs.getKey(key, null);
             storeInfo = first.get();
             assertNotNull(storeInfo);
-            assertEquals(sd, storeInfo.getStorageData());
+            assertEquals(sd, storeInfo.getMetaData());
             gs.checkHealth();
         }
     }

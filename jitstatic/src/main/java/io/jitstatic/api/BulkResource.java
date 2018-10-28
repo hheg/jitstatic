@@ -63,9 +63,9 @@ public class BulkResource {
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
 
-    public BulkResource(final Storage storage, KeyAdminAuthenticator addKeyAuthenticator) {
+    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
-        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+        this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
     }
 
     @POST
@@ -81,7 +81,7 @@ public class BulkResource {
                 .collect(Collectors.toList()));
         final List<SearchResult> result = searchResults.stream().map(p -> p.getKey().stream().filter(data -> {
             final String ref = p.getRight();
-            final MetaData storageData = data.getRight().getStorageData();
+            final MetaData storageData = data.getRight().getMetaData();
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {

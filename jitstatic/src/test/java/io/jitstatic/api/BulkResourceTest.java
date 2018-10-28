@@ -81,7 +81,7 @@ public class BulkResourceTest {
         MetaData storageData = mock(MetaData.class);
         Mockito.when(storeInfoMock.getData()).thenReturn(new byte[] { 1 });
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
-        Mockito.when(storeInfoMock.getStorageData()).thenReturn(storageData);
+        Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
         Mockito.when(storage.getList(Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), "refs/heads/master")));

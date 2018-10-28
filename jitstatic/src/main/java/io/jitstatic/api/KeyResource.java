@@ -89,9 +89,9 @@ public class KeyResource {
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
 
-    public KeyResource(final Storage storage, final KeyAdminAuthenticator addKeyAuthenticator) {
+    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
-        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+        this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
     }
 
@@ -109,7 +109,7 @@ public class KeyResource {
         final EntityTag tag = new EntityTag(storeInfo.getVersion());
         final Response noChange = helper.checkETag(headers, tag);
 
-        final MetaData data = storeInfo.getStorageData();
+        final MetaData data = storeInfo.getMetaData();
         final Set<User> allowedUsers = data.getUsers();
         final Set<Role> roles = data.getRead();
         if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
@@ -124,7 +124,7 @@ public class KeyResource {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
-        checkIfAllowed(key, user.get(), allowedUsers, ref, storeInfo.getStorageData().getRead());
+        checkIfAllowed(key, user.get(), allowedUsers, ref, storeInfo.getMetaData().getRead());
         if (noChange != null) {
             return noChange;
         }
@@ -150,7 +150,7 @@ public class KeyResource {
         helper.checkRef(ref);
 
         final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref).stream().filter(data -> {
-            final MetaData storageData = data.getRight().getStorageData();
+            final MetaData storageData = data.getRight().getMetaData();
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
@@ -207,8 +207,8 @@ public class KeyResource {
         helper.checkValidRef(ref);
 
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
-        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        final Set<Role> roles = storeInfo.getStorageData().getWrite();
+        final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
+        final Set<Role> roles = storeInfo.getMetaData().getWrite();
         boolean isAuthenticated = addKeyAuthenticator.authenticate(user, ref);
         if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty()) && !isAuthenticated) {
             throw new WebApplicationException(Status.BAD_REQUEST);
@@ -337,8 +337,8 @@ public class KeyResource {
         helper.checkValidRef(ref);
         final User user = userHolder.get();
         final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
-        final Set<User> allowedUsers = storeInfo.getStorageData().getUsers();
-        final Set<Role> roles = storeInfo.getStorageData().getWrite();
+        final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
+        final Set<Role> roles = storeInfo.getMetaData().getWrite();
 
         if (!isUserAllowed(ref, user, allowedUsers, roles)) {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {

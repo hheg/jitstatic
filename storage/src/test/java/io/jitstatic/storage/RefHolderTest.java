@@ -228,7 +228,7 @@ public class RefHolderTest {
     @Test
     public void testRefreshKey() throws IOException {
         StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        Mockito.when(storeInfo.getStorageData()).thenReturn(Mockito.mock(MetaData.class));
+        Mockito.when(storeInfo.getMetaData()).thenReturn(Mockito.mock(MetaData.class));
         Mockito.when(storeInfo.getVersion()).thenReturn("1");
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
@@ -241,7 +241,7 @@ public class RefHolderTest {
     public void testRefreshMetaData() throws IOException {
         StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
         MetaData storageData = Mockito.mock(MetaData.class);
-        Mockito.when(storeInfo.getStorageData()).thenReturn(storageData);
+        Mockito.when(storeInfo.getMetaData()).thenReturn(storageData);
         Mockito.when(storeInfo.getVersion()).thenReturn("1");
         Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);

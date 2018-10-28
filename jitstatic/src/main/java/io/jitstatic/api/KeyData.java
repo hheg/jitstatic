@@ -58,11 +58,11 @@ public class KeyData {
     }
 
     public KeyData(final Pair<String, StoreInfo> p) {
-        this(p.getLeft(), p.getRight().getStorageData().getContentType(), p.getRight().getVersion(), p.getRight().getData());
+        this(p.getLeft(), p.getRight().getMetaData().getContentType(), p.getRight().getVersion(), p.getRight().getData());
     }
 
     public KeyData(final String key, final StoreInfo si) {
-        this(key, si.getStorageData().getContentType(), si.getVersion(), null);
+        this(key, si.getMetaData().getContentType(), si.getVersion(), null);
     }
 
     public String getKey() {

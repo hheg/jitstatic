@@ -187,7 +187,7 @@ public class RefHolder implements RefHolderLock {
             if (si.isLeft() && si.getLeft().isPresent()) {
                 final StoreInfo storeInfo = si.getLeft().get();
                 if (oldversion.equals(storeInfo.getVersion())) {
-                    return Either.left(Optional.of(new StoreInfo(data, storeInfo.getStorageData(), newVersion, storeInfo.getMetaDataVersion())));
+                    return Either.left(Optional.of(new StoreInfo(data, storeInfo.getMetaData(), newVersion, storeInfo.getMetaDataVersion())));
                 }
             }
             return null;
@@ -373,7 +373,7 @@ public class RefHolder implements RefHolderLock {
     }
 
     private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
-        return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getStorageData().isProtected();
+        return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getMetaData().isProtected();
     }
 
     public String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
@@ -383,7 +383,7 @@ public class RefHolder implements RefHolderLock {
     }
 
     private void storeIfNotHidden(final String key, final RefHolder refStore, final StoreInfo newStoreInfo) {
-        if (newStoreInfo.getStorageData().isHidden()) {
+        if (newStoreInfo.getMetaData().isHidden()) {
             refStore.putKey(key, Optional.empty());
         } else {
             refStore.putKey(key, Optional.of(newStoreInfo));
