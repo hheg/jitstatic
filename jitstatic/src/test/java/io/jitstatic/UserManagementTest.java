@@ -22,8 +22,8 @@ package io.jitstatic;
 
 import static io.jitstatic.JitStaticConstants.FORCEPUSH;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.PULL;
 import static io.jitstatic.JitStaticConstants.PUSH;
 import static io.jitstatic.JitStaticConstants.SECRETS;
@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.InputStream;

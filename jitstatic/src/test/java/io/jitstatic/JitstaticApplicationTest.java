@@ -155,7 +155,7 @@ public class JitstaticApplicationTest {
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
-        when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYUSER_REALM)).thenReturn(storage);
+        when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM)).thenReturn(storage);
         app.run(config, environment);
     }
 
@@ -168,7 +168,7 @@ public class JitstaticApplicationTest {
             config.setHostedFactory(hostedFactory);
             when(config.getAddKeyAuthenticator(storage)).thenThrow(new TestException("Test exception3"));
             when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
-            when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYUSER_REALM)).thenReturn(storage);
+            when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM)).thenReturn(storage);
             app.run(config, environment);
         });
     }

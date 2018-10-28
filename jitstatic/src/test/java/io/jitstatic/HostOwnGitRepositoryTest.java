@@ -493,7 +493,7 @@ public class HostOwnGitRepositoryTest {
         try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
                 JitStaticClient client = buildClient();) {
             Path users = working.resolve(JitStaticConstants.USERS);
-            Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
+            Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_KEYUSER_REALM);
             Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("create")), "1234")), StandardOpenOption.CREATE);
@@ -508,7 +508,7 @@ public class HostOwnGitRepositoryTest {
         }).getMessage().contains("not authorized"));
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient()) {
-                client.getKey(JitStaticConstants.USERS + JitStaticConstants.JITSTATIC_KEYADMIN_REALM + "/blipp", tf);
+                client.getKey(JitStaticConstants.USERS + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "/blipp", tf);
             }
         }).getStatusCode());
         try (JitStaticClient cclient = buildCreatorClient().setPassword("1234").setUser(TEST_USER).build()) {

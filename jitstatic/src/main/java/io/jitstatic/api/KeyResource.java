@@ -20,8 +20,8 @@ package io.jitstatic.api;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 
 import java.util.List;
 import java.util.Objects;
@@ -198,7 +198,7 @@ public class KeyResource {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
         if (!userholder.isPresent()) {
-            return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
         final User user = userholder.get();
 
@@ -327,7 +327,7 @@ public class KeyResource {
     public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userHolder,
             final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
         if (!userHolder.isPresent()) {
-            return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
 
         final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);

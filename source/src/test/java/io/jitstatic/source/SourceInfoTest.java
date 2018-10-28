@@ -33,7 +33,6 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import io.jitstatic.MetaData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.MetaFileData;
 import io.jitstatic.check.SourceFileData;

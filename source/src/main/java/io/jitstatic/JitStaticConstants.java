@@ -30,8 +30,8 @@ public class JitStaticConstants {
     public static final String APPLICATION_JSON = "application/json";
     public static final String METADATA = ".metadata";
     public static final String GIT_REALM = "git";
-    public static final String JITSTATIC_KEYUSER_REALM = "keyadmin";
-    public static final String JITSTATIC_KEYADMIN_REALM = "keyuser";
+    public static final String JITSTATIC_KEYADMIN_REALM = "keyadmin";
+    public static final String JITSTATIC_KEYUSER_REALM = "keyuser";
     public static final String USERS = ".users/";
     public static final String PULL = "pull";
     public static final String PUSH = "push";
