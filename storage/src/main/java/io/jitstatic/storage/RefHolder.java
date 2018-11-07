@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
@@ -55,6 +56,7 @@ import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
@@ -63,20 +65,20 @@ public class RefHolder implements RefHolderLock {
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
     private static final SourceHandler HANDLER = new SourceHandler();
 
-    private volatile Map<String, Either<Optional<StoreInfo>, UserData>> refCache;
+    private volatile Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
     private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
     private final String ref;
     private final Source source;
 
-    public RefHolder(final String ref, final Map<String, Either<Optional<StoreInfo>, UserData>> refCache, final Source source) {
+    public RefHolder(final String ref, final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache, final Source source) {
         this.ref = ref;
         this.refCache = refCache;
         this.source = source;
     }
 
     public Optional<StoreInfo> getKey(final String key) {
-        final Either<Optional<StoreInfo>, UserData> data = refCache.get(key);
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> data = refCache.get(key);
         if (data != null && data.isLeft()) {
             return data.getLeft();
         }
@@ -173,7 +175,7 @@ public class RefHolder implements RefHolderLock {
 
     private Set<String> getFiles() {
         return refCache.entrySet().stream().filter(e -> {
-            final Either<Optional<StoreInfo>, UserData> value = e.getValue();
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
             return (value.isLeft() && value.getLeft().isPresent());
         }).map(Entry::getKey).collect(Collectors.toSet());
     }
@@ -210,13 +212,19 @@ public class RefHolder implements RefHolderLock {
         });
     }
 
-    private Map<String, Either<Optional<StoreInfo>, UserData>> refreshFiles(final Set<String> files) {
+    private Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refreshFiles(final Set<String> files) {
         final List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef = refreshRef(files);
-        final List<Exception> faults = refreshRef.stream().filter(Either::isRight).map(Either::getRight).collect(Collectors.toList());
+        final List<Exception> faults = refreshRef.stream()
+                .filter(Either::isRight)
+                .map(Either::getRight)
+                .collect(Collectors.toList());
         if (!faults.isEmpty()) {
             throw new LinkedException(faults);
         }
-        return refreshRef.stream().filter(Either::isLeft).map(Either::getLeft).flatMap(Optional::stream).filter(p -> p.getRight() != null)
+        return refreshRef.stream().filter(Either::isLeft)
+                .map(Either::getLeft)
+                .flatMap(Optional::stream)
+                .filter(p -> p.getRight() != null)
                 .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight()))));
     }
 
@@ -281,14 +289,14 @@ public class RefHolder implements RefHolderLock {
     }
 
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
-        final Map<String, Either<Optional<StoreInfo>, UserData>> refMap = refCache;
+        final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refMap = refCache;
         Optional<StoreInfo> storeInfoContainer;
         if (storeInfo != null && (keyRequestedIsMasterMeta(key, storeInfo) || keyRequestedIsNormalKey(key, storeInfo))) {
             storeInfoContainer = Optional.of(storeInfo);
         } else {
             storeInfoContainer = Optional.empty();
         }
-        final Either<Optional<StoreInfo>, UserData> computed = refMap.compute(key, (k, v) -> {
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = refMap.compute(key, (k, v) -> {
             if (v == null) {
                 return Either.left(storeInfoContainer);
             }
@@ -308,7 +316,7 @@ public class RefHolder implements RefHolderLock {
     public boolean refresh() {
         LOG.info("Reloading {}", ref);
         final Set<String> files = getFiles();
-        final Map<String, Either<Optional<StoreInfo>, UserData>> newMap = refreshFiles(files);
+        final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> newMap = refreshFiles(files);
         boolean isRefreshed = !newMap.isEmpty();
         if (isRefreshed) {
             refCache = newMap;
@@ -322,7 +330,7 @@ public class RefHolder implements RefHolderLock {
     void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
-            Either<Optional<StoreInfo>, UserData> compute = refCache.compute(plainKey, (k, v) -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> compute = refCache.compute(plainKey, (k, v) -> {
                 if (v == null) {
                     try {
                         return Either.left(Optional.ofNullable(load(k)));
@@ -390,28 +398,88 @@ public class RefHolder implements RefHolderLock {
         }
     }
 
-    public UserData getUser(final String userkey) {
-        final String key = JitStaticConstants.USERS + userkey;
-        final Either<Optional<StoreInfo>, UserData> computed = refCache.compute(key, this::mapKey);
+    public Pair<String, UserData> getUser(final String userKeyPath) {
+        final String key = JitStaticConstants.USERS + userKeyPath;
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = refCache.compute(key, this::mapKey);
         if (computed != null) {
             return computed.getRight();
         }
         return null;
     }
 
-    private Either<Optional<StoreInfo>, UserData> mapKey(final String key, final Either<Optional<StoreInfo>, UserData> v) {
-        if (v == null || !v.isRight()) {
+    private Either<Optional<StoreInfo>, Pair<String, UserData>> mapKey(final String key, final Either<Optional<StoreInfo>, Pair<String, UserData>> value) {
+        if (value == null || !value.isRight()) {
             Pair<String, UserData> user;
             try {
                 user = source.getUser(key, this.ref);
             } catch (RefNotFoundException | IOException e) {
                 throw new WrappingAPIException(e);
             }
-            if (user !=null && user.isPresent()) {
-                return Either.right(user.getRight());
+            if (user != null && user.isPresent()) {
+                return Either.right(user);
             }
         }
-        return v;
+        return value;
+    }
+
+    public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, final UserData data, final String version) {
+        final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
+        Objects.requireNonNull(data);
+        Objects.requireNonNull(version);
+        Objects.requireNonNull(username);
+        return lockWrite(() -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
+            if (keyDataHolder == null || keyDataHolder.isLeft()) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+
+            final Pair<String, UserData> userKeyData = keyDataHolder.getRight();
+            if (!version.equals(userKeyData.getLeft())) {
+                throw new WrappingAPIException(new VersionIsNotSame());
+            }
+            String newVersion;
+            try {
+                newVersion = source.updateUser(key, ref, username, data);
+                refCache.put(key, Either.right(Pair.of(newVersion, data)));
+                return newVersion;
+            } catch (RefNotFoundException e) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to update " + key, e);
+            }
+        }, key);
+    }
+
+    public Either<String, FailedToLock> postUser(String userKeyPath, String username, UserData data) {
+        final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
+        return lockWrite(() -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
+            if (keyDataHolder != null && keyDataHolder.isRight() && keyDataHolder.getRight().isPresent()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
+            }
+            try {
+                String newVersion = source.addUser(key, ref, username, data);
+                refCache.put(key, Either.right(Pair.of(newVersion, data)));
+                return newVersion;
+            } catch (RefNotFoundException e) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to add " + key, e);
+            }
+        }, key);
+    }
+
+    public void deleteUser(String userKeyPath, String username) {
+        final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
+        write(() -> {
+            try {
+                refCache.remove(key);
+                source.deleteUser(key, ref, username);                
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to delete " + key, e);
+            }
+        });
+
     }
 
 }

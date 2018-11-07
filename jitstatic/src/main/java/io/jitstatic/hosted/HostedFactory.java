@@ -338,6 +338,7 @@ public class HostedFactory {
             filter.setInitParameter("exposedHeaders", c.exposedHeaders);
             filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), true, c.corsBaseUrl);
             filter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, Boolean.FALSE.toString());
+            LOG.info("CORS is enabled");
         }
         return hostedGitRepositoryManager;
     }

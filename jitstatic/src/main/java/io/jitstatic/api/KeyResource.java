@@ -149,7 +149,8 @@ public class KeyResource {
             @QueryParam("light") final boolean light, final @Auth Optional<User> userHolder) {
         helper.checkRef(ref);
 
-        final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref).stream().filter(data -> {
+        final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref).stream()
+                .filter(data -> {
             final MetaData storageData = data.getRight().getMetaData();
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
@@ -235,7 +236,7 @@ public class KeyResource {
         }
 
         if (result.isRight()) {
-            return Response.status(Status.PRECONDITION_FAILED).tag(entityTag).build();
+            return Response.status(Status.PRECONDITION_FAILED).build();
         }
         final String newVersion = result.getLeft();
 

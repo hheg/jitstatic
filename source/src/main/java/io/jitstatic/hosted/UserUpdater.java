@@ -22,6 +22,7 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -64,9 +65,18 @@ public class UserUpdater {
         return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData);
     }
 
-    public List<Pair<String, String>> updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
+    public String updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", List.of(Pair.of(userName, MAPPER.writeValueAsBytes(userData))));
+        return repositoryUpdater.commit(ref, commitMetaData, "update user", List.of(Pair.of(userName, MAPPER.writeValueAsBytes(userData)))).get(0).getRight();
+    }
+
+    public String addUser(String key, Ref ref, String username, UserData data, CommitMetaData commitMetaData)
+            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
+        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(Pair.of(username,MAPPER.writeValueAsBytes(data)))).get(0).getRight();
+    }
+
+    public void deleteUser(String key, Ref ref, CommitMetaData commitMetaData) throws IOException {
+        repositoryUpdater.deleteKeys(Set.of(key), ref, commitMetaData);
     }
 
 }

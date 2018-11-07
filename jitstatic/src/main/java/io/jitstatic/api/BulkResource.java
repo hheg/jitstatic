@@ -77,7 +77,9 @@ public class BulkResource {
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> userHolder) {
         final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream()
-                .map(bs -> Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()), bs.getRef()))
+                .map(bs -> Pair.of(bs.getPaths().stream()
+                        .map(sp -> Pair.of(sp.getPath(), sp.isRecursively()))
+                        .collect(Collectors.toList()), bs.getRef()))
                 .collect(Collectors.toList()));
         final List<SearchResult> result = searchResults.stream().map(p -> p.getKey().stream().filter(data -> {
             final String ref = p.getRight();
@@ -92,12 +94,14 @@ public class BulkResource {
                 return false;
             }
             final User user = userHolder.get();
-            if(allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
+            if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
                 LOG.info("{} logged in and accessed key {}", user, p.getLeft());
                 return true;
             }
             return false;
-        }).map(ps -> new SearchResult(ps, p.getRight()))).flatMap(s -> s).collect(Collectors.toList());
+        }).map(ps -> new SearchResult(ps, p.getRight())))
+                .flatMap(s -> s)
+                .collect(Collectors.toList());
         if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();
         }

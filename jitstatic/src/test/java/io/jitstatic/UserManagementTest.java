@@ -22,18 +22,24 @@ package io.jitstatic;
 
 import static io.jitstatic.JitStaticConstants.FORCEPUSH;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.PULL;
 import static io.jitstatic.JitStaticConstants.PUSH;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jetty.http.HttpStatus.BAD_REQUEST_400;
+import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
+import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
+import static org.eclipse.jetty.http.HttpStatus.UNAUTHORIZED_401;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +61,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.PushResult;
@@ -122,6 +129,8 @@ public class UserManagementTest {
             ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolderString()));
     private String adress;
     private String gitAdress;
+    private UserData keyAdminUserData;
+    private UserData keyUserUserData;
 
     @BeforeEach
     public void setup() throws Exception {
@@ -145,8 +154,8 @@ public class UserManagementTest {
             Path keyAdminUser = keyAdminRealm.resolve(KEYADMINUSER);
             Path keyuser = keyUserRealm.resolve(KEYUSER);
             Path keyusernorole = keyUserRealm.resolve(KEYUSERNOROLE);
-            UserData keyAdminUserData = new UserData(Set.of(new Role("read"), new Role("write")), KEYADMINUSERPASS);
-            UserData keyUserUserData = new UserData(Set.of(new Role("role")), KEYUSERPASS);
+            keyAdminUserData = new UserData(Set.of(new Role("read"), new Role("write")), KEYADMINUSERPASS);
+            keyUserUserData = new UserData(Set.of(new Role("role")), KEYUSERPASS);
             UserData keyUserUserDataNoRole = new UserData(Set.of(), KEYUSERNOROLEPASS);
             Files.write(MAPPER.writeValueAsBytes(keyAdminUserData), keyAdminUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(keyUserUserData), keyuser.toFile());
@@ -208,7 +217,7 @@ public class UserManagementTest {
             creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file4", "master", "msg", "ui", "mail"),
                     new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
         }
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient().setPassword(KEYADMINUSERPASS).setUser("otheruser").build()) {
                 creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file3", "master", "msg", "ui", "mail"),
                         new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
@@ -220,7 +229,7 @@ public class UserManagementTest {
                         new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
             }
         }).getStatusCode());
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient().setPassword(KEYADMINUSERPASS).setUser("otheruser").build()) {
                 creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"),
                         new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
@@ -244,7 +253,7 @@ public class UserManagementTest {
     @Test
     public void testKeyUserCreateKey() throws Exception {
         String version;
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient().setPassword("wrong").setUser(KEYUSER).build()) {
                 creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"),
                         new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
@@ -259,7 +268,7 @@ public class UserManagementTest {
             Entity<JsonNode> entity = updater.getKey("file2", tf, version);
             assertEquals(version, entity.tag);
         }
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient updater = buildClient().setPassword("2222").setUser(KEYUSER).build()) {
                 updater.getKey("file2", tf);
             }
@@ -270,7 +279,7 @@ public class UserManagementTest {
             assertEquals(version, entity.tag);
         }
 
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient updater = buildClient().setPassword(KEYUSERNOROLEPASS).setUser(KEYUSERNOROLE).build()) {
                 updater.getKey("file2", tf);
             }
@@ -290,7 +299,8 @@ public class UserManagementTest {
             version = metaKey.tag;
         }
         try (JitStaticClient creator = buildClient().setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"), new io.jitstatic.client.MetaData.Role("new"));
+            Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"),
+                    new io.jitstatic.client.MetaData.Role("new"));
             version = creator.modifyMetaKey("file2", "master", version,
                     new ModifyUserKeyData(new io.jitstatic.client.MetaData(Set.of(), "application/json", roles, roles), "msg", "mail", "ui"));
         }
@@ -300,7 +310,7 @@ public class UserManagementTest {
             assertEquals(version, metaKey.tag);
         }
 
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient().setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
                 creator.getMetaKey("file2", "master", tf);
             }
@@ -452,7 +462,7 @@ public class UserManagementTest {
             Entity<JsonNode> key2 = noUser.getKey(key, tf);
             String tag = key2.tag;
             assertEquals(createKey, tag);
-            assertEquals(HttpStatus.UNAUTHORIZED_401,
+            assertEquals(UNAUTHORIZED_401,
                     assertThrows(APIException.class, () -> noUser.modifyKey(getData(4).getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), tag))
                             .getStatusCode());
             String modifyKey = client.modifyKey(getData(5).getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), key2.tag);
@@ -461,20 +471,388 @@ public class UserManagementTest {
             Entity<JsonNode> metaKey = client.getMetaKey(key, "master", tf);
             MetaData newMetaData = new MetaData("application/json", Set.of(new MetaData.Role("role")), Set.of(new MetaData.Role("role")));
             client.modifyMetaKey(key, "master", metaKey.tag, new ModifyUserKeyData(newMetaData, "msg", "mail", "info"));
-            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, tf)).getStatusCode());
-            assertEquals(HttpStatus.UNAUTHORIZED_401,
+            assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, tf)).getStatusCode());
+            assertEquals(UNAUTHORIZED_401,
                     assertThrows(APIException.class, () -> noUser.delete(new CommitData(key, "msg", "userinfo", "mail"))).getStatusCode());
             client.delete(new CommitData(key, "msg", "userinfo", "mail"));
-            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+            assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
             createKey = client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"),
                     new MetaData("application/json", Set.of(new MetaData.Role("role")), Set.of()));
-            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, tf)).getStatusCode());
-            assertEquals(HttpStatus.BAD_REQUEST_400,
+            assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, tf)).getStatusCode());
+            assertEquals(BAD_REQUEST_400,
                     assertThrows(APIException.class, () -> client.delete(new CommitData(key, "msg", "userinfo", "mail"))).getStatusCode());
             String tag2 = key2.tag;
-            assertEquals(HttpStatus.BAD_REQUEST_400,
+            assertEquals(BAD_REQUEST_400,
                     assertThrows(APIException.class, () -> client.modifyKey(getData(5).getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), tag2))
                             .getStatusCode());
+        }
+    }
+
+    @Test
+    public void testGetKeyAdminUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, tf);
+            assertNotNull(adminUser.data);
+            UserData value = MAPPER.treeToValue(adminUser.data, UserData.class);
+            assertEquals(keyAdminUserData, value);
+            assertNotNull(adminUser.tag);
+        }
+    }
+
+    @Test
+    public void testGetUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.getAdminUser(KEYADMINUSER, null, null, tf);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testGetUserWithWrongUser() throws RefNotFoundException {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.getAdminUser(KEYADMINUSER, null, null, tf);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testGetUserNotChanged() throws RefNotFoundException, URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, tf);
+            assertNotNull(adminUser.data);
+            assertNotNull(adminUser.tag);
+            Entity<JsonNode> adminUser2 = client.getAdminUser(KEYADMINUSER, null, adminUser.tag, tf);
+            assertNull(adminUser2.data);
+            assertEquals(adminUser.tag, adminUser2.tag);
+        }
+    }
+
+    @Test
+    public void testPutUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutUserWithUserButNotValid() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutUserWithUserButNotFound() {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+                client.modifyAdminUser("notfound", null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutUserWithUserButFoundWrongEtag() throws RefNotFoundException {
+        assertEquals(HttpStatus.PRECONDITION_FAILED_412, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+                client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutUserWithUserButRemoved() throws RefNotFoundException {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+                client.deleteAdminUser(KEYADMINUSER, null);
+                client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutUserWithUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            Entity<UserData> entity = client.getAdminUser(KEYADMINUSER, null, null, uf);
+            String version = client.modifyAdminUser(KEYADMINUSER, null, from(entity.data.getRoles(), "22"),
+                    entity.tag);
+            entity = client.getAdminUser(KEYADMINUSER, null, null, uf);
+            assertEquals(version, entity.tag);
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword("22").build()) {
+            assertNotNull(client.getUser(KEYUSER, null, null, uf));
+        }
+    }
+
+    @Test
+    public void testPostUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.addAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostUserWithWrongUser() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.addAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostUserWithUserButExist() {
+        assertEquals(HttpStatus.CONFLICT_409, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+                client.addAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostUserWithUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            String version = client.addAdminUser("newuser", null,
+                    new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            try (JitStaticClient newClient = buildClient().setUser("newuser").setPassword("22").build()) {
+                Entity<UserData> user = newClient.getUser(KEYUSER, null, null, uf);
+                assertNotNull(user.data);
+            }
+            Entity<UserData> adminUser = client.getAdminUser("newuser", null, null, uf);
+            assertEquals(version, adminUser.tag);
+        }
+    }
+
+    @Test
+    public void testDeleteUserWithoutUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.deleteAdminUser(KEYADMINUSER, null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteUserWithWrongUser() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.deleteAdminUser(KEYADMINUSER, null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteUserNotFound() {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+                client.deleteAdminUser("nothing", null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            client.deleteAdminUser(KEYADMINUSER, null);
+        }
+        try (JitStaticClient newClient = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getUser(KEYUSER, null, null, uf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testGetKeyUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            Entity<JsonNode> user = client.getUser(KEYUSER, null, null, tf);
+            assertNotNull(user.data);
+            UserData value = MAPPER.treeToValue(user.data, UserData.class);
+            assertEquals(keyUserUserData, value);
+            assertNotNull(user.tag);
+        }
+    }
+
+    @Test
+    public void testGetKeyUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.getUser(KEYUSER, null, null, tf);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testGetKeyUserWithWrongUser() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.getUser(KEYUSER, null, null, tf);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testGetKeyUserNotChanged() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            Entity<JsonNode> user = client.getUser(KEYUSER, null, null, tf);
+            assertNotNull(user.data);
+            assertNotNull(user.tag);
+            Entity<JsonNode> user2 = client.getUser(KEYUSER, null, user.tag, tf);
+            assertNull(user2.data);
+            assertEquals(user.tag, user2.tag);
+        }
+    }
+
+    @Test
+    public void testPutKeyUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUserButNotValid() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+                client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUserButNotFound() {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+                client.modifyUser("notfound", null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUserButFoundWrongEtag() {
+        assertEquals(HttpStatus.PRECONDITION_FAILED_412, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+                client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUserButRemoved() {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+                client.deleteUser(KEYUSER, null);
+                client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"),
+                        "12345");
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUser() throws APIException, URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            Entity<UserData> entity = client.getUser(KEYUSER, null, null, uf);
+            String version = client.modifyUser(KEYUSER, null, from(entity.data.getRoles(), "22"),
+                    entity.tag);
+            entity = client.getUser(KEYUSER, null, null, uf);
+            assertEquals(version, entity.tag);
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword("22").build()) {
+            assertNotNull(client.getKey("file", tf));
+        }
+    }
+
+    @Test
+    public void testPostKeyUserWithNoUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.addUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostKeyUserWithWrongUser() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSERNOROLE).setPassword(KEYUSERNOROLEPASS).build()) {
+                client.addUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostKeyUserWithUserButExist() {
+        assertEquals(HttpStatus.CONFLICT_409, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+                client.addUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testPostKeyUserWithUser() throws APIException, URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            String version = client.addUser("newuser", null,
+                    new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
+            try (JitStaticClient newClient = buildClient().setUser("newuser").setPassword("22").build()) {
+                Entity<JsonNode> data = newClient.getKey("file", tf);
+                assertNotNull(data.data);
+            }
+            Entity<UserData> user = client.getUser("newuser", null, null, uf);
+            assertEquals(version, user.tag);
+        }
+    }
+
+    @Test
+    public void testDeleteKeyUserWithoutUser() {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().build()) {
+                client.deleteUser(KEYUSER, null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteKeyUserWithWrongUser() {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYUSERNOROLE).setPassword(KEYUSERNOROLEPASS).build()) {
+                client.deleteUser(KEYUSER, null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteKeyUserNotFound() {
+        assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+                client.deleteUser("notfound", null);
+            }
+        }).getStatusCode());
+    }
+
+    @Test
+    public void testDeleteKeyUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
+            client.deleteUser(KEYUSER, null);
+        }
+        try (JitStaticClient newClient = buildClient().setUser(KEYUSER).setPassword(KEYUSER).build()) {
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getKey("file", uf)).getStatusCode());
         }
     }
 
@@ -560,4 +938,21 @@ public class UserManagementTest {
         }
         return new Entity<>(v, t, null);
     };
+
+    private TriFunction<InputStream, String, String, Entity<UserData>> uf = (is, v, t) -> {
+        if (is != null) {
+            try {
+                return new Entity<>(v, t, MAPPER.readValue(is, UserData.class));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return new Entity<>(v, t, null);
+    };
+
+    private static io.jitstatic.client.UserData from(Set<Role> roles, String pass) {
+        Set<io.jitstatic.client.MetaData.Role> clientRoles = roles.stream().map(r -> r.getRole()).map(io.jitstatic.client.MetaData.Role::new)
+                .collect(Collectors.toSet());
+        return new io.jitstatic.client.UserData(clientRoles, pass);
+    }
 }

@@ -25,6 +25,12 @@ import java.util.function.Function;
  */
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.UnmergedPathException;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
@@ -61,5 +67,11 @@ public interface Source extends AutoCloseable, CheckHealth {
     public List<String> getList(String keys, String ref, boolean recursive) throws RefNotFoundException, IOException;
 
     Pair<String, UserData> getUser(String userKey, String ref) throws RefNotFoundException, IOException;
+
+    public String updateUser(String key, String ref, String username, UserData data) throws RefNotFoundException, IOException;
+
+    public String addUser(String key, String ref, String username, UserData data) throws IOException, RefNotFoundException;
+
+    public void deleteUser(String key, String ref, String username) throws IOException;
 
 }
