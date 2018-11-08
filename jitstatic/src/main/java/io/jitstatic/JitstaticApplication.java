@@ -22,6 +22,10 @@ package io.jitstatic;
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.version.ProjectVersion.INSTANCE;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.dropwizard.Application;
 import io.dropwizard.setup.Environment;
@@ -36,7 +40,10 @@ import io.jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JitstaticApplication.class);
+
     public static void main(final String[] args) throws Exception {
+        LOG.info("Starting {} build {}", INSTANCE.getBuildVersion(), INSTANCE.getCommitIdAbbrev());
         new JitstaticApplication().run(args);
     }
 

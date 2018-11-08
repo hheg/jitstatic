@@ -8,11 +8,6 @@ server:
   requestLog:
     appenders:
       - type: console
-
-logging:
-  level: INFO
-  appenders:
-    - type: console
 hosted:
     basePath: file:/tmp/remote
     servletName: selfhosted
@@ -22,3 +17,5 @@ hosted:
     adminName: admin
     adminPass: pass
     protectMetrics: true
+    cors:
+      corsBaseUrl: /*
