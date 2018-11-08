@@ -22,7 +22,7 @@ package io.jitstatic;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
@@ -32,6 +32,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import javax.servlet.FilterRegistration.Dynamic;
+
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -43,6 +46,7 @@ import com.codahale.metrics.health.HealthCheckRegistry;
 
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
+import io.dropwizard.jetty.setup.ServletEnvironment;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.api.KeyResource;
@@ -73,7 +77,11 @@ public class JitstaticApplicationTest {
     private MutableServletContextHandler handler;
     @Mock
     private LoginService service;
-
+    @Mock
+    private ServletEnvironment servlets;
+    @Mock
+    private Dynamic filter;
+    
     private final JitstaticApplication app = new JitstaticApplication();
     private JitstaticConfiguration config;
 
@@ -82,7 +90,8 @@ public class JitstaticApplicationTest {
         MockitoAnnotations.initMocks(this);
         config = new JitstaticConfiguration();
         config.setStorageFactory(storageFactory);
-
+        when(environment.servlets()).thenReturn(servlets);
+        when(servlets.addFilter(Mockito.eq("CORS"), Mockito.eq(CrossOriginFilter.class))).thenReturn(filter);
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);

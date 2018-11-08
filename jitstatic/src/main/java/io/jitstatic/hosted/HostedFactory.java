@@ -22,13 +22,17 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 
+import javax.servlet.DispatcherType;
+import javax.servlet.FilterRegistration;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration.Dynamic;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 
@@ -38,9 +42,11 @@ import org.eclipse.jetty.security.authentication.BasicAuthenticator;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.lib.Constants;
+import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +56,6 @@ import io.dropwizard.setup.Environment;
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
-import io.jitstatic.hosted.HostedGitRepositoryManager;
 import io.jitstatic.source.Source;
 
 public class HostedFactory {
@@ -106,6 +111,10 @@ public class HostedFactory {
 
     @JsonProperty
     private boolean protectHealthChecks;
+
+    @JsonProperty
+    @Valid
+    private Cors cors;
 
     public String getServletName() {
         return servletName;
@@ -187,6 +196,81 @@ public class HostedFactory {
         this.protectHealthChecks = protectHealthChecks;
     }
 
+    public static class Cors {
+        @JsonProperty
+        @NotEmpty
+        private String allowedOrigins = "*";
+
+        @JsonProperty
+        @NotEmpty
+        private String allowedHeaders = "X-Requested-With,Content-Type,Accept,Origin";
+
+        @JsonProperty
+        @NotEmpty
+        private String allowedMethods = "OPTIONS,GET,PUT,POST,DELETE,HEAD";
+
+        @JsonProperty
+        @NotEmpty
+        private String corsBaseUrl = "/*";
+
+        @JsonProperty
+        @NotEmpty
+        private String preflightMaxAge = "1800";
+
+        @JsonProperty
+        @NotNull
+        private String exposedHeaders = "";
+
+        public String getAllowedOrigins() {
+            return allowedOrigins;
+        }
+
+        public void setAllowedOrigins(String allowedOrigins) {
+            this.allowedOrigins = allowedOrigins;
+        }
+
+        public String getAllowedHeaders() {
+            return allowedHeaders;
+        }
+
+        public void setAllowedHeaders(String allowedHeaders) {
+            this.allowedHeaders = allowedHeaders;
+        }
+
+        public String getAllowedMethods() {
+            return allowedMethods;
+        }
+
+        public void setAllowedMethods(String allowedMethods) {
+            this.allowedMethods = allowedMethods;
+        }
+
+        public String getCorsBaseUrl() {
+            return corsBaseUrl;
+        }
+
+        public void setCorsBaseUrl(String corsBaseUrl) {
+            this.corsBaseUrl = corsBaseUrl;
+        }
+
+        public String getPreflightMaxAge() {
+            return preflightMaxAge;
+        }
+
+        public void setPreflightMaxAge(String preflightMaxAge) {
+            this.preflightMaxAge = preflightMaxAge;
+        }
+
+        public String getExposedHeaders() {
+            return exposedHeaders;
+        }
+
+        public void setExposedHeaders(String exposedHeaders) {
+            this.exposedHeaders = exposedHeaders;
+        }
+
+    }
+
     public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
         Objects.requireNonNull(gitRealm);
@@ -244,8 +328,26 @@ public class HostedFactory {
             pathsWithUncoveredHttpMethods = adminConstraintSecurityHandler.getPathsWithUncoveredHttpMethods();
             pathsWithUncoveredHttpMethods.stream().forEach(p -> LOG.info("Not protecting {}", p));
         }
-
+        final Cors c = getCors();
+        if (c != null) {
+            final FilterRegistration.Dynamic filter = env.servlets().addFilter("CORS", CrossOriginFilter.class);
+            filter.setInitParameter("allowedOrigins", c.allowedOrigins);
+            filter.setInitParameter("allowedHeaders", c.allowedHeaders);
+            filter.setInitParameter("allowedMethods", c.allowedMethods);
+            filter.setInitParameter("preflightMaxAge", c.preflightMaxAge);
+            filter.setInitParameter("exposedHeaders", c.exposedHeaders);
+            filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), true, c.corsBaseUrl);
+            filter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, Boolean.FALSE.toString());
+        }
         return hostedGitRepositoryManager;
+    }
+
+    public Cors getCors() {
+        return cors;
+    }
+
+    public void setCors(Cors cors) {
+        this.cors = cors;
     }
 
     private static class DropWizardHandlerWrapper implements Handler {

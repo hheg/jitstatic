@@ -21,15 +21,19 @@ package io.jitstatic;
  */
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.mashape.unirest.http.Headers;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
@@ -55,11 +59,11 @@ public class AdminUrlTest {
         HttpResponse<JsonNode> response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort()))
                 .header("accept", "application/json").asJson();
         assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
-        
+
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).queryString("pretty", "true")
                 .header("accept", "application/json").asJson();
         assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
-        
+
         response = Unirest.post(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).header("accept", "application/json").asJson();
         assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
 
@@ -67,7 +71,7 @@ public class AdminUrlTest {
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
         assertEquals(HttpStatus.OK_200, response.getStatus());
-        
+
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).queryString("pretty", "true")
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
         assertEquals(HttpStatus.OK_200, response.getStatus());
@@ -83,6 +87,60 @@ public class AdminUrlTest {
         response = Unirest.get(String.format("http://localhost:%s/admin/healthcheck", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
         assertEquals(HttpStatus.OK_200, response.getStatus());
+    }
+
+    @Test
+    public void testCORS() throws UnirestException {
+        Map<String, String> headers = Map.of("Access-Control-Allow-Origin", "http://localhost", "Access-Control-Allow-Credentials", "true", "Origin",
+                "http://localhost", "Access-Control-Request-Headers", "X-PUT");
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers result = response.getHeaders();
+        assertEquals(List.of("true"), result.get("Access-Control-Allow-Credentials"));
+        assertEquals(List.of("http://localhost"), result.get("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    public void testCORSAll() throws UnirestException {
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Access-Control-Request-Headers", "X-PUT");
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers result = response.getHeaders();
+        assertEquals(List.of("true"), result.get("Access-Control-Allow-Credentials"));
+        assertEquals(List.of("http://localhost"), result.get("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    public void testCORSAllMetakey() throws UnirestException {
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Access-Control-Request-Headers", "X-PUT");
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers result = response.getHeaders();
+        assertEquals(List.of("true"), result.get("Access-Control-Allow-Credentials"));
+        assertEquals(List.of("http://localhost"), result.get("Access-Control-Allow-Origin"));
+        assertEquals(HttpStatus.NOT_FOUND_404, response.getStatus());
+    }
+
+    @Test
+    public void testCORSAllNoCredentials() throws UnirestException {
+        Map<String, String> headers = Map.of("Origin", "http://www.xxx.yyy", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers",
+                "Content-Type");
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/key", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers result = response.getHeaders();
+        assertEquals(List.of("true"), result.get("Access-Control-Allow-Credentials"));
+        assertEquals(List.of("http://www.xxx.yyy"), result.get("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    public void testAllowedHeaders() throws UnirestException {
+        Map<String, String> headers = Map.of("Origin", "http://www.xxx.yyy", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers",
+                "Content-Type");
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/key", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers result = response.getHeaders();
+        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin"), result.get("Access-Control-Allow-Headers"));
+        assertEquals(List.of("1800"), result.get("Access-Control-Max-Age"));
     }
 
     private Supplier<String> getFolder() {
