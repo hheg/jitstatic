@@ -192,7 +192,7 @@ public class UsersResource {
         try {
             final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
             if (userData == null) {
-                final String newVersion = helper.unwrapWithPOSTApi(() -> storage.postUser(key, ref, realm, user.getName(), data));
+                final String newVersion = helper.unwrapWithPOSTApi(() -> storage.addUser(key, ref, realm, user.getName(), data));
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }

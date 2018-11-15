@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
+
 /*-
  * #%L
  * jitstatic
@@ -20,21 +22,30 @@ package io.jitstatic.api;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MAIL;
+import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MESSAGE;
+import static io.jitstatic.JitStaticConstants.X_JITSTATIC_NAME;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.OPTIONS;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -77,22 +88,21 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class KeyResource {
+    private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
     private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {}";
     private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} is denied for user {}";
-    private static final String X_JITSTATIC = "X-jitstatic";
-    private static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
-    private static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
-    private static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
+    private final boolean cors;
 
-    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator) {
+    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, boolean cors) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
+        this.cors = cors;
     }
 
     @GET
@@ -101,7 +111,7 @@ public class KeyResource {
     @ExceptionMetered(name = "get_storage_exception")
     @Path("{key : .+}")
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-            final @Context HttpHeaders headers) {
+            final @Context HttpHeaders headers, final @Context HttpServletResponse response) {
 
         helper.checkRef(ref);
 
@@ -116,7 +126,7 @@ public class KeyResource {
             if (noChange != null) {
                 return noChange;
             }
-            return buildResponse(storeInfo, tag, data);
+            return buildResponse(storeInfo, tag, data, response);
         }
 
         if (!user.isPresent()) {
@@ -129,7 +139,7 @@ public class KeyResource {
             return noChange;
         }
         LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key);
-        return buildResponse(storeInfo, tag, data);
+        return buildResponse(storeInfo, tag, data, response);
     }
 
     @GET
@@ -151,23 +161,23 @@ public class KeyResource {
 
         final List<Pair<String, StoreInfo>> list = storage.getListForRef(List.of(Pair.of(key, recursive)), ref).stream()
                 .filter(data -> {
-            final MetaData storageData = data.getRight().getMetaData();
-            final Set<User> allowedUsers = storageData.getUsers();
-            final Set<Role> keyRoles = storageData.getRead();
-            if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
-                return true;
-            }
-            if (!userHolder.isPresent()) {
-                return false;
-            }
-            final User user = userHolder.get();
-            if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft());
-                return true;
-            }
-            return false;
-        }).collect(Collectors.toList());
+                    final MetaData storageData = data.getRight().getMetaData();
+                    final Set<User> allowedUsers = storageData.getUsers();
+                    final Set<Role> keyRoles = storageData.getRead();
+                    if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
+                        return true;
+                    }
+                    if (!userHolder.isPresent()) {
+                        return false;
+                    }
+                    final User user = userHolder.get();
+                    if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft());
+                        return true;
+                    }
+                    return false;
+                }).collect(Collectors.toList());
 
         if (list.isEmpty()) {
             return Response.status(Status.NOT_FOUND).build();
@@ -176,13 +186,24 @@ public class KeyResource {
         return Response.ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())).build();
     }
 
-    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data) {
+    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, HttpServletResponse response) {
         final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
         final List<HeaderPair> headers = data.getHeaders();
         if (headers != null) {
+            final Set<String> declaredHeaders = new HashSet<>();
             for (HeaderPair headerPair : headers) {
-                responseBuilder.header(headerPair.getHeader(), headerPair.getValue());
+                final String header = headerPair.getHeader();
+                responseBuilder.header(header, headerPair.getValue());
+                declaredHeaders.add(header.toLowerCase(Locale.ROOT));
+            }
+            if (cors && !declaredHeaders.isEmpty()) {
+                final String defaultExposedHeaders = response.getHeader(ACCESS_CONTROL_EXPOSE_HEADERS);
+                final Set<String> exposedHeaders = defaultExposedHeaders != null
+                        ? Arrays.stream(defaultExposedHeaders.split(",")).map(deh -> deh.toLowerCase(Locale.ROOT)).collect(Collectors.toSet())
+                        : Set.of();
+                declaredHeaders.addAll(exposedHeaders);
+                response.setHeader(ACCESS_CONTROL_EXPOSE_HEADERS, declaredHeaders.stream().collect(Collectors.joining(",")));
             }
         }
         return responseBuilder.build();
@@ -326,14 +347,14 @@ public class KeyResource {
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
     public Response delete(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userHolder,
-            final @Context HttpServletRequest request, final @Context HttpHeaders headers) {
+            final @Context HttpHeaders headers) {
         if (!userHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
 
-        final String userHeader = notEmpty(headers.getHeaderString(X_JITSTATIC_NAME), X_JITSTATIC_NAME);
-        final String message = notEmpty(headers.getHeaderString(X_JITSTATIC_MESSAGE), X_JITSTATIC_MESSAGE);
-        final String userMail = notEmpty(headers.getHeaderString(X_JITSTATIC_MAIL), X_JITSTATIC_MAIL);
+        final String userHeader = notEmpty(headers, X_JITSTATIC_NAME);
+        final String message = notEmpty(headers, X_JITSTATIC_MESSAGE);
+        final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
 
         helper.checkValidRef(ref);
         final User user = userHolder.get();
@@ -363,14 +384,58 @@ public class KeyResource {
         return Response.ok().build();
     }
 
+    @OPTIONS
+    @Path("{key : .+}")
+    @Timed(name = "options_storage_time")
+    @Metered(name = "options_storage_counter")
+    @ExceptionMetered(name = "options_storage_exception")
+    public void options(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Context HttpServletRequest request) {
+        if (!cors) {
+            return;
+        }
+        List<String> declared = new ArrayList<>();
+        if (requestingDelete(request.getHeader("Access-Control-Request-Method"))) {
+            if (ref != null && ref.startsWith("refs/tags/")) {
+                return;
+            }
+            declared = Arrays.asList(X_JITSTATIC_NAME, X_JITSTATIC_MESSAGE, X_JITSTATIC_MAIL);
+        }
+
+        final Pair<MetaData, String> metaKey = storage.getMetaKey(key, ref);
+        if (metaKey != null && metaKey.isPresent()) {
+            final List<HeaderPair> headPairList = metaKey.getLeft().getHeaders();
+            if (headPairList != null && !headPairList.isEmpty()) {
+                declared.addAll(headPairList.stream().map(HeaderPair::getHeader).collect(Collectors.toList()));
+            }
+        }
+
+        if (!declared.isEmpty()) {
+            request.setAttribute(DECLAREDHEADERS, declared);
+        }
+    }
+
+    private boolean requestingDelete(String requestMethod) {
+        if (requestMethod == null) {
+            return false;
+        }
+        final String[] methods = requestMethod.split(",");
+        for (String m : methods) {
+            if ("DELETE".equals(m.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isUserAllowed(final String ref, final User user, final Set<User> allowedUsers, final Set<Role> roles) {
         return allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles) || addKeyAuthenticator.authenticate(user, ref);
     }
 
-    private String notEmpty(final String headerString, final String headerName) {
-        if (headerString == null || headerString.isEmpty()) {
+    private String notEmpty(final HttpHeaders httpHeaders, final String headerName) {
+        String headers = httpHeaders.getHeaderString(headerName);
+        if (headers == null || headers.isEmpty()) {
             throw new WebApplicationException("Missing " + headerName, Status.BAD_REQUEST);
         }
-        return headerString;
+        return headers;
     }
 }

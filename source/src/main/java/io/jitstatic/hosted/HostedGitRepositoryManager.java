@@ -42,11 +42,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -459,7 +455,7 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public String addUser(final String key, final String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.addUser(key, findRef(ref), username, data, new CommitMetaData(username, "none@jitstatic", "update user " + key));
+        return userUpdater.addUser(key, findRef(ref), data, new CommitMetaData(username, "none@jitstatic", "add user " + key));
     }
 
     @Override

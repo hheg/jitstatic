@@ -56,7 +56,7 @@ public class UserUpdater {
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, IOException {
         final List<Pair<String, byte[]>> convertedData = userData.stream().parallel().map(p -> {
             try {
-                return Pair.of(p.getLeft(), MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(p.getRight()));
+                return writeData(p.getLeft(), p.getRight());
             } catch (JsonProcessingException e) {
                 LOGGER.error("Error deserializing user {} ", p.getKey(), e);
                 return Pair.of(p.getKey(), (byte[]) null);
@@ -65,17 +65,21 @@ public class UserUpdater {
         return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData);
     }
 
+    private Pair<String, byte[]> writeData(String user, UserData data) throws JsonProcessingException {
+        return Pair.of(user, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
+    }
+
     public String updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", List.of(Pair.of(userName, MAPPER.writeValueAsBytes(userData)))).get(0).getRight();
+        return updateUser(List.of(Pair.of(userName, userData)), ref, commitMetaData).get(0).getRight();
     }
 
-    public String addUser(String key, Ref ref, String username, UserData data, CommitMetaData commitMetaData)
+    public String addUser(final String key, final Ref ref, final UserData data, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(Pair.of(username,MAPPER.writeValueAsBytes(data)))).get(0).getRight();
+        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(writeData(key, data))).get(0).getRight();
     }
 
-    public void deleteUser(String key, Ref ref, CommitMetaData commitMetaData) throws IOException {
+    public void deleteUser(final String key, final Ref ref, final CommitMetaData commitMetaData) throws IOException {
         repositoryUpdater.deleteKeys(Set.of(key), ref, commitMetaData);
     }
 

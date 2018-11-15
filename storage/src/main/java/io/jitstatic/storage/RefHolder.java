@@ -235,7 +235,7 @@ public class RefHolder implements RefHolderLock {
             } catch (final RefNotFoundException ignore) {
                 // Ignoring that ref wasn't found
             } catch (final Exception e) {
-                return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(new RuntimeException(key + " in " + ref + " had the following error", e));
+                return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(new Exception(key + " in " + ref + " had the following error", e));
             }
             return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.<Pair<String, StoreInfo>>empty());
         }).collect(Collectors.toCollection(() -> new ArrayList<>(files.size())));
@@ -384,7 +384,7 @@ public class RefHolder implements RefHolderLock {
         return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getMetaData().isProtected();
     }
 
-    public String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
         final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, commitMetaData);
         storeIfNotHidden(key, this, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
         return version.getLeft();
@@ -411,8 +411,8 @@ public class RefHolder implements RefHolderLock {
         if (value == null || !value.isRight()) {
             Pair<String, UserData> user;
             try {
-                user = source.getUser(key, this.ref);
-            } catch (RefNotFoundException | IOException e) {
+                user = readThrow(() -> source.getUser(key, this.ref));
+            } catch (Exception e) {
                 throw new WrappingAPIException(e);
             }
             if (user != null && user.isPresent()) {
@@ -436,10 +436,9 @@ public class RefHolder implements RefHolderLock {
             final Pair<String, UserData> userKeyData = keyDataHolder.getRight();
             if (!version.equals(userKeyData.getLeft())) {
                 throw new WrappingAPIException(new VersionIsNotSame());
-            }
-            String newVersion;
+            }            
             try {
-                newVersion = source.updateUser(key, ref, username, data);
+                final String newVersion = source.updateUser(key, ref, username, data);
                 refCache.put(key, Either.right(Pair.of(newVersion, data)));
                 return newVersion;
             } catch (RefNotFoundException e) {
@@ -450,7 +449,7 @@ public class RefHolder implements RefHolderLock {
         }, key);
     }
 
-    public Either<String, FailedToLock> postUser(String userKeyPath, String username, UserData data) {
+    public Either<String, FailedToLock> addUser(final String userKeyPath, final String username, final UserData data) {
         final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
         return lockWrite(() -> {
             final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
@@ -469,12 +468,12 @@ public class RefHolder implements RefHolderLock {
         }, key);
     }
 
-    public void deleteUser(String userKeyPath, String username) {
+    public void deleteUser(final String userKeyPath, final String username) {
         final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
         write(() -> {
             try {
                 refCache.remove(key);
-                source.deleteUser(key, ref, username);                
+                source.deleteUser(key, ref, username);
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to delete " + key, e);
             }

@@ -18,3 +18,5 @@ hosted:
     hostedEndpoint: git
     userName: huser
     secret: hseCr3t
+    cors:
+      allowedOrigins: "*"

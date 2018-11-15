@@ -26,21 +26,21 @@ import com.codahale.metrics.health.HealthCheck;
 import io.jitstatic.utils.CheckHealth;
 
 public class HealthChecker extends HealthCheck {
-	
-	private final CheckHealth source;
 
-	public HealthChecker(final CheckHealth source) {
-		this.source = Objects.requireNonNull(source);
-	}
+    private final CheckHealth source;
 
-	@Override
-	protected Result check() throws Exception {
-		try{
-			source.checkHealth();
-			return Result.healthy();
-		}catch(final Exception e) {
-			return Result.unhealthy(e);
-		}
-	}
+    public HealthChecker(final CheckHealth source) {
+        this.source = Objects.requireNonNull(source);
+    }
+
+    @Override
+    protected Result check() throws Exception {
+        try {
+            source.checkHealth();
+            return Result.healthy();
+        } catch (final Exception e) {
+            return Result.unhealthy(e);
+        }
+    }
 
 }

@@ -257,15 +257,12 @@ public class GitStorage implements Storage {
         if (checkKeyIsDotFile(key)) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-
         final RefHolder refHolder = cache.get(finalRef);
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
-
         return refHolder.modifyMetadata(metaData, oldMetaDataVersion, commitMetaData, key, finalRef);
     }
 
@@ -350,8 +347,7 @@ public class GitStorage implements Storage {
 
     @Override
     public Pair<String, UserData> getUserData(final String username, String ref, final String realm) throws RefNotFoundException {
-        ref = checkRef(ref);
-        final RefHolder refHolder = getRefHolder(ref);
+        final RefHolder refHolder = getRefHolder(checkRef(ref));
         try {
             return refHolder.getUser(realm + "/" + username);
         } catch (WrappingAPIException e) {
@@ -379,7 +375,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public String postUser(String key, String ref, String realm, String username, UserData data) {
+    public String addUser(final String key, String ref, final String realm, final String username, final UserData data) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(username);
@@ -387,7 +383,7 @@ public class GitStorage implements Storage {
         ref = checkRef(ref);
         isRefATag(ref);
         final RefHolder refHolder = getRefHolder(ref);
-        final Either<String, FailedToLock> postUser = refHolder.postUser(realm + "/" + key, username, data);
+        final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, username, data);
         if (postUser.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
         }
@@ -395,7 +391,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public void deleteUser(String key, String ref, String realm, String username) {
+    public void deleteUser(final String key, String ref, final String realm, final String username) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(username);

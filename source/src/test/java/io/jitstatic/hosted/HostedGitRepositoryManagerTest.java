@@ -508,8 +508,9 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null, null), "1", STORE,
-                    "refs/tags/tag", new CommitMetaData("user", "mail", "msg")));
+            assertThrows(UnsupportedOperationException.class,
+                    () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null, null), "1", STORE,
+                            "refs/tags/tag", new CommitMetaData("user", "mail", "msg")));
         }
     }
 
@@ -678,6 +679,14 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testHostedGitRepositoryWithUsers() throws Exception {
         File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+
+        }
+    }
+
+    private void setupGitRepoWithUsers(File base)
+            throws IOException, GitAPIException, InvalidRemoteException, TransportException, JsonProcessingException, NoFilepatternException {
         File wBase = createTempFiles();
         Git bareGit = Git.init().setBare(true).setDirectory(base).call();
         Git workingGit = Git.cloneRepository().setURI(bareGit.getRepository().getDirectory().toURI().toString()).setDirectory(wBase).call();
@@ -719,9 +728,51 @@ public class HostedGitRepositoryManagerTest {
         write(supdaterUser, supdaterUserData);
 
         commit(workingGit);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+    }
 
+    @Test
+    public void testGetUserNotFound()
+            throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
+        File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+            assertFalse(hgrm.getUser(".users/git/kit", REF_HEADS_MASTER).isPresent());
         }
+    }
+
+    @Test
+    public void testAddUser()
+            throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
+        File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+            assertNotNull(hgrm.addUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234")));
+        }
+    }
+
+    @Test
+    public void testUpdateUser()
+            throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
+        File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+            assertNotNull(hgrm.updateUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234")));
+        }
+    }
+
+    @Test
+    public void testMountOnCorruptUser()
+            throws InvalidRemoteException, TransportException, JsonProcessingException, NoFilepatternException, IOException, GitAPIException {
+        File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempFiles();
+        Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();
+
+        Path users = wBase.toPath().resolve(JitStaticConstants.USERS);
+        Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
+        Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, StandardOpenOption.CREATE_NEW);
+        commit(workingGit);
+        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
     }
 
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {

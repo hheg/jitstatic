@@ -297,7 +297,7 @@ public class UsersResourceTest {
         UserIdentity ui = mock(UserIdentity.class);
         UserData userData = new UserData(Set.of(new Role("role")), "22");
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        when(storage.postUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData))).thenReturn("22");
+        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData))).thenReturn("22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .post(Entity.entity(userData, APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());
@@ -517,7 +517,7 @@ public class UsersResourceTest {
     public void testPostKeyUserWithUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
         UserData userData = new UserData(Set.of(new Role("role")), "22");
-        when(storage.postUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData))).thenReturn("22");
+        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData))).thenReturn("22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .post(Entity.entity(userData, APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());

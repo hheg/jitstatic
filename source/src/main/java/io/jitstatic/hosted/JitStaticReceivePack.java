@@ -144,10 +144,6 @@ public class JitStaticReceivePack extends ReceivePack {
             } else {
                 sendMessage(branch + " OK!");
             }
-        } catch (final MissingObjectException storageIsCorrupt) {
-            sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
-            testRc.setResult(Result.REJECTED_MISSING_OBJECT, storageIsCorrupt.getMessage());
-            setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final IOException storageIsCorrupt) {
             sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
             testRc.setResult(Result.REJECTED_OTHER_REASON, storageIsCorrupt.getMessage());

@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -495,6 +496,15 @@ public class GitStorageTest {
     }
 
     @Test
+    public void testDeleteMetaKey() throws IOException {
+        try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
+            SourceInfo si = mock(SourceInfo.class);
+            assertSame(UnsupportedOperationException.class,
+                    assertThrows(WrappingAPIException.class, () -> gs.delete("key/", null, new CommitMetaData("user", "mail", "msg"))).getCause().getClass());
+        }
+    }
+
+    @Test
     public void testAddkeyWithNewBranch() throws Exception {
         String key = "somekey";
         String branch = "refs/heads/newbranch";
@@ -629,6 +639,83 @@ public class GitStorageTest {
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
             Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq("refs/heads/master"))).thenReturn(si);
             gs.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+        }
+    }
+
+    @Test
+    public void testGetUserDataNoBranch() throws RefNotFoundException, IOException {
+        when(source.getUser(Mockito.eq(".users/git/kit"), Mockito.eq(REF_HEADS_MASTER))).thenThrow(new RefNotFoundException("Test"));
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertThrows(RefNotFoundException.class, () -> gs.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+            Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
+        }
+    }
+
+    @Test
+    public void testGetUserDataIOError() throws RefNotFoundException, IOException {
+        when(source.getUser(Mockito.eq(".users/git/kit"), Mockito.eq(REF_HEADS_MASTER))).thenThrow(new IOException("Test"));
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertThrows(UncheckedIOException.class, () -> gs.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+            Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
+        }
+    }
+
+    @Test
+    public void testUpdateUserNoRef() {
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertThrows(UnsupportedOperationException.class,
+                    () -> gs.update("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "p"), "1"));
+        }
+    }
+
+    @Test
+    public void testUpdateUser() throws RefNotFoundException, IOException {
+        when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenReturn("1");
+        when(source.updateUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenReturn("2");
+        try (GitStorage gs = new GitStorage(source, null)) {
+            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa"));
+            assertEquals("2", gs.update("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb"), "1").getLeft());
+        }
+    }
+
+    @Test
+    public void testUpdateUserNoKey() throws RefNotFoundException, IOException {
+        when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenReturn("1");
+        when(source.updateUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenReturn("2");
+        try (GitStorage gs = new GitStorage(source, null)) {
+            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa"));
+            assertEquals("2", gs.update("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb"), "1").getLeft());
+        }
+    }
+
+    @Test
+    public void testDeleteUser() throws RefNotFoundException, IOException {
+        when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenReturn("1");
+        try (GitStorage gs = new GitStorage(source, null)) {
+            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa"));
+            gs.deleteUser("kit", null, JitStaticConstants.GIT_REALM, "creator");
+        }
+    }
+
+    @Test
+    public void testAddUserRefNotFound() throws RefNotFoundException, IOException {
+        when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenThrow(RefNotFoundException.class);
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertEquals(UnsupportedOperationException.class,
+                    assertThrows(WrappingAPIException.class,
+                            () -> gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa"))).getCause()
+                                    .getClass());
+        }
+    }
+
+    @Test
+    public void testAddUserReadError() throws RefNotFoundException, IOException {
+        when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any())).thenThrow(IOException.class);
+        try (GitStorage gs = new GitStorage(source, null)) {
+            assertEquals(IOException.class,
+                    assertThrows(UncheckedIOException.class,
+                            () -> gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa"))).getCause()
+                                    .getClass());
         }
     }
 
