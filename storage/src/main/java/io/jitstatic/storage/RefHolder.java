@@ -400,7 +400,7 @@ public class RefHolder implements RefHolderLock {
 
     public Pair<String, UserData> getUser(final String userKeyPath) {
         final String key = JitStaticConstants.USERS + userKeyPath;
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = refCache.compute(key, this::mapKey);
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = read(() -> refCache.compute(key, this::mapKey));
         if (computed != null) {
             return computed.getRight();
         }
@@ -411,7 +411,7 @@ public class RefHolder implements RefHolderLock {
         if (value == null || !value.isRight()) {
             Pair<String, UserData> user;
             try {
-                user = readThrow(() -> source.getUser(key, this.ref));
+                user = source.getUser(key, this.ref);
             } catch (Exception e) {
                 throw new WrappingAPIException(e);
             }
@@ -436,7 +436,7 @@ public class RefHolder implements RefHolderLock {
             final Pair<String, UserData> userKeyData = keyDataHolder.getRight();
             if (!version.equals(userKeyData.getLeft())) {
                 throw new WrappingAPIException(new VersionIsNotSame());
-            }            
+            }
             try {
                 final String newVersion = source.updateUser(key, ref, username, data);
                 refCache.put(key, Either.right(Pair.of(newVersion, data)));

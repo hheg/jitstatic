@@ -105,7 +105,7 @@ public class BulkResource {
         if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();
         }
-        return Response.ok(result).build();
+        return Response.ok(new SearchResultWrapper(result)).build();
     }
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {

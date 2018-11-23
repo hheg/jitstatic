@@ -399,7 +399,7 @@ public class GitStorage implements Storage {
         isRefATag(ref);
         final RefHolder refHolder = cache.get(ref);
         if (refHolder != null) {
-            refHolder.deleteUser(realm+"/"+key,username);
+            refHolder.deleteUser(realm + "/" + key, username);
         }
     }
 }

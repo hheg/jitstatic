@@ -92,11 +92,10 @@ public class BulkResourceTest {
                                         new SearchPath("data/data/key1", false), new SearchPath("dir/dir/key1", false)))),
                         MediaType.APPLICATION_JSON))
                 .invoke();
-        List<SearchResult> entity = response.readEntity(new GenericType<List<SearchResult>>() {
-        });
+        SearchResultWrapper entity = response.readEntity(SearchResultWrapper.class);
         assertNotNull(entity);
-        assertFalse(entity.isEmpty());
-        Set<String> collect = entity.stream().map(sr -> sr.getKey()).collect(Collectors.toSet());
+        assertFalse(entity.getResult().isEmpty());
+        Set<String> collect = entity.getResult().stream().map(sr -> sr.getKey()).collect(Collectors.toSet());
         assertTrue(collect.contains("key1"));
     }
 

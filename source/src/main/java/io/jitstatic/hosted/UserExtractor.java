@@ -124,7 +124,7 @@ public class UserExtractor {
 
     public List<Pair<Set<Ref>, List<Pair<String, List<Pair<FileObjectIdStore, Exception>>>>>> validate(final Map<AnyObjectId, Set<Ref>> mappedRefs) {
         return mappedRefs.entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue().stream()
-                    .filter(ref -> !ref.isSymbolic()).collect(Collectors.toSet())))
+                .filter(ref -> !ref.isSymbolic()).collect(Collectors.toSet())))
                 .map(this::extracted)
                 .map(this::splitIntoRealms)
                 .map(list -> Pair.of(list.getLeft(), list.getRight().entrySet().stream()

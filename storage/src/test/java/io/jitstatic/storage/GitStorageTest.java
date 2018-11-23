@@ -598,7 +598,7 @@ public class GitStorageTest {
     @Test
     public void testGetUser() throws RefNotFoundException, IOException {
         Mockito.when(source.getUser(Mockito.anyString(), Mockito.anyString())).thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "1234")));
-        try (GitStorage gs = new GitStorage(source, null)) {
+        try (GitStorage gs = new GitStorage(source, null)) {            
             assertNotNull(gs.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
         }
     }

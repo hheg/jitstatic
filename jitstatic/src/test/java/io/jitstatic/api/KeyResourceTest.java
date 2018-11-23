@@ -733,13 +733,12 @@ public class KeyResourceTest {
         Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
         Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
         when(storage.getListForRef(Mockito.any(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
-        List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
-                });
+        KeyDataWrapper list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(KeyDataWrapper.class);
         assertNotNull(list);
-        assertEquals(2, list.size());
-        assertEquals(new KeyData(dogPair), list.get(0));
-        assertEquals(new KeyData(bookPair), list.get(1));
+        assertEquals(2, list.getResult().size());
+        assertEquals(new KeyData(dogPair), list.getResult().get(0));
+        assertEquals(new KeyData(bookPair), list.getResult().get(1));
     }
 
     @Test

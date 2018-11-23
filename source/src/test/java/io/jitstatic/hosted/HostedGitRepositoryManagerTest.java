@@ -731,6 +731,18 @@ public class HostedGitRepositoryManagerTest {
     }
 
     @Test
+    public void testGetUser()
+            throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
+        File base = createTempFiles();
+        setupGitRepoWithUsers(base);
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+            Pair<String, UserData> userDataHolder = hgrm.getUser(".users/git/gituser", REF_HEADS_MASTER);
+            assertTrue(userDataHolder.isPresent());
+            assertEquals("1234", userDataHolder.getRight().getBasicPassword());
+        }
+    }
+
+    @Test
     public void testGetUserNotFound()
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
         File base = createTempFiles();

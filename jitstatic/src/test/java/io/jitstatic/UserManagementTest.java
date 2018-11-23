@@ -48,6 +48,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -82,7 +83,9 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.KeyData;
+import io.jitstatic.api.KeyDataWrapper;
 import io.jitstatic.api.SearchResult;
+import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.BulkSearch;
@@ -337,18 +340,20 @@ public class UserManagementTest {
             }
         }
         try (JitStaticClient creator = buildClient().setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            Set<KeyData> all = creator.listAll("path/", true, (input) -> {
-                try {
-                    // If extracted to read() method, below type in TypeReference is null.
-                    return MAPPER.readValue(input, new TypeReference<Set<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-            Set<String> files = all.stream().map(KeyData::getKey).collect(Collectors.toSet());
+            KeyDataWrapper all = creator.listAll("path/", true, readKeyData());
+            Set<String> files = all.getResult().stream().map(KeyData::getKey).collect(Collectors.toSet());
             assertEquals(Set.of("path/file", "path/path/file"), files);
         }
+    }
+
+    private Function<InputStream, KeyDataWrapper> readKeyData() {
+        return (input) -> {
+            try {
+                return MAPPER.readValue(input, KeyDataWrapper.class);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
     }
 
     @Test
@@ -372,18 +377,20 @@ public class UserManagementTest {
             }
         }
         try (JitStaticClient creator = buildClient().setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            Set<SearchResult> search = creator.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("path/", true)))), (input) -> {
-                try {
-                    // If extracted to a read() method, below type in TypeReference is null.
-                    return MAPPER.readValue(input, new TypeReference<Set<SearchResult>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-            Set<String> keys = search.stream().map(SearchResult::getKey).collect(Collectors.toSet());
+            SearchResultWrapper search = creator.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("path/", true)))), readData());
+            Set<String> keys = search.getResult().stream().map(SearchResult::getKey).collect(Collectors.toSet());
             assertEquals(Set.of("path/file", "path/path/file"), keys);
         }
+    }
+
+    private Function<InputStream, SearchResultWrapper> readData() {
+        return (input) -> {
+            try {
+                return MAPPER.readValue(input, SearchResultWrapper.class);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
     }
 
     @Test

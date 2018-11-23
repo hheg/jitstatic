@@ -183,7 +183,9 @@ public class KeyResource {
             return Response.status(Status.NOT_FOUND).build();
         }
 
-        return Response.ok(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())).build();
+        return Response
+                .ok(new KeyDataWrapper(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())))
+                .build();
     }
 
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, HttpServletResponse response) {
