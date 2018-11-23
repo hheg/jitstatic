@@ -498,7 +498,6 @@ public class GitStorageTest {
     @Test
     public void testDeleteMetaKey() throws IOException {
         try (GitStorage gs = new GitStorage(source, null); InputStream test3 = getInputStream(1); InputStream mtest3 = getMetaData()) {
-            SourceInfo si = mock(SourceInfo.class);
             assertSame(UnsupportedOperationException.class,
                     assertThrows(WrappingAPIException.class, () -> gs.delete("key/", null, new CommitMetaData("user", "mail", "msg"))).getCause().getClass());
         }

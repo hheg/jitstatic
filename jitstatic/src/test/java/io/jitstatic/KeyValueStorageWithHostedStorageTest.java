@@ -75,7 +75,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -83,7 +82,6 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
-import io.jitstatic.api.KeyData;
 import io.jitstatic.api.KeyDataWrapper;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
