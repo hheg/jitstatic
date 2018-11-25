@@ -36,17 +36,15 @@ public class SourceHandlerTest {
 
     @Test
     public void testSourceHandlerMetaData() throws IOException {
-        SourceHandler handler = new SourceHandler();
-        MetaData metaData = handler.readStorage(new ByteArrayInputStream(getMetaData().getBytes(StandardCharsets.UTF_8)));
+        MetaData metaData = SourceHandler.readMetaData(new ByteArrayInputStream(getMetaData().getBytes(StandardCharsets.UTF_8)));
         User user = new User("user1", "1234");
         assertTrue(metaData.getUsers().contains(user));
     }
 
     @Test
     public void testSourceStorageData() throws IOException {
-        SourceHandler handler = new SourceHandler();
         byte[] bytes = getMetaData().getBytes(StandardCharsets.UTF_8);
-        byte[] expected = handler.readStorageData(new ByteArrayInputStream(bytes));
+        byte[] expected = SourceHandler.readStorageData(new ByteArrayInputStream(bytes));
         assertArrayEquals(bytes, expected);
     }
 

@@ -92,6 +92,8 @@ import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.hosted.SourceHandler;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
@@ -453,13 +455,13 @@ public class KeyValueStorageWithHostedStorageTest {
             assertNotNull(result);
             assertEquals(4, result.getResult().size());
             assertEquals("dir/dir/key1", result.getResult().get(0).getKey());
-            assertArrayEquals(getData(map.get("dir/dir/key1")).getBytes(UTF_8), result.getResult().get(0).getData());
+            assertArrayEquals(getData(map.get("dir/dir/key1")).getBytes(UTF_8), toByte(result.getResult().get(0).getData()));
             assertEquals("dir/key/d", result.getResult().get(1).getKey());
-            assertArrayEquals(getData(map.get("dir/key/d")).getBytes(UTF_8), result.getResult().get(1).getData());
+            assertArrayEquals(getData(map.get("dir/key/d")).getBytes(UTF_8), toByte(result.getResult().get(1).getData()));
             assertEquals("dir/key1", result.getResult().get(2).getKey());
-            assertArrayEquals(getData(map.get("dir/key1")).getBytes(UTF_8), result.getResult().get(2).getData());
+            assertArrayEquals(getData(map.get("dir/key1")).getBytes(UTF_8), toByte(result.getResult().get(2).getData()));
             assertEquals("dir/key2", result.getResult().get(3).getKey());
-            assertArrayEquals(getData(map.get("dir/key2")).getBytes(UTF_8), result.getResult().get(3).getData());
+            assertArrayEquals(getData(map.get("dir/key2")).getBytes(UTF_8), toByte(result.getResult().get(3).getData()));
         }
     }
 
@@ -504,7 +506,6 @@ public class KeyValueStorageWithHostedStorageTest {
             client.createKey(data.getBytes(UTF_8), new CommitData("key3", REFS_HEADS_MASTER, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
             KeyDataWrapper result = updaterClient.listAll("/", false, true, readKeyData());
-            System.out.println(result);
             assertNotNull(result);
             assertEquals(2, result.getResult().size(), result.toString());
             assertEquals("key1", result.getResult().get(0).getKey());
@@ -640,6 +641,14 @@ public class KeyValueStorageWithHostedStorageTest {
             return new Entity<String>(v, t, result);
         }
     };
+    
+    private static byte[] toByte(ObjectStreamProvider provider) {
+        try (InputStream is = provider.getInputStream()) {
+            return SourceHandler.readStorageData(is);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     static class Entity<T> {
 

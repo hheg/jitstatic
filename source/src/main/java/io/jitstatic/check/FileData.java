@@ -38,15 +38,17 @@ public class FileData {
         this.inputStreamHolder = Objects.requireNonNull(inputStreamHolder);
     }
 
+    @Deprecated
     public InputStream getInputStream() throws IOException {
-        if (getInputStreamHolder().isPresent()) {
+        final InputStreamHolder inputStreamHolder2 = getInputStreamHolder();
+        if (inputStreamHolder.isPresent()) {
             try {
-                return getInputStreamHolder().inputStream();
+                return inputStreamHolder2.inputStream();
             } catch (final IOException e) {
                 throw new IOException("Error reading " + getFileInfo().getFileName(), e);
             }
         } else {
-            throw new RuntimeException(getInputStreamHolder().exception());
+            throw new RuntimeException(inputStreamHolder.exception());
         }
     }
 
@@ -56,12 +58,13 @@ public class FileData {
 
     public InputStreamHolder getInputStreamHolder() {
         return inputStreamHolder;
+
     }
 
     protected FileObjectIdStore getFileInfo() {
         return fileInfo;
     }
-    
+
     public String getFileName() {
         return fileInfo.getFileName();
     }

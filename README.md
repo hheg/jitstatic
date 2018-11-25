@@ -515,7 +515,7 @@ or by specifying arguments to the application or to `JAVA_OPTS`
 
 ### Users API
 
-There's an API for the user interface. The rules are that a user in the keyadmin realm can add users to the keyuser realm the branch they are admins for. Only a user in the git realm (refs/heads/secrets) can add keyadmins to any branch.
+There's an API for the user interface. The rules are that a user in the keyadmin realm can add users to the keyuser realm the branch they are admins for. Only a user in the git realm (refs/heads/secrets) can add keyadmins to any branch. It follows the same mechanic as the previous API's.
 
 Fetching a user keyadminuser in the realm keyadmin with a user from the git realm called gituser.
 ```bash
@@ -546,6 +546,7 @@ Content-Length: 0
 ```
 
 Adding a user
+
 ```bash
 curl -i -H 'Content-Type: application/json' \
 --user gituser:3234 -X POST \

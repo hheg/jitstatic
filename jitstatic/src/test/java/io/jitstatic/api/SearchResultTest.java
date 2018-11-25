@@ -23,18 +23,37 @@ package io.jitstatic.api;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.junit.jupiter.api.Test;
+
+import io.jitstatic.source.ObjectStreamProvider;
 
 public class SearchResultTest {
 
     @Test
     public void testSearchResult() {
-        SearchResult sr1 = new SearchResult("key", "tag", "type", new byte[] {1}, "ref");
-        SearchResult sr2 = new SearchResult("key", "tag", "type", new byte[] {1}, "ref");
-        SearchResult sr3 = new SearchResult("other", "tag", "type", new byte[] {1}, "ref");
-        SearchResult sr4 = new SearchResult("key", "other", "type", new byte[] {1}, "ref");
-        SearchResult sr5 = new SearchResult("key", "tag", "other", new byte[] {1}, "ref");
-        SearchResult sr6 = new SearchResult("key", "tag", "type", new byte[] {1}, "other");
+        byte[] content = new byte[] {1};
+        ObjectStreamProvider ddd = new ObjectStreamProvider() {
+            
+            @Override
+            public long getSize() throws IOException {                
+                return content.length;
+            }
+            
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return new ByteArrayInputStream(content);
+            }
+        };
+        SearchResult sr1 = new SearchResult("key", "tag", "type", "ref", ddd);
+        SearchResult sr2 = new SearchResult("key", "tag", "type", "ref", ddd);
+        SearchResult sr3 = new SearchResult("other", "tag", "type", "ref", ddd);
+        SearchResult sr4 = new SearchResult("key", "other", "type", "ref", ddd);
+        SearchResult sr5 = new SearchResult("key", "tag", "other", "ref", ddd);
+        SearchResult sr6 = new SearchResult("key", "tag", "type", "other", ddd);
         
         assertTrue(sr1.equals(sr2));
         assertTrue(sr1.hashCode() == sr2.hashCode());

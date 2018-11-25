@@ -21,7 +21,6 @@ package io.jitstatic.storage;
  */
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +35,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,21 +50,22 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.RefHolderLock;
-import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.LargeObjectStreamProvider;
+import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.source.SmallObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
 public class RefHolder implements RefHolderLock {
 
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
-    private static final SourceHandler HANDLER = new SourceHandler();
-
     private volatile Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
     private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
@@ -127,17 +128,13 @@ public class RefHolder implements RefHolderLock {
         }
     }
 
-    private <T, V extends Exception> T readThrow(ThrowingSupplier<T, V> supplier) throws V {
+    private <T, V extends Exception> T readThrow(final ThrowingSupplier<T, V> supplier) throws V {
         refLock.readLock().lock();
         try {
             return supplier.get();
         } finally {
             refLock.readLock().unlock();
         }
-    }
-
-    private static interface ThrowingSupplier<S, E extends Exception> {
-        S get() throws E;
     }
 
     private boolean tryLock(final String key) {
@@ -184,7 +181,8 @@ public class RefHolder implements RefHolderLock {
         return refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true));
     }
 
-    void refreshKey(final byte[] data, final String key, final String oldversion, final String newVersion) {
+    @Deprecated
+    void refreshKey(final ObjectStreamProvider data, final String key, final String oldversion, final String newVersion) {
         refCache.computeIfPresent(key, (k, si) -> {
             if (si.isLeft() && si.getLeft().isPresent()) {
                 final StoreInfo storeInfo = si.getLeft().get();
@@ -205,7 +203,7 @@ public class RefHolder implements RefHolderLock {
                         refCache.clear();
                         putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
                     } else {
-                        putKey(key, Optional.of(new StoreInfo(si.getData(), metaData, si.getVersion(), newMetaDataVersion)));
+                        putKey(key, Optional.of(new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
                     }
                 }
             });
@@ -241,6 +239,7 @@ public class RefHolder implements RefHolderLock {
         }).collect(Collectors.toCollection(() -> new ArrayList<>(files.size())));
     }
 
+    // TODO Make package private
     public Optional<StoreInfo> loadAndStore(final String key) {
         Optional<StoreInfo> storeInfoContainer = getKey(key);
         if (storeInfoContainer == null) {
@@ -257,35 +256,21 @@ public class RefHolder implements RefHolderLock {
     private StoreInfo load(final String key) throws RefNotFoundException {
         final SourceInfo sourceInfo = readThrow(() -> source.getSourceInfo(key, ref));
         if (sourceInfo != null) {
-            return readStoreInfo(sourceInfo);
-        }
-        return null;
-    }
-
-    private StoreInfo readStoreInfo(final SourceInfo source) {
-        try {
-            final MetaData metaData = readMetaData(source);
-            if (!metaData.isHidden()) {
-                try (final InputStream sourceStream = source.getSourceInputStream()) {
-                    if (sourceStream != null) { // Implicitly a master .metadata SourceInfo instance...
-                        return new StoreInfo(HANDLER.readStorageData(sourceStream), metaData, source.getSourceVersion(), source.getMetaDataVersion());
+            try {
+                final MetaData metaData = sourceInfo.readMetaData();
+                if (!metaData.isHidden()) {
+                    if (!sourceInfo.isMetaDataSource()) {
+                        return new StoreInfo(sourceInfo.getSourceProvider(), metaData, sourceInfo.getSourceVersion(), sourceInfo.getMetaDataVersion());
                     } else {
-                        return new StoreInfo(metaData, source.getMetaDataVersion());
+                        return new StoreInfo(metaData, sourceInfo.getMetaDataVersion());
                     }
                 }
+                return null;
+            } catch (final IOException e) {
+                throw new UncheckedIOException(e);
             }
-            return null;
-        } catch (final IOException e) {
-            throw new UncheckedIOException(e);
         }
-    }
-
-    private MetaData readMetaData(final SourceInfo source) {
-        try (final InputStream metaDataStream = source.getMetadataInputStream()) {
-            return HANDLER.readStorage(metaDataStream);
-        } catch (final IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return null;
     }
 
     private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
@@ -353,9 +338,9 @@ public class RefHolder implements RefHolderLock {
             if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
-            final String newVersion = source.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
-            refreshKey(data, key, oldVersion, newVersion);
-            return newVersion;
+            final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = source.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
+            refreshKey(getObjectStreamProvider(data, newVersion.getRight()), key, oldVersion, newVersion.getLeft());
+            return newVersion.getLeft();
         }, key);
     }
 
@@ -385,9 +370,21 @@ public class RefHolder implements RefHolderLock {
     }
 
     String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
-        final Pair<String, String> version = source.addKey(key, finalRef, data, metaData, commitMetaData);
-        storeIfNotHidden(key, this, new StoreInfo(data, metaData, version.getLeft(), version.getRight()));
-        return version.getLeft();
+        final Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> version = source.addKey(key, finalRef, data, metaData, commitMetaData);
+        final Pair<ThrowingSupplier<ObjectLoader, IOException>, String> fileInfo = version.getLeft();
+        storeIfNotHidden(key, this, new StoreInfo(getObjectStreamProvider(data, fileInfo.getLeft()), metaData, fileInfo.getRight(), version.getRight()));
+        return fileInfo.getRight();
+    }
+
+    private ObjectStreamProvider getObjectStreamProvider(final byte[] data, final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory) {
+        final int size = data.length;
+        if (size < 1_000_000) {
+            return new SmallObjectStreamProvider(data);
+        } else {
+            return new LargeObjectStreamProvider(() -> {
+                return objectLoaderFactory.get().openStream();
+            }, size);
+        }
     }
 
     private void storeIfNotHidden(final String key, final RefHolder refStore, final StoreInfo newStoreInfo) {

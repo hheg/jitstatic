@@ -25,23 +25,28 @@ import java.util.Objects;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.MetaData;
+import io.jitstatic.source.ObjectStreamProvider;
 
 @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "It's exposed when exposed to client and it's serialized")
 public class StoreInfo {
     private final MetaData metaData;
     private final String version;
-    private final byte[] data;
+    private final ObjectStreamProvider source;
     private final String metaDataVersion;
 
-    public StoreInfo(final byte[] data, final MetaData metaData, final String version, final String metaDataVersion) {
-        this.data = data;
+    public StoreInfo(final MetaData metaData, final String metaDataVersion) {
+        this(null, null, metaData, null, metaDataVersion);
+    }
+
+    private StoreInfo(final byte[] data, final ObjectStreamProvider source, final MetaData metaData, final String sourceVersion, final String metaDataVersion) {
+        this.source = source;        
         this.metaData = Objects.requireNonNull(metaData);
-        this.version = version;
+        this.version = sourceVersion;
         this.metaDataVersion = Objects.requireNonNull(metaDataVersion);
     }
 
-    public StoreInfo(final MetaData metaData, final String metaDataVersion) {
-        this(null, metaData, null, metaDataVersion);
+    public StoreInfo(final ObjectStreamProvider source, final MetaData metaData, final String sourceVersion, final String metaDataVersion) {
+        this(null, source, metaData, sourceVersion, metaDataVersion);
     }
 
     public MetaData getMetaData() {
@@ -55,19 +60,19 @@ public class StoreInfo {
         return version;
     }
 
-    public byte[] getData() {
-        if (data == null) {
+    public ObjectStreamProvider getStreamProvider() {
+        if (source == null) {
             throw new IllegalStateException("This is a metaData storeInfo");
         }
-        return data;
+        return source;
     }
 
     public boolean isMasterMetaData() {
-        return data == null && version == null;
+        return source == null && version == null;
     }
 
     public boolean isNormalKey() {
-        return !isMasterMetaData() && version != null && data != null;
+        return !isMasterMetaData() && version != null && source != null;
     }
 
     @Override

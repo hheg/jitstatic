@@ -43,6 +43,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -66,6 +67,7 @@ import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -253,7 +255,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyKey(final String key, String ref, final byte[] data, final String version, final CommitMetaData commitMetaData) {
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final byte[] data, final String version, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(key);
@@ -310,7 +312,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);

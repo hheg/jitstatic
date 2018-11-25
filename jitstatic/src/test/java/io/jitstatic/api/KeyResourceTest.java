@@ -31,7 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -80,7 +83,9 @@ import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
+import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -110,7 +115,8 @@ public class KeyResourceTest {
                     .setRealm(JITSTATIC_KEYADMIN_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false))
+                    new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER),
+                            false))
             .build();
 
     @BeforeAll
@@ -118,18 +124,18 @@ public class KeyResourceTest {
         byte[] dog = "{\"food\":[\"bone\",\"meat\"]}".getBytes(UTF_8);
         Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
         byte[] b = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        StoreInfo bookData = new StoreInfo(b, new MetaData(users, "application/octet-stream", false, false, List.of(), null, null), "1", "1");
+        StoreInfo bookData = new StoreInfo(toProvider(b), new MetaData(users, "application/octet-stream", false, false, List.of(), null, null), "1", "1");
         DATA.put("book", Optional.of(bookData));
-        StoreInfo dogData = new StoreInfo(dog, new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
-        returnedDog = new String(dogData.getData());
+        StoreInfo dogData = new StoreInfo(toProvider(dog), new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
+        returnedDog = new String(toByte(dogData.getStreamProvider()));
         DATA.put("dog", Optional.of(dogData));
         byte[] horse = "{\"food\":[\"wheat\",\"grass\"]}".getBytes(UTF_8);
-        StoreInfo horseData = new StoreInfo(horse, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), "1", "1");
-        returnedHorse = new String(horseData.getData());
+        StoreInfo horseData = new StoreInfo(toProvider(horse), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), "1", "1");
+        returnedHorse = new String(toByte(horseData.getStreamProvider()));
         DATA.put("horse", Optional.of(horseData));
         byte[] cat = "{\"food\":[\"fish\",\"bird\"]}".getBytes(UTF_8);
         users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
-        StoreInfo catData = new StoreInfo(cat, new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
+        StoreInfo catData = new StoreInfo(toProvider(cat), new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
         DATA.put("cat", Optional.of(catData));
     }
 
@@ -541,8 +547,9 @@ public class KeyResourceTest {
     }
 
     @Test
-    public void testAddKey() throws JsonProcessingException {
-        StoreInfo si = new StoreInfo(new byte[] { 1 }, new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "1", "1");
+    public void testAddKey() throws IOException {
+        StoreInfo si = new StoreInfo(toProvider(new byte[] { 1 }), new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "1",
+                "1");
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.addKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
@@ -550,7 +557,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST).post(Entity.json(addKeyData));
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         assertEquals("1", response.getEntityTag().getValue());
-        assertArrayEquals(new byte[] { 1 }, si.getData());
+        assertArrayEquals(new byte[] { 1 }, toByte(si.getStreamProvider()));
         response.close();
     }
 
@@ -789,6 +796,28 @@ public class KeyResourceTest {
 
     private static String createCreds(String user, String secret) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
+    }
+
+    private static ObjectStreamProvider toProvider(byte[] data) {
+        return new ObjectStreamProvider() {
+            @Override
+            public long getSize() throws IOException {
+                return data.length;
+            }
+
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return new ByteArrayInputStream(data);
+            }
+        };
+    }
+
+    private static byte[] toByte(ObjectStreamProvider provider) {
+        try (InputStream is = provider.getInputStream()) {
+            return SourceHandler.readStorageData(is);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
 }

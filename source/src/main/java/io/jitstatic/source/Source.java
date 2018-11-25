@@ -25,12 +25,14 @@ import java.util.function.Function;
  */
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.utils.CheckHealth;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 
 public interface Source extends AutoCloseable, CheckHealth {
@@ -44,9 +46,9 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public String modifyKey(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
 
-    public Pair<String, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
 
     public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String finalRef, CommitMetaData commitMetaData);
 

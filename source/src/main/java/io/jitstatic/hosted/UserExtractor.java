@@ -45,6 +45,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -65,6 +66,7 @@ import io.jitstatic.StorageParseException;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.RepositoryDataError;
+import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Pair;
 
 public class UserExtractor {
@@ -257,7 +259,9 @@ public class UserExtractor {
 
     private InputStreamHolder getInputStreamFor(final ObjectId objectId) {
         try {
-            return new InputStreamHolder(repository.open(objectId));
+            Functions.ThrowingSupplier<ObjectLoader,IOException> factory = () -> repository.open(objectId);
+            factory.get(); // Trigger IOException            
+            return new InputStreamHolder(factory);
         } catch (final IOException e) {
             return new InputStreamHolder(e);
         }

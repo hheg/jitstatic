@@ -62,7 +62,8 @@ public class UserUpdater {
                 return Pair.of(p.getKey(), (byte[]) null);
             }
         }).collect(Collectors.toList());
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData);
+        return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData).stream().map(m -> Pair.of(m.getLeft(), m.getRight().name()))
+                .collect(Collectors.toList());
     }
 
     private Pair<String, byte[]> writeData(String user, UserData data) throws JsonProcessingException {
@@ -76,7 +77,7 @@ public class UserUpdater {
 
     public String addUser(final String key, final Ref ref, final UserData data, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(writeData(key, data))).get(0).getRight();
+        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(writeData(key, data))).get(0).getRight().name();
     }
 
     public void deleteUser(final String key, final Ref ref, final CommitMetaData commitMetaData) throws IOException {

@@ -20,7 +20,6 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
@@ -35,26 +34,15 @@ import io.jitstatic.MetaData;
 public class SourceHandler {
     private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
 
-    public byte[] readStorageData(final InputStream is) throws IOException {
-        return readByteArray(is);
+    public static byte[] readStorageData(final InputStream is) throws IOException {
+        Objects.requireNonNull(is);
+        return is.readAllBytes();
     }
 
-    public MetaData readStorage(final InputStream storageStream) throws IOException {
+    public static MetaData readMetaData(final InputStream storageStream) throws IOException {
         Objects.requireNonNull(storageStream);
         try (final JsonParser parser = MAPPER.createParser(storageStream);) {
             return parser.readValueAs(MetaData.class);
         }
-    }
-
-    private byte[] readByteArray(final InputStream is) throws IOException {
-        Objects.requireNonNull(is);
-        final ByteArrayOutputStream buffer = new ByteArrayOutputStream(4096);
-        int nRead;
-        byte[] data = new byte[4096];
-        while ((nRead = is.read(data, 0, data.length)) != -1) {
-            buffer.write(data, 0, nRead);
-        }
-        buffer.flush();
-        return buffer.toByteArray();
     }
 }

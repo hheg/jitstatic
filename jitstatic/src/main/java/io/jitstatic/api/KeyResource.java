@@ -1,7 +1,5 @@
 package io.jitstatic.api;
 
-import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
-
 /*-
  * #%L
  * jitstatic
@@ -22,12 +20,14 @@ import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MAIL;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MESSAGE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_NAME;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -61,6 +61,7 @@ import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.StreamingOutput;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.slf4j.Logger;
@@ -97,7 +98,7 @@ public class KeyResource {
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
     private final boolean cors;
-
+    
     public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, boolean cors) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
@@ -189,7 +190,12 @@ public class KeyResource {
     }
 
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, HttpServletResponse response) {
-        final ResponseBuilder responseBuilder = Response.ok(storeInfo.getData()).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+        final StreamingOutput so = (output) -> {
+            try (InputStream is = storeInfo.getStreamProvider().getInputStream()) {
+                is.transferTo(output);
+            }            
+        };
+        final ResponseBuilder responseBuilder = Response.ok(so).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
         final List<HeaderPair> headers = data.getHeaders();
         if (headers != null) {
@@ -416,7 +422,7 @@ public class KeyResource {
         }
     }
 
-    private boolean requestingDelete(String requestMethod) {
+    private boolean requestingDelete(final String requestMethod) {
         if (requestMethod == null) {
             return false;
         }

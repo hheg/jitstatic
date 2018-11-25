@@ -23,8 +23,11 @@ package io.jitstatic.source;
 import java.io.IOException;
 import java.io.InputStream;
 
+import io.jitstatic.MetaData;
 import io.jitstatic.check.MetaFileData;
 import io.jitstatic.check.SourceFileData;
+import io.jitstatic.hosted.InputStreamHolder;
+import io.jitstatic.hosted.SourceHandler;
 
 public class SourceInfo {
 
@@ -38,13 +41,6 @@ public class SourceInfo {
                     .format("sourceFileData cannot be null if metaFileData %s is not a masterMetaData file", metaFileData.getFileName()));
         }
         this.sourceFileData = sourceFileData;
-    }
-
-    public InputStream getSourceInputStream() throws IOException {
-        if (sourceFileData == null) {
-            return null;
-        }
-        return sourceFileData.getInputStream();
     }
 
     public String getSourceVersion() {
@@ -68,5 +64,28 @@ public class SourceInfo {
 
     public boolean hasKeyMetaData() {
         return metaFileData.isKeyMetaFile();
+    }
+
+    public ObjectStreamProvider getSourceProvider() throws IOException {
+        if(sourceFileData == null) {
+            return null;
+        }
+        InputStreamHolder inputStreamHolder = sourceFileData.getInputStreamHolder();
+        long size = inputStreamHolder.getSize();
+        // TODO 1MB?
+        if (size < 1_000_000) {
+            try (InputStream storageStream = inputStreamHolder.getInputStreamProvider().get()) {
+                return new SmallObjectStreamProvider(SourceHandler.readStorageData(storageStream));
+            }
+        } else {
+            return new LargeObjectStreamProvider(inputStreamHolder.getInputStreamProvider(), size);
+        }
+
+    }
+
+    public MetaData readMetaData() throws IOException {
+        try (final InputStream metaDataStream = getMetadataInputStream()) {
+            return SourceHandler.readMetaData(metaDataStream);
+        }
     }
 }

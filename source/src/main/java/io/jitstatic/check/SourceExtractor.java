@@ -44,6 +44,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -58,6 +59,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.Path;
 
@@ -210,8 +212,10 @@ public class SourceExtractor {
     }
 
     private InputStreamHolder getInputStreamFor(final ObjectId objectId) {
-        try {
-            return new InputStreamHolder(repository.open(objectId));
+        try {            
+            final ThrowingSupplier<ObjectLoader, IOException> loaderFactory = () -> repository.open(objectId);
+            loaderFactory.get(); // Test for existence
+            return new InputStreamHolder(loaderFactory);
         } catch (final IOException e) {
             return new InputStreamHolder(e);
         }

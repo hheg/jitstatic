@@ -28,6 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Set;
 
@@ -35,15 +39,16 @@ import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
+import io.jitstatic.source.ObjectStreamProvider;
 
 public class StoreInfoTest {
 
     @Test
     public void testStoreInfo() {
         MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of(), null, null);
-        StoreInfo s1 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
-        StoreInfo s2 = new StoreInfo(new byte[] { 0 }, sd, "1", "1");
-        StoreInfo s3 = new StoreInfo(new byte[] { 0 }, sd, "2", "1");
+        StoreInfo s1 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "1", "1");
+        StoreInfo s2 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "1", "1");
+        StoreInfo s3 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "2", "1");
         assertEquals(s1, s1);
         assertEquals(s1, s2);
         assertNotEquals(s1, s3);
@@ -51,7 +56,7 @@ public class StoreInfoTest {
         assertNotEquals(s1, new Object());
         assertEquals(s1.hashCode(), s2.hashCode());
         assertEquals("1", s1.getVersion());
-        assertArrayEquals(new byte[] { 0 }, s1.getData());
+        assertArrayEquals(new byte[] { 0 }, toByte(s1.getStreamProvider()));
         assertTrue(s1.isNormalKey());
         assertFalse(s1.isMasterMetaData());
     }
@@ -64,10 +69,33 @@ public class StoreInfoTest {
 
         assertTrue(s1.isMasterMetaData());
         assertFalse(s1.isNormalKey());
-        assertThrows(IllegalStateException.class, () -> s1.getData());
+        assertThrows(IllegalStateException.class, () -> s1.getStreamProvider());
         assertThrows(IllegalStateException.class, () -> s1.getVersion());
         assertEquals("1", s1.getMetaDataVersion());
         assertEquals(s1, s2);
+    }
+
+    private ObjectStreamProvider toProvider(byte[] data) {
+        return new ObjectStreamProvider() {
+
+            @Override
+            public long getSize() throws IOException {
+                return data.length;
+            }
+
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return new ByteArrayInputStream(data);
+            }
+        };
+    }
+    
+    private static byte[] toByte(ObjectStreamProvider provider) {
+        try (InputStream is = provider.getInputStream()) {
+            return SourceHandler.readStorageData(is);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
 }
