@@ -23,31 +23,17 @@ package io.jitstatic.api;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.tools.Utils;
 
 public class SearchResultTest {
 
     @Test
     public void testSearchResult() {
         byte[] content = new byte[] {1};
-        ObjectStreamProvider ddd = new ObjectStreamProvider() {
-            
-            @Override
-            public long getSize() throws IOException {                
-                return content.length;
-            }
-            
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(content);
-            }
-        };
+        ObjectStreamProvider ddd = Utils.toProvider(content);
         SearchResult sr1 = new SearchResult("key", "tag", "type", "ref", ddd);
         SearchResult sr2 = new SearchResult("key", "tag", "type", "ref", ddd);
         SearchResult sr3 = new SearchResult("other", "tag", "type", "ref", ddd);

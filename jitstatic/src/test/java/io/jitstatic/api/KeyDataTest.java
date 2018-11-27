@@ -23,16 +23,13 @@ package io.jitstatic.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.tools.Utils;
 
 public class KeyDataTest {
 
@@ -42,19 +39,7 @@ public class KeyDataTest {
         String type = "type";
         String tag = "tag";
         byte[] d = new byte[] { 1 };
-        ObjectStreamProvider provider = new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return d.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(d);
-            }
-        };
-
+        ObjectStreamProvider provider = Utils.toProvider(d);
         KeyData data = new KeyData(key, type, tag, provider);
         assertFalse(data.equals(null));
         assertFalse(data.equals(new Object()));
@@ -71,18 +56,7 @@ public class KeyDataTest {
     public void testDeserialize() throws JsonProcessingException {
         ObjectMapper map = new ObjectMapper();
         byte[] d = new byte[] { 1 };
-        ObjectStreamProvider provider = new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return d.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(d);
-            }
-        };
+        ObjectStreamProvider provider = Utils.toProvider(d);
         KeyData kd = new KeyData("key", "type", "tag", provider);
         assertEquals("{\"key\":\"key\",\"type\":\"type\",\"tag\":\"tag\",\"data\":\"AQ==\"}", map.writeValueAsString(kd));
     }

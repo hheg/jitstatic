@@ -181,19 +181,6 @@ public class RefHolder implements RefHolderLock {
         return refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true));
     }
 
-    @Deprecated
-    void refreshKey(final ObjectStreamProvider data, final String key, final String oldversion, final String newVersion) {
-        refCache.computeIfPresent(key, (k, si) -> {
-            if (si.isLeft() && si.getLeft().isPresent()) {
-                final StoreInfo storeInfo = si.getLeft().get();
-                if (oldversion.equals(storeInfo.getVersion())) {
-                    return Either.left(Optional.of(new StoreInfo(data, storeInfo.getMetaData(), newVersion, storeInfo.getMetaDataVersion())));
-                }
-            }
-            return null;
-        });
-    }
-
     public void refreshMetaData(final MetaData metaData, final String key, final String oldMetaDataVersion, final String newMetaDataVersion) {
         write(() -> {
             final Optional<StoreInfo> storeInfo = refCache.get(key).getLeft();
@@ -339,7 +326,15 @@ public class RefHolder implements RefHolderLock {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = source.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
-            refreshKey(getObjectStreamProvider(data, newVersion.getRight()), key, oldVersion, newVersion.getLeft());
+            refCache.compute(key, (k, si) -> {
+                if (si.isLeft() && si.getLeft().isPresent()) {
+                    final StoreInfo storeInfo1 = si.getLeft().get();
+                    if (oldVersion.equals(storeInfo1.getVersion())) {
+                        return Either.left(Optional.of(new StoreInfo(getObjectStreamProvider(data, newVersion.getRight()), storeInfo1.getMetaData(), newVersion.getLeft(), storeInfo1.getMetaDataVersion())));
+                    }
+                }
+                return null;
+            });
             return newVersion.getLeft();
         }, key);
     }

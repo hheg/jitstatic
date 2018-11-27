@@ -1,5 +1,4 @@
 package io.jitstatic.storage;
-
 /*-
  * #%L
  * jitstatic
@@ -34,6 +33,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static io.jitstatic.storage.tools.Utils.toByte;
+import static io.jitstatic.storage.tools.Utils.toProvider;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -68,9 +69,7 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.RefHolderLock;
-import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Functions;
@@ -188,29 +187,6 @@ public class GitStorageTest {
                     SHA_2_MD);
             assertArrayEquals(toByte(storage.getStreamProvider()), toByte(gs.getKey("key", null).get().getStreamProvider()));
             gs.checkHealth();
-        }
-    }
-
-    private ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
-    }
-
-    private byte[] toByte(ObjectStreamProvider provider) {
-        try {
-            return SourceHandler.readStorageData(provider.getInputStream());
-        } catch (IOException e) {
-           throw new UncheckedIOException(e);
         }
     }
 
@@ -571,9 +547,8 @@ public class GitStorageTest {
     @Test
     public void testAddKeyWithExistingKey() throws Exception {
         String key = "somekey";
-        String branch = "refs/heads/newbranch";
-        when(source.getSourceInfo(eq(key), eq(branch))).thenThrow(RefNotFoundException.class);
-        when(source.getSourceInfo(eq(key), eq("refs/heads/master"))).thenReturn(mock(SourceInfo.class));
+        String branch = "refs/heads/newbranch";        
+        when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(mock(SourceInfo.class));
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));

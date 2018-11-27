@@ -183,20 +183,29 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
 
-        if (checkKeyIsDotFile(key)) {
-            throw new WrappingAPIException(new UnsupportedOperationException(key));
-        }
-
-        if (key.endsWith("/")) {
+        if (checkKeyIsDotFile(key) || key.endsWith("/")) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
 
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
         final RefHolder refStore = getRefHolder(finalRef);
-
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
-            checkIfKeyIsPresent(key, finalRef, refStore);
+            SourceInfo sourceInfo = null;
+            final Optional<StoreInfo> storeInfo = refStore.getKey(key);
+            if (storeInfo != null && storeInfo.isPresent()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
+            try {
+                sourceInfo = source.getSourceInfo(key, finalRef);
+            } catch (final RefNotFoundException e) {
+                if (!defaultRef.equals(finalRef)) {
+                    sourceInfo = checkBranch(key, finalRef, getRefHolder(defaultRef));
+                }
+            }
+            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
             return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
         }, key);
         if (result.isRight()) {
@@ -206,38 +215,27 @@ public class GitStorage implements Storage {
         return result.getLeft();
     }
 
-    private void checkIfKeyIsPresent(final String key, final String finalRef, final RefHolder refholder) {
+    private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
         SourceInfo sourceInfo = null;
-        final Optional<StoreInfo> storeInfo = refholder.getKey(key);
-        if (storeInfo != null && storeInfo.isPresent()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
         try {
-            sourceInfo = source.getSourceInfo(key, finalRef);
-        } catch (final RefNotFoundException e) {
-            if (!defaultRef.equals(finalRef)) {
-                try {
-                    sourceInfo = source.getSourceInfo(key, defaultRef);
-                } catch (final RefNotFoundException e1) {
-                    throw new ShouldNeverHappenException("Default branch " + defaultRef + " is not found");
-                }
-                if (sourceInfo == null) {
-                    branchFromRef(finalRef);
-                }
+            final Optional<StoreInfo> defaultKey = refHolder.getKey(key);
+            if (defaultKey != null && defaultKey.isPresent()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
+            sourceInfo = source.getSourceInfo(key, defaultRef);
+        } catch (final RefNotFoundException e1) {
+            throw new ShouldNeverHappenException("Default branch " + defaultRef + " is not found");
         }
-        if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
-    }
+        if (sourceInfo == null) {
+            try {
+                source.createRef(ref);
+            } catch (final IOException e1) {
+                consumeError(e1);
+                throw new UncheckedIOException(e1);
+            }
 
-    private void branchFromRef(final String finalRef) {
-        try {
-            source.createRef(finalRef);
-        } catch (final IOException e1) {
-            consumeError(e1);
-            throw new UncheckedIOException(e1);
         }
+        return sourceInfo;
     }
 
     private void removeCacheRef(final String ref) {

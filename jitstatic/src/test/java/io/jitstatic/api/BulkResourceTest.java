@@ -25,9 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -57,9 +54,9 @@ import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.Utils;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
@@ -84,7 +81,7 @@ public class BulkResourceTest {
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(toProvider(new byte[] { 1 }));
+        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(Utils.toProvider(new byte[] { 1 }));
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
         Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
@@ -107,20 +104,4 @@ public class BulkResourceTest {
     private static String createCreds(String user, String secret) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
-
-    private ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
-    }
-
 }

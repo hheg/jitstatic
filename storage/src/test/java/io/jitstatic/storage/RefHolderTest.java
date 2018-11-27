@@ -1,7 +1,5 @@
 package io.jitstatic.storage;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * #L%
  */
 
+import static io.jitstatic.storage.tools.Utils.toProvider;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -42,19 +41,23 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.spencerwi.either.Either;
 
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.utils.Functions;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.LinkedException;
+import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class RefHolderTest {
@@ -233,13 +236,18 @@ public class RefHolderTest {
     @Test
     public void testRefreshKey() throws IOException {
         StoreInfo storeInfo = mock(StoreInfo.class);
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        @SuppressWarnings("unchecked")
+        ThrowingSupplier<ObjectLoader, IOException> ts = mock(Functions.ThrowingSupplier.class);
         when(storeInfo.getMetaData()).thenReturn(mock(MetaData.class));
         when(storeInfo.getVersion()).thenReturn("1");
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
+
+        byte[] data = getData().getBytes(UTF_8);
+        when(source.modifyKey("key", REF, data, "1", cmd)).thenReturn(Pair.of("2", ts));
         RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
         ref.putKey("key", Optional.of(storeInfo));
-        byte[] readAllBytes = asStream(getData()).readAllBytes();
-        ref.refreshKey(toProvider(readAllBytes), "key", "1", "2");
+        ref.modifyKey("key", REF, data, "1", cmd);
         assertEquals("2", ref.getKey("key").get().getVersion());
     }
 
@@ -360,21 +368,6 @@ public class RefHolderTest {
     private String getData(int i) {
         return "{\"key" + i
                 + "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
-    }
-
-    private ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
     }
 
 }

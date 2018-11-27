@@ -21,6 +21,8 @@ package io.jitstatic.api;
  */
 
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.tools.Utils.toByte;
+import static io.jitstatic.tools.Utils.toProvider;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,10 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -83,9 +82,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -797,27 +794,4 @@ public class KeyResourceTest {
     private static String createCreds(String user, String secret) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
-
-    private static ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
-    }
-
-    private static byte[] toByte(ObjectStreamProvider provider) {
-        try (InputStream is = provider.getInputStream()) {
-            return SourceHandler.readStorageData(is);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
 }

@@ -3,6 +3,7 @@ package io.jitstatic;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
+import static io.jitstatic.tools.Utils.toByte;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 
@@ -92,8 +93,6 @@ import io.jitstatic.client.MetaData.User;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
-import io.jitstatic.hosted.SourceHandler;
-import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
@@ -641,14 +640,6 @@ public class KeyValueStorageWithHostedStorageTest {
             return new Entity<String>(v, t, result);
         }
     };
-    
-    private static byte[] toByte(ObjectStreamProvider provider) {
-        try (InputStream is = provider.getInputStream()) {
-            return SourceHandler.readStorageData(is);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
 
     static class Entity<T> {
 

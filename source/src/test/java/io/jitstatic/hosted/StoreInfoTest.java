@@ -1,7 +1,5 @@
 package io.jitstatic.hosted;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-
 /*-
  * #%L
  * jitstatic
@@ -22,16 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
  * #L%
  */
 
+import static io.jitstatic.tools.Utils.toByte;
+import static io.jitstatic.tools.Utils.toProvider;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Set;
 
@@ -39,7 +37,6 @@ import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
-import io.jitstatic.source.ObjectStreamProvider;
 
 public class StoreInfoTest {
 
@@ -73,29 +70,6 @@ public class StoreInfoTest {
         assertThrows(IllegalStateException.class, () -> s1.getVersion());
         assertEquals("1", s1.getMetaDataVersion());
         assertEquals(s1, s2);
-    }
-
-    private ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
-    }
-    
-    private static byte[] toByte(ObjectStreamProvider provider) {
-        try (InputStream is = provider.getInputStream()) {
-            return SourceHandler.readStorageData(is);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
 }

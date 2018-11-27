@@ -23,9 +23,7 @@ package io.jitstatic.storage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -36,7 +34,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 
 import io.jitstatic.MetaData;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.storage.tools.Utils;
 
 public class StoreInfoTest {
 
@@ -44,9 +42,9 @@ public class StoreInfoTest {
 
     @Test
     public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-        StoreInfo si1 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
-        StoreInfo si2 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
-        StoreInfo si3 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "2", "2");
+        StoreInfo si1 = new StoreInfo(Utils.toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
+        StoreInfo si2 = new StoreInfo(Utils.toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
+        StoreInfo si3 = new StoreInfo(Utils.toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "2", "2");
 
         assertEquals(si1, si1);
         assertEquals(si1.hashCode(), si2.hashCode());
@@ -55,20 +53,5 @@ public class StoreInfoTest {
 
         assertNotEquals(si1, null);
         assertNotEquals(si1, new Object());
-    }
-
-    private ObjectStreamProvider toProvider(byte[] data) {
-        return new ObjectStreamProvider() {
-
-            @Override
-            public long getSize() throws IOException {
-                return data.length;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(data);
-            }
-        };
     }
 }
