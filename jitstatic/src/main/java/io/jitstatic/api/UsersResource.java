@@ -191,7 +191,7 @@ public class UsersResource {
     private Response addUser(final String key, final String ref, final UserData data, final User user, String realm) {
         try {
             final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
-            if (userData == null) {
+            if (userData == null || !userData.isPresent()) {
                 final String newVersion = helper.unwrapWithPOSTApi(() -> storage.addUser(key, ref, realm, user.getName(), data));
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
@@ -225,7 +225,7 @@ public class UsersResource {
     private Response delete(final String key, final String ref, final User user, String realm) {
         try {
             final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
-            if (userData != null) {
+            if (userData != null && userData.isPresent()) {
                 storage.deleteUser(key, ref, realm, user.getName());
                 return Response.ok().build();
             }

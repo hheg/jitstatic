@@ -33,6 +33,7 @@ public class SourceInfo {
 
     private final MetaFileData metaFileData;
     private final SourceFileData sourceFileData;
+    private final int threshold;
 
     public SourceInfo(final MetaFileData metaFileData, final SourceFileData sourceFileData) {
         this.metaFileData = metaFileData;
@@ -41,6 +42,7 @@ public class SourceInfo {
                     .format("sourceFileData cannot be null if metaFileData %s is not a masterMetaData file", metaFileData.getFileName()));
         }
         this.sourceFileData = sourceFileData;
+        threshold = 1_000_000;
     }
 
     public String getSourceVersion() {
@@ -71,9 +73,8 @@ public class SourceInfo {
             return null;
         }
         InputStreamHolder inputStreamHolder = sourceFileData.getInputStreamHolder();
-        long size = inputStreamHolder.getSize();
-        // TODO 1MB?
-        if (size < 1_000_000) {
+        final long size = inputStreamHolder.getSize();        
+        if (size < threshold) {
             try (InputStream storageStream = inputStreamHolder.getInputStreamProvider().get()) {
                 return new SmallObjectStreamProvider(SourceHandler.readStorageData(storageStream));
             }

@@ -145,7 +145,7 @@ public class GitStorage implements Storage {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, new ConcurrentHashMap<>(), source));
+        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, source));
     }
 
     @Override

@@ -263,9 +263,6 @@ public class HostedGitRepositoryManager implements Source {
         checkIfTag(finalRef);
         try {
             final Ref actualRef = findRef(finalRef);
-            if (!checkVersion(version, key, finalRef)) {
-                throw new WrappingAPIException(new VersionIsNotSame());
-            }
             return updater.updateKey(key, actualRef, data, commitMetaData);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
@@ -286,19 +283,7 @@ public class HostedGitRepositoryManager implements Source {
         }
         return ref;
     }
-
-    private boolean checkVersion(final String version, final String key, final String ref) {
-        try {
-            final SourceInfo sourceInfo = getSourceInfo(key, ref);
-            if (sourceInfo == null) {
-                return false;
-            }
-            return version.equals(sourceInfo.getSourceVersion());
-        } catch (final RefNotFoundException e) {
-            throw new WrappingAPIException(e);
-        }
-    }
-
+    @Deprecated
     private boolean checkMetaDataVersion(final String version, final String key, final String ref) {
         try {
             final SourceInfo sourceInfo = getSourceInfo(key, ref);
@@ -320,7 +305,6 @@ public class HostedGitRepositoryManager implements Source {
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
-
         try {
             final Ref actualRef = findRef(finalRef);
             checkIfKeyAlreadyExist(key, finalRef);
