@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -57,6 +56,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.Utils;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
@@ -73,15 +73,17 @@ public class BulkResourceTest {
                     new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
                             .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
-            .addResource(new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), "refs/heads/master") )).build();
+            .addResource(
+                    new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), "refs/heads/master")))
+            .build();
 
     @Test
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        Mockito.when(storeInfoMock.getData()).thenReturn(new byte[] { 1 });
+        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(Utils.toProvider(new byte[] { 1 }));
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
-        Mockito.when(storeInfoMock.getStorageData()).thenReturn(storageData);
+        Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
         Mockito.when(storage.getList(Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), "refs/heads/master")));
@@ -92,16 +94,14 @@ public class BulkResourceTest {
                                         new SearchPath("data/data/key1", false), new SearchPath("dir/dir/key1", false)))),
                         MediaType.APPLICATION_JSON))
                 .invoke();
-        List<SearchResult> entity = response.readEntity(new GenericType<List<SearchResult>>() {
-        });
+        SearchResultWrapper entity = response.readEntity(SearchResultWrapper.class);
         assertNotNull(entity);
-        assertFalse(entity.isEmpty());
-        Set<String> collect = entity.stream().map(sr -> sr.getKey()).collect(Collectors.toSet());
+        assertFalse(entity.getResult().isEmpty());
+        Set<String> collect = entity.getResult().stream().map(sr -> sr.getKey()).collect(Collectors.toSet());
         assertTrue(collect.contains("key1"));
     }
 
     private static String createCreds(String user, String secret) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
-
 }

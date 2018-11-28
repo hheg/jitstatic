@@ -18,4 +18,5 @@ hosted:
     adminPass: pass
     protectMetrics: true
     cors:
-      corsBaseUrl: /*
+      allowedOrigins: "*"  
+    

@@ -63,9 +63,9 @@ public class BulkResource {
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
 
-    public BulkResource(final Storage storage, KeyAdminAuthenticator addKeyAuthenticator) {
+    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator) {
         this.storage = Objects.requireNonNull(storage);
-        this.addKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+        this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
     }
 
     @POST
@@ -77,11 +77,13 @@ public class BulkResource {
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> userHolder) {
         final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream()
-                .map(bs -> Pair.of(bs.getPaths().stream().map(sp -> Pair.of(sp.getPath(), sp.isRecursively())).collect(Collectors.toList()), bs.getRef()))
+                .map(bs -> Pair.of(bs.getPaths().stream()
+                        .map(sp -> Pair.of(sp.getPath(), sp.isRecursively()))
+                        .collect(Collectors.toList()), bs.getRef()))
                 .collect(Collectors.toList()));
         final List<SearchResult> result = searchResults.stream().map(p -> p.getKey().stream().filter(data -> {
             final String ref = p.getRight();
-            final MetaData storageData = data.getRight().getStorageData();
+            final MetaData storageData = data.getRight().getMetaData();
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
@@ -92,16 +94,18 @@ public class BulkResource {
                 return false;
             }
             final User user = userHolder.get();
-            if(allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
+            if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
                 LOG.info("{} logged in and accessed key {}", user, p.getLeft());
                 return true;
             }
             return false;
-        }).map(ps -> new SearchResult(ps, p.getRight()))).flatMap(s -> s).collect(Collectors.toList());
+        }).map(ps -> new SearchResult(ps, p.getRight())))
+                .flatMap(s -> s)
+                .collect(Collectors.toList());
         if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();
         }
-        return Response.ok(result).build();
+        return Response.ok(new SearchResultWrapper(result)).build();
     }
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {

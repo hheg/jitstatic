@@ -203,7 +203,7 @@ public class HostedFactory {
 
         @JsonProperty
         @NotEmpty
-        private String allowedHeaders = "X-Requested-With,Content-Type,Accept,Origin";
+        private String allowedHeaders = "X-Requested-With,Content-Type,Accept,Origin,if-match";
 
         @JsonProperty
         @NotEmpty
@@ -211,7 +211,7 @@ public class HostedFactory {
 
         @JsonProperty
         @NotEmpty
-        private String corsBaseUrl = "/*";
+        private String corsBaseUrl = "/storage,/storage/*,/metakey/*,/users/*,/bulk/*,/info/*";
 
         @JsonProperty
         @NotEmpty
@@ -219,7 +219,7 @@ public class HostedFactory {
 
         @JsonProperty
         @NotNull
-        private String exposedHeaders = "";
+        private String exposedHeaders = "etag,Content-length";
 
         public String getAllowedOrigins() {
             return allowedOrigins;
@@ -328,16 +328,20 @@ public class HostedFactory {
             pathsWithUncoveredHttpMethods = adminConstraintSecurityHandler.getPathsWithUncoveredHttpMethods();
             pathsWithUncoveredHttpMethods.stream().forEach(p -> LOG.info("Not protecting {}", p));
         }
-        final Cors c = getCors();
-        if (c != null) {
-            final FilterRegistration.Dynamic filter = env.servlets().addFilter("CORS", CrossOriginFilter.class);
-            filter.setInitParameter("allowedOrigins", c.allowedOrigins);
-            filter.setInitParameter("allowedHeaders", c.allowedHeaders);
-            filter.setInitParameter("allowedMethods", c.allowedMethods);
-            filter.setInitParameter("preflightMaxAge", c.preflightMaxAge);
-            filter.setInitParameter("exposedHeaders", c.exposedHeaders);
-            filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), true, c.corsBaseUrl);
-            filter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, Boolean.FALSE.toString());
+        final Cors corsConfig = getCors();
+        if (corsConfig != null) {
+            final FilterRegistration.Dynamic filter = env.servlets().addFilter("CORS", InterceptingCrossOriginFilter.class);
+            filter.setInitParameter("allowedOrigins", corsConfig.allowedOrigins);
+            filter.setInitParameter("allowedHeaders", corsConfig.allowedHeaders);
+            filter.setInitParameter("allowedMethods", corsConfig.allowedMethods);
+            filter.setInitParameter("preflightMaxAge", corsConfig.preflightMaxAge);
+            filter.setInitParameter("exposedHeaders", corsConfig.exposedHeaders);
+            for (String url : corsConfig.corsBaseUrl.split(",")) {
+                url = url.trim();
+                filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), true, url);
+                LOG.info("CORS is enabled for {}", url);
+            }
+            filter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, Boolean.TRUE.toString());
         }
         return hostedGitRepositoryManager;
     }

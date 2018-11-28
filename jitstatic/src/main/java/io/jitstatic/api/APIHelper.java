@@ -111,10 +111,10 @@ class APIHelper {
                 return null;
             }
             if (apiException instanceof VersionIsNotSame) {
-                throw new WebApplicationException(apiException.getLocalizedMessage(), Status.PRECONDITION_FAILED);
+                throw new WebApplicationException(apiException.getMessage(), Status.PRECONDITION_FAILED);
             }
             if (apiException instanceof KeyAlreadyExist) {
-                throw new WebApplicationException(apiException.getLocalizedMessage(), Status.CONFLICT);
+                throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
             }
             log.error(UNHANDLED_ERROR, e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);

@@ -25,6 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.tools.Utils;
+
 public class KeyDataTest {
 
     @Test
@@ -33,16 +39,25 @@ public class KeyDataTest {
         String type = "type";
         String tag = "tag";
         byte[] d = new byte[] { 1 };
-        KeyData data = new KeyData(key, type, tag, d);
+        ObjectStreamProvider provider = Utils.toProvider(d);
+        KeyData data = new KeyData(key, type, tag, provider);
         assertFalse(data.equals(null));
         assertFalse(data.equals(new Object()));
-        assertEquals(new KeyData(key, type, tag, d), data);
+        assertEquals(new KeyData(key, type, tag, provider), data);
         assertEquals(data, data);
-        assertFalse(data.equals(new KeyData("key1", type, tag, d)));
-        assertFalse(data.equals(new KeyData(key, "typee", tag, d)));
-        assertFalse(data.equals(new KeyData(key, type, "1", d)));
-        assertFalse(data.equals(new KeyData(key, type, tag, new byte[] { 2 })));
+        assertFalse(data.equals(new KeyData("key1", type, tag, provider)));
+        assertFalse(data.equals(new KeyData(key, "typee", tag, provider)));
+        assertFalse(data.equals(new KeyData(key, type, "1", provider)));
         assertEquals(data.hashCode(), data.hashCode());
         assertEquals(data.toString(), data.toString());
+    }
+
+    @Test
+    public void testDeserialize() throws JsonProcessingException {
+        ObjectMapper map = new ObjectMapper();
+        byte[] d = new byte[] { 1 };
+        ObjectStreamProvider provider = Utils.toProvider(d);
+        KeyData kd = new KeyData("key", "type", "tag", provider);
+        assertEquals("{\"key\":\"key\",\"type\":\"type\",\"tag\":\"tag\",\"data\":\"AQ==\"}", map.writeValueAsString(kd));
     }
 }

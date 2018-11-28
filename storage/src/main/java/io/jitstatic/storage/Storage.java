@@ -56,5 +56,13 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
 
-    public Pair<MetaData,String> getMetaKey(String key, String ref);
+    public Pair<String, UserData> getUserData(String username, String defaultRef, String realm) throws RefNotFoundException;
+
+    public Pair<MetaData, String> getMetaKey(String key, String ref);
+
+    public Either<String, FailedToLock> update(String key, String ref, String path, String username, UserData data, String version);
+    
+    public String addUser(String key, String ref, String path, String name, UserData data);
+
+    public void deleteUser(String key, String ref, String jitstaticKeyadminRealm, String name);
 }

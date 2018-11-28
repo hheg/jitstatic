@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.api;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,27 +20,21 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.Objects;
-import com.codahale.metrics.health.HealthCheck;
+import java.util.List;
 
-import io.jitstatic.utils.CheckHealth;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class HealthChecker extends HealthCheck {
+public class SearchResultWrapper {
 
-    private final CheckHealth source;
+    private final List<SearchResult> result;
 
-    public HealthChecker(final CheckHealth source) {
-        this.source = Objects.requireNonNull(source);
+    @JsonCreator
+    public SearchResultWrapper(@JsonProperty("result") List<SearchResult> result) {
+        this.result = result;
     }
 
-    @Override
-    protected Result check() throws Exception {
-        try {
-            source.checkHealth();
-            return Result.healthy();
-        } catch (final Exception e) {
-            return Result.unhealthy(e);
-        }
+    public List<SearchResult> getResult() {
+        return result;
     }
-
 }

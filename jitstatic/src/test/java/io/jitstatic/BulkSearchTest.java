@@ -47,14 +47,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
-import io.jitstatic.api.SearchResult;
+import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.client.BulkSearch;
 import io.jitstatic.client.JitStaticClient;
 import io.jitstatic.client.JitStaticClientBuilder;
@@ -97,29 +96,28 @@ public class BulkSearchTest {
     @Test
     public void testSearch() throws Exception {
         try (JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
-            List<SearchResult> search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
+            SearchResultWrapper search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
                     parse());
             assertNotNull(search);
-            assertTrue(search.size() == 1);
-            assertEquals("data/key3", search.get(0).getKey());
+            assertTrue(search.getResult().size() == 1);
+            assertEquals("data/key3", search.getResult().get(0).getKey());
         }
     }
 
     @Test
     public void testSearchNoUser() throws Exception {
         try (JitStaticClient updaterClient = buildClient().build()) {
-            List<SearchResult> search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
+            SearchResultWrapper search = updaterClient.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))),
                     parse());
             assertNotNull(search);
-            assertTrue(search.size() == 0);
+            assertTrue(search.getResult().size() == 0);
         }
     }
 
-    private Function<InputStream, List<SearchResult>> parse() {
+    private Function<InputStream, SearchResultWrapper> parse() {
         return (is) -> {
             try {
-                return MAPPER.readValue(is, new TypeReference<List<SearchResult>>() {
-                });
+                return MAPPER.readValue(is, SearchResultWrapper.class);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

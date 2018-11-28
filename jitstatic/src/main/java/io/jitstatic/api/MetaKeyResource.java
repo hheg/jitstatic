@@ -73,8 +73,8 @@ public class MetaKeyResource {
     private final KeyAdminAuthenticator keyAdminAuthenticator;
     private final APIHelper helper;
 
-    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator addKeyAuthenticator) {
-        this.keyAdminAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
+    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator) {
+        this.keyAdminAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
     }

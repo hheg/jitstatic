@@ -38,5 +38,11 @@ public class JitStaticConstants {
     public static final String FORCEPUSH = "forcepush";
     public static final String SECRETS = "secrets";
     public static final Set<String> ROLES = Set.of(PULL, PUSH, FORCEPUSH, SECRETS);
+    public static final String DECLAREDHEADERS = "declaredheaders";
+    public static final String DEFERREDHEADERS = "deferredheaders";
+    public static final String X_JITSTATIC = "X-jitstatic";
+    public static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
+    public static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
+    public static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
 
 }

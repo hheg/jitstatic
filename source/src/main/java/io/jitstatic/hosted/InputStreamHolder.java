@@ -26,35 +26,52 @@ import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.lib.ObjectLoader;
 
+import io.jitstatic.utils.Functions.ThrowingSupplier;
+
 public class InputStreamHolder {
-	private final ObjectLoader loader;
-	private final Exception e;
+    private final ThrowingSupplier<ObjectLoader, IOException> loaderFactory;
+    private final Exception e;
 
-	public InputStreamHolder(final ObjectLoader ol) {
-		this.loader = ol;
-		this.e = null;
-	}
+    public InputStreamHolder(final ThrowingSupplier<ObjectLoader, IOException> loaderFactory) {
+        this(loaderFactory, null);
+    }
 
-	public InputStreamHolder(final Exception e) {
-		this.loader = null;
-		this.e = e;
-	}
+    private InputStreamHolder(final ThrowingSupplier<ObjectLoader, IOException> loaderFactory, final Exception e) {
+        this.loaderFactory = loaderFactory;
+        this.e = e;
+    }
 
-	public boolean isPresent() {
-		return loader != null;
-	}
+    public InputStreamHolder(final Exception e) {
+        this(null, e);
+    }
 
-	public InputStream inputStream() throws IOException {
-		if (isPresent()) {
-			return loader.openStream();
-		}
-		throw new NoSuchElementException();
-	}
+    public boolean isPresent() {
+        return loaderFactory != null;
+    }
+    @Deprecated
+    public InputStream inputStream() throws IOException {
+        if (isPresent()) {
+            return loaderFactory.get().openStream();
+        }
+        throw new NoSuchElementException();
+    }
 
-	public Exception exception() {
-		if (!isPresent()) {
-			return e;
-		}
-		throw new NoSuchElementException();
-	}
+    public Exception exception() {
+        if (!isPresent()) {
+            return e;
+        }
+        throw new NoSuchElementException();
+    }
+
+    public long getSize() throws IOException {
+        if (isPresent()) {
+            return loaderFactory.get().getSize();
+        }
+        throw new NoSuchElementException();
+    }
+
+    public ThrowingSupplier<InputStream, IOException> getInputStreamProvider() {
+        return () -> inputStream();
+    }
+
 }

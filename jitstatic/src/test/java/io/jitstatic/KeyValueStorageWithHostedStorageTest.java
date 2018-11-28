@@ -3,6 +3,7 @@ package io.jitstatic;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
+import static io.jitstatic.tools.Utils.toByte;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 
@@ -55,6 +56,7 @@ import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -74,7 +76,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.codahale.metrics.health.HealthCheck.Result;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -82,7 +83,7 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
-import io.jitstatic.api.KeyData;
+import io.jitstatic.api.KeyDataWrapper;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticClient;
@@ -393,18 +394,11 @@ public class KeyValueStorageWithHostedStorageTest {
             }
             client.createKey(data.getBytes(UTF_8), new CommitData("key3", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
-            List<KeyData> result = updaterClient.listAll("/", (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            KeyDataWrapper result = updaterClient.listAll("/", readKeyData());
             assertNotNull(result);
-            assertEquals(2, result.size(), result.toString());
-            assertEquals("key1", result.get(0).getKey());
-            assertEquals("key2", result.get(1).getKey());
+            assertEquals(2, result.getResult().size(), result.toString());
+            assertEquals("key1", result.getResult().get(0).getKey());
+            assertEquals("key2", result.getResult().get(1).getKey());
         }
     }
 
@@ -424,19 +418,12 @@ public class KeyValueStorageWithHostedStorageTest {
             }
             client.createKey(data.getBytes(UTF_8), new CommitData("dir/key3", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
-            List<KeyData> result = updaterClient.listAll("dir/", (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            KeyDataWrapper result = updaterClient.listAll("dir/", readKeyData());
             assertNotNull(result);
-            assertEquals(3, result.size());
-            assertEquals("dir/k", result.get(0).getKey());
-            assertEquals("dir/key1", result.get(1).getKey());
-            assertEquals("dir/key2", result.get(2).getKey());
+            assertEquals(3, result.getResult().size());
+            assertEquals("dir/k", result.getResult().get(0).getKey());
+            assertEquals("dir/key1", result.getResult().get(1).getKey());
+            assertEquals("dir/key2", result.getResult().get(2).getKey());
         }
     }
 
@@ -462,25 +449,18 @@ public class KeyValueStorageWithHostedStorageTest {
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
             client.createKey(data.getBytes(UTF_8), new CommitData("dir/dir/key3", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
-            List<KeyData> result = updaterClient.listAll("dir/", true, (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            KeyDataWrapper result = updaterClient.listAll("dir/", true, readKeyData());
             System.out.println(result);
             assertNotNull(result);
-            assertEquals(4, result.size());
-            assertEquals("dir/dir/key1", result.get(0).getKey());
-            assertArrayEquals(getData(map.get("dir/dir/key1")).getBytes(UTF_8), result.get(0).getData());
-            assertEquals("dir/key/d", result.get(1).getKey());
-            assertArrayEquals(getData(map.get("dir/key/d")).getBytes(UTF_8), result.get(1).getData());
-            assertEquals("dir/key1", result.get(2).getKey());
-            assertArrayEquals(getData(map.get("dir/key1")).getBytes(UTF_8), result.get(2).getData());
-            assertEquals("dir/key2", result.get(3).getKey());
-            assertArrayEquals(getData(map.get("dir/key2")).getBytes(UTF_8), result.get(3).getData());
+            assertEquals(4, result.getResult().size());
+            assertEquals("dir/dir/key1", result.getResult().get(0).getKey());
+            assertArrayEquals(getData(map.get("dir/dir/key1")).getBytes(UTF_8), toByte(result.getResult().get(0).getData()));
+            assertEquals("dir/key/d", result.getResult().get(1).getKey());
+            assertArrayEquals(getData(map.get("dir/key/d")).getBytes(UTF_8), toByte(result.getResult().get(1).getData()));
+            assertEquals("dir/key1", result.getResult().get(2).getKey());
+            assertArrayEquals(getData(map.get("dir/key1")).getBytes(UTF_8), toByte(result.getResult().get(2).getData()));
+            assertEquals("dir/key2", result.getResult().get(3).getKey());
+            assertArrayEquals(getData(map.get("dir/key2")).getBytes(UTF_8), toByte(result.getResult().get(3).getData()));
         }
     }
 
@@ -502,17 +482,10 @@ public class KeyValueStorageWithHostedStorageTest {
 
             client.createKey(data.getBytes(UTF_8), new CommitData("dir/key3", REFS_HEADS_MASTER, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
-            List<KeyData> result = updaterClient.listAll("dir/", (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            KeyDataWrapper result = updaterClient.listAll("dir/", readKeyData());
             assertNotNull(result);
-            assertEquals(1, result.size());
-            assertEquals("dir/key1", result.get(0).getKey());
+            assertEquals(1, result.getResult().size());
+            assertEquals("dir/key1", result.getResult().get(0).getKey());
         }
     }
 
@@ -531,21 +504,13 @@ public class KeyValueStorageWithHostedStorageTest {
             }
             client.createKey(data.getBytes(UTF_8), new CommitData("key3", REFS_HEADS_MASTER, "new key", "user", "mail"),
                     new MetaData(Set.of(new User("someother", PASSWORD)), APPLICATION_JSON));
-            List<KeyData> result = updaterClient.listAll("/", false, true, (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-            System.out.println(result);
+            KeyDataWrapper result = updaterClient.listAll("/", false, true, readKeyData());
             assertNotNull(result);
-            assertEquals(2, result.size(), result.toString());
-            assertEquals("key1", result.get(0).getKey());
-            assertEquals("key2", result.get(1).getKey());
-            assertNull(result.get(0).getData());
-            assertNull(result.get(1).getData());
+            assertEquals(2, result.getResult().size(), result.toString());
+            assertEquals("key1", result.getResult().get(0).getKey());
+            assertEquals("key2", result.getResult().get(1).getKey());
+            assertNull(result.getResult().get(0).getData());
+            assertNull(result.getResult().get(1).getData());
 
         }
     }
@@ -590,19 +555,22 @@ public class KeyValueStorageWithHostedStorageTest {
 
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
 
-            List<KeyData> keyData = updaterClient.listAll("test1/test2/", (is) -> {
-                try {
-                    return MAPPER.readValue(is, new TypeReference<List<KeyData>>() {
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            KeyDataWrapper keyData = updaterClient.listAll("test1/test2/", readKeyData());
             assertNotNull(keyData);
-            assertFalse(keyData.isEmpty());
+            assertFalse(keyData.getResult().isEmpty());
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClient.getKey("test1/test2", tf)).getStatusCode());
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> updaterClientNoCred.getKey("test1/test2", tf)).getStatusCode());
         }
+    }
+
+    private Function<InputStream, KeyDataWrapper> readKeyData() {
+        return (is) -> {
+            try {
+                return MAPPER.readValue(is, KeyDataWrapper.class);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
     }
 
     @Test

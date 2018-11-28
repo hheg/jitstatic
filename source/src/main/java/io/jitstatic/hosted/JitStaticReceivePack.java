@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -144,10 +143,6 @@ public class JitStaticReceivePack extends ReceivePack {
             } else {
                 sendMessage(branch + " OK!");
             }
-        } catch (final MissingObjectException storageIsCorrupt) {
-            sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
-            testRc.setResult(Result.REJECTED_MISSING_OBJECT, storageIsCorrupt.getMessage());
-            setFault(new RepositoryException(storageIsCorrupt.getMessage(), storageIsCorrupt));
         } catch (final IOException storageIsCorrupt) {
             sendError("Couldn't resolve " + branch + " because " + storageIsCorrupt.getLocalizedMessage());
             testRc.setResult(Result.REJECTED_OTHER_REASON, storageIsCorrupt.getMessage());

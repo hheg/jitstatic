@@ -37,6 +37,8 @@ hosted:
     hostedEndpoint: git
     userName: huser
     secret: hseCr3t
+    cors:
+      allowedOrigins: "*"
 ```
 storage is the key-value end point and hosted is the git end point.
 
@@ -56,16 +58,23 @@ To lauch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
-INFO  [2018-10-23 18:01:12,141] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-10-23 18:01:12,145] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-10-23 18:01:12,150] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
-INFO  [2018-10-23 18:01:12,258] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/git
-INFO  [2018-10-23 18:01:12,298] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
-INFO  [2018-10-23 18:01:12,298] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
-INFO  [2018-10-23 18:01:12,300] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
-INFO  [2018-10-23 18:01:12,386] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@27898e13{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-10-23 18:01:12,388] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT; built: 2018-06-05T18:24:03.829Z; git: d5fc0523cfa96bfebfbda19606cad384d772f04c; jvm 10.0.2+13
-INFO  [2018-10-23 18:01:13,054] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
+21:26:35.950 [main] INFO io.jitstatic.JitstaticApplication - Starting 0.21.1-SNAPSHOT build 4ab20e8
+INFO  [2018-11-23 20:26:37,350] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-11-23 20:26:37,352] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-11-23 20:26:37,355] io.jitstatic.hosted.HostedGitRepositoryManager: Mounting repository on /tmp/jitstatic/remote
+INFO  [2018-11-23 20:26:37,449] io.jitstatic.hosted.HostedFactory: Configuring hosted GIT environment on /jitstatic/git
+INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /storage
+INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /storage/*
+INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /metakey/*
+INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /users/*
+INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /bulk/*
+INFO  [2018-11-23 20:26:37,477] io.jitstatic.hosted.HostedFactory: CORS is enabled for /info/*
+INFO  [2018-11-23 20:26:37,503] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
+INFO  [2018-11-23 20:26:37,503] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
+INFO  [2018-11-23 20:26:37,505] io.dropwizard.server.ServerFactory: Starting JitstaticApplication
+INFO  [2018-11-23 20:26:37,642] org.eclipse.jetty.setuid.SetUIDListener: Opened JitstaticApplication@52831a73{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-11-23 20:26:37,645] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT; built: 2018-06-05T18:24:03.829Z; git: d5fc0523cfa96bfebfbda19606cad384d772f04c; jvm 10.0.2+13
+INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
     POST    /bulk/fetch (io.jitstatic.api.BulkResource)
     GET     /info/commitid (io.jitstatic.api.JitstaticInfoResource)
@@ -77,21 +86,29 @@ INFO  [2018-10-23 18:01:13,054] io.dropwizard.jersey.DropwizardResourceConfig: T
     GET     /storage/{key : .+/} (io.jitstatic.api.KeyResource)
     DELETE  /storage/{key : .+} (io.jitstatic.api.KeyResource)
     GET     /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    OPTIONS /storage/{key : .+} (io.jitstatic.api.KeyResource)
     POST    /storage/{key : .+} (io.jitstatic.api.KeyResource)
     PUT     /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    DELETE  /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
+    GET     /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
+    POST    /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
+    PUT     /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
+    DELETE  /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
+    GET     /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
+    POST    /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
+    PUT     /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
 
-INFO  [2018-10-23 18:01:13,061] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@30228de7{/app,null,AVAILABLE}
-INFO  [2018-10-23 18:01:13,065] io.dropwizard.setup.AdminEnvironment: tasks = 
+INFO  [2018-11-23 20:26:38,495] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@2e7bb00e{/app,null,AVAILABLE}
+INFO  [2018-11-23 20:26:38,500] io.dropwizard.setup.AdminEnvironment: tasks = 
 
     POST    /tasks/log-level (io.dropwizard.servlets.tasks.LogConfigurationTask)
     POST    /tasks/gc (io.dropwizard.servlets.tasks.GarbageCollectionTask)
 
-INFO  [2018-10-23 18:01:13,071] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@e49437{/admin,null,AVAILABLE}
-INFO  [2018-10-23 18:01:13,079] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@27898e13{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
-INFO  [2018-10-23 18:01:13,079] org.eclipse.jetty.server.Server: Started @2714ms
-
-
+INFO  [2018-11-23 20:26:38,514] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@2cea921a{/admin,null,AVAILABLE}
+INFO  [2018-11-23 20:26:38,544] org.eclipse.jetty.server.AbstractConnector: Started JitstaticApplication@52831a73{HTTP/1.1,[http/1.1]}{0.0.0.0:8085}
+INFO  [2018-11-23 20:26:38,547] org.eclipse.jetty.server.Server: Started @2861ms
 ```
+
 This should start JitStatic on port 8085.
 
 Now you can clone the git repository with:
@@ -368,34 +385,34 @@ And making a query for all files in `root/dir1/` will result in the combined res
 ```
 curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/
 HTTP/1.1 200 OK
-Date: Fri, 24 Aug 2018 15:26:09 GMT
+Date: Fri, 23 Nov 2018 20:36:23 GMT
 Content-Type: application/json
 Vary: Accept-Encoding
-Content-Length: 279
+Content-Length: 290
 
-[{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]
+{"result":[{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]}
 ```
 It is possible to do a recursive search to include `root/dir1/dir2/file4` with:
 ```
 curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/?recursive=true
 HTTP/1.1 200 OK
-Date: Fri, 24 Aug 2018 15:28:54 GMT
+Date: Fri, 23 Nov 2018 20:37:09 GMT
 Content-Type: application/json
 Vary: Accept-Encoding
-Content-Length: 423
+Content-Length: 434
 
-[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]
+{"result":[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922","data":"eyJoZWxsbyIgOiAid29ybGQifQo="}]}
 ```
 And if you want to just to get the keys and no payload you can do this:
 ```
 curl --user user1:1234 -i http://localhost:8085/app/storage/root/dir1/?recursive=true\&light=true
 HTTP/1.1 200 OK
-Date: Fri, 24 Aug 2018 16:53:19 GMT
+Date: Fri, 23 Nov 2018 20:37:41 GMT
 Content-Type: application/json
 Vary: Accept-Encoding
-Content-Length: 309
+Content-Length: 320
 
-[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"}]
+{"result":[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"}]}
 ```
 ### API for Fetching multiple keys
 
@@ -416,14 +433,14 @@ curl --user user1:1234 -i http://localhost:8085/app/bulk/fetch \
 -X POST \
 -d '[{"ref":"refs/heads/master","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":true}]},{"ref":"refs/heads/develop","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":false}]}]'
 HTTP/1.1 200 OK
-Date: Tue, 11 Sep 2018 19:51:23 GMT
+Date: Fri, 23 Nov 2018 20:38:21 GMT
 Content-Type: application/json
-Content-Length: 526
+Content-Length: 537
 
-[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir3/file3","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]
+{"result":[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir3/file3","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]}
 ```
 
-All keys are still protected by authorization. The keys are still protected by the correspoding access rules. 
+All keys are still protected by authorization. The keys are still protected by the corresponding access rules. 
 
 
 ### MetaKeys
@@ -490,10 +507,67 @@ hosted:
     protectMetrics: true
     protectHealthcheck: true
 ```
-or by specifying arguments to the application or to `JAVA_OPT` 
+or by specifying arguments to the application or to `JAVA_OPTS` 
 
 ```
 -Ddw.hosted.adminName=admin -Ddw.hosted.adminPass=pass -Ddw.hosted.protectMetrics=true -Ddw.hosted.protectHealhcheck=true
+```
+
+### Users API
+
+There's an API for the user interface. The rules are that a user in the keyadmin realm can add users to the keyuser realm the branch they are admins for. Only a user in the git realm (refs/heads/secrets) can add keyadmins to any branch. It follows the same mechanic as the previous API's.
+
+Fetching a user keyadminuser in the realm keyadmin with a user from the git realm called gituser.
+```bash
+curl --user gituser:3234 -i http://localhost:8085/app/users/keyadmin/keyadminuser
+HTTP/1.1 200 OK
+Date: Fri, 23 Nov 2018 21:18:14 GMT
+ETag: "c1eb087e3498d309a051f3051e92938dc9b4d04b"
+Content-Encoding: utf-8
+Content-Type: application/json
+Content-Length: 61
+
+{"roles":[{"role":"one"},{"role":"two"}],"basicPassword":"p"}
+
+```
+
+Updating a user
+
+```bash
+curl -i -H 'Content-Type: application/json' \
+-H 'If-Match: "c1eb087e3498d309a051f3051e92938dc9b4d04b"' \
+--user gituser:3234 -X PUT \
+-d '{"roles":[{"role":"one"},{"role":"two"}],"basicPassword":"p2"}' \
+-i http://localhost:8085/app/users/keyadmin/keyadminuser
+HTTP/1.1 200 OK
+Date: Fri, 23 Nov 2018 21:23:45 GMT
+ETag: "70a0f29ac3f0468a367a55f52004b5eafdfbe2e3"
+Content-Length: 0
+```
+
+Adding a user
+
+```bash
+curl -i -H 'Content-Type: application/json' \
+--user gituser:3234 -X POST \
+-d '{"roles":[{"role":"one"},{"role":"two"}],"basicPassword":"p3"}' \
+-i http://localhost:8085/app/users/keyadmin/otherkeyadmin
+HTTP/1.1 200 OK
+Date: Fri, 23 Nov 2018 21:58:14 GMT
+ETag: "70dd186fee57318a0d30ebd8cd6b2f79d978c36d"
+Content-Length: 0
+
+```
+
+## CORS Support
+
+JitStatic has now CORS support. To enable CORS support to the docker container add
+```bash
+docker run -e JAVA_OPTS="-Ddw.hosted.cors.allowOrigins=*" -e USER=huser -e PASS=hseCr3t -v $PWD:/home/jitstatic/db -d -p 8085:8085 hheg/jitstatic:latest
+```
+or
+```bash
+java -Ddw.hosted.cors.allowOrigins=* -jar jistatic.jar server config.yaml
 ```
 
 ## Java client

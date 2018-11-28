@@ -21,6 +21,7 @@ package io.jitstatic;
  */
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -272,7 +273,7 @@ public class LoadWriterIT {
     }
 
     private static byte[] getMetaData() throws UnsupportedEncodingException {
-        String md = "{\"users\":[{\"password\":\"" + PASSWORD + "\",\"user\":\"" + USER + "\"}]}";
+        String md = "{\"users\":[],\"contentType\":\"application/json\",\"protected\":false,\"hidden\":false,\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}";
         return md.getBytes(UTF_8);
     }
 
@@ -288,6 +289,13 @@ public class LoadWriterIT {
     }
 
     private void writeFiles(WriteData testData, File workingFolder, byte[] data) throws IOException, UnsupportedEncodingException {
+        Path path = Paths.get(workingFolder.toURI());
+        Path user = path.resolve(JitStaticConstants.USERS).resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM).resolve(USER);
+        assertTrue(user.getParent().toFile().mkdirs());
+        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8),
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.TRUNCATE_EXISTING);
+
         for (String name : testData.names) {
             Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, StandardOpenOption.CREATE_NEW,
                     StandardOpenOption.TRUNCATE_EXISTING);

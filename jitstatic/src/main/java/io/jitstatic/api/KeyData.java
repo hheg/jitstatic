@@ -20,20 +20,20 @@ package io.jitstatic.api;
  * #L%
  */
 
-import java.util.Arrays;
-
 import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 
-@SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
+
 @JsonInclude(Include.NON_NULL)
 public class KeyData {
 
@@ -42,27 +42,28 @@ public class KeyData {
 
     @NotBlank
     private final String type;
-
-    private final byte[] data;
+    
+    @JsonSerialize(using = StreamingSerializer.class)
+    private final ObjectStreamProvider data;
 
     @NotBlank
     private final String key;
 
     @JsonCreator
     public KeyData(@JsonProperty("key") final String key, @JsonProperty("type") final String type, @JsonProperty("tag") final String tag,
-            @JsonProperty("data") final byte[] data) {
+            @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") ObjectStreamProvider provider) {
         this.type = type;
         this.tag = tag;
         this.key = key;
-        this.data = data;
+        this.data = provider;
     }
 
     public KeyData(final Pair<String, StoreInfo> p) {
-        this(p.getLeft(), p.getRight().getStorageData().getContentType(), p.getRight().getVersion(), p.getRight().getData());
+        this(p.getLeft(), p.getRight().getMetaData().getContentType(), p.getRight().getVersion(), p.getRight().getStreamProvider());
     }
 
     public KeyData(final String key, final StoreInfo si) {
-        this(key, si.getStorageData().getContentType(), si.getVersion(), null);
+        this(key, si.getMetaData().getContentType(), si.getVersion(), null);
     }
 
     public String getKey() {
@@ -77,7 +78,7 @@ public class KeyData {
         return type;
     }
 
-    public byte[] getData() {
+    public ObjectStreamProvider getData() {
         return data;
     }
 
@@ -85,7 +86,6 @@ public class KeyData {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + Arrays.hashCode(data);
         result = prime * result + key.hashCode();
         result = prime * result + tag.hashCode();
         result = prime * result + type.hashCode();
@@ -101,8 +101,6 @@ public class KeyData {
         if (getClass() != obj.getClass())
             return false;
         KeyData other = (KeyData) obj;
-        if (!Arrays.equals(data, other.data))
-            return false;
         if (!key.equals(other.key))
             return false;
         if (!tag.equals(other.tag))

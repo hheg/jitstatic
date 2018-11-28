@@ -22,6 +22,7 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -55,18 +56,32 @@ public class UserUpdater {
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, IOException {
         final List<Pair<String, byte[]>> convertedData = userData.stream().parallel().map(p -> {
             try {
-                return Pair.of(p.getLeft(), MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(p.getRight()));
+                return writeData(p.getLeft(), p.getRight());
             } catch (JsonProcessingException e) {
                 LOGGER.error("Error deserializing user {} ", p.getKey(), e);
                 return Pair.of(p.getKey(), (byte[]) null);
             }
         }).collect(Collectors.toList());
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData);
+        return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData).stream().map(m -> Pair.of(m.getLeft(), m.getRight().name()))
+                .collect(Collectors.toList());
     }
 
-    public List<Pair<String, String>> updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
+    private Pair<String, byte[]> writeData(String user, UserData data) throws JsonProcessingException {
+        return Pair.of(user, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
+    }
+
+    public String updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", List.of(Pair.of(userName, MAPPER.writeValueAsBytes(userData))));
+        return updateUser(List.of(Pair.of(userName, userData)), ref, commitMetaData).get(0).getRight();
+    }
+
+    public String addUser(final String key, final Ref ref, final UserData data, final CommitMetaData commitMetaData)
+            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
+        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(writeData(key, data))).get(0).getRight().name();
+    }
+
+    public void deleteUser(final String key, final Ref ref, final CommitMetaData commitMetaData) throws IOException {
+        repositoryUpdater.deleteKeys(Set.of(key), ref, commitMetaData);
     }
 
 }

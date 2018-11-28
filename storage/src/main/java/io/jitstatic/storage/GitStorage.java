@@ -137,7 +137,7 @@ public class GitStorage implements Storage {
             return Pair.ofNothing();
         }
         final StoreInfo storeInfo = keyDirect.get();
-        return Pair.of(storeInfo.getStorageData(), storeInfo.getMetaDataVersion());
+        return Pair.of(storeInfo.getMetaData(), storeInfo.getMetaDataVersion());
     }
 
     private boolean checkKeyIsDotFile(final String key) {
@@ -145,7 +145,7 @@ public class GitStorage implements Storage {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, new ConcurrentHashMap<>(), source));
+        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, source));
     }
 
     @Override
@@ -183,20 +183,29 @@ public class GitStorage implements Storage {
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
 
-        if (checkKeyIsDotFile(key)) {
-            throw new WrappingAPIException(new UnsupportedOperationException(key));
-        }
-
-        if (key.endsWith("/")) {
+        if (checkKeyIsDotFile(key) || key.endsWith("/")) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
 
         final String finalRef = checkRef(branch);
         isRefATag(finalRef);
         final RefHolder refStore = getRefHolder(finalRef);
-
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
-            checkIfKeyIsPresent(key, finalRef, refStore);
+            SourceInfo sourceInfo = null;
+            final Optional<StoreInfo> storeInfo = refStore.getKey(key);
+            if (storeInfo != null && storeInfo.isPresent()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
+            try {
+                sourceInfo = source.getSourceInfo(key, finalRef);
+            } catch (final RefNotFoundException e) {
+                if (!defaultRef.equals(finalRef)) {
+                    sourceInfo = checkBranch(key, finalRef, getRefHolder(defaultRef));
+                }
+            }
+            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
             return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
         }, key);
         if (result.isRight()) {
@@ -206,38 +215,27 @@ public class GitStorage implements Storage {
         return result.getLeft();
     }
 
-    private void checkIfKeyIsPresent(final String key, final String finalRef, final RefHolder refholder) {
+    private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
         SourceInfo sourceInfo = null;
-        final Optional<StoreInfo> storeInfo = refholder.getKey(key);
-        if (storeInfo != null && storeInfo.isPresent()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
         try {
-            sourceInfo = source.getSourceInfo(key, finalRef);
-        } catch (final RefNotFoundException e) {
-            if (!defaultRef.equals(finalRef)) {
-                try {
-                    sourceInfo = source.getSourceInfo(key, defaultRef);
-                } catch (final RefNotFoundException e1) {
-                    throw new ShouldNeverHappenException("Default branch " + defaultRef + " is not found");
-                }
-                if (sourceInfo == null) {
-                    branchFromRef(finalRef);
-                }
+            final Optional<StoreInfo> defaultKey = refHolder.getKey(key);
+            if (defaultKey != null && defaultKey.isPresent()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
+            sourceInfo = source.getSourceInfo(key, defaultRef);
+        } catch (final RefNotFoundException e1) {
+            throw new ShouldNeverHappenException("Default branch " + defaultRef + " is not found");
         }
-        if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
-    }
+        if (sourceInfo == null) {
+            try {
+                source.createRef(ref);
+            } catch (final IOException e1) {
+                consumeError(e1);
+                throw new UncheckedIOException(e1);
+            }
 
-    private void branchFromRef(final String finalRef) {
-        try {
-            source.createRef(finalRef);
-        } catch (final IOException e1) {
-            consumeError(e1);
-            throw new UncheckedIOException(e1);
         }
+        return sourceInfo;
     }
 
     private void removeCacheRef(final String ref) {
@@ -257,15 +255,12 @@ public class GitStorage implements Storage {
         if (checkKeyIsDotFile(key)) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-
         final RefHolder refHolder = cache.get(finalRef);
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
-
         return refHolder.modifyMetadata(metaData, oldMetaDataVersion, commitMetaData, key, finalRef);
     }
 
@@ -305,36 +300,52 @@ public class GitStorage implements Storage {
     public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
         Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
-        return Tree.of(keyPairs).accept(new PathBuilderVisitor()).parallelStream().map(pair -> {
-            final String key = pair.getLeft();
-            if (key.endsWith("/")) {
-                try {
-                    return source.getList(key, finalRef, pair.getRight()).parallelStream().map(k -> Pair.of(k, getKey(k, finalRef))).filter(Pair::isPresent)
-                            .filter(pa -> pa.getRight().isPresent()).map(pa -> Pair.of(pa.getLeft(), pa.getRight().get())).collect(Collectors.toList());
-                } catch (final RefNotFoundException rnfe) {
+        return Tree.of(keyPairs).accept(new PathBuilderVisitor())
+                .parallelStream()
+                .map(pair -> {
+                    final String key = pair.getLeft();
+                    if (key.endsWith("/")) {
+                        try {
+                            return source.getList(key, finalRef, pair.getRight()).parallelStream()
+                                    .map(k -> Pair.of(k, getKey(k, finalRef)))
+                                    .filter(Pair::isPresent)
+                                    .filter(pa -> pa.getRight().isPresent())
+                                    .map(pa -> Pair.of(pa.getLeft(), pa.getRight().get()))
+                                    .collect(Collectors.toList());
+                        } catch (final RefNotFoundException rnfe) {
+                            return List.<Pair<String, StoreInfo>>of();
+                        } catch (final IOException e) {
+                            consumeError(e);
+                            return List.<Pair<String, StoreInfo>>of();
+                        }
+                    }
+                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);
+                    if (keyContent.isPresent()) {
+                        return List.of(Pair.of(key, keyContent.get()));
+                    }
                     return List.<Pair<String, StoreInfo>>of();
-                } catch (final IOException e) {
-                    consumeError(e);
-                    return List.<Pair<String, StoreInfo>>of();
-                }
-            }
-            final Optional<StoreInfo> keyContent = getKey(key, finalRef);
-            if (keyContent.isPresent()) {
-                return List.of(Pair.of(key, keyContent.get()));
-            }
-            return List.<Pair<String, StoreInfo>>of();
-        }).flatMap(List::stream).collect(Collectors.toList());
+                }).flatMap(List::stream).collect(Collectors.toList());
     }
 
     @Override
     public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input) {
-        return input.stream().map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight()), p.getRight())).collect(Collectors.toList());
+        return input.stream()
+                .map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight()), p.getRight()))
+                .collect(Collectors.toList());
     }
 
     @Override
     public UserData getUser(final String username, String ref, final String realm) throws RefNotFoundException {
-        ref = checkRef(ref);
-        final RefHolder refHolder = getRefHolder(ref);
+        final Pair<String, UserData> userData = getUserData(username, ref, realm);
+        if (userData != null && userData.isPresent()) {
+            return userData.getRight();
+        }
+        return null;
+    }
+
+    @Override
+    public Pair<String, UserData> getUserData(final String username, String ref, final String realm) throws RefNotFoundException {
+        final RefHolder refHolder = getRefHolder(checkRef(ref));
         try {
             return refHolder.getUser(realm + "/" + username);
         } catch (WrappingAPIException e) {
@@ -346,6 +357,47 @@ public class GitStorage implements Storage {
                 throw new UncheckedIOException((IOException) cause);
             }
             throw e;
+        }
+    }
+
+    @Override
+    public Either<String, FailedToLock> update(final String key, String ref, final String realm, final String username, final UserData data,
+            final String version) {
+        ref = checkRef(ref);
+        isRefATag(ref);
+        final RefHolder refHolder = cache.get(ref);
+        if (refHolder == null) {
+            throw new UnsupportedOperationException(key);
+        }
+        return refHolder.updateUser(realm + "/" + key, username, data, version);
+    }
+
+    @Override
+    public String addUser(final String key, String ref, final String realm, final String username, final UserData data) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(realm);
+        Objects.requireNonNull(username);
+        Objects.requireNonNull(data);
+        ref = checkRef(ref);
+        isRefATag(ref);
+        final RefHolder refHolder = getRefHolder(ref);
+        final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, username, data);
+        if (postUser.isRight()) {
+            throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
+        }
+        return postUser.getLeft();
+    }
+
+    @Override
+    public void deleteUser(final String key, String ref, final String realm, final String username) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(realm);
+        Objects.requireNonNull(username);
+        ref = checkRef(ref);
+        isRefATag(ref);
+        final RefHolder refHolder = cache.get(ref);
+        if (refHolder != null) {
+            refHolder.deleteUser(realm + "/" + key, username);
         }
     }
 }

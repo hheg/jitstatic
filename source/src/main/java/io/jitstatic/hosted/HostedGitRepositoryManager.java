@@ -43,6 +43,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -66,6 +67,7 @@ import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -85,6 +87,7 @@ public class HostedGitRepositoryManager implements Source {
     private final SourceUpdater updater;
     private final JitStaticUploadPackFactory uploadPackFactory;
     private final UserExtractor userExtractor;
+    private final UserUpdater userUpdater;
 
     HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter)
             throws CorruptedSourceException, IOException {
@@ -111,7 +114,7 @@ public class HostedGitRepositoryManager implements Source {
         }
 
         this.userExtractor = new UserExtractor(bareRepository);
-        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(this.bareRepository);        
+        final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = checkStoreForErrors(this.bareRepository);
         errors.addAll(checkForUserErrors(this.userExtractor));
 
         if (!errors.isEmpty()) {
@@ -126,6 +129,7 @@ public class HostedGitRepositoryManager implements Source {
         this.uploadPackFactory = new JitStaticUploadPackFactory(errorReporter);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
+        this.userUpdater = new UserUpdater(repositoryUpdater);
     }
 
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
@@ -135,21 +139,22 @@ public class HostedGitRepositoryManager implements Source {
 
     private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkForUserErrors(UserExtractor userExtractor) {
         return userExtractor.validateAll().stream()
-                .map(p -> Pair.of(p.getLeft(), p.getRight().stream().map(Pair::getRight).flatMap(List::stream).collect(Collectors.toList())))
+                .map(p -> Pair.of(p.getLeft(), p.getRight().stream()
+                        .map(Pair::getRight)
+                        .flatMap(List::stream)
+                        .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
 
     private void checkIfDefaultBranchExist(final String defaultRef) throws IOException {
-        Objects.requireNonNull(defaultRef, "defaultBranch cannot be null");
-        if (defaultRef.isEmpty()) {
+        if (Objects.requireNonNull(defaultRef, "defaultBranch cannot be null").isEmpty()) {
             throw new IllegalArgumentException("defaultBranch cannot be empty");
         }
-        SourceChecker sc = new SourceChecker(bareRepository);
-        sc.checkIfDefaultBranchExists(defaultRef);
+        new SourceChecker(bareRepository).checkIfDefaultBranchExists(defaultRef);
     }
 
     private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkStoreForErrors(final Repository bareRepository) {
-        return new SourceChecker(bareRepository).check();        
+        return new SourceChecker(bareRepository).check();
     }
 
     private static Repository setUpBareRepository(final Path repositoryBase) throws IOException, GitAPIException {
@@ -250,7 +255,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyKey(final String key, String ref, final byte[] data, final String version, CommitMetaData commitMetaData) {
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final byte[] data, final String version, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(key);
@@ -258,9 +263,6 @@ public class HostedGitRepositoryManager implements Source {
         checkIfTag(finalRef);
         try {
             final Ref actualRef = findRef(finalRef);
-            if (!checkVersion(version, key, finalRef)) {
-                throw new WrappingAPIException(new VersionIsNotSame());
-            }
             return updater.updateKey(key, actualRef, data, commitMetaData);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
@@ -281,19 +283,7 @@ public class HostedGitRepositoryManager implements Source {
         }
         return ref;
     }
-
-    private boolean checkVersion(final String version, final String key, final String ref) {
-        try {
-            final SourceInfo sourceInfo = getSourceInfo(key, ref);
-            if (sourceInfo == null) {
-                return false;
-            }
-            return version.equals(sourceInfo.getSourceVersion());
-        } catch (final RefNotFoundException e) {
-            throw new WrappingAPIException(e);
-        }
-    }
-
+    @Deprecated
     private boolean checkMetaDataVersion(final String version, final String key, final String ref) {
         try {
             final SourceInfo sourceInfo = getSourceInfo(key, ref);
@@ -307,7 +297,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);
@@ -315,7 +305,6 @@ public class HostedGitRepositoryManager implements Source {
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
         final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
-
         try {
             final Ref actualRef = findRef(finalRef);
             checkIfKeyAlreadyExist(key, finalRef);
@@ -441,7 +430,23 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, UserData> getUser(final String userKey, final String ref) throws RefNotFoundException, IOException {
+    public Pair<String, UserData> getUser(final String userKey, final String ref) throws IOException, RefNotFoundException {
         return userExtractor.extractUserFromRef(userKey, checkRef(ref));
+    }
+
+    @Override
+    public String updateUser(final String key, String ref, final String username, final UserData data) throws IOException {
+        return userUpdater.updateUser(key, findRef(ref), data, new CommitMetaData(username, "none@jitstatic", "update user " + key));
+    }
+
+    @Override
+    public String addUser(final String key, final String ref, final String username, final UserData data) throws IOException {
+        return userUpdater.addUser(key, findRef(ref), data, new CommitMetaData(username, "none@jitstatic", "add user " + key));
+    }
+
+    @Override
+    public void deleteUser(String key, String ref, String username) throws IOException {
+        userUpdater.deleteUser(key,findRef(ref),new CommitMetaData(username, "none@jitstatic", "delete user "+key));
+        
     }
 }

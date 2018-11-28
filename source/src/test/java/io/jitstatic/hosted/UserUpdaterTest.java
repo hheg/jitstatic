@@ -157,12 +157,12 @@ public class UserUpdaterTest {
         UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
-        List<Pair<String, String>> updateUser = uu.updateUser(gitAdmin, bareGit.getRepository().findRef(REF_HEAD_MASTER), gitAdminData,
+        String updateUser = uu.updateUser(gitAdmin, bareGit.getRepository().findRef(REF_HEAD_MASTER), gitAdminData,
                 new CommitMetaData("user", "test", "msg"));
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
         Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
         assertEquals(gitAdminData, extractUserFromRef.getRight());
-        assertEquals(updateUser.get(0).getRight(), extractUserFromRef.getLeft());
+        assertEquals(updateUser, extractUserFromRef.getLeft());
     }
 
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {

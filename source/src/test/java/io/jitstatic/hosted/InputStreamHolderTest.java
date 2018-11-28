@@ -1,5 +1,7 @@
 package io.jitstatic.hosted;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /*-
  * #%L
  * jitstatic
@@ -39,9 +41,12 @@ public class InputStreamHolderTest {
     public void testInputStreamHolder() throws IOException {
         ObjectLoader ol = Mockito.mock(ObjectLoader.class);
         Mockito.when(ol.openStream()).thenReturn(Mockito.mock(ObjectStream.class));
-        InputStreamHolder ish = new InputStreamHolder(ol);
+        Mockito.when(ol.getSize()).thenReturn(2L);
+        InputStreamHolder ish = new InputStreamHolder(() -> ol);
         assertTrue(ish.isPresent());
         assertNotNull(ish.inputStream());
+        assertNotNull(ish.getInputStreamProvider());
+        assertEquals(2L,ish.getSize());
         assertThrows(NoSuchElementException.class, () -> ish.exception());
     }
 
@@ -51,5 +56,7 @@ public class InputStreamHolderTest {
         assertFalse(ish.isPresent());
         assertNotNull(ish.exception());
         assertThrows(NoSuchElementException.class, () -> ish.inputStream());
+        assertThrows(NoSuchElementException.class, () -> ish.getSize());
     }
+    
 }

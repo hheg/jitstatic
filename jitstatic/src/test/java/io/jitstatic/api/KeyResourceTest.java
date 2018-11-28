@@ -1,8 +1,5 @@
 package io.jitstatic.api;
 
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-
 /*-
  * #%L
  * jitstatic
@@ -23,6 +20,9 @@ import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.tools.Utils.toByte;
+import static io.jitstatic.tools.Utils.toProvider;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,7 +49,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -113,7 +112,8 @@ public class KeyResourceTest {
                     .setRealm(JITSTATIC_KEYADMIN_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER)))
+                    new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER),
+                            false))
             .build();
 
     @BeforeAll
@@ -121,18 +121,18 @@ public class KeyResourceTest {
         byte[] dog = "{\"food\":[\"bone\",\"meat\"]}".getBytes(UTF_8);
         Set<User> users = new HashSet<>(Arrays.asList(new User(USER, SECRET)));
         byte[] b = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        StoreInfo bookData = new StoreInfo(b, new MetaData(users, "application/octet-stream", false, false, List.of(), null, null), "1", "1");
+        StoreInfo bookData = new StoreInfo(toProvider(b), new MetaData(users, "application/octet-stream", false, false, List.of(), null, null), "1", "1");
         DATA.put("book", Optional.of(bookData));
-        StoreInfo dogData = new StoreInfo(dog, new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
-        returnedDog = new String(dogData.getData());
+        StoreInfo dogData = new StoreInfo(toProvider(dog), new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
+        returnedDog = new String(toByte(dogData.getStreamProvider()));
         DATA.put("dog", Optional.of(dogData));
         byte[] horse = "{\"food\":[\"wheat\",\"grass\"]}".getBytes(UTF_8);
-        StoreInfo horseData = new StoreInfo(horse, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), "1", "1");
-        returnedHorse = new String(horseData.getData());
+        StoreInfo horseData = new StoreInfo(toProvider(horse), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), "1", "1");
+        returnedHorse = new String(toByte(horseData.getStreamProvider()));
         DATA.put("horse", Optional.of(horseData));
         byte[] cat = "{\"food\":[\"fish\",\"bird\"]}".getBytes(UTF_8);
         users = new HashSet<>(Arrays.asList(new User("auser", "apass")));
-        StoreInfo catData = new StoreInfo(cat, new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
+        StoreInfo catData = new StoreInfo(toProvider(cat), new MetaData(users, null, false, false, List.of(), null, null), "1", "1");
         DATA.put("cat", Optional.of(catData));
     }
 
@@ -544,8 +544,9 @@ public class KeyResourceTest {
     }
 
     @Test
-    public void testAddKey() throws JsonProcessingException {
-        StoreInfo si = new StoreInfo(new byte[] { 1 }, new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "1", "1");
+    public void testAddKey() throws IOException {
+        StoreInfo si = new StoreInfo(toProvider(new byte[] { 1 }), new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "1",
+                "1");
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
         when(storage.addKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
         AddKeyData addKeyData = new AddKeyData("test", REFS_HEADS_MASTER, new byte[] { 1 },
@@ -553,7 +554,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST).post(Entity.json(addKeyData));
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         assertEquals("1", response.getEntityTag().getValue());
-        assertArrayEquals(new byte[] { 1 }, si.getData());
+        assertArrayEquals(new byte[] { 1 }, toByte(si.getStreamProvider()));
         response.close();
     }
 
@@ -734,13 +735,12 @@ public class KeyResourceTest {
         Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
         Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
         when(storage.getListForRef(Mockito.any(), Mockito.any())).thenReturn(List.of(dogPair, bookPair));
-        List<KeyData> list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(new GenericType<List<KeyData>>() {
-                });
+        KeyDataWrapper list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(KeyDataWrapper.class);
         assertNotNull(list);
-        assertEquals(2, list.size());
-        assertEquals(new KeyData(dogPair), list.get(0));
-        assertEquals(new KeyData(bookPair), list.get(1));
+        assertEquals(2, list.getResult().size());
+        assertEquals(new KeyData(dogPair), list.getResult().get(0));
+        assertEquals(new KeyData(bookPair), list.getResult().get(1));
     }
 
     @Test
@@ -754,7 +754,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowed() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "p"));
         assertTrue(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -762,7 +762,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithNoRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(), "p"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -770,7 +770,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("other")), "p"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -778,7 +778,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongPassword() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -786,7 +786,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongPasswordNoBranch() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), null, Set.of(new Role("role"))));
     }
@@ -794,5 +794,4 @@ public class KeyResourceTest {
     private static String createCreds(String user, String secret) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(UTF_8));
     }
-
 }

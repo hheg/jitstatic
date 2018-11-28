@@ -22,9 +22,12 @@ package io.jitstatic.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
@@ -34,20 +37,23 @@ public class SearchResult {
     private final String ref;
     private final String tag;
     private final String contentType;
-    private final byte[] content;
+
+    @JsonSerialize(using = StreamingSerializer.class)
+    private final ObjectStreamProvider content;
 
     public SearchResult(final Pair<String, StoreInfo> data, final String ref) {
-        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getStorageData().getContentType(), data.getRight().getData(), ref);
+        this(data.getLeft(), data.getRight().getVersion(), data.getRight().getMetaData().getContentType(), ref, data.getRight().getStreamProvider());
     }
 
     @JsonCreator
     public SearchResult(@JsonProperty("key") final String key, @JsonProperty("tag") final String tag, @JsonProperty("contentType") final String contentType,
-            @JsonProperty("content") final byte[] content, @JsonProperty("ref") final String ref) {
+            @JsonProperty("ref") final String ref,
+            @JsonProperty("content") @JsonDeserialize(using = StreamingDeserializer.class) ObjectStreamProvider provider) {
         this.tag = tag;
         this.contentType = contentType;
-        this.content = content;
         this.key = key;
         this.ref = ref;
+        this.content = provider;
     }
 
     public String getTag() {
@@ -58,7 +64,7 @@ public class SearchResult {
         return contentType;
     }
 
-    public byte[] getContent() {
+    public ObjectStreamProvider getContent() {
         return content;
     }
 

@@ -21,8 +21,8 @@ package io.jitstatic.hosted;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -42,12 +42,10 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -68,6 +66,7 @@ import io.jitstatic.StorageParseException;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.RepositoryDataError;
+import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Pair;
 
 public class UserExtractor {
@@ -82,8 +81,7 @@ public class UserExtractor {
         this.repository = repository;
     }
 
-    public Pair<String, UserData> extractUserFromRef(final String userKey, final String ref)
-            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException, RefNotFoundException {
+    public Pair<String, UserData> extractUserFromRef(final String userKey, final String ref) throws IOException, RefNotFoundException {
         if (!Objects.requireNonNull(userKey).startsWith(JitStaticConstants.USERS)) {
             throw new IllegalArgumentException("Trying to get users through illegal key " + userKey + " in ref " + ref);
         }
@@ -119,32 +117,41 @@ public class UserExtractor {
             branch = new WrappingRef(branch, alias);
         }
         return validate(Map.of(branch.getObjectId(), Set.of(branch))).stream()
-                .map(p -> Pair.of(p.getLeft(), p.getRight().stream().map(Pair::getRight).flatMap(List::stream).collect(Collectors.toList())))
+                .map(p -> Pair.of(p.getLeft(), p.getRight().stream()
+                        .map(Pair::getRight)
+                        .flatMap(List::stream)
+                        .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
 
     public List<Pair<Set<Ref>, List<Pair<String, List<Pair<FileObjectIdStore, Exception>>>>>> validate(final Map<AnyObjectId, Set<Ref>> mappedRefs) {
-        return mappedRefs.entrySet().stream().map(e -> {
-            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic()).collect(Collectors.toSet());
-            return Pair.of(e.getKey(), refs);
-        }).map(this::extracted).map(this::splitIntoRealms)
-                .map(list -> Pair.of(list.getLeft(), list.getRight().entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue().parallelStream().map(p -> {
-                    InputStreamHolder inputStream = p.getRight();
-                    if (inputStream.isPresent()) {
-                        try (InputStream is = inputStream.inputStream()) {
-                            final UserData readValue = MAPPER.readValue(is, UserData.class);
-                            final Set<ConstraintViolation<UserData>> validationErrors = validator.validate(readValue);
-                            if(!validationErrors.isEmpty()) {                                
-                                return Pair.of(p.getLeft(),Either.<UserData,Exception>right(new StorageParseException(validationErrors)));
-                            }
-                            return Pair.of(p.getLeft(), Either.<UserData, Exception>left(readValue));
-                        } catch (IOException e1) {
-                            return Pair.of(p.getLeft(), Either.<UserData, Exception>right(e1));
-                        }
-                    }
-                    return Pair.of(p.getLeft(), Either.<UserData, Exception>right(inputStream.exception()));
-                }).collect(Collectors.toList()))).map(this::getUserDataIOErrors).filter(this::hasErrors).collect(Collectors.toList())))
-                .filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
+        return mappedRefs.entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue().stream()
+                .filter(ref -> !ref.isSymbolic()).collect(Collectors.toSet())))
+                .map(this::extracted)
+                .map(this::splitIntoRealms)
+                .map(list -> Pair.of(list.getLeft(), list.getRight().entrySet().stream()
+                        .map(e -> Pair.of(e.getKey(), e.getValue().parallelStream()
+                                .map(p -> {
+                                    final InputStreamHolder inputStream = p.getRight();
+                                    if (inputStream.isPresent()) {
+                                        try (InputStream is = inputStream.inputStream()) {
+                                            final UserData readValue = MAPPER.readValue(is, UserData.class);
+                                            final Set<ConstraintViolation<UserData>> validationErrors = validator.validate(readValue);
+                                            if (!validationErrors.isEmpty()) {
+                                                return Pair.of(p.getLeft(), Either.<UserData, Exception>right(new StorageParseException(validationErrors)));
+                                            }
+                                            return Pair.of(p.getLeft(), Either.<UserData, Exception>left(readValue));
+                                        } catch (IOException e1) {
+                                            return Pair.of(p.getLeft(), Either.<UserData, Exception>right(e1));
+                                        }
+                                    }
+                                    return Pair.of(p.getLeft(), Either.<UserData, Exception>right(inputStream.exception()));
+                                }).collect(Collectors.toList())))
+                        .map(this::getUserDataIOErrors)
+                        .filter(this::hasErrors)
+                        .collect(Collectors.toList())))
+                .filter(p -> !p.getRight().isEmpty())
+                .collect(Collectors.toList());
     }
 
     public List<Pair<Set<Ref>, List<Pair<String, List<Pair<FileObjectIdStore, Exception>>>>>> validateAll() {
@@ -164,7 +171,7 @@ public class UserExtractor {
             realms.put(USERS, list);
         }
         for (Pair<FileObjectIdStore, InputStreamHolder> p : data.getLeft()) {
-            FileObjectIdStore fileObjectIdStore = p.getLeft();
+            final FileObjectIdStore fileObjectIdStore = p.getLeft();
             final String pathName = fileObjectIdStore.getFileName().substring(USERS.length());
             int firstSlash = pathName.indexOf('/');
             String realm = pathName.substring(0, firstSlash);
@@ -214,15 +221,17 @@ public class UserExtractor {
             stream = p.getRight().stream();
         }
         return Pair.of(p.getLeft(),
-                stream.filter(l -> l.getRight().isRight()).map(err -> Pair.of(err.getLeft(), err.getRight().getRight())).collect(Collectors.toList()));
+                stream.filter(l -> l.getRight().isRight())
+                        .map(err -> Pair.of(err.getLeft(), err.getRight().getRight()))
+                        .collect(Collectors.toList()));
     }
 
-    private Pair<Set<Ref>, Pair<List<Pair<FileObjectIdStore, InputStreamHolder>>, RepositoryDataError>> extracted(Pair<AnyObjectId, Set<Ref>> p) {
+    private Pair<Set<Ref>, Pair<List<Pair<FileObjectIdStore, InputStreamHolder>>, RepositoryDataError>> extracted(final Pair<AnyObjectId, Set<Ref>> p) {
         return Pair.of(p.getRight(), extractAll(p.getLeft()));
     }
 
     public Pair<List<Pair<FileObjectIdStore, InputStreamHolder>>, RepositoryDataError> extractAll(final AnyObjectId tip) {
-        List<Pair<FileObjectIdStore, InputStreamHolder>> files = new ArrayList<>();
+        final List<Pair<FileObjectIdStore, InputStreamHolder>> files = new ArrayList<>();
         RepositoryDataError error = null;
         try (final RevWalk rev = new RevWalk(repository)) {
             final RevCommit parsedCommit = rev.parseCommit(tip);
@@ -250,7 +259,9 @@ public class UserExtractor {
 
     private InputStreamHolder getInputStreamFor(final ObjectId objectId) {
         try {
-            return new InputStreamHolder(repository.open(objectId));
+            Functions.ThrowingSupplier<ObjectLoader,IOException> factory = () -> repository.open(objectId);
+            factory.get(); // Trigger IOException            
+            return new InputStreamHolder(factory);
         } catch (final IOException e) {
             return new InputStreamHolder(e);
         }

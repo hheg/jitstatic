@@ -1,4 +1,4 @@
-package io.jitstatic.tools;
+package io.jitstatic.storage.tools;
 
 /*-
  * #%L
@@ -20,43 +20,19 @@ package io.jitstatic.tools;
  * #L%
  */
 
-import static org.hamcrest.MatcherAssert.assertThat;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UncheckedIOException;
-import java.util.List;
-import java.util.Objects;
-import java.util.SortedMap;
-import java.util.stream.Collectors;
 
-import org.hamcrest.Matchers;
-
-import com.codahale.metrics.health.HealthCheck.Result;
-
-import io.dropwizard.testing.junit5.DropwizardAppExtension;
-import io.jitstatic.JitstaticConfiguration;
 import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.source.ObjectStreamProvider;
 
 public class Utils {
 
-    public static void checkContainerForErrors(DropwizardAppExtension<JitstaticConfiguration> dw) {
-        SortedMap<String, Result> healthChecks = dw.getEnvironment().healthChecks().runHealthChecks();
-        List<Throwable> errors = healthChecks.entrySet().stream().map(e -> e.getValue().getError()).filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        assertThat(errors.stream().map(e -> {
-            StringWriter sw = new StringWriter();
-            e.printStackTrace(new PrintWriter(sw));
-            return new StringBuilder(sw.toString());
-        }).map(sb -> sb.append(",")).map(sb -> sb.toString()).collect(Collectors.joining(",")), errors.isEmpty(), Matchers.is(true));
-    }
-    
     public static ObjectStreamProvider toProvider(byte[] data) {
         return new ObjectStreamProvider() {
+
             @Override
             public long getSize() throws IOException {
                 return data.length;
@@ -70,10 +46,10 @@ public class Utils {
     }
 
     public static byte[] toByte(ObjectStreamProvider provider) {
-        try (InputStream is = provider.getInputStream()) {
-            return SourceHandler.readStorageData(is);
+        try {
+            return SourceHandler.readStorageData(provider.getInputStream());
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+           throw new UncheckedIOException(e);
         }
     }
 }

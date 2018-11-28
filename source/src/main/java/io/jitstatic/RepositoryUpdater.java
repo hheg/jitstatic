@@ -58,17 +58,19 @@ public class RepositoryUpdater {
         this.repository = repository;
     }
 
-    public List<Pair<String, String>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method, final List<Pair<String, byte[]>> files)
+    public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method, final List<Pair<String, byte[]>> files)
             throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {
         final DirCache inCoreIndex = DirCache.newInCore();
         final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
         final ObjectId headRef = ref.getObjectId();
-        final List<Pair<String, String>> fileVersions = new ArrayList<>(files.size());
+        final List<Pair<String, ObjectId>> fileVersions = new ArrayList<>(files.size());
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
             final Set<String> filesAddedToTree = new HashSet<>(files.size());
             for (Pair<String, byte[]> pair : files) {
-                final String blob = createBlob(pair, dirCacheBuilder, objectInserter, filesAddedToTree);
-                fileVersions.add(Pair.of(pair.getLeft(), blob));
+                if (pair.isPresent()) {
+                    final ObjectId blob = createBlob(pair, dirCacheBuilder, objectInserter, filesAddedToTree);
+                    fileVersions.add(Pair.of(pair.getLeft(), blob));
+                }
             }
             buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
@@ -79,16 +81,11 @@ public class RepositoryUpdater {
         }
     }
 
-    private String createBlob(final Pair<String, byte[]> file, final DirCacheBuilder dirCacheBuilder, final ObjectInserter objectInserter,
+    private ObjectId createBlob(final Pair<String, byte[]> file, final DirCacheBuilder dirCacheBuilder, final ObjectInserter objectInserter,
             final Set<String> filesAddedToTree) throws IOException {
-        final String blob;
-        if (file.isPresent()) {
-            final String keyName = file.getLeft();
-            blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder).name();
-            filesAddedToTree.add(keyName);
-        } else {
-            blob = null;
-        }
+        final String keyName = file.getLeft();
+        final ObjectId blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder);
+        filesAddedToTree.add(keyName);
         return blob;
     }
 
@@ -205,5 +202,9 @@ public class RepositoryUpdater {
             ru.setForceUpdate(true);
             checkResult(ru.delete(), ref);
         }
+    }
+
+    public Repository getRepository() {
+        return repository;
     }
 }

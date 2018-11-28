@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.utils;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,27 +20,14 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.Objects;
-import com.codahale.metrics.health.HealthCheck;
+public interface Functions {
 
-import io.jitstatic.utils.CheckHealth;
-
-public class HealthChecker extends HealthCheck {
-
-    private final CheckHealth source;
-
-    public HealthChecker(final CheckHealth source) {
-        this.source = Objects.requireNonNull(source);
+    interface ThrowingSupplier<S, E extends Exception> {
+        S get() throws E;
     }
 
-    @Override
-    protected Result check() throws Exception {
-        try {
-            source.checkHealth();
-            return Result.healthy();
-        } catch (final Exception e) {
-            return Result.unhealthy(e);
-        }
+    interface DoubleThrowingSupplier<S, E extends Exception, F extends Exception> {
+        S get() throws E, F;
     }
 
 }

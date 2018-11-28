@@ -20,37 +20,43 @@ package io.jitstatic.storage;
  * #L%
  */
 
+import static io.jitstatic.storage.tools.Utils.toProvider;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
+import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.storage.RefHolder;
+import io.jitstatic.utils.Functions;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.LinkedException;
+import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class RefHolderTest {
@@ -60,12 +66,12 @@ public class RefHolderTest {
 
     @BeforeEach
     public void setup() {
-        source = Mockito.mock(Source.class);
+        source = mock(Source.class);
     }
 
     @Test
     public void testPutGet() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.empty());
         assertNotNull(ref.getKey("key"));
         assertTrue(ref.isEmpty());
@@ -73,7 +79,7 @@ public class RefHolderTest {
 
     @Test
     public void testLockWrite() throws FailedToLock, InterruptedException {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         AtomicBoolean b = new AtomicBoolean(true);
         AtomicBoolean c = new AtomicBoolean(true);
         CompletableFuture<Void> async = CompletableFuture.runAsync(() -> {
@@ -101,7 +107,7 @@ public class RefHolderTest {
 
     @Test
     public void testLockTwiceOnKeys() throws FailedToLock {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.lockWrite(() -> {
             Either<Boolean, FailedToLock> lockWrite = ref.lockWrite(() -> true, "a");
             assertTrue(lockWrite.isLeft());
@@ -111,7 +117,7 @@ public class RefHolderTest {
 
     @Test
     public void testLockWriteFail() throws FailedToLock {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         assertEquals(FailedToLock.class, assertThrows(RuntimeException.class, () -> ref.lockWrite(() -> {
             CompletableFuture.runAsync(() -> {
                 Either<Boolean, FailedToLock> lockWrite = ref.lockWrite(() -> {
@@ -127,7 +133,7 @@ public class RefHolderTest {
 
     @Test
     public void testReadWrite() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.read(() -> "1");
         ref.write(() -> {
         });
@@ -136,7 +142,7 @@ public class RefHolderTest {
 
     @Test
     public void testReloadAll() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.write(() -> {
             ref.reloadAll(() -> {
             });
@@ -145,14 +151,14 @@ public class RefHolderTest {
 
     @Test
     public void testReloadAllWithoutLock() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         assertFalse(ref.reloadAll(() -> {
         }));
     }
 
     @Test
     public void testLockWriteAll() throws FailedToLock {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         AtomicBoolean b = new AtomicBoolean(true);
         AtomicBoolean c = new AtomicBoolean(true);
         CompletableFuture<Boolean> async = CompletableFuture.supplyAsync(() -> {
@@ -177,21 +183,22 @@ public class RefHolderTest {
 
     @Test
     public void testRefreshNoFiles() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         boolean refresh = ref.refresh();
         assertFalse(refresh);
     }
 
     @Test
     public void testRefresh() throws RefNotFoundException, IOException {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
-        Mockito.when(sourceInfo.getSourceInputStream()).thenReturn(asStream(getData()));
-        Mockito.when(sourceInfo.getMetaDataVersion()).thenReturn("2");
-        Mockito.when(sourceInfo.getSourceVersion()).thenReturn("2");
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        SourceInfo sourceInfo = mock(SourceInfo.class);
+        when(sourceInfo.getSourceProvider()).thenReturn(toProvider(getData().getBytes(UTF_8)));
+        when(sourceInfo.readMetaData()).thenCallRealMethod();
+        when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
+        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(sourceInfo.getSourceVersion()).thenReturn("2");
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         boolean refresh = ref.refresh();
         assertTrue(refresh);
@@ -199,8 +206,8 @@ public class RefHolderTest {
 
     @Test
     public void testRefreshKeyIsNotFound() {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         boolean refresh = ref.refresh();
         assertFalse(refresh);
@@ -208,43 +215,49 @@ public class RefHolderTest {
 
     @Test
     public void testRefreshKeyLoadedWithError() throws RefNotFoundException {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
+        StoreInfo storeInfo = mock(StoreInfo.class);
         RuntimeException re = new RuntimeException("Test Exception");
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenThrow(re);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(re);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         assertThrows(LinkedException.class, () -> ref.refresh());
     }
 
     @Test
     public void testRefreshrefNotFoundForKey() throws RefNotFoundException {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenThrow(new RefNotFoundException(""));
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(""));
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         assertFalse(ref.refresh());
     }
 
     @Test
     public void testRefreshKey() throws IOException {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        Mockito.when(storeInfo.getStorageData()).thenReturn(Mockito.mock(MetaData.class));
-        Mockito.when(storeInfo.getVersion()).thenReturn("1");
-        Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        @SuppressWarnings("unchecked")
+        ThrowingSupplier<ObjectLoader, IOException> ts = mock(Functions.ThrowingSupplier.class);
+        when(storeInfo.getMetaData()).thenReturn(mock(MetaData.class));
+        when(storeInfo.getVersion()).thenReturn("1");
+        when(storeInfo.getMetaDataVersion()).thenReturn("1");
+
+        byte[] data = getData().getBytes(UTF_8);
+        when(source.modifyKey("key", REF, data, "1", cmd)).thenReturn(Pair.of("2", ts));
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshKey(asStream(getData()).readAllBytes(), "key", "1", "2");
+        ref.modifyKey("key", REF, data, "1", cmd);
         assertEquals("2", ref.getKey("key").get().getVersion());
     }
 
     @Test
     public void testRefreshMetaData() throws IOException {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        MetaData storageData = Mockito.mock(MetaData.class);
-        Mockito.when(storeInfo.getStorageData()).thenReturn(storageData);
-        Mockito.when(storeInfo.getVersion()).thenReturn("1");
-        Mockito.when(storeInfo.getMetaDataVersion()).thenReturn("1");
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        MetaData storageData = mock(MetaData.class);
+        when(storeInfo.getMetaData()).thenReturn(storageData);
+        when(storeInfo.getVersion()).thenReturn("1");
+        when(storeInfo.getMetaDataVersion()).thenReturn("1");
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         ref.refreshMetaData(storageData, "key", "1", "2");
         assertEquals("2", ref.getKey("key").get().getMetaDataVersion());
@@ -252,32 +265,34 @@ public class RefHolderTest {
 
     @Test
     public void testLoadAndStore() throws IOException, RefNotFoundException {
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
-        Mockito.when(sourceInfo.getSourceInputStream()).thenReturn(asStream(getData()));
-        Mockito.when(sourceInfo.getMetaDataVersion()).thenReturn("2");
-        Mockito.when(sourceInfo.getSourceVersion()).thenReturn("2");
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        SourceInfo sourceInfo = mock(SourceInfo.class);
+        when(sourceInfo.getSourceProvider()).thenReturn(toProvider(getData().getBytes(UTF_8)));
+        when(sourceInfo.readMetaData()).thenCallRealMethod();
+        when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
+        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(sourceInfo.getSourceVersion()).thenReturn("2");
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
+        RefHolder ref = new RefHolder(REF, source);
         assertTrue(ref.loadAndStore("key").isPresent());
     }
 
     @Test
     public void testLoadAndStoreRefNotFound() throws IOException, RefNotFoundException {
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenThrow(new RefNotFoundException(REF));
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(REF));
+        RefHolder ref = new RefHolder(REF, source);
         assertThrows(LoadException.class, () -> ref.loadAndStore("key"));
     }
 
     @Test
     public void testLoadAndStoreHidden() throws RefNotFoundException, IOException {
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaDataHidden()));
-        Mockito.when(sourceInfo.getSourceInputStream()).thenReturn(asStream(getData()));
-        Mockito.when(sourceInfo.getMetaDataVersion()).thenReturn("2");
-        Mockito.when(sourceInfo.getSourceVersion()).thenReturn("2");
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        SourceInfo sourceInfo = mock(SourceInfo.class);
+        when(sourceInfo.getSourceProvider()).thenReturn(toProvider(getData().getBytes(UTF_8)));
+        when(sourceInfo.readMetaData()).thenCallRealMethod();
+        when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaDataHidden()));
+        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(sourceInfo.getSourceVersion()).thenReturn("2");
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
+        RefHolder ref = new RefHolder(REF, source);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key");
         assertEquals(ref.getKey("key"), loadAndStore);
         assertFalse(loadAndStore.isPresent());
@@ -285,55 +300,45 @@ public class RefHolderTest {
 
     @Test
     public void testLoadAndStoreMetaData() throws IOException, RefNotFoundException {
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
-        Mockito.when(sourceInfo.getMetaDataVersion()).thenReturn("2");
-        Mockito.when(source.getSourceInfo(Mockito.eq("key/"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        SourceInfo sourceInfo = mock(SourceInfo.class);
+        when(sourceInfo.readMetaData()).thenCallRealMethod();
+        when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
+        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
+        RefHolder ref = new RefHolder(REF, source);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key/");
         assertEquals(ref.getKey("key/"), loadAndStore);
         assertTrue(loadAndStore.isPresent());
     }
 
     @Test
-    public void testLoadAndStoreSourceInputThrowsIOException() throws IOException, RefNotFoundException {
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
-        IOException ioException = new IOException("Test exception");
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
-        Mockito.when(sourceInfo.getSourceInputStream()).thenThrow(ioException);
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
-        assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.loadAndStore("key")).getCause());
-    }
-
-    @Test
     public void testLoadAndStoreMetaDataInputThrowsIOException() throws IOException, RefNotFoundException {
-        SourceInfo sourceInfo = Mockito.mock(SourceInfo.class);
+        SourceInfo sourceInfo = mock(SourceInfo.class);
         IOException ioException = new IOException("Test exception");
-        Mockito.when(sourceInfo.getMetadataInputStream()).thenThrow(ioException);
-        ;
-        Mockito.when(source.getSourceInfo(Mockito.eq("key"), Mockito.eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        when(sourceInfo.readMetaData()).thenCallRealMethod();
+        when(sourceInfo.getMetadataInputStream()).thenThrow(ioException);
+        when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
+        RefHolder ref = new RefHolder(REF, source);
         assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.loadAndStore("key")).getCause());
     }
 
     @Test
     public void testCheckIfPlainKeyDoesNotExist() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.empty());
         ref.checkIfPlainKeyExist("key/");
     }
 
     @Test
     public void testCheckIfPlainKeyDoesNotExistNull() {
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        RefHolder ref = new RefHolder(REF, source);
         ref.checkIfPlainKeyExist("key/");
     }
 
     @Test
     public void testCheckIfPlainKeyExist() {
-        StoreInfo storeInfo = Mockito.mock(StoreInfo.class);
-        RefHolder ref = new RefHolder(REF, new ConcurrentHashMap<>(), source);
+        StoreInfo storeInfo = mock(StoreInfo.class);
+        RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
         assertThrows(WrappingAPIException.class, () -> ref.checkIfPlainKeyExist("key/"));
     }
@@ -344,7 +349,7 @@ public class RefHolderTest {
     }
 
     private ByteArrayInputStream asStream(String data) {
-        return new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8));
+        return new ByteArrayInputStream(data.getBytes(UTF_8));
     }
 
     private String getData() {
