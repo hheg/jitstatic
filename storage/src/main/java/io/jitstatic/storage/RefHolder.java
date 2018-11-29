@@ -23,7 +23,6 @@ package io.jitstatic.storage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,11 +59,12 @@ import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 
-@SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "")
+@SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefHolderLock {
 
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
@@ -77,16 +77,19 @@ public class RefHolder implements RefHolderLock {
 
     public RefHolder(final String ref, final Source source) {
         this.ref = ref;
-        this.refCache = new LinkedHashMap<>() {
+        this.refCache = getStorage(1000);
+        this.source = source;
+        threshold = 1_000_000;
+    }
 
+    private LinkedHashMap<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> getStorage(final int size) {
+        return new LinkedHashMap<>(size) {
             private static final long serialVersionUID = 1L;
 
             protected boolean removeEldestEntry(final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
-                return size() > 10000;
+                return size() > 1000;
             };
         };
-        this.source = source;
-        threshold = 1_000_000;
     }
 
     public Optional<StoreInfo> getKey(final String key) {
@@ -109,7 +112,7 @@ public class RefHolder implements RefHolderLock {
                 unlock(key);
             }
         }
-        return Either.right(new FailedToLock(ref + key));
+        return Either.right(new FailedToLock(ref + "/" + key));
     }
 
     public <T> T write(final Supplier<T> supplier) {
@@ -217,11 +220,14 @@ public class RefHolder implements RefHolderLock {
         if (!faults.isEmpty()) {
             throw new LinkedException(faults);
         }
-        return refreshedRef.stream().filter(Either::isLeft)
+        return refreshedRef.stream()
+                .filter(Either::isLeft)
                 .map(Either::getLeft)
                 .flatMap(Optional::stream)
                 .filter(p -> p.getRight() != null)
-                .collect(Collectors.toConcurrentMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight()))));
+                .collect(Collectors.toMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight())), (a, b) -> {
+                    throw new ShouldNeverHappenException("duplicate values for key");
+                }, () -> getStorage(files.size())));
     }
 
     private List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef(final Set<String> files) {
@@ -386,7 +392,7 @@ public class RefHolder implements RefHolderLock {
     }
 
     private ObjectStreamProvider getObjectStreamProvider(final byte[] data, final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory) {
-        final int size = data.length;        
+        final int size = data.length;
         if (size < threshold) {
             return new SmallObjectStreamProvider(data);
         } else {
@@ -407,7 +413,7 @@ public class RefHolder implements RefHolderLock {
     public Pair<String, UserData> getUser(final String userKeyPath) {
         final String key = JitStaticConstants.USERS + userKeyPath;
         Either<Optional<StoreInfo>, Pair<String, UserData>> computed = read(() -> refCache.get(key));
-        if (computed == null) {          
+        if (computed == null) {
             computed = write(() -> refCache.compute(key, this::mapKey));
         }
         if (computed != null) {
