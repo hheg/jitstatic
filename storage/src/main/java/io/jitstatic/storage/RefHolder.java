@@ -160,8 +160,8 @@ public class RefHolder implements RefHolderLock {
     }
 
     private void unlock(final String key) {
-        activeKeys.remove(key);
         refLock.writeLock().unlock();
+        activeKeys.remove(key);
     }
 
     public boolean reloadAll(final Runnable runnable) {
