@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -69,8 +70,7 @@ public class RefHolder implements RefHolderLock {
 
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
     private volatile Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
-    private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
-    private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
+    private final RefLock lock = new RefLock();
     private final String ref;
     private final Source source;
     private final int threshold;
@@ -105,83 +105,27 @@ public class RefHolder implements RefHolderLock {
     }
 
     public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key) {
-        if (tryLock(key)) {
-            try {
-                return Either.left(supplier.get());
-            } finally {
-                unlock(key);
-            }
-        }
-        return Either.right(new FailedToLock(ref + "/" + key));
+        return lock.lockWrite(supplier, key, ref);
     }
 
-    public <T> T write(final Supplier<T> supplier) {
-        refLock.writeLock().lock();
-        try {
-            return supplier.get();
-        } finally {
-            refLock.writeLock().unlock();
-        }
+    <T> T write(final Supplier<T> supplier) {
+        return lock.write(supplier);
     }
 
-    public void write(final Runnable runnable) {
-        refLock.writeLock().lock();
-        try {
-            runnable.run();
-        } finally {
-            refLock.writeLock().unlock();
-        }
+    void write(final Runnable runnable) {
+        lock.write(runnable);
     }
 
-    public <T> T read(final Supplier<T> supplier) {
-        refLock.readLock().lock();
-        try {
-            return supplier.get();
-        } finally {
-            refLock.readLock().unlock();
-        }
-    }
-
-    private <T, V extends Exception> T readThrow(final ThrowingSupplier<T, V> supplier) throws V {
-        refLock.readLock().lock();
-        try {
-            return supplier.get();
-        } finally {
-            refLock.readLock().unlock();
-        }
-    }
-
-    private boolean tryLock(final String key) {
-        if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null || activeKeys.get(key) == Thread.currentThread()) {
-            refLock.writeLock().lock();
-            return true;
-        }
-        return false;
-    }
-
-    private void unlock(final String key) {
-        refLock.writeLock().unlock();
-        activeKeys.remove(key);
+    <T> T read(final Supplier<T> supplier) {
+        return lock.read(supplier);
     }
 
     public boolean reloadAll(final Runnable runnable) {
-        if (refLock.isWriteLockedByCurrentThread()) {
-            runnable.run();
-            return true;
-        } else {
-            return false;
-        }
+        return lock.reloadAll(runnable);
     }
 
     public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier) {
-        if (refLock.writeLock().tryLock()) {
-            try {
-                return Either.left(supplier.get());
-            } finally {
-                refLock.writeLock().unlock();
-            }
-        }
-        return Either.right(new FailedToLock(ref));
+        return lock.lockWriteAll(supplier, ref);
     }
 
     private Set<String> getFiles() {
@@ -224,7 +168,7 @@ public class RefHolder implements RefHolderLock {
                 .filter(Either::isLeft)
                 .map(Either::getLeft)
                 .flatMap(Optional::stream)
-                .filter(p -> p.getRight() != null)
+                .filter(p -> p.getRight() != null)                
                 .collect(Collectors.toMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight())), (a, b) -> {
                     throw new ShouldNeverHappenException("duplicate values for key");
                 }, () -> getStorage(files.size())));
@@ -257,7 +201,7 @@ public class RefHolder implements RefHolderLock {
     }
 
     private StoreInfo load(final String key) throws RefNotFoundException {
-        final SourceInfo sourceInfo = readThrow(() -> source.getSourceInfo(key, ref));
+        final SourceInfo sourceInfo = lock.readThrow(() -> source.getSourceInfo(key, ref));
         if (sourceInfo != null) {
             try {
                 final MetaData metaData = sourceInfo.readMetaData();
@@ -494,7 +438,93 @@ public class RefHolder implements RefHolderLock {
                 throw new UncheckedIOException("Failed to delete " + key, e);
             }
         });
+    }
 
+    private static class RefLock {
+
+        private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
+        private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
+        private final Condition allLocked = refLock.writeLock().newCondition();
+
+        public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key, final String ref) {
+            if (tryLock(key)) {
+                try {
+                    return Either.left(supplier.get());
+                } finally {
+                    unlock(key);
+                }
+            }
+            return Either.right(new FailedToLock(ref + "/" + key));
+        }
+
+        public <T> T write(final Supplier<T> supplier) {
+            refLock.writeLock().lock();
+            try {
+                return supplier.get();
+            } finally {
+                refLock.writeLock().unlock();
+            }
+        }
+
+        public void write(final Runnable runnable) {
+            refLock.writeLock().lock();
+            try {
+                runnable.run();
+            } finally {
+                refLock.writeLock().unlock();
+            }
+        }
+
+        public <T> T read(final Supplier<T> supplier) {
+            refLock.readLock().lock();
+            try {
+                return supplier.get();
+            } finally {
+                refLock.readLock().unlock();
+            }
+        }
+
+        private <T, V extends Exception> T readThrow(final ThrowingSupplier<T, V> supplier) throws V {
+            refLock.readLock().lock();
+            try {
+                return supplier.get();
+            } finally {
+                refLock.readLock().unlock();
+            }
+        }
+
+        private boolean tryLock(final String key) {
+            if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null || activeKeys.get(key) == Thread.currentThread()) {
+                refLock.writeLock().lock();
+                return true;
+            }
+            return false;
+        }
+
+        private void unlock(final String key) {
+            refLock.writeLock().unlock();
+            activeKeys.remove(key);
+        }
+
+        public boolean reloadAll(final Runnable runnable) {
+            if (refLock.isWriteLockedByCurrentThread()) {
+                runnable.run();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier, String ref) {
+            if (refLock.writeLock().tryLock()) {
+                try {
+                    return Either.left(supplier.get());
+                } finally {
+                    refLock.writeLock().unlock();
+                }
+            }
+            return Either.right(new FailedToLock(ref));
+        }
     }
 
 }
