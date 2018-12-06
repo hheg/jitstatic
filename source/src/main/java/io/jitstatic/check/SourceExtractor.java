@@ -228,7 +228,9 @@ public class SourceExtractor {
     public Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> extractAll() {
         final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
         return allRefs.entrySet().stream().map(e -> {
-            final Set<Ref> refs = e.getValue().stream().filter(ref -> !ref.isSymbolic()).filter(ref -> ref.getName().startsWith(R_HEADS))
+            final Set<Ref> refs = e.getValue().stream()
+                    .filter(ref -> !ref.isSymbolic())
+                    .filter(ref -> ref.getName().startsWith(R_HEADS))
                     .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
         }).map(this::fileLoader).collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));

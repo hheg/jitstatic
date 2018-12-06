@@ -31,7 +31,6 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -128,13 +127,6 @@ public class RefHolder implements RefHolderLock {
         return lock.lockWriteAll(supplier, ref);
     }
 
-    private Set<String> getFiles() {
-        return refCache.entrySet().stream().filter(e -> {
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
-            return (value.isLeft() && value.getLeft().isPresent());
-        }).map(Entry::getKey).collect(Collectors.toSet());
-    }
-
     public boolean isEmpty() {
         return refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true));
     }
@@ -168,7 +160,19 @@ public class RefHolder implements RefHolderLock {
                 .filter(Either::isLeft)
                 .map(Either::getLeft)
                 .flatMap(Optional::stream)
-                .filter(p -> p.getRight() != null)                
+                .filter(p -> p.getRight() != null)
+                .filter(p -> {
+                    final StoreInfo newValue = p.getRight();
+                    final Either<Optional<StoreInfo>, Pair<String, UserData>> oldCachedValue = refCache.get(p.getLeft());
+                    if(oldCachedValue == null) {
+                        return false;
+                    }
+                    if (oldCachedValue.isLeft() && oldCachedValue.getLeft().isPresent()) {
+                        final StoreInfo value = oldCachedValue.getLeft().get();
+                        return (newValue.isNormalKey() && value.isNormalKey()) || (newValue.isMasterMetaData() && value.isMasterMetaData());
+                    }
+                    return false;
+                })
                 .collect(Collectors.toMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight())), (a, b) -> {
                     throw new ShouldNeverHappenException("duplicate values for key");
                 }, () -> getStorage(files.size())));
@@ -178,9 +182,9 @@ public class RefHolder implements RefHolderLock {
         return files.stream().map(key -> {
             try {
                 return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.of(Pair.of(key, load(key))));
-            } catch (final RefNotFoundException ignore) {
+            } catch (RefNotFoundException ignore) {
                 // Ignoring that ref wasn't found
-            } catch (final Exception e) {
+            } catch (Exception e) {
                 return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(new Exception(key + " in " + ref + " had the following error", e));
             }
             return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.<Pair<String, StoreInfo>>empty());
@@ -249,7 +253,10 @@ public class RefHolder implements RefHolderLock {
 
     public boolean refresh() {
         LOG.info("Reloading {}", ref);
-        final Set<String> files = getFiles();
+        final Set<String> files = refCache.entrySet().stream().filter(e -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
+            return (value.isLeft() && value.getLeft().isPresent());
+        }).map(Entry::getKey).collect(Collectors.toSet());
         final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> newMap = refreshFiles(files);
         boolean isRefreshed = !newMap.isEmpty();
         if (isRefreshed) {
@@ -443,8 +450,7 @@ public class RefHolder implements RefHolderLock {
     private static class RefLock {
 
         private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
-        private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
-        private final Condition allLocked = refLock.writeLock().newCondition();
+        private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();        
 
         public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key, final String ref) {
             if (tryLock(key)) {

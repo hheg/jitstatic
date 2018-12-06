@@ -57,4 +57,12 @@ public class PathTest {
         Path p = Path.of("base/element1/element2/key");
         assertEquals("base/element1/element2/", p.getParentElements());
     }
+
+    @Test
+    public void testKeyMetaData() {
+        Path p = Path.of("key.metadata");
+        assertEquals("key.metadata", p.getLastElement());
+        p = Path.of("dir/path/key.metadata");
+        assertEquals("key.metadata", p.getLastElement());
+    }
 }

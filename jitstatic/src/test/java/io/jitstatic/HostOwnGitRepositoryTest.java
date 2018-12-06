@@ -47,8 +47,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
@@ -514,6 +514,48 @@ public class HostOwnGitRepositoryTest {
         try (JitStaticClient cclient = buildCreatorClient().setPassword("1234").setUser(TEST_USER).build()) {
             assertNotNull(cclient.createKey(new byte[] { 1 }, new CommitData("string/key", "msg", "user", "mail"),
                     new MetaData(Set.of(new MetaData.User("news", "1234")), "application/json")));
+        }
+    }
+
+    @Test
+    public void testPhantomKeys() throws Exception {
+        String localFilePath = STORE;
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticClient client = buildClient();) {
+            String repopath = getRepopath(git);
+            Path path = Paths.get(repopath, localFilePath);
+            Path mpath = Paths.get(repopath, METADATA);
+            Files.createDirectories(path.getParent());
+            Files.write(path, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+            Files.write(mpath, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Inital commit").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            Entity key = client.getKey(STORE, tf);
+            assertNotNull(key.data);
+            git.rm().addFilepattern(STORE).call();
+            git.commit().setMessage("removed file").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(STORE, tf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testDeleteFileButMetadataIsStillLeft() throws Exception {
+        String localFilePath = STORE;
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticClient client = buildClient();) {
+            assertNotNull(createData(localFilePath, git));
+            Entity key = client.getKey(STORE, tf);
+            assertNotNull(key.data);
+            git.rm().addFilepattern(STORE).call();
+            git.commit().setMessage("removed file").call();
+            Iterable<PushResult> iterable = git.push().setCredentialsProvider(provider).call();
+            PushResult pushResult = iterable.iterator().next();
+            RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(REFS_HEADS_MASTER);
+            assertEquals(Status.REJECTED_OTHER_REASON, remoteUpdate.getStatus());
         }
     }
 

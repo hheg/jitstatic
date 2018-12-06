@@ -43,6 +43,9 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
+import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +76,7 @@ public class SourceCheckerTest {
         RemoteTestUtils.copy("/test3.json", wBase.toPath().resolve(store));
         workingGit.add().addFilepattern(store).call();
         workingGit.commit().setMessage("Initial commit").call();
-        workingGit.push().call();
+        verifyOkPush(workingGit.push().call());
     }
 
     private File createTempFiles() throws IOException {
@@ -102,6 +105,26 @@ public class SourceCheckerTest {
     }
 
     @Test
+    public void testCheckMetaDataFileOnBareRepo() throws Exception {
+        workingGit.rm().addFilepattern(store).call();
+        RemoteTestUtils.copy("/test3.md.json", workingGit.getRepository().getWorkTree().toPath().resolve(store + JitStaticConstants.METADATA));
+        workingGit.add().addFilepattern(".").call();
+        workingGit.commit().setMessage("removed file").call();
+        verifyOkPush(workingGit.push().call());
+        SourceChecker sc = new SourceChecker(bareGit.getRepository());
+        List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
+        Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>> pair = errors.get(0);
+        Optional<Ref> firstRef = pair.getLeft().stream().findFirst();
+        assertEquals(REF_HEAD_MASTER, firstRef.get().getName());
+        List<Pair<FileObjectIdStore, Exception>> exceptions = pair.getRight();
+        assertTrue(exceptions.size() == 1);
+        Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
+        assertEquals(store + JitStaticConstants.METADATA, fileExPair.getLeft().getFileName());
+        System.out.println(fileExPair.getRight().getClass());
+        assertTrue(fileExPair.getRight() instanceof MetaDataFileIsMissingSourceFile);
+    }
+
+    @Test
     public void testCheckSourceRepoWithUsers() throws IOException, NoFilepatternException, GitAPIException {
         Path workingPath = workingGit.getRepository().getWorkTree().toPath();
         Path users = workingPath.resolve(JitStaticConstants.USERS);
@@ -115,8 +138,7 @@ public class SourceCheckerTest {
         workingGit.push().call();
         SourceChecker sc = new SourceChecker(bareGit.getRepository());
         List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
-        
-        assertTrue(errors.isEmpty());        
+        assertTrue(errors.isEmpty());
     }
 
     @Test
@@ -152,6 +174,16 @@ public class SourceCheckerTest {
             SourceChecker sc = new SourceChecker(bareGit.getRepository());
             sc.checkBranchForErrors(branch);
         }).getLocalizedMessage());
+    }
+
+    private void verifyOkPush(Iterable<PushResult> iterable) {
+        verifyOkPush(iterable, "refs/heads/master");
+    }
+
+    private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+        PushResult pushResult = iterable.iterator().next();
+        RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
+        assertEquals(Status.OK, remoteUpdate.getStatus());
     }
 
     private String getMetaData(int i) {
