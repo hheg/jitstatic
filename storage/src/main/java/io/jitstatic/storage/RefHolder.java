@@ -66,7 +66,8 @@ import io.jitstatic.utils.Functions.ThrowingSupplier;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefHolderLock {
-
+    private static final int MAX_ENTRIES = 1000;
+    private static final int THREASHOLD = 1_000_000;
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
     private volatile Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final RefLock lock = new RefLock();
@@ -76,9 +77,9 @@ public class RefHolder implements RefHolderLock {
 
     public RefHolder(final String ref, final Source source) {
         this.ref = ref;
-        this.refCache = getStorage(1000);
+        this.refCache = getStorage(MAX_ENTRIES);
         this.source = source;
-        threshold = 1_000_000;
+        this.threshold = THREASHOLD;
     }
 
     private LinkedHashMap<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> getStorage(final int size) {
@@ -86,7 +87,7 @@ public class RefHolder implements RefHolderLock {
             private static final long serialVersionUID = 1L;
 
             protected boolean removeEldestEntry(final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
-                return size() > 1000;
+                return size() > MAX_ENTRIES;
             };
         };
     }

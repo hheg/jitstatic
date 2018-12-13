@@ -59,6 +59,7 @@ import io.jitstatic.utils.Pair;
 @Path("bulk")
 public class BulkResource {
 
+    private static final String DEFAULT_REF = "default ref";
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
@@ -87,7 +88,8 @@ public class BulkResource {
             final Set<User> allowedUsers = storageData.getUsers();
             final Set<Role> keyRoles = storageData.getRead();
             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                LOG.info("{} logged in and accessed key {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
+                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
+                        (ref == null ? DEFAULT_REF : ref));
                 return true;
             }
             if (!userHolder.isPresent()) {
@@ -95,7 +97,7 @@ public class BulkResource {
             }
             final User user = userHolder.get();
             if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
-                LOG.info("{} logged in and accessed key {}", user, p.getLeft());
+                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), (ref == null ? DEFAULT_REF : ref));
                 return true;
             }
             return false;

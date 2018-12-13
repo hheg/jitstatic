@@ -67,6 +67,7 @@ import io.jitstatic.utils.Pair;
 @Path("metakey")
 public class MetaKeyResource {
 
+    private static final String DEFAULT_REF = "default ref";
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
@@ -106,7 +107,7 @@ public class MetaKeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info("{} logged in and accessed key {}", user.get(), key);
+        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, (ref == null ? DEFAULT_REF : ref));
         return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
     }
 
@@ -149,7 +150,7 @@ public class MetaKeyResource {
         helper.checkRef(ref);
 
         Pair<MetaData, String> metaKeyData = storage.getMetaKey(key, ref);
-        if(!metaKeyData.isPresent()) {
+        if (!metaKeyData.isPresent()) {
             throw new WebApplicationException(key, Status.NOT_FOUND);
         }
         authorize(user.get(), ref, metaKeyData.getLeft().getWrite());
@@ -172,7 +173,7 @@ public class MetaKeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {}", user.get(), key);
+        LOG.info("{} logged in and modified key {} in {}", user.get(), key, (ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
