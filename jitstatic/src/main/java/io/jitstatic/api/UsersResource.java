@@ -73,7 +73,7 @@ public class UsersResource {
 
     private static final String DEFAULT_REF = "default ref";
     private static final Logger LOG = LoggerFactory.getLogger(UsersResource.class);
-    private static final String UTF_8 = null;
+    private static final String UTF_8 = "utf-8";
     private final Storage storage;
     private final KeyAdminAuthenticator adminKeyAuthenticator;
     private final APIHelper helper;

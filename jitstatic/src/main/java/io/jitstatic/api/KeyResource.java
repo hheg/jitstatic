@@ -273,7 +273,7 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in ", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and modified key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
