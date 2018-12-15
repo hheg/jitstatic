@@ -78,7 +78,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
 
 import io.dropwizard.testing.ConfigOverride;
-import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.KeyData;
@@ -98,6 +97,7 @@ import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class UserManagementTest {
@@ -127,7 +127,7 @@ public class UserManagementTest {
     private String rootPassword;
 
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolderString()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolderString()));
     private String adress;
     private String gitAdress;
     private UserData keyAdminUserData;

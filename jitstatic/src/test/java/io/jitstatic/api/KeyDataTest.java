@@ -29,7 +29,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.source.ObjectStreamProvider;
-import io.jitstatic.tools.Utils;
+import io.jitstatic.tools.AUtils;
 
 public class KeyDataTest {
 
@@ -39,7 +39,7 @@ public class KeyDataTest {
         String type = "type";
         String tag = "tag";
         byte[] d = new byte[] { 1 };
-        ObjectStreamProvider provider = Utils.toProvider(d);
+        ObjectStreamProvider provider = AUtils.toProvider(d);
         KeyData data = new KeyData(key, type, tag, provider);
         assertFalse(data.equals(null));
         assertFalse(data.equals(new Object()));
@@ -56,7 +56,7 @@ public class KeyDataTest {
     public void testDeserialize() throws JsonProcessingException {
         ObjectMapper map = new ObjectMapper();
         byte[] d = new byte[] { 1 };
-        ObjectStreamProvider provider = Utils.toProvider(d);
+        ObjectStreamProvider provider = AUtils.toProvider(d);
         KeyData kd = new KeyData("key", "type", "tag", provider);
         assertEquals("{\"key\":\"key\",\"type\":\"type\",\"tag\":\"tag\",\"data\":\"AQ==\"}", map.writeValueAsString(kd));
     }

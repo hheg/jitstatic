@@ -46,12 +46,13 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class JitstaticInfoTest {
 
     private final DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private TemporaryFolder tmpFolder;
     private String adress;
 

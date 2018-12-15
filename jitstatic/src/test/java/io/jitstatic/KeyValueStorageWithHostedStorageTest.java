@@ -1,12 +1,5 @@
 package io.jitstatic;
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.SECRETS;
-import static io.jitstatic.JitStaticConstants.USERS;
-import static io.jitstatic.tools.Utils.toByte;
-import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
-import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
-
 /*-
  * #%L
  * jitstatic
@@ -27,6 +20,12 @@ import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.USERS;
+import static io.jitstatic.tools.AUtils.toByte;
+import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
+import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,7 +79,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.testing.ConfigOverride;
-import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.KeyDataWrapper;
@@ -95,6 +93,7 @@ import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class KeyValueStorageWithHostedStorageTest {
@@ -109,7 +108,7 @@ public class KeyValueStorageWithHostedStorageTest {
     private static final String PASSWORD = "ssecret";
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private TemporaryFolder tmpfolder;
     private String adress;
 

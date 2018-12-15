@@ -61,6 +61,7 @@ import io.jitstatic.client.SearchPath;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
 public class BulkSearchTest {
@@ -69,7 +70,7 @@ public class BulkSearchTest {
     private static final String USER = "user1";
     private static final String SECRET = "0234";
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
 
     private static final String METADATA = ".metadata";
     private static TemporaryFolder tmpFolder;

@@ -101,7 +101,7 @@ import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.Utils;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
@@ -238,7 +238,7 @@ public class LoadWriterIT {
         } finally {
             statsClient.close();
         }
-        Utils.checkContainerForErrors(DW);
+        AUtils.checkContainerForErrors(DW);
     }
 
     private void printStats(ResultData r) {

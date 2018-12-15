@@ -21,8 +21,8 @@ package io.jitstatic.api;
  */
 
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-import static io.jitstatic.tools.Utils.toByte;
-import static io.jitstatic.tools.Utils.toProvider;
+import static io.jitstatic.tools.AUtils.toByte;
+import static io.jitstatic.tools.AUtils.toProvider;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
