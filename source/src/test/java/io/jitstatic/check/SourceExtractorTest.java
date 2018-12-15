@@ -65,6 +65,9 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
+import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -574,6 +577,21 @@ public class SourceExtractorTest {
         assertTrue(listForKey.isEmpty());
     }
 
+    @Test
+    public void testCheckedInMetaKeyWithoutKey() throws Exception {
+        File temporaryGitFolder = getFolder();
+        try (Git local = Git.cloneRepository().setURI(workingFolder.toURI().toString()).setDirectory(temporaryGitFolder).call()) {
+            addFilesAndPush("key", temporaryGitFolder, local);
+            SourceExtractor se = new SourceExtractor(local.getRepository());
+            Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> extracted = se.sourceBranchExtractor(REFS_HEADS_MASTER);
+            assertTrue(extracted.getRight().stream().map(m -> m.pair()).flatMap(m -> m.stream()).allMatch(p -> p.getKey() != null && p.getRight() != null));
+            local.rm().addFilepattern("key").call();
+            local.commit().setMessage("removed key").call();
+            Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> extracted2 = se.sourceBranchExtractor(REFS_HEADS_MASTER);
+            assertTrue(extracted2.getRight().stream().map(m -> m.pair()).flatMap(m -> m.stream()).allMatch(p -> p.getKey() != null && p.getRight() == null));
+        }
+    }
+
     private void addFilesAndPush(final String key, File temporaryGitFolder, Git local) throws IOException, NoFilepatternException, GitAPIException {
         final Path file = temporaryGitFolder.toPath().resolve(key);
         final Path mfile = temporaryGitFolder.toPath().resolve(key + METADATA);
@@ -587,8 +605,14 @@ public class SourceExtractorTest {
         }
         Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE, TRUNCATE_EXISTING);
         local.add().addFilepattern(".").call();
-        local.commit().setMessage("Commit " + file.toString()).call();
-        local.push().call();
+        local.commit().setMessage("Commit " + file.toString()).call();        
+        verifyOkPush(local.push().call(),local.getRepository().getFullBranch());
+    }
+
+    private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+        PushResult pushResult = iterable.iterator().next();
+        RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
+        assertEquals(Status.OK, remoteUpdate.getStatus());
     }
 
     File getFolder() throws IOException {

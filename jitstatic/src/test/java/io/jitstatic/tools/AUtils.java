@@ -37,12 +37,13 @@ import org.hamcrest.Matchers;
 
 import com.codahale.metrics.health.HealthCheck.Result;
 
+import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.jitstatic.JitstaticConfiguration;
 import io.jitstatic.hosted.SourceHandler;
 import io.jitstatic.source.ObjectStreamProvider;
 
-public class Utils {
+public class AUtils {
 
     public static void checkContainerForErrors(DropwizardAppExtension<JitstaticConfiguration> dw) {
         SortedMap<String, Result> healthChecks = dw.getEnvironment().healthChecks().runHealthChecks();
@@ -54,7 +55,7 @@ public class Utils {
             return new StringBuilder(sw.toString());
         }).map(sb -> sb.append(",")).map(sb -> sb.toString()).collect(Collectors.joining(",")), errors.isEmpty(), Matchers.is(true));
     }
-    
+
     public static ObjectStreamProvider toProvider(byte[] data) {
         return new ObjectStreamProvider() {
             @Override
@@ -74,6 +75,15 @@ public class Utils {
             return SourceHandler.readStorageData(is);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }        
+    }
+
+    public static String getDropwizardConfigurationResource() {
+        if (System.getenv("CI") != null) {
+            return ResourceHelpers.resourceFilePath("simpleserver_ci.yaml");
+        } else {
+            return ResourceHelpers.resourceFilePath("simpleserver.yaml");
         }
     }
+
 }

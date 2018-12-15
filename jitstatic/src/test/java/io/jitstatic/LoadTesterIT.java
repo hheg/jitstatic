@@ -104,7 +104,7 @@ import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.Utils;
+import io.jitstatic.tools.AUtils;
 
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
@@ -181,7 +181,7 @@ public class LoadTesterIT {
         LOG.info("Git failures: {}", gitCounters.failiures);
         LOG.info("Put updates: {}", putCounters.updates);
         LOG.info("Put failures: {}", putCounters.failiures);
-        Utils.checkContainerForErrors(DW);
+        AUtils.checkContainerForErrors(DW);
     }
 
     private static void log(Runnable r) {

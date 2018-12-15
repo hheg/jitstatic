@@ -56,7 +56,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.Utils;
+import io.jitstatic.tools.AUtils;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
@@ -81,7 +81,7 @@ public class BulkResourceTest {
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(Utils.toProvider(new byte[] { 1 }));
+        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
         Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
         Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");

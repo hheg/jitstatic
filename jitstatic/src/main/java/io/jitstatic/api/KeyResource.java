@@ -89,16 +89,17 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class KeyResource {
+    private static final String DEFAULT_REF = "default ref";
     private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
-    private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {}";
-    private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} is denied for user {}";
+    private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {} in {}";
+    private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} in {} is denied for user {}";
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
     private final boolean cors;
-    
+
     public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, boolean cors) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
@@ -131,7 +132,7 @@ public class KeyResource {
         }
 
         if (!user.isPresent()) {
-            LOG.info("Resource {} needs a user", key);
+            LOG.info("Resource {} in {} needs a user", key,(ref == null ? DEFAULT_REF : ref));
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
@@ -139,7 +140,7 @@ public class KeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key);
+        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key, (ref == null ? DEFAULT_REF : ref));
         return buildResponse(storeInfo, tag, data, response);
     }
 
@@ -166,7 +167,7 @@ public class KeyResource {
                     final Set<User> allowedUsers = storageData.getUsers();
                     final Set<Role> keyRoles = storageData.getRead();
                     if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft());
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),(ref == null ? DEFAULT_REF : ref));
                         return true;
                     }
                     if (!userHolder.isPresent()) {
@@ -174,7 +175,7 @@ public class KeyResource {
                     }
                     final User user = userHolder.get();
                     if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft());
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(),(ref == null ? DEFAULT_REF : ref));
                         return true;
                     }
                     return false;
@@ -193,7 +194,7 @@ public class KeyResource {
         final StreamingOutput so = (output) -> {
             try (InputStream is = storeInfo.getStreamProvider().getInputStream()) {
                 is.transferTo(output);
-            }            
+            }
         };
         final ResponseBuilder responseBuilder = Response.ok(so).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
                 .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
@@ -245,7 +246,7 @@ public class KeyResource {
         }
 
         if (!(isAuthenticated || allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles))) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -272,13 +273,13 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {}", user, key);
+        LOG.info("{} logged in and modified key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
     void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
         if (!isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
@@ -329,7 +330,7 @@ public class KeyResource {
             try {
                 final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
                 if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
-                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
                     throw new WebApplicationException(Status.FORBIDDEN);
                 }
             } catch (RefNotFoundException e) {
@@ -340,12 +341,12 @@ public class KeyResource {
         final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
 
         if (storeInfo.isPresent()) {
-            throw new WebApplicationException(key + " already exist", Status.CONFLICT);
+            throw new WebApplicationException(key + " already exist in "+(ref == null ? DEFAULT_REF : ref), Status.CONFLICT);
         }
 
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
                 new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
-        LOG.info("{} logged in and added key {}", user, key);
+        LOG.info("{} logged in and added key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -374,7 +375,7 @@ public class KeyResource {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
                 throw new WebApplicationException(Status.BAD_REQUEST);
             }
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -388,7 +389,7 @@ public class KeyResource {
             LOG.error("Unknown API error", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
-        LOG.info("{} logged in and deleted key {}", user, key);
+        LOG.info("{} logged in and deleted key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
         return Response.ok().build();
     }
 

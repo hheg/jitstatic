@@ -192,6 +192,7 @@ public class RefHolderTest {
     public void testRefresh() throws RefNotFoundException, IOException {
         StoreInfo storeInfo = mock(StoreInfo.class);
         SourceInfo sourceInfo = mock(SourceInfo.class);
+        when(storeInfo.isNormalKey()).thenReturn(true);
         when(sourceInfo.getSourceProvider()).thenReturn(toProvider(getData().getBytes(UTF_8)));
         when(sourceInfo.readMetaData()).thenCallRealMethod();
         when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));

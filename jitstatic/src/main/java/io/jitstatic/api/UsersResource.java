@@ -71,8 +71,9 @@ import io.jitstatic.utils.Pair;
 @Path("users")
 public class UsersResource {
 
+    private static final String DEFAULT_REF = "default ref";
     private static final Logger LOG = LoggerFactory.getLogger(UsersResource.class);
-    private static final String UTF_8 = null;
+    private static final String UTF_8 = "utf-8";
     private final Storage storage;
     private final KeyAdminAuthenticator adminKeyAuthenticator;
     private final APIHelper helper;
@@ -115,7 +116,7 @@ public class UsersResource {
             if (noChange != null) {
                 return noChange;
             }
-            LOG.info("{} logged in and accessed {}", user, key);
+            LOG.info("{} logged in and accessed {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
             return Response.ok(value.getRight()).tag(new EntityTag(value.getLeft())).encoding("utf-8").build();
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -161,7 +162,7 @@ public class UsersResource {
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
-                LOG.info("{} logged in and modified key {}", user, key);
+                LOG.info("{} logged in and modified key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
                 return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
             }
             throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
@@ -196,7 +197,7 @@ public class UsersResource {
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
-                LOG.info("{} logged in and added key {}", user, key);
+                LOG.info("{} logged in and added key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
                 return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
             }
             throw new WebApplicationException(key + " already exist", Status.CONFLICT);

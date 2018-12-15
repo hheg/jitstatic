@@ -47,8 +47,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
@@ -68,7 +68,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.testing.ConfigOverride;
-import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.auth.UserData;
@@ -81,7 +80,7 @@ import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.Utils;
+import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class HostOwnGitRepositoryTest {
@@ -98,7 +97,7 @@ public class HostOwnGitRepositoryTest {
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
     private TemporaryFolder tmpFolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            ResourceHelpers.resourceFilePath("simpleserver.yaml"), ConfigOverride.config("hosted.basePath", getFolderString()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolderString()));
 
     private UsernamePasswordCredentialsProvider provider;
 
@@ -114,7 +113,7 @@ public class HostOwnGitRepositoryTest {
 
     @AfterEach
     public void after() {
-        Utils.checkContainerForErrors(DW);
+        AUtils.checkContainerForErrors(DW);
     }
 
     @Test
@@ -514,6 +513,48 @@ public class HostOwnGitRepositoryTest {
         try (JitStaticClient cclient = buildCreatorClient().setPassword("1234").setUser(TEST_USER).build()) {
             assertNotNull(cclient.createKey(new byte[] { 1 }, new CommitData("string/key", "msg", "user", "mail"),
                     new MetaData(Set.of(new MetaData.User("news", "1234")), "application/json")));
+        }
+    }
+
+    @Test
+    public void testPhantomKeys() throws Exception {
+        String localFilePath = STORE;
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticClient client = buildClient();) {
+            String repopath = getRepopath(git);
+            Path path = Paths.get(repopath, localFilePath);
+            Path mpath = Paths.get(repopath, METADATA);
+            Files.createDirectories(path.getParent());
+            Files.write(path, getData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+            Files.write(mpath, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Inital commit").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            Entity key = client.getKey(STORE, tf);
+            assertNotNull(key.data);
+            git.rm().addFilepattern(STORE).call();
+            git.commit().setMessage("removed file").call();
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(STORE, tf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testDeleteFileButMetadataIsStillLeft() throws Exception {
+        String localFilePath = STORE;
+        Path working = getFolder();
+        try (Git git = Git.cloneRepository().setDirectory(working.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call();
+                JitStaticClient client = buildClient();) {
+            assertNotNull(createData(localFilePath, git));
+            Entity key = client.getKey(STORE, tf);
+            assertNotNull(key.data);
+            git.rm().addFilepattern(STORE).call();
+            git.commit().setMessage("removed file").call();
+            Iterable<PushResult> iterable = git.push().setCredentialsProvider(provider).call();
+            PushResult pushResult = iterable.iterator().next();
+            RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(REFS_HEADS_MASTER);
+            assertEquals(Status.REJECTED_OTHER_REASON, remoteUpdate.getStatus());
         }
     }
 
