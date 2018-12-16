@@ -58,6 +58,7 @@ import org.apache.http.impl.client.cache.CachingHttpClients;
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.PullResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -108,9 +109,10 @@ import io.jitstatic.tools.AUtils;
 
 /*
  * This test is a stress test, and the expected behavior is that the commits will end up in order.
- * Two common errors:
- * WantNotValidException happens when the git client is out of sync when pulling
- * Broken pipe. The git client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
+ * Two common "normal" errors:
+ * WantNotValidException happens when the jgit client is out of sync when pulling.
+ * Broken pipe. The jgit client sometimes suffers a broken pipe. Most likely due to that a connection isn't closed properly.
+ * This bug happens in the jgit client.
  */
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
@@ -236,8 +238,9 @@ public class LoadTesterIT {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         int localPort = DW.getLocalPort();
         String gitAdress = String.format("http://localhost:%d/application/%s/%s", localPort, hf.getServletName(), hf.getHostedEndpoint());
-        ExecutorService clientPool = Executors.newFixedThreadPool(data.clients);
-        ExecutorService updaterPool = Executors.newFixedThreadPool(data.updaters);
+
+        ExecutorService clientPool = Executors.newFixedThreadPool(Math.max(1, data.clients));
+        ExecutorService updaterPool = Executors.newFixedThreadPool(Math.max(1, data.updaters));
         try {
             initRepo(getCredentials(hf), data);
             for (int i = 0; i < data.clients; i++) {
@@ -253,8 +256,8 @@ public class LoadTesterIT {
             doWork(data, clients, updaters, clientPool, updaterPool, clientJobs, updaterJobs);
             waitForJobstoFinish(clientJobs, updaterJobs);
         } finally {
-            putCounters = clients.stream().map(JitStaticUpdater::counter).reduce(Counters::add).get();
-            gitCounters = updaters.stream().map(GitClientUpdater::counter).reduce(Counters::add).get();
+            putCounters = clients.stream().map(JitStaticUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0));
+            gitCounters = updaters.stream().map(GitClientUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0));
             clients.stream().forEach(c -> {
                 try {
                     c.close();
@@ -281,22 +284,22 @@ public class LoadTesterIT {
         } while (System.currentTimeMillis() - start < 10_000);
     }
 
-    private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs) {
-        CompletableFuture<Void> allClientJobs = CompletableFuture.allOf(clientJobs);
-        CompletableFuture<Void> allUpdaterJobs = CompletableFuture.allOf(updaterJobs);
-        waitForJobs(allClientJobs);
-        waitForJobs(allUpdaterJobs);
+    private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture.allOf(
+                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(clientJobs), "direct clients")),
+                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(updaterJobs), "git clients"))).get(60, TimeUnit.SECONDS);
     }
 
-    private void waitForJobs(CompletableFuture<Void> jobs) {
+    private void waitForJobs(CompletableFuture<Void> jobs, String type) {
         long start = System.currentTimeMillis();
         try {
-            LOG.info("Waiting...");
-            jobs.get(60, TimeUnit.SECONDS);
+            LOG.info("Waiting for {}...", type);
+            jobs.get(59, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
-            LOG.error("Failed to wait", e);
+            LOG.error("Failed to wait {}", type, e);
         } finally {
-            LOG.info("Waited {} ms to terminate", (System.currentTimeMillis() - start));
+            LOG.info("Waited {} ms to terminate {}", (System.currentTimeMillis() - start), type);
         }
     }
 
@@ -308,11 +311,9 @@ public class LoadTesterIT {
                 updaterJobs[i] = CompletableFuture.runAsync(() -> {
                     GitClientUpdater cu = take(updaters);
                     try {
-                        synchronized (cu) {
-                            for (String branch : data.branches) {
-                                for (String name : data.names) {
-                                    cu.updateClient(name, branch, data);
-                                }
+                        for (String branch : data.branches) {
+                            for (String name : data.names) {
+                                cu.updateClient(name, branch, data);
                             }
                         }
                     } catch (Exception e) {
@@ -320,7 +321,6 @@ public class LoadTesterIT {
                     } finally {
                         updaters.add(cu);
                     }
-
                 }, updaterPool);
             }
         }
@@ -348,6 +348,7 @@ public class LoadTesterIT {
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, TestData testData)
             throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+        LOG.info("Setting up repo");
         File workingFolder = getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             int c = 0;
@@ -356,12 +357,12 @@ public class LoadTesterIT {
             git.add().addFilepattern(".").call();
             git.commit().setMessage("i:a:0").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
-            String value = new String(data, "UTF-8");
-            pushBranches(provider, testData, git, c, value);
+            pushBranches(provider, testData, git, c);
         }
+        LOG.info("Done setting up repo");
     }
 
-    private void pushBranches(UsernamePasswordCredentialsProvider provider, TestData testData, Git git, int c, String value)
+    private void pushBranches(UsernamePasswordCredentialsProvider provider, TestData testData, Git git, int c)
             throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
             UnsupportedEncodingException, InvalidRemoteException, TransportException {
         for (String branch : testData.branches) {
@@ -557,64 +558,67 @@ public class LoadTesterIT {
     private class GitClientUpdater {
 
         private final File workingFolder;
-        private final String name;
-        private final String pass;
         private final Counters counter;
+        private final UsernamePasswordCredentialsProvider provider;
 
         public GitClientUpdater(final String gitAdress, String name, String pass) throws IOException {
             this.workingFolder = getFolderFile();
-            this.name = name;
-            this.pass = pass;
             this.counter = new Counters(0, 0);
+            this.provider = getCredentials(name, pass);
         }
 
-        public synchronized void initRepo() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
-            Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(getCredentials(name, pass)).call()
+        public void initRepo() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+            Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()
                     .close();
         }
 
         public void updateClient(String key, String branch, TestData testData)
                 throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
             try (Git git = Git.open(workingFolder)) {
-                UsernamePasswordCredentialsProvider provider = getCredentials(name, pass);
                 Ref head = checkoutBranch(branch, git);
-                git.pull().setCredentialsProvider(provider).call();
-                Path filedata = Paths.get(workingFolder.toURI()).resolve(key);
-                JsonNode readData = readData(filedata);
-                int c = readData.get("data").asInt() + 1;
-                byte[] data = getData(c);
-                Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                DirCache dc = git.add().addFilepattern(".").call();
-                if (dc.getEntryCount() > 0) {
-                    String message = "g:" + key + ":" + c;
-                    git.commit().setMessage(message).call();
-                    boolean ok = false;
-                    try {
-                        ok = verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
-                    } finally {
-                        if (!ok) {
-                            git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
-                            git.clean().setCleanDirectories(true).setForce(true).call();
+                try {
+                    PullResult pr = git.pull().setCredentialsProvider(provider).call();
+                    if (pr.isSuccessful()) {
+                        Path filedata = Paths.get(workingFolder.toURI()).resolve(key);
+                        JsonNode readData = readData(filedata);
+                        int c = readData.get("data").asInt() + 1;
+                        byte[] data = getData(c);
+                        Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        DirCache dc = git.add().addFilepattern(".").call();
+                        if (dc.getEntryCount() > 0) {
+                            String message = "g:" + key + ":" + c;
+                            git.commit().setMessage(message).call();
+                            boolean ok = false;
+                            try {
+                                ok = verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
+                            } finally {
+                                if (!ok) {
+                                    git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
+                                    git.clean().setCleanDirectories(true).setForce(true).call();
+                                }
+                            }
+                            if (ok) {
+                                counter.updates++;
+                                String v = new String(data, "UTF-8");
+                                log(() -> LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, v, message));
+                            } else {
+                                counter.failiures++;
+                            }
                         }
-                    }
-                    if (ok) {
-                        counter.updates++;
-                        String v = new String(data, "UTF-8");
-                        log(() -> LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, v, message));
                     } else {
-                        counter.failiures++;
+                        LOG.info("Failed to pull f:{} m:{}", pr.getFetchResult(), pr.getMergeResult());
                     }
+                } catch (TransportException e) {
+                    counter.failiures++;
+                    Throwable cause = e.getCause();
+                    if (cause == null) {
+                        throw e;
+                    }
+                    if (!(cause instanceof org.eclipse.jgit.errors.TransportException)) {
+                        throw e;
+                    }
+                    LOG.warn("Got known error {}", cause.getMessage());                    
                 }
-            } catch (TransportException e) {
-                Throwable cause = e.getCause();
-                if (cause == null) {
-                    throw e;
-                }
-                if (!(cause instanceof org.eclipse.jgit.errors.TransportException)) {
-                    throw e;
-                }
-                LOG.warn("Got known error {}", cause.getMessage());
-                counter.failiures++;
             }
         }
 

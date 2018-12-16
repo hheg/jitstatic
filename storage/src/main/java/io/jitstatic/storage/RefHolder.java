@@ -69,7 +69,7 @@ public class RefHolder implements RefHolderLock {
     private static final int MAX_ENTRIES = 1000;
     private static final int THREASHOLD = 1_000_000;
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
-    private volatile Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
+    private Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final RefLock lock = new RefLock();
     private final String ref;
     private final Source source;
@@ -93,7 +93,15 @@ public class RefHolder implements RefHolderLock {
     }
 
     public Optional<StoreInfo> getKey(final String key) {
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> data = read(() -> refCache.get(key));
+        return unwrapKey(() -> refCache.get(key));
+    }
+
+    public Optional<StoreInfo> readKey(String key) {
+        return unwrapKey(() -> read(() -> refCache.get(key)));
+    }
+
+    private Optional<StoreInfo> unwrapKey(Supplier<Either<Optional<StoreInfo>, Pair<String, UserData>>> supplier) {
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> data = supplier.get();
         if (data != null && data.isLeft()) {
             return data.getLeft();
         }
@@ -165,7 +173,7 @@ public class RefHolder implements RefHolderLock {
                 .filter(p -> {
                     final StoreInfo newValue = p.getRight();
                     final Either<Optional<StoreInfo>, Pair<String, UserData>> oldCachedValue = refCache.get(p.getLeft());
-                    if(oldCachedValue == null) {
+                    if (oldCachedValue == null) {
                         return false;
                     }
                     if (oldCachedValue.isLeft() && oldCachedValue.getLeft().isPresent()) {
@@ -254,10 +262,11 @@ public class RefHolder implements RefHolderLock {
 
     public boolean refresh() {
         LOG.info("Reloading {}", ref);
-        final Set<String> files = refCache.entrySet().stream().filter(e -> {
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
-            return (value.isLeft() && value.getLeft().isPresent());
-        }).map(Entry::getKey).collect(Collectors.toSet());
+        final Set<String> files = refCache.entrySet().stream()
+                .filter(e -> {
+                    final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
+                    return (value.isLeft() && value.getLeft().isPresent());
+                }).map(Entry::getKey).collect(Collectors.toSet());
         final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> newMap = refreshFiles(files);
         boolean isRefreshed = !newMap.isEmpty();
         if (isRefreshed) {
@@ -451,7 +460,7 @@ public class RefHolder implements RefHolderLock {
     private static class RefLock {
 
         private final ReentrantReadWriteLock refLock = new ReentrantReadWriteLock(true);
-        private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();        
+        private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
 
         public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key, final String ref) {
             if (tryLock(key)) {
@@ -533,5 +542,4 @@ public class RefHolder implements RefHolderLock {
             return Either.right(new FailedToLock(ref));
         }
     }
-
 }

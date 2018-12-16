@@ -1,7 +1,5 @@
 package io.jitstatic.hosted;
 
-import java.util.List;
-
 /*-
  * #%L
  * jitstatic
@@ -22,13 +20,20 @@ import java.util.List;
  * #L%
  */
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.transport.PreUploadHookChain;
 import org.eclipse.jgit.transport.UploadPack;
+import org.eclipse.jgit.transport.UploadPack.RequestPolicy;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
@@ -37,10 +42,10 @@ import io.jitstatic.JitStaticConstants;
 
 public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServletRequest> {
 
-    private final ErrorReporter errorReporter;
+    private final ExecutorService executorService;
 
-    public JitStaticUploadPackFactory(final ErrorReporter errorReporter) {
-        this.errorReporter = errorReporter;
+    public JitStaticUploadPackFactory(ExecutorService executorService) {
+        this.executorService = Objects.requireNonNull(executorService);
     }
 
     static class ServiceConfig {
@@ -55,18 +60,13 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
     @Override
     public UploadPack create(final HttpServletRequest req, final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         if (db.getConfig().get(ServiceConfig::new).enabled) {
-            final JitStaticUploadPack jitStaticUploadPack = new JitStaticUploadPack(db, errorReporter);
+            final PackConfig cfg = new PackConfig(db.getConfig());            
+            cfg.setExecutor(executorService);
+            final UploadPack jitStaticUploadPack = new UploadPack(db);
+            jitStaticUploadPack.setRequestPolicy(RequestPolicy.ANY);
+            jitStaticUploadPack.setPackConfig(cfg);
             jitStaticUploadPack.setPreUploadHook(PreUploadHookChain.newChain(List.of(new LogoPoster())));
-            jitStaticUploadPack.setRefFilter(refs -> {
-                if (refs != null && !req.isUserInRole(JitStaticConstants.SECRETS)) {
-                    Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
-                    Ref head = refs.get("HEAD");
-                    if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
-                        refs.remove("HEAD");
-                    }
-                }
-                return refs;
-            });
+            jitStaticUploadPack.setRefFilter(new JitStaticRefFilter(req));
             return jitStaticUploadPack;
         } else
             throw new ServiceNotEnabledException();

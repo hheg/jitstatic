@@ -34,6 +34,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -88,6 +91,7 @@ public class HostedGitRepositoryManager implements Source {
     private final JitStaticUploadPackFactory uploadPackFactory;
     private final UserExtractor userExtractor;
     private final UserUpdater userUpdater;
+    private final ExecutorService uploadPackExecutor;
 
     HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter)
             throws CorruptedSourceException, IOException {
@@ -120,13 +124,14 @@ public class HostedGitRepositoryManager implements Source {
         if (!errors.isEmpty()) {
             throw new CorruptedSourceException(errors);
         }
+        this.uploadPackExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
         checkIfDefaultBranchExist(defaultRef);
         final RepositoryUpdater repositoryUpdater = new RepositoryUpdater(this.bareRepository);
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(repositoryUpdater);
         this.repositoryBus = new RepositoryBus(errorReporter);
         this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, repositoryBus, userExtractor);
-        this.uploadPackFactory = new JitStaticUploadPackFactory(errorReporter);
+        this.uploadPackFactory = new JitStaticUploadPackFactory(uploadPackExecutor);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
         this.userUpdater = new UserUpdater(repositoryUpdater);
@@ -180,7 +185,14 @@ public class HostedGitRepositoryManager implements Source {
     public void close() {
         try {
             this.bareRepository.close();
-        } catch (final Exception ignore) {
+        } catch (Exception ignore) {
+            // NOOP
+        }
+        try {
+            this.uploadPackExecutor.shutdown();
+            this.uploadPackExecutor.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (Exception ignore) {
+            // NOOP
         }
     }
 

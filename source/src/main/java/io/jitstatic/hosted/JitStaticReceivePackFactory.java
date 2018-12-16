@@ -87,16 +87,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));
-        rp.setRefFilter(refs -> {
-                if (refs != null && !req.isUserInRole(JitStaticConstants.SECRETS)) {
-                    Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
-                    Ref head = refs.get("HEAD");
-                    if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
-                        refs.remove("HEAD");
-                    }
-                }
-                return refs;
-            });
+        rp.setRefFilter(new JitStaticRefFilter(req));
         return rp;
     }
 

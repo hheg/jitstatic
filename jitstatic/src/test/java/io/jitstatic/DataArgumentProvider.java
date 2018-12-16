@@ -39,7 +39,9 @@ public class DataArgumentProvider implements ArgumentsProvider {
                 new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, true, 50, 1),
                 new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, true, 50, 1),
                 new TestData(new String[] { "a", "b", "c", "d", "e", "f", "g" },
-                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 1))
+                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 1),
+//                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 0, 30),
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 2, 0))
                 .map(Arguments::of);
     }
 
