@@ -77,31 +77,31 @@ public class BulkResource {
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> userHolder) {
-        final List<Pair<List<Pair<String, StoreInfo>>, String>> searchResults = storage.getList(searches.stream()
+        final List<SearchResult> result = storage.getList(searches.stream()
                 .map(bs -> Pair.of(bs.getPaths().stream()
                         .map(sp -> Pair.of(sp.getPath(), sp.isRecursively()))
                         .collect(Collectors.toList()), bs.getRef()))
-                .collect(Collectors.toList()));
-        final List<SearchResult> result = searchResults.stream().map(p -> p.getKey().stream().filter(data -> {
-            final String ref = p.getRight();
-            final MetaData storageData = data.getRight().getMetaData();
-            final Set<User> allowedUsers = storageData.getUsers();
-            final Set<Role> keyRoles = storageData.getRead();
-            if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
-                        (ref == null ? DEFAULT_REF : ref));
-                return true;
-            }
-            if (!userHolder.isPresent()) {
-                return false;
-            }
-            final User user = userHolder.get();
-            if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
-                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), (ref == null ? DEFAULT_REF : ref));
-                return true;
-            }
-            return false;
-        }).map(ps -> new SearchResult(ps, p.getRight())))
+                .collect(Collectors.toList())).stream()
+                .map(p -> p.getKey().stream()
+                        .filter(data -> {
+                            final String ref = p.getRight();
+                            final MetaData storageData = data.getRight().getMetaData();
+                            final Set<User> allowedUsers = storageData.getUsers();
+                            final Set<Role> keyRoles = storageData.getRead();
+                            if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(), (ref == null ? DEFAULT_REF : ref));
+                                return true;
+                            }
+                            if (!userHolder.isPresent()) {
+                                return false;
+                            }
+                            final User user = userHolder.get();
+                            if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
+                                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), (ref == null ? DEFAULT_REF : ref));
+                                return true;
+                            }
+                            return false;
+                        }).map(ps -> new SearchResult(ps, p.getRight())))
                 .flatMap(s -> s)
                 .collect(Collectors.toList());
         if (result.isEmpty()) {
@@ -113,7 +113,7 @@ public class BulkResource {
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
         try {
-            UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
             if (userData == null) {
                 return false;
             }

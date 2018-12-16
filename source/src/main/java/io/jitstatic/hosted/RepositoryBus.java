@@ -58,5 +58,4 @@ public class RepositoryBus {
     void addListener(final SourceEventListener listener) {
         this.sourceEventListeners.add(listener);
     }
-
 }

@@ -28,6 +28,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -40,6 +43,7 @@ import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -48,9 +52,10 @@ import io.jitstatic.hosted.JitStaticUploadPackFactory.ServiceConfig;
 
 public class JitStaticUploadPackFactoryTest {
 
+    private static ExecutorService service = Executors.newSingleThreadExecutor();
+
     @Test
     public void testCreate() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-        ErrorReporter reporter = new ErrorReporter();
         HttpServletRequest req = mock(HttpServletRequest.class);
         Repository db = mock(Repository.class);
         StoredConfig scfg = mock(StoredConfig.class);
@@ -62,13 +67,12 @@ public class JitStaticUploadPackFactoryTest {
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(true);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
 
-        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(reporter);
+        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(service);
         assertNotNull(jsrpf.create(req, db));
     }
 
     @Test
     public void testServiceNotEnabledException() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-        ErrorReporter reporter = new ErrorReporter();
         HttpServletRequest req = mock(HttpServletRequest.class);
         Repository db = mock(Repository.class);
         StoredConfig scfg = mock(StoredConfig.class);
@@ -80,13 +84,12 @@ public class JitStaticUploadPackFactoryTest {
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(false);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
 
-        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(reporter);
+        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(service);
         assertThrows(ServiceNotEnabledException.class, () -> jsrpf.create(req, db));
     }
 
     @Test
     public void testSecretsFilter() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-        ErrorReporter reporter = new ErrorReporter();
         HttpServletRequest req = mock(HttpServletRequest.class);
         Repository db = mock(Repository.class);
         StoredConfig scfg = mock(StoredConfig.class);
@@ -103,12 +106,22 @@ public class JitStaticUploadPackFactoryTest {
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(true);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
 
-        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(reporter);
+        JitStaticUploadPackFactory jsrpf = new JitStaticUploadPackFactory(service);
         UploadPack up = jsrpf.create(req, db);
         Map<String, Ref> map = new HashMap<>();
         map.put("refs/heads/secrets", secrets);
         map.put("HEAD", head);
         Map<String, Ref> filtered = up.getRefFilter().filter(map);
         assertTrue(filtered.isEmpty());
+    }
+
+    @AfterAll
+    public static void tearDown() {
+        try {
+            service.shutdown();
+            service.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (Exception ignore) {
+            // ignore
+        }
     }
 }

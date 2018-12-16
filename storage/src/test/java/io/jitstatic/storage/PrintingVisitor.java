@@ -1,5 +1,7 @@
 package io.jitstatic.storage;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /*-
  * #%L
  * jitstatic
@@ -23,7 +25,6 @@ package io.jitstatic.storage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import io.jitstatic.storage.Tree.Branch;
@@ -40,10 +41,10 @@ public class PrintingVisitor implements TreeVisitor<Void> {
     private final byte[] indent;
 
     static {
-        BRANCHES = ("|-").getBytes(StandardCharsets.UTF_8);
-        LEAFS = ("|--").getBytes(StandardCharsets.UTF_8);
+        BRANCHES = ("|-").getBytes(UTF_8);
+        LEAFS = ("|--").getBytes(UTF_8);
         DASH = new byte[] { '/' };
-        NL = System.lineSeparator().getBytes(StandardCharsets.UTF_8);
+        NL = System.lineSeparator().getBytes(UTF_8);
     }
 
     public PrintingVisitor(final OutputStream os) {
@@ -80,7 +81,7 @@ public class PrintingVisitor implements TreeVisitor<Void> {
     }
 
     private void printBranchHeader(Branch tree) {
-        write((tree.getName()).getBytes(StandardCharsets.UTF_8));
+        write((tree.getName()).getBytes(UTF_8));
         write(DASH);
         write(NL);
     }
@@ -111,7 +112,7 @@ public class PrintingVisitor implements TreeVisitor<Void> {
     }
 
     private void printTree(Tree tree) {
-        write((tree.getName()).getBytes(StandardCharsets.UTF_8));
+        write((tree.getName()).getBytes(UTF_8));
         write(NL);
     }
 

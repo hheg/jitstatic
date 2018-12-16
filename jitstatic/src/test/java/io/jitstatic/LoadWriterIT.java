@@ -199,13 +199,11 @@ public class LoadWriterIT {
     }
 
     private String setupRun(JitStaticClient buildKeyClient, String branch, final String key) {
-        String tag;
         try {
-            tag = buildKeyClient.getKey(key, branch, LoadWriterIT::read).tag;
+            return buildKeyClient.getKey(key, branch, LoadWriterIT::read).tag;
         } catch (URISyntaxException | IOException e1) {
             throw new RuntimeException(e1);
         }
-        return tag;
     }
 
     @AfterEach
@@ -256,12 +254,11 @@ public class LoadWriterIT {
             git.add().addFilepattern(".").call();
             git.commit().setMessage("i:a:0").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
-            String value = new String(data, UTF_8);
-            pushBranches(provider, testData, git, c, value);
+            pushBranches(provider, testData, git, c);
         }
     }
 
-    private void pushBranches(UsernamePasswordCredentialsProvider provider, WriteData testData, Git git, int c, String value)
+    private void pushBranches(UsernamePasswordCredentialsProvider provider, WriteData testData, Git git, int c)
             throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
             UnsupportedEncodingException, InvalidRemoteException, TransportException {
         for (String branch : testData.branches) {

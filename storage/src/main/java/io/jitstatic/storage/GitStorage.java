@@ -72,8 +72,7 @@ public class GitStorage implements Storage {
     }
 
     public void reload(final List<String> refsToReload) {
-        Objects.requireNonNull(refsToReload);
-        refsToReload.stream().forEach(ref -> {
+        Objects.requireNonNull(refsToReload).stream().forEach(ref -> {
             final RefHolder refHolder = cache.get(ref);
             if (refHolder != null) {
                 if (!refHolder.reloadAll(() -> {
@@ -82,7 +81,7 @@ public class GitStorage implements Storage {
                     }
                 })) {
                     final String msg = String.format("Failed to reload %s because couldn't aquire lock", ref);
-                    LOG.info(msg);
+                    LOG.error(msg);
                     throw new ShouldNeverHappenException(msg);
                 }
             }
@@ -122,7 +121,7 @@ public class GitStorage implements Storage {
 
         final String finalRef = checkRef(ref);
         final RefHolder refHolder = getRefHolder(finalRef);
-        final Optional<StoreInfo> storeInfo = refHolder.getKey(key);
+        final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
         if (storeInfo == null) {
             return refHolder.loadAndStore(key);
         }
@@ -319,7 +318,7 @@ public class GitStorage implements Storage {
                             return List.<Pair<String, StoreInfo>>of();
                         }
                     }
-                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);
+                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);                    
                     if (keyContent.isPresent()) {
                         return List.of(Pair.of(key, keyContent.get()));
                     }
