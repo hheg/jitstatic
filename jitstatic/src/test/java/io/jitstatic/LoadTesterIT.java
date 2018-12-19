@@ -27,7 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -364,7 +363,7 @@ public class LoadTesterIT {
 
     private void pushBranches(UsernamePasswordCredentialsProvider provider, TestData testData, Git git, int c)
             throws GitAPIException, RefAlreadyExistsException, RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
-            UnsupportedEncodingException, InvalidRemoteException, TransportException {
+            InvalidRemoteException, TransportException {
         for (String branch : testData.branches) {
             if (!MASTER.equals(branch)) {
                 git.checkout().setName(branch).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
@@ -373,7 +372,7 @@ public class LoadTesterIT {
         }
     }
 
-    private void writeFiles(TestData testData, File workingFolder, byte[] data) throws IOException, UnsupportedEncodingException {
+    private void writeFiles(TestData testData, File workingFolder, byte[] data) throws IOException {
         Path path = Paths.get(workingFolder.toURI());
         Path user = path.resolve(JitStaticConstants.USERS).resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM).resolve(USER);
         assertTrue(user.getParent().toFile().mkdirs());
@@ -389,12 +388,12 @@ public class LoadTesterIT {
         }
     }
 
-    private static byte[] getMetaData() throws UnsupportedEncodingException {
+    private static byte[] getMetaData() {
         String md = "{\"users\":[],\"contentType\":\"application/json\",\"protected\":false,\"hidden\":false,\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}";
         return md.getBytes(UTF_8);
     }
 
-    private static byte[] getData(int c) throws UnsupportedEncodingException {
+    private static byte[] getData(int c) {
         String s = "{\"data\":" + c + ",\"salt\":\"" + UUID.randomUUID() + "\"}";
         return s.getBytes(UTF_8);
     }
@@ -445,7 +444,7 @@ public class LoadTesterIT {
         return client;
     }
 
-    private static boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) throws UnsupportedEncodingException {
+    private static boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) {
         PushResult pushResult = iterable.iterator().next();
         RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate("refs/heads/" + branch);
         if (Status.OK == remoteUpdate.getStatus()) {
@@ -573,7 +572,7 @@ public class LoadTesterIT {
         }
 
         public void updateClient(String key, String branch, TestData testData)
-                throws UnsupportedEncodingException, IOException, NoFilepatternException, GitAPIException {
+                throws IOException, NoFilepatternException, GitAPIException {
             try (Git git = Git.open(workingFolder)) {
                 Ref head = checkoutBranch(branch, git);
                 try {
@@ -599,7 +598,7 @@ public class LoadTesterIT {
                             }
                             if (ok) {
                                 counter.updates++;
-                                String v = new String(data, "UTF-8");
+                                String v = new String(data, UTF_8);
                                 log(() -> LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, v, message));
                             } else {
                                 counter.failiures++;

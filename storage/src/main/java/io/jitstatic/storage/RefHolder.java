@@ -35,6 +35,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.slf4j.Logger;
@@ -86,20 +88,24 @@ public class RefHolder implements RefHolderLock {
         return new LinkedHashMap<>(size) {
             private static final long serialVersionUID = 1L;
 
-            protected boolean removeEldestEntry(final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
+            protected boolean removeEldestEntry(
+                    final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
                 return size() > MAX_ENTRIES;
             }
         };
     }
 
-    public Optional<StoreInfo> getKey(final String key) {
+    @Nullable
+    Optional<StoreInfo> getKey(final String key) {
         return unwrapKey(() -> refCache.get(key));
     }
 
+    @Nullable
     public Optional<StoreInfo> readKey(String key) {
         return unwrapKey(() -> read(() -> refCache.get(key)));
     }
 
+    @Nullable
     private Optional<StoreInfo> unwrapKey(Supplier<Either<Optional<StoreInfo>, Pair<String, UserData>>> supplier) {
         final Either<Optional<StoreInfo>, Pair<String, UserData>> data = supplier.get();
         if (data != null && data.isLeft()) {
@@ -140,7 +146,8 @@ public class RefHolder implements RefHolderLock {
         return refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true));
     }
 
-    public void refreshMetaData(final MetaData metaData, final String key, final String oldMetaDataVersion, final String newMetaDataVersion) {
+    public void refreshMetaData(final MetaData metaData, final String key, final String oldMetaDataVersion,
+            final String newMetaDataVersion) {
         write(() -> {
             final Optional<StoreInfo> storeInfo = refCache.get(key).getLeft();
             storeInfo.ifPresent(si -> {
@@ -149,7 +156,8 @@ public class RefHolder implements RefHolderLock {
                         refCache.clear();
                         putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
                     } else {
-                        putKey(key, Optional.of(new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
+                        putKey(key, Optional.of(
+                                new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
                     }
                 }
             });
@@ -178,7 +186,8 @@ public class RefHolder implements RefHolderLock {
                     }
                     if (oldCachedValue.isLeft() && oldCachedValue.getLeft().isPresent()) {
                         final StoreInfo value = oldCachedValue.getLeft().get();
-                        return (newValue.isNormalKey() && value.isNormalKey()) || (newValue.isMasterMetaData() && value.isMasterMetaData());
+                        return (newValue.isNormalKey() && value.isNormalKey())
+                                || (newValue.isMasterMetaData() && value.isMasterMetaData());
                     }
                     return false;
                 })
@@ -194,25 +203,26 @@ public class RefHolder implements RefHolderLock {
             } catch (RefNotFoundException ignore) {
                 // Ignoring that ref wasn't found
             } catch (Exception e) {
-                return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(new Exception(key + " in " + ref + " had the following error", e));
+                return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(
+                        new Exception(key + " in " + ref + " had the following error", e));
             }
             return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.<Pair<String, StoreInfo>>empty());
         }).collect(Collectors.toCollection(() -> new ArrayList<>(files.size())));
     }
 
     Optional<StoreInfo> loadAndStore(final String key) {
-        Optional<StoreInfo> storeInfoContainer = getKey(key);
-        if (storeInfoContainer == null) {
-            try {
-                final StoreInfo storeInfo = load(key);
-                storeInfoContainer = store(key, storeInfo);
-            } catch (RefNotFoundException e) {
-                throw new LoadException(e);
-            }
-        }
-        return storeInfoContainer;
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> value = write(
+                () -> refCache.computeIfAbsent(key, k -> {
+                    try {
+                        return Either.left(isStorable(key, load(key)));
+                    } catch (RefNotFoundException e) {
+                        throw new LoadException(e);
+                    }
+                }));
+        return value.fold(s -> s, s -> Optional.empty());
     }
 
+    @Nullable
     private StoreInfo load(final String key) throws RefNotFoundException {
         final SourceInfo sourceInfo = lock.readThrow(() -> source.getSourceInfo(key, ref));
         if (sourceInfo != null) {
@@ -220,7 +230,8 @@ public class RefHolder implements RefHolderLock {
                 final MetaData metaData = sourceInfo.readMetaData();
                 if (!metaData.isHidden()) {
                     if (!sourceInfo.isMetaDataSource()) {
-                        return new StoreInfo(sourceInfo.getSourceProvider(), metaData, sourceInfo.getSourceVersion(), sourceInfo.getMetaDataVersion());
+                        return new StoreInfo(sourceInfo.getSourceProvider(), metaData, sourceInfo.getSourceVersion(),
+                                sourceInfo.getMetaDataVersion());
                     } else {
                         return new StoreInfo(metaData, sourceInfo.getMetaDataVersion());
                     }
@@ -231,17 +242,6 @@ public class RefHolder implements RefHolderLock {
             }
         }
         return null;
-    }
-
-    private Optional<StoreInfo> store(final String key, final StoreInfo storeInfo) {
-        Optional<StoreInfo> storeInfoContainer = isStorable(key, storeInfo);
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = write(() -> refCache.compute(key, (k, v) -> {
-            if (v == null) {
-                return Either.left(storeInfoContainer);
-            }
-            return v;
-        }));
-        return computed != null && computed.isLeft() ? computed.getLeft() : storeInfoContainer;
     }
 
     private Optional<StoreInfo> isStorable(final String key, final StoreInfo storeInfo) {
@@ -301,8 +301,7 @@ public class RefHolder implements RefHolderLock {
         }
     }
 
-    public Either<String, FailedToLock> modifyKey(final String key, final String finalRef, final byte[] data, final String oldVersion,
-            final CommitMetaData commitMetaData) {
+    public Either<String, FailedToLock> modifyKey(final String key, final String finalRef, final byte[] data, final String oldVersion, final CommitMetaData commitMetaData) {
         return lockWrite(() -> {
             final Optional<StoreInfo> keyHolder = getKey(key);
             if (storageIsForbidden(keyHolder)) {
@@ -312,9 +311,12 @@ public class RefHolder implements RefHolderLock {
             if (!oldVersion.equals(storeInfo.getVersion())) {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }
-            final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = source.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
-            refCache.put(key, Either.left(Optional.of(new StoreInfo(getObjectStreamProvider(data, newVersion.getRight()), storeInfo.getMetaData(),
-                    newVersion.getLeft(), storeInfo.getMetaDataVersion()))));
+            final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = source.modifyKey(key, finalRef,
+                    data, oldVersion, commitMetaData);
+            refCache.put(key,
+                    Either.left(Optional.of(
+                            new StoreInfo(getObjectStreamProvider(data, newVersion.getRight()), storeInfo.getMetaData(),
+                                    newVersion.getLeft(), storeInfo.getMetaDataVersion()))));
             return newVersion.getLeft();
         }, key);
     }
@@ -327,7 +329,8 @@ public class RefHolder implements RefHolderLock {
         }, key);
     }
 
-    public Either<String, FailedToLock> modifyMetadata(final MetaData metaData, final String oldMetaDataVersion, final CommitMetaData commitMetaData,
+    public Either<String, FailedToLock> modifyMetadata(final MetaData metaData, final String oldMetaDataVersion,
+            final CommitMetaData commitMetaData,
             final String key, final String finalRef) {
         return lockWrite(() -> {
             checkIfPlainKeyExist(key);
@@ -345,14 +348,17 @@ public class RefHolder implements RefHolderLock {
         return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getMetaData().isProtected();
     }
 
-    String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    String addKey(final String key, final String finalRef, final byte[] data, final MetaData metaData,
+            final CommitMetaData commitMetaData) {
         final Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> version = source.addKey(key, finalRef, data, metaData, commitMetaData);
         final Pair<ThrowingSupplier<ObjectLoader, IOException>, String> fileInfo = version.getLeft();
-        storeIfNotHidden(key, this, new StoreInfo(getObjectStreamProvider(data, fileInfo.getLeft()), metaData, fileInfo.getRight(), version.getRight()));
+        storeIfNotHidden(key, this, new StoreInfo(getObjectStreamProvider(data, fileInfo.getLeft()), metaData,
+                fileInfo.getRight(), version.getRight()));
         return fileInfo.getRight();
     }
 
-    private ObjectStreamProvider getObjectStreamProvider(final byte[] data, final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory) {
+    private ObjectStreamProvider getObjectStreamProvider(final byte[] data,
+            final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory) {
         final int size = data.length;
         if (size < threshold) {
             return new SmallObjectStreamProvider(data);
@@ -383,7 +389,8 @@ public class RefHolder implements RefHolderLock {
         return null;
     }
 
-    private Either<Optional<StoreInfo>, Pair<String, UserData>> mapKey(final String key, final Either<Optional<StoreInfo>, Pair<String, UserData>> value) {
+    private Either<Optional<StoreInfo>, Pair<String, UserData>> mapKey(final String key,
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> value) {
         if (value == null || !value.isRight()) {
             Pair<String, UserData> user;
             try {
@@ -399,7 +406,8 @@ public class RefHolder implements RefHolderLock {
         return value;
     }
 
-    public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, final UserData data, final String version) {
+    public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, final UserData data,
+            final String version) {
         final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
@@ -510,7 +518,8 @@ public class RefHolder implements RefHolderLock {
         }
 
         private boolean tryLock(final String key) {
-            if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null || activeKeys.get(key) == Thread.currentThread()) {
+            if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null
+                    || activeKeys.get(key) == Thread.currentThread()) {
                 refLock.writeLock().lock();
                 return true;
             }

@@ -184,13 +184,13 @@ public class HostedGitRepositoryManager implements Source {
     @Override
     public void close() {
         try {
-            this.bareRepository.close();
+            this.uploadPackExecutor.shutdown();
+            this.uploadPackExecutor.awaitTermination(60, TimeUnit.SECONDS);
         } catch (Exception ignore) {
             // NOOP
         }
         try {
-            this.uploadPackExecutor.shutdown();
-            this.uploadPackExecutor.awaitTermination(60, TimeUnit.SECONDS);
+            this.bareRepository.close();
         } catch (Exception ignore) {
             // NOOP
         }

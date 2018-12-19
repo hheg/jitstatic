@@ -132,7 +132,7 @@ public class KeyResource {
         }
 
         if (!user.isPresent()) {
-            LOG.info("Resource {} in {} needs a user", key,(ref == null ? DEFAULT_REF : ref));
+            LOG.info("Resource {} in {} needs a user", key, (ref == null ? DEFAULT_REF : ref));
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
@@ -167,7 +167,8 @@ public class KeyResource {
                     final Set<User> allowedUsers = storageData.getUsers();
                     final Set<Role> keyRoles = storageData.getRead();
                     if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),(ref == null ? DEFAULT_REF : ref));
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
+                                (ref == null ? DEFAULT_REF : ref));
                         return true;
                     }
                     if (!userHolder.isPresent()) {
@@ -175,7 +176,7 @@ public class KeyResource {
                     }
                     final User user = userHolder.get();
                     if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(),(ref == null ? DEFAULT_REF : ref));
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), (ref == null ? DEFAULT_REF : ref));
                         return true;
                     }
                     return false;
@@ -273,7 +274,7 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and modified key {} in {}", user, key, (ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -341,12 +342,12 @@ public class KeyResource {
         final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
 
         if (storeInfo.isPresent()) {
-            throw new WebApplicationException(key + " already exist in "+(ref == null ? DEFAULT_REF : ref), Status.CONFLICT);
+            throw new WebApplicationException(key + " already exist in " + (ref == null ? DEFAULT_REF : ref), Status.CONFLICT);
         }
 
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
                 new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
-        LOG.info("{} logged in and added key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and added key {} in {}", user, key, (ref == null ? DEFAULT_REF : ref));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -389,7 +390,7 @@ public class KeyResource {
             LOG.error("Unknown API error", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
-        LOG.info("{} logged in and deleted key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and deleted key {} in {}", user, key, (ref == null ? DEFAULT_REF : ref));
         return Response.ok().build();
     }
 
