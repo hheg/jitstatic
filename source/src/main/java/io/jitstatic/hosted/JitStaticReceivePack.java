@@ -96,6 +96,46 @@ public class JitStaticReceivePack extends ReceivePack {
             return;
         
         final List<ReceiveCommand> cmds = new ArrayList<>(commands.size());
+        final Map<String, ReceiveCommand> index = createTempBranchesAndIndex(commands, cmds);
+        try {
+            updateAndCommit(updating, cmds, index);
+        } finally {
+            CompletableFuture.runAsync(() -> {
+                List<ReceiveCommand> tmpRefs = cmds.stream()
+                        .filter(rc -> rc.getRefName().startsWith(JitStaticConstants.REFS_JITSTATIC))
+                        .map(rc -> new ReceiveCommand(rc.getNewId(), ObjectId.zeroId(), rc.getRefName(), ReceiveCommand.Type.DELETE))
+                        .collect(Collectors.toList());
+                maintenanceBatchUpdate(tmpRefs);
+            });
+        }
+    }
+
+    private void updateAndCommit(ProgressMonitor updating, final List<ReceiveCommand> cmds, final Map<String, ReceiveCommand> index) {
+        if (!cmds.isEmpty()) {
+            try {
+                batchUpdate(updating, cmds);
+                commitCommands(checkBranches(updating, cmds, index).stream().filter(p -> {
+                    if (p.isPresent()) {
+                        return p.getRight().getResult() == Result.OK;
+                    }
+                    // Deleted Branch
+                    return p.getLeft().getResult() == Result.OK;
+                }).collect(Collectors.toList()), updating);
+            } catch (IOException err) {
+                for (ReceiveCommand cmd : cmds) {
+                    ReceiveCommand rc = index.get(cmd.getRefName());
+                    if(rc == null) {
+                        rc = cmd;
+                    }
+                    if (rc.getResult() == Result.NOT_ATTEMPTED)
+                        cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
+                                JGitText.get().lockError, err.getMessage()));
+                }
+            }
+        }
+    }
+
+    private Map<String, ReceiveCommand> createTempBranchesAndIndex(final List<ReceiveCommand> commands, final List<ReceiveCommand> cmds) {
         final Map<String, ReceiveCommand> map = new HashMap<>();
         for (ReceiveCommand rc : commands) {
             if (!ObjectId.equals(ObjectId.zeroId(), rc.getNewId())) {
@@ -117,38 +157,7 @@ public class JitStaticReceivePack extends ReceivePack {
                 }
             }
         }
-        try {
-            if (!cmds.isEmpty()) {
-                try {
-                    batchUpdate(updating, cmds);
-                    commitCommands(checkBranches(updating, cmds, map).stream().filter(p -> {
-                        if (p.isPresent()) {
-                            return p.getRight().getResult() == Result.OK;
-                        }
-                        // Deleted Branch
-                        return p.getLeft().getResult() == Result.OK;
-                    }).collect(Collectors.toList()), updating);
-                } catch (IOException err) {
-                    for (ReceiveCommand cmd : cmds) {
-                        ReceiveCommand rc = map.get(cmd.getRefName());
-                        if(rc == null) {
-                            rc = cmd;
-                        }
-                        if (rc.getResult() == Result.NOT_ATTEMPTED)
-                            cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-                                    JGitText.get().lockError, err.getMessage()));
-                    }
-                }
-            }
-        } finally {
-            CompletableFuture.runAsync(() -> {
-                List<ReceiveCommand> tmpRefs = cmds.stream()
-                        .filter(rc -> rc.getRefName().startsWith(JitStaticConstants.REFS_JITSTATIC))
-                        .map(rc -> new ReceiveCommand(rc.getNewId(), ObjectId.zeroId(), rc.getRefName(), ReceiveCommand.Type.DELETE))
-                        .collect(Collectors.toList());
-                maintenanceBatchUpdate(tmpRefs);
-            });
-        }
+        return map;
     }
 
     private void maintenanceBatchUpdate(List<ReceiveCommand> tmpRefs) {

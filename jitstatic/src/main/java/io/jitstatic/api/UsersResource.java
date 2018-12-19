@@ -117,7 +117,7 @@ public class UsersResource {
                 return noChange;
             }
             LOG.info("{} logged in and accessed {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
-            return Response.ok(value.getRight()).tag(new EntityTag(value.getLeft())).encoding("utf-8").build();
+            return Response.ok(value.getRight()).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }

@@ -1,7 +1,5 @@
 package io.jitstatic.auth;
 
-import io.jitstatic.auth.User;
-
 /*-
  * #%L
  * jitstatic

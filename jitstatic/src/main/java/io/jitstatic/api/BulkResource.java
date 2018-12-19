@@ -52,7 +52,6 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
-import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 

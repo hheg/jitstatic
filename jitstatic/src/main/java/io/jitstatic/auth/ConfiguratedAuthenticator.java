@@ -25,7 +25,6 @@ import java.util.Optional;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.basic.BasicCredentials;
-import io.jitstatic.auth.User;
 
 public class ConfiguratedAuthenticator implements Authenticator<BasicCredentials, User> {
 

@@ -27,7 +27,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PreReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;

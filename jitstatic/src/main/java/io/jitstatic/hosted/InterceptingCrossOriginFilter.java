@@ -92,7 +92,7 @@ public class InterceptingCrossOriginFilter extends CrossOriginFilter {
                         response.setHeader(ACCESS_CONTROL_ALLOW_HEADERS_HEADER,
                                 DEFAULT_ALLOWED_HEADERS.stream().collect(joining(",")) + "," + declared);
                     } else {
-                        rollback(request, response);
+                        rollback(response);
                     }
                 }
             } else if (deferredHeaders != null) {
@@ -100,7 +100,7 @@ public class InterceptingCrossOriginFilter extends CrossOriginFilter {
                 if (defaultExposedHeaders == null) {
                     // There were no declared headers which means that there's no matching ones
                     // Rollback any positive decisions in because we now have non-allowed headers
-                    rollback(request, response);
+                    rollback(response);
                 }
             }
         } else {
@@ -113,7 +113,7 @@ public class InterceptingCrossOriginFilter extends CrossOriginFilter {
         return (List<String>) request.getAttribute(attribute);
     }
 
-    private void rollback(final HttpServletRequest request, final HttpServletResponse response) {
+    private void rollback(final HttpServletResponse response) {
         response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER, null);
         response.setHeader("Vary", null);
         response.setHeader(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER, null);

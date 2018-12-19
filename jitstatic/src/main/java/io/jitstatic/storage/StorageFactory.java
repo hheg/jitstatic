@@ -33,17 +33,14 @@ import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
-import io.jitstatic.storage.GitStorage;
-import io.jitstatic.storage.Storage;
 
 public class StorageFactory {
 
     public Storage build(final Source source, final Environment env, final String storageRealm) {
         Objects.requireNonNull(source, "Source cannot be null");
         env.jersey().register(new AuthDynamicFeature(
-                new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator()).setAuthorizer((user, role) -> {
-                    return true;
-                }).setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null")).buildAuthFilter()));
+				new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
+						.setAuthorizer((user, role) -> true).setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null")).buildAuthFilter()));
         env.jersey().register(RolesAllowedDynamicFeature.class);
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
         final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());

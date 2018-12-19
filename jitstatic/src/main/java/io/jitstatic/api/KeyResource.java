@@ -191,7 +191,7 @@ public class KeyResource {
     }
 
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, HttpServletResponse response) {
-        final StreamingOutput so = (output) -> {
+        final StreamingOutput so = output -> {
             try (InputStream is = storeInfo.getStreamProvider().getInputStream()) {
                 is.transferTo(output);
             }

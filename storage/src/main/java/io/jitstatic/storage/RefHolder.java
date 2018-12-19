@@ -88,7 +88,7 @@ public class RefHolder implements RefHolderLock {
 
             protected boolean removeEldestEntry(final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
                 return size() > MAX_ENTRIES;
-            };
+            }
         };
     }
 
