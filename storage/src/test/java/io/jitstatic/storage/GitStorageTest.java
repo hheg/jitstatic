@@ -1,4 +1,5 @@
 package io.jitstatic.storage;
+
 /*-
  * #%L
  * jitstatic
@@ -72,6 +73,7 @@ import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.tools.Utils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
@@ -207,7 +209,7 @@ public class GitStorageTest {
             when(si1.getMetadataInputStream()).thenReturn(mtest3);
             when(si1.getSourceVersion()).thenReturn(SHA_1);
             when(si2.getSourceProvider()).thenReturn(toProvider(getByteArray(2)));
-            when(si2.readMetaData()).thenCallRealMethod();            
+            when(si2.readMetaData()).thenCallRealMethod();
             when(si2.getMetadataInputStream()).thenReturn(mtest4);
             when(si2.getSourceVersion()).thenReturn(SHA_2);
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
@@ -321,7 +323,7 @@ public class GitStorageTest {
             byte[] data = readData("{\"one\" : \"two\"}");
             String key = "key3";
             when(si.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
-            when(si.readMetaData()).thenCallRealMethod();            
+            when(si.readMetaData()).thenCallRealMethod();
             when(si.getMetadataInputStream()).thenReturn(mtest3);
             when(si.getSourceVersion()).thenReturn(SHA_1);
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
@@ -332,7 +334,7 @@ public class GitStorageTest {
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
             assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-            Either<String, FailedToLock> put = gs.put(key, null, data, SHA_1, new CommitMetaData("user", "mail", "msg"));
+            Either<String, FailedToLock> put = gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
             String newVersion = put.getLeft();
             assertEquals(SHA_2, newVersion);
             first = gs.getKey(key, null);
@@ -363,7 +365,7 @@ public class GitStorageTest {
                 StoreInfo storeInfo = first.get();
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-                gs.put(key, null, data, SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
             }
             gs.checkHealth();
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
@@ -409,7 +411,7 @@ public class GitStorageTest {
             assertThrows(IllegalArgumentException.class, () -> {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
-                gs.put(key, null, data, SHA_1, new CommitMetaData("user", "mail", ""));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", ""));
             });
             gs.checkHealth();
         }
@@ -422,7 +424,7 @@ public class GitStorageTest {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
                 gs.checkHealth();
-                gs.put(key, null, data, SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
             }
         }).getCause(), Matchers.isA(RefNotFoundException.class));
     }
@@ -441,13 +443,13 @@ public class GitStorageTest {
                 when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
 
                 when(source.getSourceInfo(eq("key3"), anyString())).thenReturn(si);
-                when(source.modifyKey(eq(key), any(), eq(data), eq(SHA_1), any())).thenReturn(Pair.of(SHA_2, factory));
+                when(source.modifyKey(eq(key), any(), any(), eq(SHA_1), any())).thenReturn(Pair.of(SHA_2, factory));
                 Optional<StoreInfo> first = gs.getKey(key, null);
                 StoreInfo storeInfo = first.get();
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
                 gs.checkHealth();
-                gs.put("other", null, data, SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put("other", null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
             }
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
@@ -458,7 +460,8 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey("somekey", "refs/heads/master", pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
+            String si = gs.addKey("somekey", "refs/heads/master", Utils.toProvider(pretty),
+                    new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg"));
             assertEquals("1", si);
             gs.checkHealth();
@@ -534,7 +537,7 @@ public class GitStorageTest {
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey(key, branch, pretty, new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
+            String si = gs.addKey(key, branch, Utils.toProvider(pretty), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg"));
             assertEquals("1", si);
             gs.checkHealth();
@@ -547,13 +550,13 @@ public class GitStorageTest {
     @Test
     public void testAddKeyWithExistingKey() throws Exception {
         String key = "somekey";
-        String branch = "refs/heads/newbranch";        
+        String branch = "refs/heads/newbranch";
         when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(mock(SourceInfo.class));
         try (GitStorage gs = new GitStorage(source, null)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, pretty,
+                    assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, Utils.toProvider(pretty),
                             new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg"))).getCause()
                                     .getClass());
         }
@@ -613,7 +616,7 @@ public class GitStorageTest {
     public void testAddDotFile() {
         try (GitStorage gs = new GitStorage(source, null)) {
             assertThrows(WrappingAPIException.class,
-                    () -> gs.addKey("dot/.dot", null, new byte[] { 1 }, new MetaData(Set.of()), new CommitMetaData("d", "d", "d")));
+                    () -> gs.addKey("dot/.dot", null, Utils.toProvider(new byte[] { 1 }), new MetaData(Set.of()), new CommitMetaData("d", "d", "d")));
         }
     }
 
@@ -743,7 +746,7 @@ public class GitStorageTest {
     private byte[] getByteArray(int c) {
         return ("{\"data\":\"value" + c + "\"}").getBytes(UTF_8);
     }
-    
+
     private InputStream getMetaData() {
         return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}]}".getBytes(UTF_8));
     }

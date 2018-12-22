@@ -30,7 +30,8 @@ public class DataArgumentProvider implements ArgumentsProvider {
 
     @Override
     public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-        return Stream.of(new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 10, 10),
+        return Stream.of(
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 10, 10),
                 new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, false, 10, 10),
                 new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, true, 10, 10),
                 new TestData(new String[] { "a", "b", "c" }, new String[] { LoadTesterIT.MASTER, "develop", "something" }, true, 10, 10),
@@ -41,7 +42,11 @@ public class DataArgumentProvider implements ArgumentsProvider {
                 new TestData(new String[] { "a", "b", "c", "d", "e", "f", "g" },
                         new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 1),
 //                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 0, 30),
-                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 2, 0))
+                new TestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 2, 0),
+                new FatTestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 10, 0),
+                new FatTestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 50, 0),
+                new FatTestData(new String[] { "a", "b", "c", "d", "e", "f", "g" },
+                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 0))
                 .map(Arguments::of);
     }
 

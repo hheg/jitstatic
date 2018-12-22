@@ -23,9 +23,25 @@ package io.jitstatic.source;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.eclipse.jgit.lib.ObjectLoader;
+
+import io.jitstatic.utils.Functions.ThrowingSupplier;
+
 public interface ObjectStreamProvider {
 
     InputStream getInputStream() throws IOException;
-    
+
     long getSize() throws IOException;
+
+    public default ObjectStreamProvider getObjectStreamProvider(final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory, final int threshold)
+            throws IOException {
+        final long size = getSize();
+        if (size < threshold) {
+            return this;
+        } else {
+            return new LargeObjectStreamProvider(() -> {
+                return objectLoaderFactory.get().openStream();
+            }, size);
+        }
+    }
 }

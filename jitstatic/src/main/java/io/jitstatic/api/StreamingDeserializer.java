@@ -36,8 +36,9 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
     @Override
     public ObjectStreamProvider deserialize(final JsonParser p, final DeserializationContext ctxt) throws IOException, JsonProcessingException {
         // Slurp this for now
-        final byte[] binaryValue = p.getBinaryValue();
-
+        // TODO Fix this to handle large arrays
+        final byte[] binaryValue = p.getBinaryValue();        
+        
         return new ObjectStreamProvider() {
             @Override
             public long getSize() throws IOException {

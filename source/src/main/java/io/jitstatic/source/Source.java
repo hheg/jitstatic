@@ -46,9 +46,9 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, ObjectStreamProvider data, String version, CommitMetaData commitMetaData);
 
-    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String finalRef, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String finalRef, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
 
     public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String finalRef, CommitMetaData commitMetaData);
 

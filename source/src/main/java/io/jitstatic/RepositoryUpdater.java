@@ -21,6 +21,7 @@ package io.jitstatic;
  */
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 
 public class RepositoryUpdater {
@@ -58,7 +60,8 @@ public class RepositoryUpdater {
         this.repository = repository;
     }
 
-    public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method, final List<Pair<String, byte[]>> files)
+    public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method,
+            final List<Pair<String, ObjectStreamProvider>> files)
             throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {
         final DirCache inCoreIndex = DirCache.newInCore();
         final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
@@ -66,10 +69,21 @@ public class RepositoryUpdater {
         final List<Pair<String, ObjectId>> fileVersions = new ArrayList<>(files.size());
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
             final Set<String> filesAddedToTree = new HashSet<>(files.size());
-            for (Pair<String, byte[]> pair : files) {
+            for (Pair<String, ObjectStreamProvider> pair : files) {
                 if (pair.isPresent()) {
-                    final ObjectId blob = createBlob(pair, dirCacheBuilder, objectInserter, filesAddedToTree);
-                    fileVersions.add(Pair.of(pair.getLeft(), blob));
+                    final String keyName = pair.getLeft();
+                    final ObjectStreamProvider data = pair.getRight();
+                    try (InputStream is = data.getInputStream()) {
+                        final DirCacheEntry changedFileEntry = new DirCacheEntry(keyName);
+                        changedFileEntry.setLength(data.getSize());
+                        changedFileEntry.setLastModified(System.currentTimeMillis());
+                        changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
+                        changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data.getSize(), is));
+                        final ObjectId blob = changedFileEntry.getObjectId();
+                        dirCacheBuilder.add(changedFileEntry);
+                        filesAddedToTree.add(keyName);
+                        fileVersions.add(Pair.of(pair.getLeft(), blob));
+                    }
                 }
             }
             buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
@@ -79,14 +93,6 @@ public class RepositoryUpdater {
             commitRef(ref, rw, commiter, inserted, method);
             return fileVersions;
         }
-    }
-
-    private ObjectId createBlob(final Pair<String, byte[]> file, final DirCacheBuilder dirCacheBuilder, final ObjectInserter objectInserter,
-            final Set<String> filesAddedToTree) throws IOException {
-        final String keyName = file.getLeft();
-        final ObjectId blob = addBlob(keyName, file.getRight(), objectInserter, dirCacheBuilder);
-        filesAddedToTree.add(keyName);
-        return blob;
     }
 
     private void commitRef(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted, final String method)
@@ -131,18 +137,6 @@ public class RepositoryUpdater {
             }
         }
         dcBuilder.finish();
-    }
-
-    private ObjectId addBlob(final String fileEntry, final byte[] data, final ObjectInserter objectInserter, final DirCacheBuilder dcBuilder)
-            throws IOException {
-        final DirCacheEntry changedFileEntry = new DirCacheEntry(fileEntry);
-        changedFileEntry.setLength(data.length);
-        changedFileEntry.setLastModified(System.currentTimeMillis());
-        changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
-        changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data));
-        final ObjectId blob = changedFileEntry.getObjectId();
-        dcBuilder.add(changedFileEntry);
-        return blob;
     }
 
     private void checkResult(final Result update, final String ref) {

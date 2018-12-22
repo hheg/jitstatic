@@ -112,7 +112,7 @@ public class LoadWriterIT {
     private static final Logger LOG = LoggerFactory.getLogger(LoadWriterIT.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final Charset UTF_8 = StandardCharsets.UTF_8;
+    static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String METADATA = ".metadata";
     static final String MASTER = "master";
@@ -153,7 +153,7 @@ public class LoadWriterIT {
                     jobs[j] = CompletableFuture.supplyAsync(() -> {
                         try (JitStaticClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
-                            ResultData resultData = execute(buildKeyClient, branch, key, tag);
+                            ResultData resultData = execute(buildKeyClient, branch, key, tag, data);
                             printStats(resultData);
                             return resultData;
                         }
@@ -180,14 +180,14 @@ public class LoadWriterIT {
         return nominator / (double) (denominator / 1000);
     }
 
-    private ResultData execute(final JitStaticClient buildKeyClient, final String branch, final String key, String tag) {
+    private ResultData execute(final JitStaticClient buildKeyClient, final String branch, final String key, String tag, WriteData testData) {
         int bytes = 0;
         long stop = 0;
         int i = 1;
         long start = System.currentTimeMillis();
         try {
             while ((stop = System.currentTimeMillis()) - start < 20_000) {
-                byte[] data2 = getData(i);
+                byte[] data2 = testData.getData(i);
                 bytes += data2.length;
                 tag = buildKeyClient.modifyKey(data2, new CommitData(key, branch, "k:" + key + ":" + i, "userinfo", "mail"), tag);
                 i++;
@@ -211,27 +211,26 @@ public class LoadWriterIT {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         Client statsClient = buildClient("stats");
         try {
-            Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
-            try {
-                log(() -> LOG.info(response.readEntity(String.class)));
-                File workingFolder = getFolderFile();
-                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
-                        .setCredentialsProvider(getCredentials(hf)).call()) {
-                    LOG.info(data.toString());
-                    for (String branch : data.branches) {
-                        checkoutBranch(branch, git);
-                        LOG.info("##### {} #####", branch);
-                        Map<String, Integer> data = pairNamesWithData(workingFolder);
-                        Map<String, Integer> cnt = new HashMap<>();
-                        for (RevCommit rc : git.log().call()) {
-                            String msg = matchData(data, cnt, rc);
-                            log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
-                        }
-                    }
-                    result.ifPresent(this::printStats);
-                }
-            } finally {
+            log(() -> {
+                Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
+                LOG.info(response.readEntity(String.class));
                 response.close();
+            });
+            File workingFolder = getFolderFile();
+            try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
+                    .setCredentialsProvider(getCredentials(hf)).call()) {
+                LOG.info(data.toString());
+                for (String branch : data.branches) {
+                    checkoutBranch(branch, git);
+                    LOG.info("##### {} #####", branch);
+                    Map<String, Integer> data = pairNamesWithData(workingFolder);
+                    Map<String, Integer> cnt = new HashMap<>();
+                    for (RevCommit rc : git.log().call()) {
+                        String msg = matchData(data, cnt, rc);
+                        log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
+                    }
+                }
+                result.ifPresent(this::printStats);
             }
         } finally {
             statsClient.close();
@@ -249,11 +248,11 @@ public class LoadWriterIT {
         File workingFolder = getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             int c = 0;
-            byte[] data = getData(c);
+            byte[] data = testData.getData(c);
             writeFiles(testData, workingFolder, data);
             git.add().addFilepattern(".").call();
             git.commit().setMessage("i:a:0").call();
-            verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
+            assertTrue(verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c));
             pushBranches(provider, testData, git, c);
         }
     }
@@ -264,7 +263,7 @@ public class LoadWriterIT {
         for (String branch : testData.branches) {
             if (!MASTER.equals(branch)) {
                 git.checkout().setName(branch).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
-                verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
+                assertTrue(verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c));
             }
         }
     }
@@ -358,10 +357,6 @@ public class LoadWriterIT {
         JerseyClientBuilder jerseyClientBuilder = new JerseyClientBuilder(environment);
         jerseyClientBuilder.setApacheHttpClientBuilder(new HttpClientBuilder(environment));
         return jerseyClientBuilder.build(name);
-    }
-
-    private static byte[] getData(int c) throws UnsupportedEncodingException {
-        return new StringBuilder("{\"data\":").append(c).append("}").toString().getBytes(UTF_8);
     }
 
     private static UsernamePasswordCredentialsProvider getCredentials(final HostedFactory hf) {
