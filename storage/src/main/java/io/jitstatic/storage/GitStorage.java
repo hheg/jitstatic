@@ -46,6 +46,7 @@ import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.RefHolderLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
@@ -164,7 +165,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public Either<String, FailedToLock> put(final String key, String ref, final byte[] data, final String oldVersion, final CommitMetaData commitMetaData) {
+    public Either<String, FailedToLock> put(final String key, String ref, final ObjectStreamProvider data, final String oldVersion, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
@@ -177,7 +178,7 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public String addKey(final String key, String branch, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    public String addKey(final String key, String branch, final ObjectStreamProvider data, final MetaData metaData, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -205,7 +206,11 @@ public class GitStorage implements Storage {
             if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
-            return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
+            try {
+                return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }, key);
         if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));

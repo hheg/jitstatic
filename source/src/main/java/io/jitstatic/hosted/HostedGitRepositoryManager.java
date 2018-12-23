@@ -67,6 +67,7 @@ import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.check.SourceExtractor;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
@@ -267,7 +268,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final byte[] data, final String version, final CommitMetaData commitMetaData) {
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final ObjectStreamProvider data, final String version, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(version);
         Objects.requireNonNull(key);
@@ -309,7 +310,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final String key, String ref, final byte[] data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final String key, String ref, final ObjectStreamProvider data, final MetaData metaData, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);

@@ -21,6 +21,7 @@ package io.jitstatic;
  */
 
 import java.util.Arrays;
+import java.util.UUID;
 
 public class TestData {
     final String[] names;
@@ -40,5 +41,19 @@ public class TestData {
     @Override
     public String toString() {
         return "TestData [names=" + Arrays.toString(names) + ", branches=" + Arrays.toString(branches) + ", cache=" + cache + ", clients=" + clients + ", updaters=" + updaters + "]";
+    }
+
+    byte[] getData(int c) {
+        String s = "{\"data\":" + c + ",\"salt\":\"" + fill() + "\"}";
+        return s.getBytes(LoadTesterIT.UTF_8);
+    }
+
+    public String fill() {        
+        return UUID.randomUUID().toString();
+    }
+
+    byte[] getMetaData() {
+        String md = "{\"users\":[],\"contentType\":\"application/json\",\"protected\":false,\"hidden\":false,\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}";
+        return md.getBytes(LoadTesterIT.UTF_8);
     }
 }

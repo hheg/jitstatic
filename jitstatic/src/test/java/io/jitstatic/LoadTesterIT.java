@@ -36,7 +36,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -124,7 +123,7 @@ public class LoadTesterIT {
     private static final Logger LOG = LoggerFactory.getLogger(LoadTesterIT.class);
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final Charset UTF_8 = StandardCharsets.UTF_8;
+    static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
@@ -150,30 +149,29 @@ public class LoadTesterIT {
         final HostedFactory hf = DW.getConfiguration().getHostedFactory();
         Client statsClient = buildClient("stats");
         try {
-            Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
-            try {
-                log(() -> LOG.info(response.readEntity(String.class)));
-                File workingFolder = getFolderFile();
-                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
-                        .setCredentialsProvider(getCredentials(hf)).call()) {
-                    LOG.info(data.toString());
-                    for (String branch : data.branches) {
-                        try {
-                            checkoutBranch(branch, git);
-                            LOG.info("##### {} #####", branch);
-                            Map<String, Integer> data = pairNamesWithData(workingFolder);
-                            Map<String, Integer> cnt = new HashMap<>();
-                            for (RevCommit rc : git.log().call()) {
-                                String msg = matchData(data, cnt, rc);
-                                log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
-                            }
-                        } catch (IOException | GitAPIException e) {
-                            e.printStackTrace();
+            log(() -> {
+                Response response = statsClient.target(adminAdress + "/metrics").queryParam("pretty", true).request().get();
+                LOG.info(response.readEntity(String.class));
+                response.close();
+            });
+            File workingFolder = getFolderFile();
+            try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
+                    .setCredentialsProvider(getCredentials(hf)).call()) {
+                LOG.info(data.toString());
+                for (String branch : data.branches) {
+                    try {
+                        checkoutBranch(branch, git);
+                        LOG.info("##### {} #####", branch);
+                        Map<String, Integer> data = pairNamesWithData(workingFolder);
+                        Map<String, Integer> cnt = new HashMap<>();
+                        for (RevCommit rc : git.log().call()) {
+                            String msg = matchData(data, cnt, rc);
+                            log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                         }
+                    } catch (IOException | GitAPIException e) {
+                        e.printStackTrace();
                     }
                 }
-            } finally {
-                response.close();
             }
         } finally {
             statsClient.close();
@@ -351,11 +349,11 @@ public class LoadTesterIT {
         File workingFolder = getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             int c = 0;
-            byte[] data = getData(c);
+            byte[] data = testData.getData(c);
             writeFiles(testData, workingFolder, data);
             git.add().addFilepattern(".").call();
             git.commit().setMessage("i:a:0").call();
-            verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c);
+            assertTrue(verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c));
             pushBranches(provider, testData, git, c);
         }
         LOG.info("Done setting up repo");
@@ -367,7 +365,7 @@ public class LoadTesterIT {
         for (String branch : testData.branches) {
             if (!MASTER.equals(branch)) {
                 git.checkout().setName(branch).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).call();
-                verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c);
+                assertTrue(verifyOkPush(git.push().setCredentialsProvider(provider).call(), branch, c));
             }
         }
     }
@@ -383,19 +381,9 @@ public class LoadTesterIT {
         for (String name : testData.names) {
             Files.write(path.resolve(name), data, StandardOpenOption.CREATE_NEW,
                     StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(path.resolve(name + METADATA), getMetaData(), StandardOpenOption.CREATE_NEW,
+            Files.write(path.resolve(name + METADATA), testData.getMetaData(), StandardOpenOption.CREATE_NEW,
                     StandardOpenOption.TRUNCATE_EXISTING);
         }
-    }
-
-    private static byte[] getMetaData() {
-        String md = "{\"users\":[],\"contentType\":\"application/json\",\"protected\":false,\"hidden\":false,\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}";
-        return md.getBytes(UTF_8);
-    }
-
-    private static byte[] getData(int c) {
-        String s = "{\"data\":" + c + ",\"salt\":\"" + UUID.randomUUID() + "\"}";
-        return s.getBytes(UTF_8);
     }
 
     private static Entity read(InputStream is, String tag, String contentType) {
@@ -527,7 +515,7 @@ public class LoadTesterIT {
         private void modifyKey(TestData testData, String branch, String name, String ref, Entity entity, String readValue) {
             int c = entity.getValue().get("data").asInt() + 1;
             try {
-                byte[] data = getData(c);
+                byte[] data = testData.getData(c);
                 String newTag = updater.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
                         entity.getTag());
                 counter.updates++;
@@ -581,7 +569,7 @@ public class LoadTesterIT {
                         Path filedata = Paths.get(workingFolder.toURI()).resolve(key);
                         JsonNode readData = readData(filedata);
                         int c = readData.get("data").asInt() + 1;
-                        byte[] data = getData(c);
+                        byte[] data = testData.getData(c);
                         Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                         DirCache dc = git.add().addFilepattern(".").call();
                         if (dc.getEntryCount() > 0) {
@@ -616,7 +604,7 @@ public class LoadTesterIT {
                     if (!(cause instanceof org.eclipse.jgit.errors.TransportException)) {
                         throw e;
                     }
-                    LOG.warn("Got known error {}", cause.getMessage());                    
+                    LOG.warn("Got known error {}", cause.getMessage());
                 }
             }
         }

@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -53,6 +54,7 @@ import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.tools.Utils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.LinkedException;
@@ -244,10 +246,10 @@ public class RefHolderTest {
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
 
         byte[] data = getData().getBytes(UTF_8);
-        when(source.modifyKey("key", REF, data, "1", cmd)).thenReturn(Pair.of("2", ts));
+        when(source.modifyKey(eq("key"), eq(REF), any(), eq("1"), eq(cmd))).thenReturn(Pair.of("2", ts));
         RefHolder ref = new RefHolder(REF, source);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.modifyKey("key", REF, data, "1", cmd);
+        ref.modifyKey("key", REF, Utils.toProvider(data), "1", cmd);
         assertEquals("2", ref.getKey("key").get().getVersion());
     }
 

@@ -32,6 +32,7 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
@@ -42,9 +43,9 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public void close();
 
-    public Either<String, FailedToLock> put(String key, String ref, byte[] data, String version, CommitMetaData commitMetaData);
+    public Either<String, FailedToLock> put(String key, String ref, ObjectStreamProvider data, String version, CommitMetaData commitMetaData);
 
-    public String addKey(String key, String branch, byte[] data, MetaData metaData, CommitMetaData commitMetaData);
+    public String addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
 
     public Either<String, FailedToLock> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion, CommitMetaData commitMetaData);
 

@@ -21,13 +21,15 @@ package io.jitstatic.api;
  */
 
 import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.jitstatic.source.ObjectStreamProvider;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class ModifyKeyData {
@@ -39,8 +41,9 @@ public class ModifyKeyData {
 
     @JsonProperty
     @NotNull
-    @Size(min = 1)
-    private byte[] data;
+    @JsonDeserialize(using = StreamingDeserializer.class)
+    @JsonSerialize(using= StreamingSerializer.class)
+    private ObjectStreamProvider data;
 
     @JsonProperty
     @NotNull
@@ -52,11 +55,11 @@ public class ModifyKeyData {
     @NotEmpty
     private String userInfo;
 
-    public byte[] getData() {
+    public ObjectStreamProvider getData() {
         return data;
     }
 
-    public void setData(final byte[] data) {
+    public void setData(final ObjectStreamProvider data) {
         this.data = data;
     }
 

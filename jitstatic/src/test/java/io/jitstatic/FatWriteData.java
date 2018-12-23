@@ -1,7 +1,5 @@
 package io.jitstatic;
 
-import java.io.UnsupportedEncodingException;
-
 /*-
  * #%L
  * jitstatic
@@ -24,27 +22,23 @@ import java.io.UnsupportedEncodingException;
 
 import java.util.List;
 
-public class WriteData {
+import org.apache.commons.lang3.RandomStringUtils;
 
-    final List<String> branches;
-    final List<String> names;
+public class FatWriteData extends WriteData {
 
-    WriteData(final List<String> branches, final List<String> names) {
-        this.branches = branches;
-        this.names = names;
+    private final String data;
+
+    FatWriteData(List<String> branches, List<String> names) {
+        super(branches, names);
+        data = RandomStringUtils.random(1_000_000, true, true);
     }
 
+    public String fill() {
+        return data;
+    }
+    
     @Override
     public String toString() {
-        return "WriteData [branches=" + branches + ", names=" + names + "]";
+        return "FatWriteData [branches=" + branches + ", names=" + names + "]";
     }
-
-    byte[] getData(int c) throws UnsupportedEncodingException {
-        return new StringBuilder("{\"data\":").append(c).append(",").append("\"fill\":").append("\"").append(fill()).append("\"").append("}").toString().getBytes(LoadWriterIT.UTF_8);
-    }
-
-    String fill() {
-        return "";
-    }
-
 }
