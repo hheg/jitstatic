@@ -90,8 +90,9 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class KeyResourceTest {
+    private static final String REFS_HEADS_MASTER2 = "refs/heads/master";
     private static final String APPLICATION_JSON = "application/json";
-    private static final String REFS_HEADS_MASTER = "refs/heads/master";
+    private static final String REFS_HEADS_MASTER = REFS_HEADS_MASTER2;
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String USER = "user";
     private static final String SECRET = "secret";
@@ -113,7 +114,7 @@ public class KeyResourceTest {
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
                     new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER),
-                            false))
+                            false, REFS_HEADS_MASTER2))
             .build();
 
     @BeforeAll
@@ -754,7 +755,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowed() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "p"));
         assertTrue(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -762,7 +763,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithNoRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(), "p"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -770,7 +771,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("other")), "p"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -778,7 +779,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongPassword() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
@@ -786,7 +787,7 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowedWithWrongPasswordNoBranch() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false);
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER);
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), null, Set.of(new Role("role"))));
     }

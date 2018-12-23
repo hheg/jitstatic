@@ -67,17 +67,18 @@ import io.jitstatic.utils.Pair;
 @Path("metakey")
 public class MetaKeyResource {
 
-    private static final String DEFAULT_REF = "default ref";
+    final String defaultRef;
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator keyAdminAuthenticator;
     private final APIHelper helper;
 
-    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator) {
+    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch) {
         this.keyAdminAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
+        this.defaultRef = Objects.requireNonNull(defaultBranch);
     }
 
     @GET
@@ -107,7 +108,7 @@ public class MetaKeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, (ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, helper.setToDefaultRef(this, ref));
         return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
     }
 
@@ -173,7 +174,7 @@ public class MetaKeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user.get(), key, (ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and modified key {} in {}", user.get(), key, helper.setToDefaultRef(this, ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 

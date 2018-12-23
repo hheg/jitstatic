@@ -187,4 +187,16 @@ class APIHelper {
     StoreInfo checkIfKeyExist(final String key, final String ref, Storage storage) {
         return unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND));
     }
+
+    String seToDefaultRef(KeyResource keyResource, final String ref) {
+        return ref == null ? keyResource.defaultRef : ref;
+    }
+
+    String setToDefaultRef(MetaKeyResource metaKeyResource, final String ref) {
+        return ref == null ? metaKeyResource.defaultRef : ref;
+    }
+
+    String setToDefaultRef(UsersResource usersResource, final String ref) {
+        return ref == null ? usersResource.defaultRef : ref;
+    }
 }

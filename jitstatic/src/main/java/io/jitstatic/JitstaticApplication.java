@@ -55,6 +55,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         try {
             source = config.build(env, GIT_REALM);
             storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM);
+            final String defaultBranch = config.getHostedFactory().getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             loginService.setUserStorage(storage);
             env.lifecycle().manage(new ManagedObject<>(source));
@@ -62,11 +63,11 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
             final KeyAdminAuthenticator authenticator = config.getAddKeyAuthenticator(storage);
-            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null));
+            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch));
             env.jersey().register(new JitstaticInfoResource());
-            env.jersey().register(new MetaKeyResource(storage, authenticator));
-            env.jersey().register(new BulkResource(storage, authenticator));
-            env.jersey().register(new UsersResource(storage, authenticator, loginService));
+            env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch));
+            env.jersey().register(new BulkResource(storage, authenticator, defaultBranch));
+            env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch));
         } catch (final Exception e) {
             closeSilently(source);
             closeSilently(storage);

@@ -58,14 +58,15 @@ import io.jitstatic.utils.Pair;
 @Path("bulk")
 public class BulkResource {
 
-    private static final String DEFAULT_REF = "default ref";
+    private final String defaultRef;
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
 
-    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator) {
+    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
+        this.defaultRef = Objects.requireNonNull(defaultBranch);
     }
 
     @POST
@@ -88,7 +89,7 @@ public class BulkResource {
                             final Set<User> allowedUsers = storageData.getUsers();
                             final Set<Role> keyRoles = storageData.getRead();
                             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(), (ref == null ? DEFAULT_REF : ref));
+                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(), setToDefaultRef(ref));
                                 return true;
                             }
                             if (!userHolder.isPresent()) {
@@ -96,7 +97,7 @@ public class BulkResource {
                             }
                             final User user = userHolder.get();
                             if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
-                                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), (ref == null ? DEFAULT_REF : ref));
+                                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), setToDefaultRef(ref));
                                 return true;
                             }
                             return false;
@@ -107,6 +108,10 @@ public class BulkResource {
             Response.status(Status.NOT_FOUND).build();
         }
         return Response.ok(new SearchResultWrapper(result)).build();
+    }
+
+    public String setToDefaultRef(final String ref) {
+        return ref == null ? defaultRef : ref;
     }
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {

@@ -70,6 +70,7 @@ import io.jitstatic.utils.WrappingAPIException;
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class MetaKeyResourceTest {
 
+    private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String PUSER = "puser";
     private static final String PSECRET = "psecret";
@@ -80,11 +81,14 @@ public class MetaKeyResourceTest {
     private Storage storage = mock(Storage.class);
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                    .setRealm(JitStaticConstants.JITSTATIC_KEYUSER_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
+                    .setAuthenticator(new ConfiguratedAuthenticator())
+                    .setRealm(JitStaticConstants.JITSTATIC_KEYUSER_REALM)
+                    .setAuthorizer((User u, String r) -> true)
+                    .buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MetaKeyResource(storage,
-                    new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), "refs/heads/master")))
+                    new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), REFS_HEADS_MASTER))
             .build();
 
     @AfterEach

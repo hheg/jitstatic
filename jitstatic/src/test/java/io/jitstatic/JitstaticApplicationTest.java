@@ -80,7 +80,7 @@ public class JitstaticApplicationTest {
     private ServletEnvironment servlets;
     @Mock
     private Dynamic filter;
-    
+
     private final JitstaticApplication app = new JitstaticApplication();
     private JitstaticConfiguration config;
 
@@ -89,6 +89,7 @@ public class JitstaticApplicationTest {
         MockitoAnnotations.initMocks(this);
         config = new JitstaticConfiguration();
         config.setStorageFactory(storageFactory);
+        when(hostedFactory.getBranch()).thenReturn("refs/heads/master");
         when(environment.servlets()).thenReturn(servlets);
         when(servlets.addFilter(Mockito.eq("CORS"), Mockito.eq(CrossOriginFilter.class))).thenReturn(filter);
         when(environment.lifecycle()).thenReturn(lifecycle);
