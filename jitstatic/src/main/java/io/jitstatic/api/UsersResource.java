@@ -118,7 +118,7 @@ public class UsersResource {
             if (noChange != null) {
                 return noChange;
             }
-            LOG.info("{} logged in and accessed {} in {}", user, key,helper.setToDefaultRef(this, ref));
+            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
             return Response.ok(value.getRight()).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -164,7 +164,7 @@ public class UsersResource {
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
-                LOG.info("{} logged in and modified key {} in {}", user, key,helper.setToDefaultRef(this, ref));
+                LOG.info("{} logged in and modified key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
                 return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
             }
             throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
@@ -199,7 +199,7 @@ public class UsersResource {
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
-                LOG.info("{} logged in and added key {} in {}", user, key,helper.setToDefaultRef(this, ref));
+                LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
                 return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
             }
             throw new WebApplicationException(key + " already exist", Status.CONFLICT);

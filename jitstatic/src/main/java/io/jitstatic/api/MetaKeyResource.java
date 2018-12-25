@@ -108,7 +108,7 @@ public class MetaKeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, helper.setToDefaultRef(this, ref));
+        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
     }
 
@@ -174,7 +174,7 @@ public class MetaKeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user.get(), key, helper.setToDefaultRef(this, ref));
+        LOG.info("{} logged in and modified key {} in {}", user.get(), key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 

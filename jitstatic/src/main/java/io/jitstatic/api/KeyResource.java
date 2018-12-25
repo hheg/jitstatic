@@ -133,7 +133,7 @@ public class KeyResource {
         }
 
         if (!user.isPresent()) {
-            LOG.info("Resource {} in {} needs a user", key, helper.seToDefaultRef(this, ref));
+            LOG.info("Resource {} in {} needs a user", key, helper.setToDefaultRef(defaultRef, ref));
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
@@ -141,7 +141,7 @@ public class KeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key, helper.seToDefaultRef(this, ref));
+        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key, helper.setToDefaultRef(defaultRef, ref));
         return buildResponse(storeInfo, tag, data, response);
     }
 
@@ -169,7 +169,7 @@ public class KeyResource {
                     final Set<Role> keyRoles = storageData.getRead();
                     if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
                         LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
-                                helper.seToDefaultRef(this, ref));
+                                helper.setToDefaultRef(defaultRef, ref));
                         return true;
                     }
                     if (!userHolder.isPresent()) {
@@ -177,7 +177,7 @@ public class KeyResource {
                     }
                     final User user = userHolder.get();
                     if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), helper.seToDefaultRef(this, ref));
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), helper.setToDefaultRef(defaultRef, ref));
                         return true;
                     }
                     return false;
@@ -248,7 +248,7 @@ public class KeyResource {
         }
 
         if (!(isAuthenticated || allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles))) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.seToDefaultRef(this, ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -275,13 +275,13 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user, key, helper.seToDefaultRef(this, ref));
+        LOG.info("{} logged in and modified key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
     void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
         if (!isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.seToDefaultRef(this, ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
@@ -332,7 +332,7 @@ public class KeyResource {
             try {
                 final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
                 if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
-                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.seToDefaultRef(this, ref), user);
+                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
                     throw new WebApplicationException(Status.FORBIDDEN);
                 }
             } catch (RefNotFoundException e) {
@@ -348,7 +348,7 @@ public class KeyResource {
 
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
                 new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
-        LOG.info("{} logged in and added key {} in {}", user, key, helper.seToDefaultRef(this, ref));
+        LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -377,7 +377,7 @@ public class KeyResource {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
                 throw new WebApplicationException(Status.BAD_REQUEST);
             }
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.seToDefaultRef(this, ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -391,7 +391,7 @@ public class KeyResource {
             LOG.error("Unknown API error", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
-        LOG.info("{} logged in and deleted key {} in {}", user, key, helper.seToDefaultRef(this, ref));
+        LOG.info("{} logged in and deleted key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().build();
     }
 
