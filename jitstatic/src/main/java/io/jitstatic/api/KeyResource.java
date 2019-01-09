@@ -301,6 +301,7 @@ public class KeyResource {
         }
     }
 
+    @SuppressWarnings("deprecation")
     @POST
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })

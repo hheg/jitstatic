@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.util.Arrays;
+
 /*-
  * #%L
  * jitstatic
@@ -33,6 +35,10 @@ public class FatTestData extends TestData {
 
     public String fill() {
         return data + super.fill();
+    }
+    @Override
+    public String toString() {
+        return "FatTestData [names=" + Arrays.toString(names) + ", branches=" + Arrays.toString(branches) + ", cache=" + cache + ", clients=" + clients + ", updaters=" + updaters + "]";
     }
 
 }
