@@ -68,8 +68,7 @@ public class SourceUpdater {
     private ThrowingSupplier<ObjectLoader, IOException> getObjectLoaderFactory(final Pair<String, ObjectId> updatedKeyEntry) {
         final Repository repository = repositoryUpdater.getRepository();
         final ObjectId objectId = updatedKeyEntry.getRight();
-        final ThrowingSupplier<ObjectLoader, IOException> loaderFactory = () -> repository.open(objectId);
-        return loaderFactory;
+        return () -> repository.open(objectId);
     }
 
     private List<Pair<String, ObjectId>> addEntry(final Pair<Pair<String, ObjectStreamProvider>, Pair<String, byte[]>> keyEntry, final Ref ref,
