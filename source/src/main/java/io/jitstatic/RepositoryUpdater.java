@@ -23,12 +23,11 @@ package io.jitstatic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -39,15 +38,15 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RefUpdate.Result;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.TreeWalk;
 
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
@@ -59,45 +58,71 @@ public class RepositoryUpdater {
     public RepositoryUpdater(final Repository repository) {
         this.repository = repository;
     }
-
+    
     public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method,
             final List<Pair<String, ObjectStreamProvider>> files)
             throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {
-        final DirCache inCoreIndex = DirCache.newInCore();
-        final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
-        final ObjectId headRef = ref.getObjectId();
+        
         final List<Pair<String, ObjectId>> fileVersions = new ArrayList<>(files.size());
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
-            final Set<String> filesAddedToTree = new HashSet<>(files.size());
+            final DirCache inCoreIndex = getCurrentDirCache(rw, ref);
+            final DirCacheEditor editor = inCoreIndex.editor();
             for (Pair<String, ObjectStreamProvider> pair : files) {
                 if (pair.isPresent()) {
                     final String keyName = pair.getLeft();
                     final ObjectStreamProvider data = pair.getRight();
                     try (InputStream is = data.getInputStream()) {
-                        final DirCacheEntry changedFileEntry = new DirCacheEntry(keyName);
-                        changedFileEntry.setLength(data.getSize());
-                        changedFileEntry.setLastModified(System.currentTimeMillis());
-                        changedFileEntry.setFileMode(FileMode.REGULAR_FILE);
-                        changedFileEntry.setObjectId(objectInserter.insert(Constants.OBJ_BLOB, data.getSize(), is));
-                        final ObjectId blob = changedFileEntry.getObjectId();
-                        dirCacheBuilder.add(changedFileEntry);
-                        filesAddedToTree.add(keyName);
-                        fileVersions.add(Pair.of(pair.getLeft(), blob));
+                        final ObjectId blobId = objectInserter.insert(Constants.OBJ_BLOB, data.getSize(), is);
+                        editor.add(new DirCacheEditor.PathEdit(keyName) {
+                            @Override
+                            public void apply(DirCacheEntry ent) {
+                                ent.setFileMode(FileMode.REGULAR_FILE);                                
+                                ent.setObjectId(blobId);
+                            }
+                        });
+                        fileVersions.add(Pair.of(pair.getLeft(), blobId));
                     }
                 }
             }
-            buildTreeIndex(filesAddedToTree, rw, headRef, dirCacheBuilder);
+            editor.finish();
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
             final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
-            final ObjectId inserted = buildCommit(ref, commitMetaData, objectInserter, fullTree, commiter);
-            commitRef(ref, rw, commiter, inserted, method);
+            buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
             return fileVersions;
         }
     }
 
-    private void commitRef(final Ref ref, final RevWalk rw, final PersonIdent commiter, final ObjectId inserted, final String method)
+    private DirCache getCurrentDirCache(final RevWalk rw, Ref head) throws MissingObjectException, IncorrectObjectTypeException, IOException {
+        RevCommit revision = head.getObjectId() != null ? rw.parseCommit(head.getObjectId()) : null;
+        RevTree tree = revision != null ? rw.parseTree(revision) : null;
+        return getIndex(tree);
+    }
+    
+    private DirCache getIndex(RevTree tree) throws IOException {
+        if(tree == null) {
+            return DirCache.newInCore();
+        }
+        try (ObjectReader reader = repository.newObjectReader()) {
+            return DirCache.read(reader, tree);
+        }
+    }
+
+    private void buildCommit(final Ref ref, final CommitMetaData commitMetaData, final String method, final RevWalk rw, final ObjectInserter objectInserter,
+            final ObjectId fullTree, final PersonIdent commiter) throws IOException, MissingObjectException, IncorrectObjectTypeException {
+        final CommitBuilder commitBuilder = new CommitBuilder();
+        commitBuilder.setAuthor(new PersonIdent(commitMetaData.getUserInfo(), (commitMetaData.getUserMail() != null ? commitMetaData.getUserMail() : "")));
+        commitBuilder.setMessage(commitMetaData.getMessage());
+        commitBuilder.setCommitter(commiter);
+        commitBuilder.setTreeId(fullTree);
+        commitBuilder.setParentId(ref.getObjectId());
+        final ObjectId insertedCommit = objectInserter.insert(commitBuilder);
+        objectInserter.flush();
+        updateRef(ref, method, rw, commiter, insertedCommit);
+    }
+
+    private void updateRef(final Ref ref, final String method, final RevWalk rw, final PersonIdent commiter, final ObjectId insertedCommit)
             throws MissingObjectException, IncorrectObjectTypeException, IOException {
-        final RevCommit newCommit = rw.parseCommit(inserted);
+        final RevCommit newCommit = rw.parseCommit(insertedCommit);
         final RefUpdate ru = repository.updateRef(ref.getName());
         ru.setRefLogIdent(commiter);
         ru.setNewObjectId(newCommit);
@@ -105,38 +130,6 @@ public class RepositoryUpdater {
         ru.setRefLogMessage("jitstatic " + method, true);
         ru.setExpectedOldObjectId(ref.getObjectId());
         checkResult(ru.update(rw), ref.getName());
-    }
-
-    private ObjectId buildCommit(final Ref ref, final CommitMetaData commitMetaData, final ObjectInserter objectInserter, final ObjectId fullTree,
-            final PersonIdent commiter) throws IOException {
-        final CommitBuilder commitBuilder = new CommitBuilder();
-        commitBuilder.setAuthor(new PersonIdent(commitMetaData.getUserInfo(), (commitMetaData.getUserMail() != null ? commitMetaData.getUserMail() : "")));
-        commitBuilder.setMessage(commitMetaData.getMessage());
-        commitBuilder.setCommitter(commiter);
-        commitBuilder.setTreeId(fullTree);
-        commitBuilder.setParentId(ref.getObjectId());
-        final ObjectId inserted = objectInserter.insert(commitBuilder);
-        objectInserter.flush();
-        return inserted;
-    }
-
-    private void buildTreeIndex(final Set<String> list, final RevWalk rw, final ObjectId headRef, final DirCacheBuilder dcBuilder)
-            throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException {
-        try (final TreeWalk treeWalk = new TreeWalk(repository)) {
-            final int hIdx = treeWalk.addTree(rw.parseTree(headRef));
-            treeWalk.setRecursive(true);
-            while (treeWalk.next()) {
-                final String entryPath = treeWalk.getPathString();
-                final CanonicalTreeParser hTree = treeWalk.getTree(hIdx, CanonicalTreeParser.class);
-                if (!list.contains(entryPath)) {
-                    final DirCacheEntry dcEntry = new DirCacheEntry(entryPath);
-                    dcEntry.setObjectId(hTree.getEntryObjectId());
-                    dcEntry.setFileMode(hTree.getEntryFileMode());
-                    dcBuilder.add(dcEntry);
-                }
-            }
-        }
-        dcBuilder.finish();
     }
 
     private void checkResult(final Result update, final String ref) {
@@ -161,15 +154,16 @@ public class RepositoryUpdater {
 
     public void deleteKeys(final Set<String> filesToDelete, final Ref ref, final CommitMetaData commitMetaData) throws IOException {
         final String method = "delete";
-        final DirCache inCoreIndex = DirCache.newInCore();
-        final DirCacheBuilder dirCacheBuilder = inCoreIndex.builder();
-        final ObjectId headRef = ref.getObjectId();
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
-            buildTreeIndex(filesToDelete, rw, headRef, dirCacheBuilder);
+            final DirCache inCoreIndex = getCurrentDirCache(rw, ref);
+            final DirCacheEditor editor = inCoreIndex.editor();
+            for (String file : filesToDelete) {
+                editor.add(new DirCacheEditor.DeletePath(file));
+            }
+            editor.finish();
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
             final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
-            final ObjectId inserted = buildCommit(ref, commitMetaData, objectInserter, fullTree, commiter);
-            commitRef(ref, rw, commiter, inserted, method);
+            buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
             rw.dispose();
         }
     }
