@@ -1,4 +1,4 @@
-package io.jitstatic.auth;
+package io.jitstatic;
 
 /*-
  * #%L
@@ -20,6 +20,25 @@ package io.jitstatic.auth;
  * #L%
  */
 
-public interface KeyAdminAuthenticator {
-    boolean authenticate(User user, String ref);
+import java.util.List;
+
+import org.apache.commons.lang3.RandomStringUtils;
+
+public class FatWriteData extends WriteData {
+
+    private final String data;
+
+    FatWriteData(List<String> branches, List<String> names) {
+        super(branches, names);
+        data = RandomStringUtils.random(1_000_000, true, true);
+    }
+
+    public String fill() {
+        return data;
+    }
+    
+    @Override
+    public String toString() {
+        return "FatWriteData [branches=" + branches + ", names=" + names + "]";
+    }
 }

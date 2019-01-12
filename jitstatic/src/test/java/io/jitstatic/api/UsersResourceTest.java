@@ -95,10 +95,13 @@ public class UsersResourceTest {
     private static final String BASIC_AUTH_CRED = createCreds(PUSER, PSECRET);
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                    .setRealm(JITSTATIC_KEYUSER_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
+            .addProvider(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
+                    .setAuthenticator(new ConfiguratedAuthenticator())
+                    .setRealm(JITSTATIC_KEYUSER_REALM)
+                    .setAuthorizer((User u, String r) -> true)
+                    .buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new UsersResource(storage,
-                    authen, loginService))
+                    authen, loginService, "refs/heads/master"))
             .build();
 
     @AfterEach
@@ -242,20 +245,20 @@ public class UsersResourceTest {
     @Test
     public void testPutUserWithUser() throws RefNotFoundException {
         try {
-        UserIdentity ui = mock(UserIdentity.class);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
-        when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
-                .thenReturn(Either.left("2"));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
-        assertEquals("2", data.getEntityTag().getValue());
-        data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),                
-                eq(userData), eq("1"));
-        }catch(Exception e) {
+            UserIdentity ui = mock(UserIdentity.class);
+            UserData userData = new UserData(Set.of(new Role("role")), "22");
+            when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
+            when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
+                    .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+            when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
+                    .thenReturn(Either.left("2"));
+            Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
+                    .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+            assertEquals("2", data.getEntityTag().getValue());
+            data.close();
+            verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
+                    eq(userData), eq("1"));
+        } catch (Exception e) {
             e.printStackTrace();
             fail();
         }

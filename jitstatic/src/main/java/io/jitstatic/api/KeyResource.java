@@ -27,6 +27,7 @@ import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MAIL;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MESSAGE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_NAME;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +41,9 @@ import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.validation.Valid;
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
+import javax.validation.Validator;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -70,6 +73,9 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
@@ -89,7 +95,7 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 public class KeyResource {
-    private static final String DEFAULT_REF = "default ref";
+    private final String defaultRef;
     private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
     private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {} in {}";
     private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} in {} is denied for user {}";
@@ -99,12 +105,18 @@ public class KeyResource {
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
     private final boolean cors;
+    private final ObjectMapper mapper;
+    private final Validator validator;
 
-    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, boolean cors) {
+    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final boolean cors, final String defaultBranch,
+            final ObjectMapper mapper, Validator validator) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
         this.cors = cors;
+        this.defaultRef = Objects.requireNonNull(defaultBranch);
+        this.mapper = Objects.requireNonNull(mapper);
+        this.validator = Objects.requireNonNull(validator);
     }
 
     @GET
@@ -132,7 +144,7 @@ public class KeyResource {
         }
 
         if (!user.isPresent()) {
-            LOG.info("Resource {} in {} needs a user", key,(ref == null ? DEFAULT_REF : ref));
+            LOG.info("Resource {} in {} needs a user", key, helper.setToDefaultRef(defaultRef, ref));
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYUSER_REALM);
         }
 
@@ -140,7 +152,7 @@ public class KeyResource {
         if (noChange != null) {
             return noChange;
         }
-        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key, (ref == null ? DEFAULT_REF : ref));
+        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user.get(), key, helper.setToDefaultRef(defaultRef, ref));
         return buildResponse(storeInfo, tag, data, response);
     }
 
@@ -167,7 +179,8 @@ public class KeyResource {
                     final Set<User> allowedUsers = storageData.getUsers();
                     final Set<Role> keyRoles = storageData.getRead();
                     if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),(ref == null ? DEFAULT_REF : ref));
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
+                                helper.setToDefaultRef(defaultRef, ref));
                         return true;
                     }
                     if (!userHolder.isPresent()) {
@@ -175,7 +188,7 @@ public class KeyResource {
                     }
                     final User user = userHolder.get();
                     if (isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(),(ref == null ? DEFAULT_REF : ref));
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), helper.setToDefaultRef(defaultRef, ref));
                         return true;
                     }
                     return false;
@@ -191,7 +204,7 @@ public class KeyResource {
     }
 
     private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, HttpServletResponse response) {
-        final StreamingOutput so = (output) -> {
+        final StreamingOutput so = output -> {
             try (InputStream is = storeInfo.getStreamProvider().getInputStream()) {
                 is.transferTo(output);
             }
@@ -225,7 +238,8 @@ public class KeyResource {
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public Response modifyKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userholder,
-            final @Valid @NotNull ModifyKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
+            final @Context HttpServletRequest httpRequest, final @Context Request request, final @Context HttpHeaders headers)
+            throws JsonParseException, JsonMappingException, IOException {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
         if (!userholder.isPresent()) {
@@ -246,7 +260,7 @@ public class KeyResource {
         }
 
         if (!(isAuthenticated || allowedUsers.contains(user) || isKeyUserAllowed(user, ref, roles))) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -257,6 +271,7 @@ public class KeyResource {
         if (response != null) {
             return response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
         }
+        final ModifyKeyData data = processValue(ModifyKeyData.class, httpRequest);
 
         final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
                 () -> storage.put(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
@@ -273,13 +288,25 @@ public class KeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and modified key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+    }
+
+    private <T> T processValue(final Class<T> class1, final HttpServletRequest httpRequest) throws JsonParseException, JsonMappingException, IOException {
+        final T data = mapper.readValue(httpRequest.getInputStream(), class1);
+        if (data == null) {
+            throw new WebApplicationException("entity is null", 422);
+        }
+        final Set<ConstraintViolation<T>> violations = validator.validate(data);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        return data;
     }
 
     void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
         if (!isUserAllowed(ref, user, allowedUsers, keyRoles)) {
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
@@ -300,25 +327,14 @@ public class KeyResource {
     }
 
     @POST
-    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public Response addKeyOld(@Valid @NotNull final AddKeyData data, final @Auth Optional<User> userHolder) {
-        if (data.getKey() == null) {
-            throw new WebApplicationException("key is null", 422);
-        }
-        return addKey(data.getKey(), data.getBranch(), data, userHolder);
-    }
-
-    @POST
     @Timed(name = "post_storage_time")
     @Metered(name = "post_storage_counter")
     @ExceptionMetered(name = "post_storage_exception")
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public Response addKey(@NotNull final @PathParam("key") String key, final @QueryParam("ref") String ref, @Valid @NotNull final AddKeyData data,
-            final @Auth Optional<User> userHolder) {
-
+    public Response addKey(@NotNull final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Context HttpServletRequest httpRequest,
+            final @Auth Optional<User> userHolder) throws JsonParseException, JsonMappingException, IOException {
         if (!userHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
@@ -330,7 +346,7 @@ public class KeyResource {
             try {
                 final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
                 if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
-                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
+                    LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
                     throw new WebApplicationException(Status.FORBIDDEN);
                 }
             } catch (RefNotFoundException e) {
@@ -341,12 +357,12 @@ public class KeyResource {
         final Optional<StoreInfo> storeInfo = helper.unwrap(() -> storage.getKey(key, ref));
 
         if (storeInfo.isPresent()) {
-            throw new WebApplicationException(key + " already exist in "+(ref == null ? DEFAULT_REF : ref), Status.CONFLICT);
+            throw new WebApplicationException(key + " already exist in " + (ref == null ? defaultRef : ref), Status.CONFLICT);
         }
-
+        final AddKeyData data = processValue(AddKeyData.class, httpRequest);
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
                 new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
-        LOG.info("{} logged in and added key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 
@@ -375,7 +391,7 @@ public class KeyResource {
             if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
                 throw new WebApplicationException(Status.BAD_REQUEST);
             }
-            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, (ref == null ? DEFAULT_REF : ref), user);
+            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
 
@@ -389,7 +405,7 @@ public class KeyResource {
             LOG.error("Unknown API error", e);
             throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
         }
-        LOG.info("{} logged in and deleted key {} in {}", user, key,(ref == null ? DEFAULT_REF : ref));
+        LOG.info("{} logged in and deleted key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().build();
     }
 

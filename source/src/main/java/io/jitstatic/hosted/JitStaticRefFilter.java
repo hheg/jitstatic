@@ -21,8 +21,10 @@ package io.jitstatic.hosted;
  */
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Ref;
@@ -35,10 +37,11 @@ public class JitStaticRefFilter implements RefFilter {
     private final HttpServletRequest req;
 
     public JitStaticRefFilter(final HttpServletRequest req) {
-        this.req = req;
+        this.req = Objects.requireNonNull(req);
     }
 
     @Override
+    @Nullable
     public Map<String, Ref> filter(final Map<String, Ref> refs) {
         if (refs != null) {
             if (!req.isUserInRole(JitStaticConstants.SECRETS)) {

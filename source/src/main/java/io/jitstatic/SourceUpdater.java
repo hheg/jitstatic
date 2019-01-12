@@ -30,6 +30,8 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 
+import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.source.SmallObjectStreamProvider;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 
@@ -41,7 +43,8 @@ public class SourceUpdater {
         this.repositoryUpdater = repositoryUpdater;
     }
 
-    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> fileEntry,
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(
+            final Pair<Pair<String, ObjectStreamProvider>, Pair<String, byte[]>> fileEntry,
             final Ref ref, final CommitMetaData commitMetaData)
             throws IOException {
         final List<Pair<String, ObjectId>> addedEntry = addEntry(fileEntry, ref, commitMetaData, "add key");
@@ -56,7 +59,7 @@ public class SourceUpdater {
         return updateMetaDataEntry.getRight().name();
     }
 
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> updateKey(final String key, final Ref ref, final byte[] data,
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> updateKey(final String key, final Ref ref, final ObjectStreamProvider data,
             final CommitMetaData commitMetaData) throws IOException {
         final Pair<String, ObjectId> updatedKeyEntry = addEntry(Pair.of(Pair.of(key, data), Pair.ofNothing()), ref, commitMetaData, "update key").get(0);
         return Pair.of(updatedKeyEntry.getRight().name(), getObjectLoaderFactory(updatedKeyEntry));
@@ -65,22 +68,23 @@ public class SourceUpdater {
     private ThrowingSupplier<ObjectLoader, IOException> getObjectLoaderFactory(final Pair<String, ObjectId> updatedKeyEntry) {
         final Repository repository = repositoryUpdater.getRepository();
         final ObjectId objectId = updatedKeyEntry.getRight();
-        final ThrowingSupplier<ObjectLoader, IOException> loaderFactory = () -> repository.open(objectId);
-        return loaderFactory;
+        return () -> repository.open(objectId);
     }
 
-    private List<Pair<String, ObjectId>> addEntry(final Pair<Pair<String, byte[]>, Pair<String, byte[]>> keyEntry, final Ref ref,
+    private List<Pair<String, ObjectId>> addEntry(final Pair<Pair<String, ObjectStreamProvider>, Pair<String, byte[]>> keyEntry, final Ref ref,
             final CommitMetaData commitMetaData,
             final String method) throws IOException {
         Objects.requireNonNull(keyEntry);
         Objects.requireNonNull(ref);
 
-        final Pair<String, byte[]> file = Objects.requireNonNull(keyEntry.getLeft());
+        final Pair<String, ObjectStreamProvider> file = Objects.requireNonNull(keyEntry.getLeft());
         final Pair<String, byte[]> fileMetadata = Objects.requireNonNull(keyEntry.getRight());
         if (!file.isPresent() && !fileMetadata.isPresent()) {
             throw new IllegalArgumentException("No entry data");
         }
-        return repositoryUpdater.commit(ref, commitMetaData, method, List.of(file, fileMetadata));
+        byte[] fileMetaDataArray = fileMetadata.getRight();
+        return repositoryUpdater.commit(ref, commitMetaData, method,
+                List.of(file, Pair.of(fileMetadata.getLeft(), fileMetaDataArray == null ? null : new SmallObjectStreamProvider(fileMetaDataArray))));
     }
 
     public void deleteKey(final String file, final Ref ref, final CommitMetaData commitMetaData, final boolean hasKeyMetaFile)

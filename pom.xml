@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-parent</artifactId>
-    <version>0.23.0</version>
+    <version>0.30.0</version>
     <packaging>pom</packaging>
     <modules>
         <module>jitstatic</module>
@@ -14,12 +14,12 @@
         <module>test-utils</module>
     </modules>
     <properties>
-        <dropwizard.version>1.3.7</dropwizard.version>
-        <jgit.version>5.2.0.201812061821-r</jgit.version>
+        <dropwizard.version>1.3.8</dropwizard.version>
+        <jgit.version>5.2.1.201812262042-r</jgit.version>
         <jersey.version>2.26</jersey.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.fileEncoding>UTF-8</project.build.fileEncoding>
-        <jackson.version>2.9.5</jackson.version>
+        <jackson.version>2.9.8</jackson.version>
         <jetty.version>9.4.11.v20180605</jetty.version>
         <metrics.version>4.0.2</metrics.version>
         <maven.compiler.release>10</maven.compiler.release>
@@ -113,6 +113,51 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-guava</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-jdk8</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-joda</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-jsr310</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-jaxrs-base</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-json-provder</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-module-afterburner</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-jaxb-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-module-parameter-names</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>
@@ -304,18 +349,11 @@
                 <plugin>
                     <groupId>com.amashchenko.maven.plugin</groupId>
                     <artifactId>gitflow-maven-plugin</artifactId>
-                    <version>1.9.0</version>
+                    <version>1.10.0</version>
                     <configuration>
                         <installProject>false</installProject>
                         <gitFlowConfig>
-                            <productionBranch>master</productionBranch>
-                            <developmentBranch>develop</developmentBranch>
-                            <featureBranchPrefix>feature/</featureBranchPrefix>
-                            <releaseBranchPrefix>release/</releaseBranchPrefix>
-                            <hotfixBranchPrefix>hotfix/</hotfixBranchPrefix>
-                            <supportBranchPrefix>support/</supportBranchPrefix>
-                            <versionTagPrefix>v</versionTagPrefix>
-                            <origin>origin</origin>
+                            <versionTagPrefix>v</versionTagPrefix>                            
                         </gitFlowConfig>
 
                         <commitMessages>

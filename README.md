@@ -82,7 +82,6 @@ INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: T
     GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     PUT     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     GET     /storage (io.jitstatic.api.KeyResource)
-    POST    /storage (io.jitstatic.api.KeyResource)
     GET     /storage/{key : .+/} (io.jitstatic.api.KeyResource)
     DELETE  /storage/{key : .+} (io.jitstatic.api.KeyResource)
     GET     /storage/{key : .+} (io.jitstatic.api.KeyResource)
@@ -120,7 +119,7 @@ remote:    \ \(_) |_/ _\ |_ __ _| |_(_) ___
 remote:     \ \ | __\ \| __/ _` | __| |/ __|
 remote:  /\_/ / | |__\ \ || (_| | |_| | (__ 
 remote:  \___/|_|\__\__/\__\__,_|\__|_|\___|
-remote:                                     0.20.0
+remote:                                     0.23.0
 remote: Counting objects: 4, done
 remote: Finding sources: 100% (4/4)
 remote: Getting sizes: 100% (3/3)
@@ -231,7 +230,7 @@ Content-Length: 20
 
 {"hello" : "world"}
 ```
-Use that to be able to modify the `hello_world` by sending a PUT command to change it. You'll have to provide a commit message as well. Since JitStatic is supporting any content, unfortunately the data has to be an base64 encoded array.
+Use that to be able to modify the `hello_world` by sending a PUT command to change it. You'll have to provide a commit message as well. Since JitStatic is supporting any content and due to the JSON format, the data has to be an base64 encoded byte array. If the the data is a string, this string must be in the UTF-8 format. JavaScript f.ex uses a version of UTF-16 as default encoding for their strings which cause the text to get garbled if the string is stored directly, without being converted. It has to be UTF-8 since that's how Git stores text.
 ```
 curl -i -H 'Content-Type: application/json' \
 -H 'If-Match: "264f8aec58118e2682091653017213ace0c04922"' \
@@ -580,4 +579,8 @@ You can find a Java client for JitStatic in Maven Central with coordinates
     <version>0.10.0</version>
 </dependency>
 ```
+## Disclaimer
+
+This is a project with some interesting challenges I'd like to explore while being useful at the same time. This is used in production today, but it's also a way of testing some new ideas and techniques.
+
 

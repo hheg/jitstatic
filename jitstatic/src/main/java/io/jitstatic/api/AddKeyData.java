@@ -22,31 +22,23 @@ package io.jitstatic.api;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Pattern;
-import javax.validation.constraints.Size;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.MetaData;
+import io.jitstatic.source.ObjectStreamProvider;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class AddKeyData {
-    @Deprecated
-    private static final String REFS_HEADS_MASTER = "refs/heads/master";
-    @Deprecated
-    private final String key;
-
-    @Deprecated
-    @Pattern(regexp = "^refs/heads/.+$")
-    private final String branch;
 
     @NotNull
-    @Size(min = 1)
-    private final byte[] data;
+    private final ObjectStreamProvider data;
 
     @NotNull
     @Valid
@@ -65,27 +57,17 @@ public class AddKeyData {
     private final String userInfo;
 
     @JsonCreator
-    public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch, @JsonProperty("data") final byte[] data,
+    public AddKeyData(@JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
             @JsonProperty("metaData") final MetaData metaData, @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
-        this.key = key;
-        this.branch = (branch == null ? REFS_HEADS_MASTER : branch);
         this.data = data;
         this.metaData = metaData;
         this.message = message;
         this.userMail = userMail;
         this.userInfo = userInfo;
     }
-    @Deprecated
-    public String getKey() {
-        return key;
-    }
-    @Deprecated
-    public String getBranch() {
-        return branch;
-    }
 
-    public byte[] getData() {
+    public ObjectStreamProvider getData() {
         return data;
     }
 

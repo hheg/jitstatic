@@ -41,7 +41,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.codahale.metrics.health.HealthCheck.Result;
 
 import io.dropwizard.testing.ConfigOverride;
-import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.test.TemporaryFolder;

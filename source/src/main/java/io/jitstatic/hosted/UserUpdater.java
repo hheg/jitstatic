@@ -40,6 +40,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.RepositoryUpdater;
 import io.jitstatic.auth.UserData;
+import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.source.SmallObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 
 public class UserUpdater {
@@ -54,20 +56,20 @@ public class UserUpdater {
 
     public List<Pair<String, String>> updateUser(final List<Pair<String, UserData>> userData, final Ref ref, final CommitMetaData commitMetaData)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, IOException {
-        final List<Pair<String, byte[]>> convertedData = userData.stream().parallel().map(p -> {
+        final List<Pair<String, ObjectStreamProvider>> convertedData = userData.stream().parallel().map(p -> {
             try {
                 return writeData(p.getLeft(), p.getRight());
             } catch (JsonProcessingException e) {
                 LOGGER.error("Error deserializing user {} ", p.getKey(), e);
-                return Pair.of(p.getKey(), (byte[]) null);
+                return Pair.of(p.getKey(), (ObjectStreamProvider) null);
             }
         }).collect(Collectors.toList());
         return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData).stream().map(m -> Pair.of(m.getLeft(), m.getRight().name()))
                 .collect(Collectors.toList());
     }
 
-    private Pair<String, byte[]> writeData(String user, UserData data) throws JsonProcessingException {
-        return Pair.of(user, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
+    private Pair<String, ObjectStreamProvider> writeData(String user, UserData data) throws JsonProcessingException {
+        return Pair.of(user, new SmallObjectStreamProvider(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(data)));
     }
 
     public String updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)

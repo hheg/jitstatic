@@ -26,8 +26,6 @@ import java.util.Objects;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
-import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
 import io.jitstatic.storage.Storage;
 
 public class KeyAdminAuthenticatorImpl implements KeyAdminAuthenticator {

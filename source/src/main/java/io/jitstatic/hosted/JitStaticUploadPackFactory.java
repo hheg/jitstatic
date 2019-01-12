@@ -21,14 +21,12 @@ package io.jitstatic.hosted;
  */
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
+
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.transport.PreUploadHookChain;
@@ -37,8 +35,6 @@ import org.eclipse.jgit.transport.UploadPack.RequestPolicy;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
-
-import io.jitstatic.JitStaticConstants;
 
 public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServletRequest> {
 

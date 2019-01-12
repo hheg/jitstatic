@@ -61,6 +61,7 @@ import io.jitstatic.utils.Pair;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
 public class BulkResourceTest {
+    private static final String REF_HEADS_MASTER = "refs/heads/master";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String USER = "user";
     private static final String SECRET = "secret";
@@ -74,7 +75,7 @@ public class BulkResourceTest {
                             .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), "refs/heads/master")))
+                    new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER), REF_HEADS_MASTER))
             .build();
 
     @Test
@@ -86,10 +87,10 @@ public class BulkResourceTest {
         Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
         Mockito.when(storageData.getContentType()).thenReturn("application/something");
         Mockito.when(storage.getList(Mockito.any()))
-                .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), "refs/heads/master")));
+                .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER)));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(
-                        List.of(new BulkSearch("refs/heads/master",
+                        List.of(new BulkSearch(REF_HEADS_MASTER,
                                 List.of(new SearchPath("key1", false), new SearchPath("decoy/key1", false),
                                         new SearchPath("data/data/key1", false), new SearchPath("dir/dir/key1", false)))),
                         MediaType.APPLICATION_JSON))
