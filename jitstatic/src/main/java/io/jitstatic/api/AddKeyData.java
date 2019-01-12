@@ -22,7 +22,7 @@ package io.jitstatic.api;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Pattern;
+
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -36,14 +36,6 @@ import io.jitstatic.source.ObjectStreamProvider;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class AddKeyData {
-    @Deprecated
-    private static final String REFS_HEADS_MASTER = "refs/heads/master";
-    @Deprecated
-    private final String key;
-
-    @Deprecated
-    @Pattern(regexp = "^refs/heads/.+$")
-    private final String branch;
 
     @NotNull
     private final ObjectStreamProvider data;
@@ -65,27 +57,14 @@ public class AddKeyData {
     private final String userInfo;
 
     @JsonCreator
-    public AddKeyData(@JsonProperty("key") final String key, @JsonProperty("branch") final String branch,
-            @JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
+    public AddKeyData(@JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
             @JsonProperty("metaData") final MetaData metaData, @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
             @JsonProperty("userMail") final String userMail) {
-        this.key = key;
-        this.branch = (branch == null ? REFS_HEADS_MASTER : branch);
         this.data = data;
         this.metaData = metaData;
         this.message = message;
         this.userMail = userMail;
         this.userInfo = userInfo;
-    }
-
-    @Deprecated
-    public String getKey() {
-        return key;
-    }
-
-    @Deprecated
-    public String getBranch() {
-        return branch;
     }
 
     public ObjectStreamProvider getData() {

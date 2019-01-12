@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.servlet.FilterRegistration.Dynamic;
+import javax.validation.Validator;
 
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,7 @@ import org.mockito.MockitoAnnotations;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.codahale.metrics.health.HealthCheckRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
@@ -80,6 +82,10 @@ public class JitstaticApplicationTest {
     private ServletEnvironment servlets;
     @Mock
     private Dynamic filter;
+    @Mock
+    private Validator validator;
+    @Mock
+    private ObjectMapper mapper;
 
     private final JitstaticApplication app = new JitstaticApplication();
     private JitstaticConfiguration config;
@@ -98,6 +104,8 @@ public class JitstaticApplicationTest {
         when(storageFactory.build(any(), isA(Environment.class), any())).thenReturn(storage);
         when(environment.getApplicationContext()).thenReturn(handler);
         when(handler.getBean(Mockito.eq(LoginService.class))).thenReturn(service);
+        when(environment.getValidator()).thenReturn(validator);
+        when(environment.getObjectMapper()).thenReturn(mapper);
     }
 
     @Test

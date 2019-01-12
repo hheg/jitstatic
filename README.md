@@ -82,7 +82,6 @@ INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: T
     GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     PUT     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
     GET     /storage (io.jitstatic.api.KeyResource)
-    POST    /storage (io.jitstatic.api.KeyResource)
     GET     /storage/{key : .+/} (io.jitstatic.api.KeyResource)
     DELETE  /storage/{key : .+} (io.jitstatic.api.KeyResource)
     GET     /storage/{key : .+} (io.jitstatic.api.KeyResource)

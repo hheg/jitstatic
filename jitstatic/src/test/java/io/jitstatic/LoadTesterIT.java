@@ -300,8 +300,8 @@ public class LoadTesterIT {
         }
     }
 
-    private void execUpdatersJobs(ExecutorService updaterPool, CompletableFuture<?>[] updaterJobs,
-            ConcurrentLinkedQueue<GitClientUpdater> updaters, TestData data) {
+    private void execUpdatersJobs(ExecutorService updaterPool, CompletableFuture<?>[] updaterJobs, ConcurrentLinkedQueue<GitClientUpdater> updaters,
+            TestData data) {
         for (int i = 0; i < updaterJobs.length; i++) {
             CompletableFuture<?> f = updaterJobs[i];
             if (f == null || f.isDone()) {

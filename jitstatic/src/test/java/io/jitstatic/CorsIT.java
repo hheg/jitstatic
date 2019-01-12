@@ -270,7 +270,7 @@ public class CorsIT {
                 "Content-Type", "application/json",
                 "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/application/storage/file3", DW.getLocalPort())).headers(headers)
-                .body(MAPPER.writeValueAsBytes(new AddKeyData(null, null, AUtils.toProvider(new byte[] { 0 }),
+                .body(MAPPER.writeValueAsBytes(new AddKeyData(AUtils.toProvider(new byte[] { 0 }),
                         new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))
                 .asString();
         Headers responseHeaders = response.getHeaders();
