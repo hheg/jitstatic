@@ -47,7 +47,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         LOG.info("Starting {} build {}", INSTANCE.getBuildVersion(), INSTANCE.getCommitIdAbbrev());
         new JitstaticApplication().run(args);
     }
-
+    
     @Override
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
         Source source = null;

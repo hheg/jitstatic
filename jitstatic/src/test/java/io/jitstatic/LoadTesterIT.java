@@ -23,10 +23,12 @@ package io.jitstatic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.SocketException;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +53,7 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.core.Response;
 
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.client.cache.CacheConfig;
 import org.apache.http.impl.client.cache.CachingHttpClients;
 import org.eclipse.jgit.api.CheckoutCommand;
@@ -87,6 +90,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.CountingInputStream;
 
 import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.JerseyClientBuilder;
@@ -261,9 +265,21 @@ public class LoadTesterIT {
                 } catch (Exception e1) {
                 }
             });
-            updaterPool.shutdown();
-            clientPool.shutdown();
+            CompletableFuture.allOf(
+                    CompletableFuture.runAsync(shutdownAndAwait(updaterPool)),
+                    CompletableFuture.runAsync(shutdownAndAwait(clientPool))).get(15, TimeUnit.SECONDS);
         }
+    }
+
+    private static Runnable shutdownAndAwait(ExecutorService pool) {
+        pool.shutdown();
+        return () -> {
+            try {
+                pool.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e1) {
+                // Ignore
+            }
+        };
     }
 
     private void doWork(TestData data, ConcurrentLinkedQueue<JitStaticUpdater> clients, ConcurrentLinkedQueue<GitClientUpdater> updaters,
@@ -279,20 +295,21 @@ public class LoadTesterIT {
                 execClientJobs(clientPool, clientJobs, clients, data);
             }
         } while (System.currentTimeMillis() - start < 10_000);
+        LOG.info("doWork is done!");
     }
 
     private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs)
             throws InterruptedException, ExecutionException, TimeoutException {
         CompletableFuture.allOf(
                 CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(clientJobs), "direct clients")),
-                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(updaterJobs), "git clients"))).get(60, TimeUnit.SECONDS);
+                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(updaterJobs), "git clients"))).get(160, TimeUnit.SECONDS);
     }
 
     private void waitForJobs(CompletableFuture<Void> jobs, String type) {
         long start = System.currentTimeMillis();
         try {
             LOG.info("Waiting for {}...", type);
-            jobs.get(59, TimeUnit.SECONDS);
+            jobs.get(100, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             LOG.error("Failed to wait {}", type, e);
         } finally {
@@ -411,6 +428,8 @@ public class LoadTesterIT {
                         if (Math.random() < 0.5) {
                             client.modifyKey(testData, branch, name, ref, entity, readValue);
                         }
+                    } catch (SocketException se) {
+                        LOG.error("Got socker error {}", se.getLocalizedMessage());
                     } catch (Exception e) {
                         LOG.error("TestSuiteError: Failed with ", e);
                     }
@@ -445,11 +464,17 @@ public class LoadTesterIT {
 
     private JitStaticClient buildKeyClient(boolean cache) throws URISyntaxException {
         int localPort = DW.getLocalPort();
-        JitStaticClientBuilder builder = JitStaticClient.create().setHost("localhost").setPort(localPort)
-                .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
+        JitStaticClientBuilder builder = JitStaticClient.create()
+                .setHost("localhost").setPort(localPort)
+                .setAppContext("/application/")
+                .setUser(USER).setPassword(PASSWORD);
         if (cache) {
-            builder.setCacheConfig(CacheConfig.custom().setMaxCacheEntries(1000).setMaxObjectSize(8192).build())
-                    .setHttpClientBuilder(CachingHttpClients.custom());
+            builder.setCacheConfig(CacheConfig.custom()
+                    .setMaxCacheEntries(1000)
+                    .setMaxObjectSize(8192).build())
+                    .setHttpClientBuilder(CachingHttpClients.custom().disableAutomaticRetries());
+        } else {
+            builder.setHttpClientBuilder(HttpClients.custom().disableAutomaticRetries());
         }
         return builder.build();
     }
@@ -514,21 +539,26 @@ public class LoadTesterIT {
 
         private void modifyKey(TestData testData, String branch, String name, String ref, Entity entity, String readValue) {
             int c = entity.getValue().get("data").asInt() + 1;
+            byte[] data2 = testData.getData(c);
+            CountingInputStream cis = new CountingInputStream(new ByteArrayInputStream(data2));
             try {
-                byte[] data = testData.getData(c);
-                String newTag = updater.modifyKey(data, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
+                String newTag = updater.modifyKey(cis, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
                         entity.getTag());
                 counter.updates++;
-                log(() -> LOG.info("Ok modified {};{} with {}", name, branch, c));
+                log(() -> LOG.info("Ok modified {}:{} with {}", name, branch, c));
                 if (Math.random() < 0.5) {
                     updater.getKey(name, branch, newTag, LoadTesterIT::read);
                 }
             } catch (APIException e) {
-                log(() -> LOG.info("TestSuiteError: Failed to modify {} {}", c, e.getLocalizedMessage()));
+                log(() -> LOG.info("TestSuiteError: Failed to modify {}:{}:{} {}", name, ref, c, e.getLocalizedMessage()));
                 counter.failiures++;
+            } catch (SocketException e) {
+                counter.failiures++;
+                LOG.error("TestSuiteError: Socket write error {}:{}:{} wrote {} of {} bytes", name, ref, c, cis.getCount(), data2.length,
+                        e.getLocalizedMessage());
             } catch (Exception e) {
                 counter.failiures++;
-                LOG.error("TestSuiteError: General error " + c, e);
+                LOG.error("TestSuiteError: General error {}:{}:{} wrote {} of {} bytes {}", name, ref, c, cis.getCount(), data2.length, e);
             }
         }
 
@@ -547,11 +577,13 @@ public class LoadTesterIT {
         private final File workingFolder;
         private final Counters counter;
         private final UsernamePasswordCredentialsProvider provider;
+        private final String gitAdress;
 
         public GitClientUpdater(final String gitAdress, String name, String pass) throws IOException {
             this.workingFolder = getFolderFile();
             this.counter = new Counters(0, 0);
             this.provider = getCredentials(name, pass);
+            this.gitAdress = gitAdress;
         }
 
         public void initRepo() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
@@ -586,8 +618,7 @@ public class LoadTesterIT {
                             }
                             if (ok) {
                                 counter.updates++;
-                                String v = new String(data, UTF_8);
-                                log(() -> LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, v, message));
+                                log(() -> compileAndLog(key, branch, readData, c, data, message));
                             } else {
                                 counter.failiures++;
                             }
@@ -607,6 +638,10 @@ public class LoadTesterIT {
                     LOG.warn("Got known error {}", cause.getMessage());
                 }
             }
+        }
+
+        private void compileAndLog(String key, String branch, JsonNode readData, int c, byte[] data, String message) {
+            LOG.info("OK push {} {}:{} from {} to {} commit {}", c, key, branch, readData, new String(data, UTF_8), message);
         }
 
         public Counters counter() {

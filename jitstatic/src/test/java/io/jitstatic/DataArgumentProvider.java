@@ -46,7 +46,7 @@ public class DataArgumentProvider implements ArgumentsProvider {
                 new FatTestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 10, 0),
                 new FatTestData(new String[] { "a" }, new String[] { LoadTesterIT.MASTER }, false, 50, 0),
                 new FatTestData(new String[] { "a", "b", "c", "d", "e", "f", "g" },
-                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, true, 50, 0))
+                        new String[] { LoadTesterIT.MASTER, "develop", "something", "a1", "a2", "a3", "a4", "a5" }, false, 50, 0))
                 .map(Arguments::of);
     }
 

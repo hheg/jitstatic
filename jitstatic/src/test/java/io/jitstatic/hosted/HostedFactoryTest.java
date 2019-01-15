@@ -49,6 +49,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.jetty.setup.ServletEnvironment;
 import io.dropwizard.setup.Environment;
@@ -68,13 +70,14 @@ public class HostedFactoryTest {
     private MutableServletContextHandler handler = mock(MutableServletContextHandler.class);
     private TemporaryFolder tmpFolder;
     private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+    private ObjectMapper mapper = new ObjectMapper();
 
     @Test
     public void testAHostedRemoteFileBuild() throws IOException, CorruptedSourceException {
         when(env.servlets()).thenReturn(senv);
         when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
         when(env.getApplicationContext()).thenReturn(handler);
-
+        when(env.getObjectMapper()).thenReturn(mapper);
         HostedFactory rf = new HostedFactory();
         rf.setBasePath(getFolder().toAbsolutePath());
         rf.setHostedEndpoint("endpoint");
@@ -91,6 +94,7 @@ public class HostedFactoryTest {
         when(env.servlets()).thenReturn(senv);
         when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
         when(env.getApplicationContext()).thenReturn(handler);
+        when(env.getObjectMapper()).thenReturn(mapper);
         HostedFactory hf = new HostedFactory();
         hf.setBasePath(getFolder().toAbsolutePath());
         hf.setHostedEndpoint("endpoint");
@@ -108,6 +112,7 @@ public class HostedFactoryTest {
         when(env.servlets()).thenReturn(senv);
         when(senv.addServlet(any(), Mockito.<Servlet>any())).thenReturn(servlet);
         when(env.getApplicationContext()).thenReturn(handler);
+        when(env.getObjectMapper()).thenReturn(mapper);
         HostedFactory hf = new HostedFactory();
         hf.setBasePath(getFolder().toAbsolutePath());
         hf.setHostedEndpoint("endpoint");
