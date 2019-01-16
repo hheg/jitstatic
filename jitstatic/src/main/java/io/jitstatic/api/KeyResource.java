@@ -293,7 +293,8 @@ public class KeyResource {
     }
 
     private <T> T processValue(final Class<T> class1, final HttpServletRequest httpRequest) throws JsonParseException, JsonMappingException, IOException {
-        final T data = mapper.readValue(httpRequest.getInputStream(), class1);
+        T data = mapper.readValue(httpRequest.getInputStream(), class1);
+
         if (data == null) {
             throw new WebApplicationException("entity is null", 422);
         }
@@ -445,7 +446,7 @@ public class KeyResource {
         }
         final String[] methods = requestMethod.split(",");
         for (String m : methods) {
-            if ("DELETE".equals(m.trim())) {
+            if ("DELETE".equalsIgnoreCase(m.trim())) {
                 return true;
             }
         }

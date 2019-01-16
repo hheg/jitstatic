@@ -33,6 +33,8 @@ import javax.servlet.ServletRegistration.Dynamic;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 
@@ -51,12 +53,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import io.dropwizard.setup.Environment;
 import io.jitstatic.JitStaticConstants;
+import io.jitstatic.api.StreamingDeserializer;
 import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
+import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
+import io.jitstatic.utils.FilesUtils;
 
 public class HostedFactory {
     private static final Logger LOG = LoggerFactory.getLogger(HostedFactory.class);
@@ -88,6 +95,14 @@ public class HostedFactory {
     @NotNull
     @JsonProperty
     private Path basePath;
+
+    @JsonProperty
+    private Path tmpPath;
+
+    @JsonProperty
+    @Min(1_000_000)
+    @Max(20_000_000)
+    private int threshold = 1_000_000;
 
     @NotNull
     @JsonProperty
@@ -273,6 +288,17 @@ public class HostedFactory {
 
     public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
+        Path tempfolder = getTmpPath();
+        if (tempfolder == null) {
+            tempfolder = getBasePath().resolve(".git").resolve("jitstatic").resolve("tmpfolder");
+        }
+        FilesUtils.checkOrCreateFolder(tempfolder.toFile());
+        final ObjectMapper mapper = env.getObjectMapper();
+        final SimpleModule module = new SimpleModule();
+        module.addDeserializer(ObjectStreamProvider.class, new StreamingDeserializer(getThreshold(), tempfolder.toFile()));
+        mapper.registerModule(module);
+        env.getObjectMapper().registerModule(module);
+
         Objects.requireNonNull(gitRealm);
         final String base = "/" + getServletName() + "/";
         final String baseServletPath = base + "*";
@@ -291,6 +317,13 @@ public class HostedFactory {
         servlet.setInitParameter(SERVLET_NAME, getServletName());
         servlet.addMapping(baseServletPath);
 
+        final ConstraintMapping baseMapping = new ConstraintMapping();
+        baseMapping.setConstraint(new Constraint());
+        baseMapping.getConstraint().setAuthenticate(true);
+        baseMapping.getConstraint().setDataConstraint(Constraint.DC_NONE);
+        baseMapping.getConstraint().setRoles(new String[] {});
+        baseMapping.setPathSpec(base + getHostedEndpoint() + "/*");
+
         final ConstraintMapping infoPath = new ConstraintMapping();
         infoPath.setConstraint(new Constraint());
         infoPath.getConstraint().setAuthenticate(true);
@@ -305,13 +338,20 @@ public class HostedFactory {
         receivePath.getConstraint().setRoles(new String[] { JitStaticConstants.PUSH });
         receivePath.setPathSpec(base + getHostedEndpoint() + "/git-receive-pack");
 
+        final ConstraintMapping uploadPath = new ConstraintMapping();
+        uploadPath.setConstraint(new Constraint());
+        uploadPath.getConstraint().setAuthenticate(true);
+        uploadPath.getConstraint().setDataConstraint(Constraint.DC_NONE);
+        uploadPath.getConstraint().setRoles(new String[] { JitStaticConstants.PULL });
+        uploadPath.setPathSpec(base + getHostedEndpoint() + "/git-upload-pack");
+
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
         sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
         final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS);
         sec.setLoginService(gitLoginService);
-        sec.setConstraintMappings(new ConstraintMapping[] { infoPath, receivePath });
+        sec.setConstraintMappings(new ConstraintMapping[] { baseMapping, infoPath, receivePath, uploadPath });
 
         sec.setHandler(new DropWizardHandlerWrapper(env.getApplicationContext()));
         Set<String> pathsWithUncoveredHttpMethods = sec.getPathsWithUncoveredHttpMethods();
@@ -352,6 +392,22 @@ public class HostedFactory {
 
     public void setCors(Cors cors) {
         this.cors = cors;
+    }
+
+    public Path getTmpPath() {
+        return tmpPath;
+    }
+
+    public void setTmpPath(Path tmpPath) {
+        this.tmpPath = tmpPath;
+    }
+
+    public int getThreshold() {
+        return threshold;
+    }
+
+    public void setThreshold(int threshold) {
+        this.threshold = threshold;
     }
 
     private static class DropWizardHandlerWrapper implements Handler {

@@ -28,8 +28,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.input.ProxyInputStream;
 import org.apache.commons.io.output.DeferredFileOutputStream;
@@ -40,14 +42,16 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 
 import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.utils.FilesUtils;
 
 public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider> {
-
+    
+    private static final Logger LOG = LoggerFactory.getLogger(StreamingDeserializer.class);
     private static final int DEFAULT_MAX_BYTE_SIZE = 10_000_000;
     private static final int MAX_FILE_SIZE = Integer.MAX_VALUE - 1;
     private static final File TMP_DIR = Paths.get(System.getProperty("java.io.tmpdir"), "jitstatic").toFile();
     static {
-        checkOrCreateFolder(TMP_DIR);
+        FilesUtils.checkOrCreateFolder(TMP_DIR);
     }
     private final int threshold;
     private final File workingDirectory;
@@ -65,18 +69,12 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
     }
 
     public StreamingDeserializer(final int threshold, final File workingDirectory) {
+        if (threshold >= MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("Threshold too large " + threshold);
+        }
         this.threshold = threshold < 0 ? DEFAULT_MAX_BYTE_SIZE : threshold;
-        checkOrCreateFolder(workingDirectory);
+        FilesUtils.checkOrCreateFolder(workingDirectory);
         this.workingDirectory = workingDirectory;
-    }
-
-    private static void checkOrCreateFolder(final File workingDirectory) {
-        if (!Objects.requireNonNull(workingDirectory).exists() && !workingDirectory.mkdirs()) {
-            throw new IllegalArgumentException(String.format("Folder %s doesn't exist and can't be created", workingDirectory.getAbsolutePath()));
-        }
-        if (!workingDirectory.canWrite()) {
-            throw new IllegalArgumentException(String.format("Folder %s exist but can't be written to", workingDirectory.getAbsolutePath()));
-        }
     }
 
     DeferredFileOutputStream getOutPutStream() {
@@ -125,7 +123,7 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
                                         Files.delete(path);
                                     }
                                 } catch (IOException e) {
-                                    // Ignore
+                                   LOG.warn("Error deleting temporary file",e);
                                 }
                             });
                         }
