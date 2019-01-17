@@ -1,5 +1,8 @@
 package io.jitstatic;
 
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+
 /*-
  * #%L
  * jitstatic
@@ -173,7 +176,7 @@ public class LoadTesterIT {
                             log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                         }
                     } catch (IOException | GitAPIException e) {
-                        e.printStackTrace();
+                        LOG.error("Caught error when trying to read repository", e);
                     }
                 }
             }
@@ -184,6 +187,7 @@ public class LoadTesterIT {
         LOG.info("Git failures: {}", gitCounters.failiures);
         LOG.info("Put updates: {}", putCounters.updates);
         LOG.info("Put failures: {}", putCounters.failiures);
+        LOG.info("Data sent: {}", putCounters.data);
         AUtils.checkContainerForErrors(DW);
     }
 
@@ -257,8 +261,8 @@ public class LoadTesterIT {
             doWork(data, clients, updaters, clientPool, updaterPool, clientJobs, updaterJobs);
             waitForJobstoFinish(clientJobs, updaterJobs);
         } finally {
-            putCounters = clients.stream().map(JitStaticUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0));
-            gitCounters = updaters.stream().map(GitClientUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0));
+            putCounters = clients.stream().map(JitStaticUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0, 0));
+            gitCounters = updaters.stream().map(GitClientUpdater::counter).reduce(Counters::add).orElse(new Counters(0, 0, 0));
             clients.stream().forEach(c -> {
                 try {
                     c.close();
@@ -392,14 +396,11 @@ public class LoadTesterIT {
         Path user = path.resolve(JitStaticConstants.USERS).resolve(JitStaticConstants.JITSTATIC_KEYADMIN_REALM).resolve(USER);
         assertTrue(user.getParent().toFile().mkdirs());
         Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8),
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.TRUNCATE_EXISTING);
+                CREATE_NEW, TRUNCATE_EXISTING);
 
         for (String name : testData.names) {
-            Files.write(path.resolve(name), data, StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(path.resolve(name + METADATA), testData.getMetaData(), StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(path.resolve(name), data, CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(path.resolve(name + METADATA), testData.getMetaData(), CREATE_NEW, TRUNCATE_EXISTING);
         }
     }
 
@@ -529,7 +530,7 @@ public class LoadTesterIT {
 
         public JitStaticUpdater(JitStaticClient updater) {
             this.updater = updater;
-            this.counter = new Counters(0, 0);
+            this.counter = new Counters(0, 0, 0);
         }
 
         public Entity getKey(String name, String ref, TriFunction<InputStream, String, String, Entity> object)
@@ -559,6 +560,8 @@ public class LoadTesterIT {
             } catch (Exception e) {
                 counter.failiures++;
                 LOG.error("TestSuiteError: General error {}:{}:{} wrote {} of {} bytes {}", name, ref, c, cis.getCount(), data2.length, e);
+            } finally {
+                counter.data += cis.getCount();
             }
         }
 
@@ -581,7 +584,7 @@ public class LoadTesterIT {
 
         public GitClientUpdater(final String gitAdress, String name, String pass) throws IOException {
             this.workingFolder = getFolderFile();
-            this.counter = new Counters(0, 0);
+            this.counter = new Counters(0, 0, 0);
             this.provider = getCredentials(name, pass);
             this.gitAdress = gitAdress;
         }
@@ -602,7 +605,7 @@ public class LoadTesterIT {
                         JsonNode readData = readData(filedata);
                         int c = readData.get("data").asInt() + 1;
                         byte[] data = testData.getData(c);
-                        Files.write(filedata, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        Files.write(filedata, data, StandardOpenOption.CREATE, TRUNCATE_EXISTING);
                         DirCache dc = git.add().addFilepattern(".").call();
                         if (dc.getEntryCount() > 0) {
                             String message = "g:" + key + ":" + c;
@@ -672,14 +675,16 @@ public class LoadTesterIT {
     private static class Counters {
         private int updates;
         private int failiures;
+        private int data;
 
-        public Counters(final int gitUpdates, final int gitFailiures) {
+        public Counters(final int gitUpdates, final int gitFailiures, int data) {
             this.updates = gitUpdates;
             this.failiures = gitFailiures;
+            this.data = data;
         }
 
         public static Counters add(Counters a, Counters b) {
-            return new Counters(a.updates + b.updates, a.failiures + b.failiures);
+            return new Counters(a.updates + b.updates, a.failiures + b.failiures, a.data + b.data);
         }
     }
 }
