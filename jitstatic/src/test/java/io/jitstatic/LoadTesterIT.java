@@ -1,5 +1,6 @@
 package io.jitstatic;
 
+import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 
@@ -38,7 +39,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -605,7 +605,7 @@ public class LoadTesterIT {
                         JsonNode readData = readData(filedata);
                         int c = readData.get("data").asInt() + 1;
                         byte[] data = testData.getData(c);
-                        Files.write(filedata, data, StandardOpenOption.CREATE, TRUNCATE_EXISTING);
+                        Files.write(filedata, data, CREATE, TRUNCATE_EXISTING);
                         DirCache dc = git.add().addFilepattern(".").call();
                         if (dc.getEntryCount() > 0) {
                             String message = "g:" + key + ":" + c;

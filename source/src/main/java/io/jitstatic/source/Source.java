@@ -30,7 +30,8 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
-import io.jitstatic.hosted.RefHolderLock;
+import io.jitstatic.hosted.RefLockHolder;
+import io.jitstatic.hosted.ReloadRefEventListener;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
@@ -38,7 +39,7 @@ import io.jitstatic.utils.Pair;
 public interface Source extends AutoCloseable, CheckHealth {
     public void close();
 
-    public void addListener(SourceEventListener listener);
+    public void addListener(ReloadRefEventListener listener);
 
     public void start();
 
@@ -54,7 +55,7 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public void deleteKey(String key, String ref, CommitMetaData commitMetaData);
 
-    public void addRefHolderFactory(Function<String, RefHolderLock> factory);
+    public void addRefHolderFactory(Function<String, RefLockHolder> factory);
 
     public void createRef(String ref) throws IOException;
 

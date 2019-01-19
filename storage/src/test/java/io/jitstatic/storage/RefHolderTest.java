@@ -57,7 +57,6 @@ import io.jitstatic.source.SourceInfo;
 import io.jitstatic.storage.tools.Utils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
-import io.jitstatic.utils.LinkedException;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -181,58 +180,6 @@ public class RefHolderTest {
         });
         b.set(false);
         async.join();
-    }
-
-    @Test
-    public void testRefreshNoFiles() {
-        RefHolder ref = new RefHolder(REF, source);
-        boolean refresh = ref.refresh();
-        assertFalse(refresh);
-    }
-
-    @Test
-    public void testRefresh() throws RefNotFoundException, IOException {
-        StoreInfo storeInfo = mock(StoreInfo.class);
-        SourceInfo sourceInfo = mock(SourceInfo.class);
-        when(storeInfo.isNormalKey()).thenReturn(true);
-        when(sourceInfo.getSourceProvider()).thenReturn(toProvider(getData().getBytes(UTF_8)));
-        when(sourceInfo.readMetaData()).thenCallRealMethod();
-        when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
-        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
-        when(sourceInfo.getSourceVersion()).thenReturn("2");
-        when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        RefHolder ref = new RefHolder(REF, source);
-        ref.putKey("key", Optional.of(storeInfo));
-        boolean refresh = ref.refresh();
-        assertTrue(refresh);
-    }
-
-    @Test
-    public void testRefreshKeyIsNotFound() {
-        StoreInfo storeInfo = mock(StoreInfo.class);
-        RefHolder ref = new RefHolder(REF, source);
-        ref.putKey("key", Optional.of(storeInfo));
-        boolean refresh = ref.refresh();
-        assertFalse(refresh);
-    }
-
-    @Test
-    public void testRefreshKeyLoadedWithError() throws RefNotFoundException {
-        StoreInfo storeInfo = mock(StoreInfo.class);
-        RuntimeException re = new RuntimeException("Test Exception");
-        when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(re);
-        RefHolder ref = new RefHolder(REF, source);
-        ref.putKey("key", Optional.of(storeInfo));
-        assertThrows(LinkedException.class, () -> ref.refresh());
-    }
-
-    @Test
-    public void testRefreshrefNotFoundForKey() throws RefNotFoundException {
-        StoreInfo storeInfo = mock(StoreInfo.class);
-        when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(""));
-        RefHolder ref = new RefHolder(REF, source);
-        ref.putKey("key", Optional.of(storeInfo));
-        assertFalse(ref.refresh());
     }
 
     @Test

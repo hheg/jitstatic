@@ -41,10 +41,10 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
 
     private final String defaultRef;
     private final ErrorReporter errorReporter;
-    private final RepositoryBus bus;
+    private final RefLockHolderManager bus;
     private final UserExtractor userExtractor;
 
-    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RepositoryBus bus, UserExtractor userExtractor) {
+    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RefLockHolderManager bus, UserExtractor userExtractor) {
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.errorReporter = Objects.requireNonNull(reporter);
         this.bus = Objects.requireNonNull(bus);

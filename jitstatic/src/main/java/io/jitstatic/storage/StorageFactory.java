@@ -23,7 +23,6 @@ import java.util.Objects;
  */
 
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
-import org.slf4j.LoggerFactory;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
@@ -31,8 +30,8 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.hosted.ReloadRefEventListener;
 import io.jitstatic.source.Source;
-import io.jitstatic.source.SourceEventListener;
 
 public class StorageFactory {
 
@@ -44,14 +43,8 @@ public class StorageFactory {
         env.jersey().register(RolesAllowedDynamicFeature.class);
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
         final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());
+        source.addListener(new ReloadRefEventListener(gitStorage));
         source.addRefHolderFactory(gitStorage::getRefHolderLock);
-        source.addListener(updatedRefs -> {
-            try {
-                gitStorage.reload(updatedRefs);
-            } catch (final Exception e) {
-                LoggerFactory.getLogger(SourceEventListener.class).error("Error while loading storage", e);
-            }
-        });
         return gitStorage;
     }
 }

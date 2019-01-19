@@ -39,7 +39,7 @@ import io.jitstatic.utils.Pair;
 public interface Storage extends AutoCloseable, CheckHealth {
     public Optional<StoreInfo> getKey(String key, String ref);
 
-    public void reload(List<String> refsToReload);
+//    public void reload(List<String> refsToReload);
 
     public void close();
 
