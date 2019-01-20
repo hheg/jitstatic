@@ -116,7 +116,7 @@ public class JitStaticReceivePackTest {
     private TestProtocol<Object> protocol;
     private URIish uri;
     private ErrorReporter errorReporter;
-    private RepositoryBus bus;
+    private RefLockHolderManager bus;
 
     @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
@@ -132,7 +132,7 @@ public class JitStaticReceivePackTest {
         clientGit.push().call();
 
         errorReporter = new ErrorReporter();
-        bus = new RepositoryBus(errorReporter);
+        bus = new RefLockHolderManager();
         bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db),
@@ -500,9 +500,9 @@ public class JitStaticReceivePackTest {
         SourceChecker sc = mock(SourceChecker.class);
         RefDatabase refDatabase = mock(RefDatabase.class);
         UserExtractor ue = mock(UserExtractor.class);
-        RepositoryBus repobus = mock(RepositoryBus.class);
+        RefLockHolderManager repobus = mock(RefLockHolderManager.class);
         when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
-        RefHolderLock refholder = mock(RefHolderLock.class);
+        RefLockHolder refholder = mock(RefLockHolder.class);
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, repobus);
         when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
         when(testUpdate.forceUpdate()).thenReturn(RefUpdate.Result.FORCED);
@@ -640,7 +640,7 @@ public class JitStaticReceivePackTest {
         return spyBatchRefUpdate;
     }
 
-    private JitStaticReceivePack initUnit(Repository remoteRepository, SourceChecker sc, UserExtractor ue, ReceiveCommand rc, RepositoryBus bus) {
+    private JitStaticReceivePack initUnit(Repository remoteRepository, SourceChecker sc, UserExtractor ue, ReceiveCommand rc, RefLockHolderManager bus) {
         JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
@@ -655,8 +655,8 @@ public class JitStaticReceivePackTest {
         return rp;
     }
 
-    RefHolderLock refHolderFactory(String ref) {
-        return new RefHolderLock() {
+    RefLockHolder refHolderFactory(String ref) {
+        return new RefLockHolder() {
             @Override
             public <T> Either<T, FailedToLock> lockWriteAll(Supplier<T> supplier) {
                 return Either.left(supplier.get());

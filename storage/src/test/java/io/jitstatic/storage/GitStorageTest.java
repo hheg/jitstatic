@@ -69,7 +69,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
-import io.jitstatic.hosted.RefHolderLock;
+import io.jitstatic.hosted.RefLockHolder;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
@@ -174,14 +174,14 @@ public class GitStorageTest {
             when(si2.getMetaDataVersion()).thenReturn(SHA_2_MD);
             when(source.getSourceInfo(eq("key"), eq(REF_HEADS_MASTER))).thenReturn(si1).thenReturn(si2);
 
-            gs.reload(List.of(REF_HEADS_MASTER));
+            gs.reload(REF_HEADS_MASTER);
             StoreInfo storage = new StoreInfo(toProvider(readData("{\"data\":\"value1\"}")), new MetaData(users, null, false, false, List.of(), null, null),
                     SHA_1,
                     SHA_1_MD);
             assertTrue(Arrays.equals(toByte(storage.getStreamProvider()), toByte(gs.getKey("key", null).get().getStreamProvider())));
-            RefHolderLock refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
+            RefLockHolder refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
             refHolderLock.lockWriteAll(() -> {
-                gs.reload(List.of(REF_HEADS_MASTER));
+                gs.reload(REF_HEADS_MASTER);
                 return true;
             });
 
@@ -245,7 +245,7 @@ public class GitStorageTest {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(anyString(), anyString());
         try (GitStorage gs = new GitStorage(source, null); InputStream md = getMetaData()) {
-            gs.reload(List.of(REF_HEADS_MASTER));
+            gs.reload(REF_HEADS_MASTER);
             assertFalse(gs.getKey("test3.json", null).isPresent());
             assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
             Mockito.reset(source);
@@ -268,7 +268,7 @@ public class GitStorageTest {
 
         assertSame(cause, assertThrows(RuntimeException.class, () -> {
             try (GitStorage gs = new GitStorage(source, null);) {
-                gs.reload(List.of(REF_HEADS_MASTER));
+                gs.reload(REF_HEADS_MASTER);
                 assertFalse(gs.getKey("key", null).isPresent());
                 assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
                 gs.getKey("key", null);

@@ -24,6 +24,6 @@ import java.util.function.Supplier;
 
 import com.spencerwi.either.Either;
 
-public interface RefHolderLock {
+public interface RefLockHolder {
     public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier);
 }

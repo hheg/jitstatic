@@ -22,14 +22,13 @@ package io.jitstatic.storage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
@@ -52,20 +51,18 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
-import io.jitstatic.hosted.RefHolderLock;
+import io.jitstatic.hosted.RefLockHolder;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.utils.LinkedException;
+import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
-import io.jitstatic.utils.Functions.ThrowingSupplier;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
-public class RefHolder implements RefHolderLock {
+public class RefHolder implements RefLockHolder {
     private static final int MAX_ENTRIES = 1000;
     private static final int THREASHOLD = 1_000_000;
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
@@ -163,52 +160,6 @@ public class RefHolder implements RefHolderLock {
         });
     }
 
-    private Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refreshFiles(final Set<String> files) {
-        final List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshedRef = refreshRef(files);
-        final List<Exception> faults = refreshedRef.stream()
-                .filter(Either::isRight)
-                .map(Either::getRight)
-                .collect(Collectors.toList());
-        if (!faults.isEmpty()) {
-            throw new LinkedException(faults);
-        }
-        return refreshedRef.stream()
-                .filter(Either::isLeft)
-                .map(Either::getLeft)
-                .flatMap(Optional::stream)
-                .filter(p -> Objects.nonNull(p.getRight()))
-                .filter(p -> {
-                    final StoreInfo newValue = p.getRight();
-                    final Either<Optional<StoreInfo>, Pair<String, UserData>> oldCachedValue = refCache.get(p.getLeft());
-                    if (oldCachedValue == null) {
-                        return false;
-                    }
-                    if (oldCachedValue.isLeft() && oldCachedValue.getLeft().isPresent()) {
-                        final StoreInfo value = oldCachedValue.getLeft().get();
-                        return (newValue.isNormalKey() && value.isNormalKey())
-                                || (newValue.isMasterMetaData() && value.isMasterMetaData());
-                    }
-                    return false;
-                })
-                .collect(Collectors.toMap(Pair::getLeft, p -> Either.left(Optional.of(p.getRight())), (a, b) -> {
-                    throw new ShouldNeverHappenException("duplicate values for key");
-                }, () -> getStorage(files.size())));
-    }
-
-    private List<Either<Optional<Pair<String, StoreInfo>>, Exception>> refreshRef(final Set<String> files) {
-        return files.stream().map(key -> {
-            try {
-                return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.of(Pair.of(key, load(key))));
-            } catch (RefNotFoundException ignore) {
-                // Ignoring that ref wasn't found
-            } catch (Exception e) {
-                return Either.<Optional<Pair<String, StoreInfo>>, Exception>right(
-                        new Exception(key + " in " + ref + " had the following error", e));
-            }
-            return Either.<Optional<Pair<String, StoreInfo>>, Exception>left(Optional.<Pair<String, StoreInfo>>empty());
-        }).collect(Collectors.toCollection(() -> new ArrayList<>(files.size())));
-    }
-
     Optional<StoreInfo> loadAndStore(final String key) {
         final Either<Optional<StoreInfo>, Pair<String, UserData>> value = write(
                 () -> refCache.computeIfAbsent(key, k -> {
@@ -257,21 +208,6 @@ public class RefHolder implements RefHolderLock {
 
     private boolean keyRequestedIsMasterMeta(final String key, final StoreInfo storeInfo) {
         return key.endsWith("/") && storeInfo.isMasterMetaData();
-    }
-
-    public boolean refresh() {
-        LOG.info("Reloading {}", ref);
-        final Set<String> files = refCache.entrySet().stream()
-                .filter(e -> {
-                    final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
-                    return (value.isLeft() && value.getLeft().isPresent());
-                }).map(Entry::getKey).collect(Collectors.toSet());
-        final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> newMap = refreshFiles(files);
-        boolean isRefreshed = !newMap.isEmpty();
-        if (isRefreshed) {
-            refCache = newMap;
-        }
-        return isRefreshed;
     }
 
     /*
@@ -532,5 +468,21 @@ public class RefHolder implements RefHolderLock {
             }
             return Either.right(new FailedToLock(ref));
         }
+    }
+
+    public void reload() {        
+        write(() -> {
+          LOG.info("Reloading {}", ref);
+            Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
+            refCache = getStorage(refCache.size());
+            return (Runnable)() -> {
+                final Set<String> files = oldRefCache.entrySet().stream()
+                        .filter(e -> {
+                            final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
+                            return (value.isLeft() && value.getLeft().isPresent());
+                        }).map(Entry::getKey).collect(Collectors.toSet());
+                files.stream().forEach(key -> CompletableFuture.runAsync(()-> loadAndStore(key)));
+            };
+        }).run();
     }
 }

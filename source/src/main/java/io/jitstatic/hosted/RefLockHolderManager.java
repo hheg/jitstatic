@@ -1,10 +1,10 @@
-package io.jitstatic.source;
+package io.jitstatic.hosted;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,20 @@ package io.jitstatic.source;
  * #L%
  */
 
-import java.util.EventListener;
-import java.util.List;
+import java.util.function.Function;
 
-public interface SourceEventListener extends EventListener {
-    public void onEvent(List<String> updatedRefs);
+public class RefLockHolderManager {
+    
+    private Function<String, RefLockHolder> refSource;
+
+    public RefLockHolderManager() {
+    }
+
+    public void setRefHolderFactory(final Function<String, RefLockHolder> factory) {
+        refSource = factory;
+    }
+
+    public RefLockHolder getRefHolder(final String ref) {
+        return refSource.apply(ref);
+    }
 }

@@ -97,7 +97,6 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.RepositoryIsMissingIntendedBranch;
-import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
@@ -341,7 +340,7 @@ public class HostedGitRepositoryManagerTest {
 
     @Test
     public void testListeners() throws CorruptedSourceException, IOException {
-        SourceEventListener svl = mock(SourceEventListener.class);
+        ReloadRefEventListener svl = mock(ReloadRefEventListener.class);
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
             grm.addListener(svl);
         }

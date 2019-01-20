@@ -69,7 +69,6 @@ import io.jitstatic.check.SourceChecker;
 import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
-import io.jitstatic.source.SourceEventListener;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
@@ -87,7 +86,7 @@ public class HostedGitRepositoryManager implements Source {
     private final String defaultRef;
     private final JitStaticReceivePackFactory receivePackFactory;
     private final ErrorReporter errorReporter;
-    private final RepositoryBus repositoryBus;
+    private final RefLockHolderManager refLockHolderManager;
     private final SourceUpdater updater;
     private final JitStaticUploadPackFactory uploadPackFactory;
     private final UserExtractor userExtractor;
@@ -130,8 +129,8 @@ public class HostedGitRepositoryManager implements Source {
         final RepositoryUpdater repositoryUpdater = new RepositoryUpdater(this.bareRepository);
         this.extractor = new SourceExtractor(this.bareRepository);
         this.updater = new SourceUpdater(repositoryUpdater);
-        this.repositoryBus = new RepositoryBus(errorReporter);
-        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, repositoryBus, userExtractor);
+        this.refLockHolderManager = new RefLockHolderManager();
+        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor);
         this.uploadPackFactory = new JitStaticUploadPackFactory(uploadPackExecutor);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
@@ -221,8 +220,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void addListener(final SourceEventListener listener) {
-        this.repositoryBus.addListener(listener);
+    public void addListener(final ReloadRefEventListener listener) {
+        this.bareRepository.getListenerList().addListener(ReloadRefEventListener.class, listener);
     }
 
     @Override
@@ -413,8 +412,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void addRefHolderFactory(final Function<String, RefHolderLock> factory) {
-        this.repositoryBus.setRefHolderFactory(factory);
+    public void addRefHolderFactory(final Function<String, RefLockHolder> factory) {
+        this.refLockHolderManager.setRefHolderFactory(factory);
     }
 
     @Override

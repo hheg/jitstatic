@@ -61,8 +61,7 @@ public class RepositoryUpdater {
     
     public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method,
             final List<Pair<String, ObjectStreamProvider>> files)
-            throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {
-        
+            throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {        
         final List<Pair<String, ObjectId>> fileVersions = new ArrayList<>(files.size());
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
             final DirCache inCoreIndex = getCurrentDirCache(rw, ref);

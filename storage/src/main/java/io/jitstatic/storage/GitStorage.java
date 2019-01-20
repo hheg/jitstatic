@@ -44,7 +44,8 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
-import io.jitstatic.hosted.RefHolderLock;
+import io.jitstatic.hosted.RefLockHolder;
+import io.jitstatic.hosted.Reloader;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
@@ -53,7 +54,7 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class GitStorage implements Storage {
+public class GitStorage implements Storage, Reloader {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
@@ -68,25 +69,8 @@ public class GitStorage implements Storage {
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
     }
 
-    public RefHolderLock getRefHolderLock(final String ref) {
+    public RefLockHolder getRefHolderLock(final String ref) {
         return getRefHolder(ref);
-    }
-
-    public void reload(final List<String> refsToReload) {
-        Objects.requireNonNull(refsToReload).stream().forEach(ref -> {
-            final RefHolder refHolder = cache.get(ref);
-            if (refHolder != null) {
-                if (!refHolder.reloadAll(() -> {
-                    if (!refHolder.refresh()) {
-                        cache.remove(ref);
-                    }
-                })) {
-                    final String msg = String.format("Failed to reload %s because couldn't aquire lock", ref);
-                    LOG.error(msg);
-                    throw new ShouldNeverHappenException(msg);
-                }
-            }
-        });
     }
 
     private void consumeError(final Exception e) {
@@ -165,7 +149,8 @@ public class GitStorage implements Storage {
     }
 
     @Override
-    public Either<String, FailedToLock> put(final String key, String ref, final ObjectStreamProvider data, final String oldVersion, final CommitMetaData commitMetaData) {
+    public Either<String, FailedToLock> put(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
+            final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
@@ -323,7 +308,7 @@ public class GitStorage implements Storage {
                             return List.<Pair<String, StoreInfo>>of();
                         }
                     }
-                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);                    
+                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);
                     if (keyContent.isPresent()) {
                         return List.of(Pair.of(key, keyContent.get()));
                     }
@@ -402,6 +387,14 @@ public class GitStorage implements Storage {
         final RefHolder refHolder = cache.get(ref);
         if (refHolder != null) {
             refHolder.deleteUser(realm + "/" + key, username);
+        }
+    }
+
+    @Override
+    public void reload(String ref) {
+        final RefHolder refHolder = cache.get(ref);
+        if (refHolder != null) {
+            refHolder.reload();
         }
     }
 }

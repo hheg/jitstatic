@@ -29,12 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
-import org.eclipse.jgit.lib.Constants;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -44,10 +41,8 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.JitStaticConstants;
+import io.jitstatic.hosted.ReloadRefEventListener;
 import io.jitstatic.source.Source;
-import io.jitstatic.source.SourceEventListener;
-import io.jitstatic.storage.Storage;
-import io.jitstatic.storage.StorageFactory;
 
 public class StorageFactoryTest {
 
@@ -61,7 +56,6 @@ public class StorageFactoryTest {
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
         try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
-            storage.reload(List.of(Constants.R_HEADS + Constants.MASTER));
             assertEquals(Optional.empty(), storage.getKey("key", null));
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));
@@ -82,9 +76,9 @@ public class StorageFactoryTest {
     public void testListener() {
         when(env.jersey()).thenReturn(jersey);
         try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
-            ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+            ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
             verify(source).addListener(c.capture());
-            c.getValue().onEvent(Collections.emptyList());
+            c.getValue().reload("refs/heads/master");
         }
     }
 
@@ -92,9 +86,9 @@ public class StorageFactoryTest {
     public void testListenerWithNullArgument() {
         when(env.jersey()).thenReturn(jersey);
         try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
-            ArgumentCaptor<SourceEventListener> c = ArgumentCaptor.forClass(SourceEventListener.class);
+            ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
             verify(source).addListener(c.capture());
-            c.getValue().onEvent(null);
+            assertThrows(NullPointerException.class, () -> c.getValue().reload(null));
         }
     }
 }

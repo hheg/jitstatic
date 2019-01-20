@@ -65,13 +65,13 @@ public class JitStaticReceivePack extends ReceivePack {
     private static final Logger LOG = LoggerFactory.getLogger(JitStaticReceivePack.class);
 
     private final String defaultRef;
-    private final RepositoryBus bus;
+    private final RefLockHolderManager bus;
     private final ErrorReporter errorReporter;
     private final SourceChecker sourceChecker;
     private final UserExtractor userExtractor;
     private final boolean canForceUpdate;
 
-    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RepositoryBus bus,
+    public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RefLockHolderManager bus,
             final SourceChecker sourceChecker, final UserExtractor userExtractor, boolean canForceUpdate) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
@@ -85,12 +85,7 @@ public class JitStaticReceivePack extends ReceivePack {
     // TODO Refactor into its own xUpdate class
     @Override
     protected void executeCommands() {
-        ProgressMonitor updating = NullProgressMonitor.INSTANCE;
-        if (isSideBand()) {
-            SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
-            pm.setDelayStart(250, TimeUnit.MILLISECONDS);
-            updating = pm;
-        }
+        ProgressMonitor updating = getProgressBar();
         final List<ReceiveCommand> commands = filterCommands(Result.NOT_ATTEMPTED);
         if (Objects.requireNonNull(commands).isEmpty())
             return;
@@ -108,6 +103,15 @@ public class JitStaticReceivePack extends ReceivePack {
                 maintenanceBatchUpdate(tmpRefs);
             });
         }
+    }
+
+    private ProgressMonitor getProgressBar() {
+        if (isSideBand()) {
+            SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
+            pm.setDelayStart(250, TimeUnit.MILLISECONDS);
+            return pm;
+        }
+        return NullProgressMonitor.INSTANCE;
     }
 
     private void updateAndCommit(ProgressMonitor updating, final List<ReceiveCommand> cmds, final Map<String, ReceiveCommand> index) {
@@ -247,7 +251,7 @@ public class JitStaticReceivePack extends ReceivePack {
         final ReceiveCommand rc = cmds.getLeft();
         final String refName = rc.getRefName();
         sendMessage("Reloading " + refName);
-        bus.process(List.of(refName));
+        getRepository().fireEvent(new ReloadRepositoryEvent(refName));
     }
 
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
