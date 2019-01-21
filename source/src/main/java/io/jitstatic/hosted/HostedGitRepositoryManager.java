@@ -46,6 +46,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.events.RepositoryListener;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -220,8 +221,8 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void addListener(final ReloadRefEventListener listener) {
-        this.bareRepository.getListenerList().addListener(ReloadRefEventListener.class, listener);
+    public <T extends RepositoryListener>  void addListener(final T listener, Class<T> type) {
+        this.bareRepository.getListenerList().addListener(type, listener);
     }
 
     @Override

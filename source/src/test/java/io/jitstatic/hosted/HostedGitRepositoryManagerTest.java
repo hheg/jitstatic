@@ -97,6 +97,7 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.RepositoryIsMissingIntendedBranch;
+import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
@@ -342,7 +343,7 @@ public class HostedGitRepositoryManagerTest {
     public void testListeners() throws CorruptedSourceException, IOException {
         ReloadRefEventListener svl = mock(ReloadRefEventListener.class);
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
-            grm.addListener(svl);
+            grm.addListener(svl, ReloadRefEventListener.class);
         }
     }
 
@@ -763,7 +764,7 @@ public class HostedGitRepositoryManagerTest {
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {
         Files.write(userPath, MAPPER.writeValueAsBytes(userData), StandardOpenOption.CREATE);
     }
-    
+
     private MetaData readMetaData(SourceInfo secondSourceInfo) throws IOException, JsonParseException, JsonMappingException {
         try (InputStream is = secondSourceInfo.getMetadataInputStream()) {
             return MAPPER.readValue(is, MetaData.class);

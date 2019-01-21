@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
@@ -20,17 +20,18 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import java.util.function.Function;
+import org.eclipse.jgit.events.RepositoryListener;
 
-public class RefLockHolderManager {
-    
-    private Function<String, RefLockHolder> refSource;
+public class DeleteRefEventListener implements RepositoryListener {
 
-    public void setRefHolderFactory(final Function<String, RefLockHolder> factory) {
-        refSource = factory;
+    private final DeleteRef deleteRef;
+
+    public DeleteRefEventListener(final DeleteRef deleteRef) {
+        this.deleteRef = deleteRef;
     }
 
-    public RefLockHolder getRefHolder(final String ref) {
-        return refSource.apply(ref);
+    public void onDeleteRef(final String ref) {
+        deleteRef.deleteRef(ref);
     }
+
 }

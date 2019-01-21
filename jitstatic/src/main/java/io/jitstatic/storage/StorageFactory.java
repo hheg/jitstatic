@@ -30,7 +30,8 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.hosted.ReloadRefEventListener;
+import io.jitstatic.hosted.events.DeleteRefEventListener;
+import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.source.Source;
 
 public class StorageFactory {
@@ -38,12 +39,13 @@ public class StorageFactory {
     public Storage build(final Source source, final Environment env, final String storageRealm) {
         Objects.requireNonNull(source, "Source cannot be null");
         env.jersey().register(new AuthDynamicFeature(
-				new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-						.setAuthorizer((user, role) -> true).setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null")).buildAuthFilter()));
+                new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
+                        .setAuthorizer((user, role) -> true).setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null")).buildAuthFilter()));
         env.jersey().register(RolesAllowedDynamicFeature.class);
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
         final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef());
-        source.addListener(new ReloadRefEventListener(gitStorage));
+        source.addListener(new ReloadRefEventListener(gitStorage), ReloadRefEventListener.class);
+        source.addListener(new DeleteRefEventListener(gitStorage), DeleteRefEventListener.class);
         source.addRefHolderFactory(gitStorage::getRefHolderLock);
         return gitStorage;
     }

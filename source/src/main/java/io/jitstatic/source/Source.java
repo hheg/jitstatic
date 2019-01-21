@@ -25,21 +25,19 @@ import java.util.function.Function;
  */
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.events.RepositoryListener;
 import org.eclipse.jgit.lib.ObjectLoader;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.RefLockHolder;
-import io.jitstatic.hosted.ReloadRefEventListener;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 
 public interface Source extends AutoCloseable, CheckHealth {
     public void close();
-
-    public void addListener(ReloadRefEventListener listener);
 
     public void start();
 
@@ -70,5 +68,7 @@ public interface Source extends AutoCloseable, CheckHealth {
     public String addUser(String key, String ref, String username, UserData data) throws IOException, RefNotFoundException;
 
     public void deleteUser(String key, String ref, String username) throws IOException;
+
+    <T extends RepositoryListener> void addListener(T listener, Class<T> type);
 
 }

@@ -35,13 +35,14 @@ import java.util.concurrent.ExecutionException;
 import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.JitStaticConstants;
-import io.jitstatic.hosted.ReloadRefEventListener;
+import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.source.Source;
 
 public class StorageFactoryTest {
@@ -77,8 +78,8 @@ public class StorageFactoryTest {
         when(env.jersey()).thenReturn(jersey);
         try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
-            verify(source).addListener(c.capture());
-            c.getValue().reload("refs/heads/master");
+            verify(source).addListener(c.capture(), Mockito.eq(ReloadRefEventListener.class));
+            c.getValue().onReload("refs/heads/master");
         }
     }
 
@@ -87,8 +88,8 @@ public class StorageFactoryTest {
         when(env.jersey()).thenReturn(jersey);
         try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM);) {
             ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
-            verify(source).addListener(c.capture());
-            assertThrows(NullPointerException.class, () -> c.getValue().reload(null));
+            verify(source).addListener(c.capture(), Mockito.eq(ReloadRefEventListener.class));
+            assertThrows(NullPointerException.class, () -> c.getValue().onReload(null));
         }
     }
 }

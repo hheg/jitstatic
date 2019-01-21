@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
@@ -25,11 +25,11 @@ import java.util.Objects;
 import org.eclipse.jgit.events.RepositoryEvent;
 import org.slf4j.LoggerFactory;
 
-public class ReloadRepositoryEvent extends RepositoryEvent<ReloadRefEventListener> {
+public class ReloadRefEvent extends RepositoryEvent<ReloadRefEventListener> {
 
     private final String ref;
 
-    public ReloadRepositoryEvent(final String ref) {
+    public ReloadRefEvent(final String ref) {
         this.ref = Objects.requireNonNull(ref);
     }
 
@@ -41,7 +41,7 @@ public class ReloadRepositoryEvent extends RepositoryEvent<ReloadRefEventListene
     @Override
     public void dispatch(final ReloadRefEventListener listener) {
         try {
-            listener.reload(ref);
+            listener.onReload(ref);
         } catch (Exception e) {
             LoggerFactory.getLogger(getClass()).error("Error while loading storage", e);
         }

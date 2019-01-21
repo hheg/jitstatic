@@ -56,6 +56,8 @@ import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
+import io.jitstatic.hosted.events.DeleteRefEvent;
+import io.jitstatic.hosted.events.ReloadRefEvent;
 import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePack extends ReceivePack {
@@ -248,10 +250,16 @@ public class JitStaticReceivePack extends ReceivePack {
     }
 
     private void signalReload(final Pair<ReceiveCommand, ReceiveCommand> cmds) {
-        final ReceiveCommand rc = cmds.getLeft();
-        final String refName = rc.getRefName();
-        sendMessage("Reloading " + refName);
-        getRepository().fireEvent(new ReloadRepositoryEvent(refName));
+        final ReceiveCommand actualRef = cmds.getLeft();
+        final ReceiveCommand testRef = cmds.getRight();
+        final String refName = actualRef.getRefName();
+        if(testRef == null) {
+            sendMessage("Deleting " +refName);
+            getRepository().fireEvent(new DeleteRefEvent(refName));
+        } else {
+            sendMessage("Reloading " + refName);
+            getRepository().fireEvent(new ReloadRefEvent(refName));    
+        }
     }
 
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
