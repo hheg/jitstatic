@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L

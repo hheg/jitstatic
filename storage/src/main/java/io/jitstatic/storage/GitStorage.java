@@ -45,8 +45,9 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.RefLockHolder;
-import io.jitstatic.hosted.Reloader;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.hosted.events.DeleteRef;
+import io.jitstatic.hosted.events.Reloader;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
@@ -54,7 +55,7 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class GitStorage implements Storage, Reloader {
+public class GitStorage implements Storage, Reloader, DeleteRef {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
@@ -396,5 +397,11 @@ public class GitStorage implements Storage, Reloader {
         if (refHolder != null) {
             refHolder.reload();
         }
+    }
+
+    @Override
+    public void deleteRef(String ref) {
+        LOG.info("Deleting {}", ref);
+        cache.remove(ref);        
     }
 }

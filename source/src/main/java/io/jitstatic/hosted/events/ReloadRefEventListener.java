@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
@@ -20,17 +20,18 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import java.util.function.Function;
+import org.eclipse.jgit.events.RepositoryListener;
 
-public class RefLockHolderManager {
+public class ReloadRefEventListener implements RepositoryListener {
+
+    private final Reloader reloader;
+
+    public ReloadRefEventListener(final Reloader reloader) {  
+        this.reloader = reloader;
+    }
     
-    private Function<String, RefLockHolder> refSource;
-
-    public void setRefHolderFactory(final Function<String, RefLockHolder> factory) {
-        refSource = factory;
+    public void onReload(String ref) {
+        reloader.reload(ref);
     }
 
-    public RefLockHolder getRefHolder(final String ref) {
-        return refSource.apply(ref);
-    }
 }

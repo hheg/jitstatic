@@ -1,4 +1,4 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
@@ -20,18 +20,6 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import org.eclipse.jgit.events.RepositoryListener;
-
-public class ReloadRefEventListener implements RepositoryListener {
-
-    private final Reloader reloader;
-
-    public ReloadRefEventListener(final Reloader reloader) {  
-        this.reloader = reloader;
-    }
-    
-    public void reload(String ref) {
-        reloader.reload(ref);
-    }
-
+public interface DeleteRef {
+    void deleteRef(String ref);
 }
