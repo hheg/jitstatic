@@ -91,7 +91,7 @@ public class JitStaticReceivePack extends ReceivePack {
         final List<ReceiveCommand> commands = filterCommands(Result.NOT_ATTEMPTED);
         if (Objects.requireNonNull(commands).isEmpty())
             return;
-        
+
         final List<ReceiveCommand> cmds = new ArrayList<>(commands.size());
         final Map<String, ReceiveCommand> index = createTempBranchesAndIndex(commands, cmds);
         try {
@@ -130,7 +130,7 @@ public class JitStaticReceivePack extends ReceivePack {
             } catch (IOException err) {
                 for (ReceiveCommand cmd : cmds) {
                     ReceiveCommand rc = index.get(cmd.getRefName());
-                    if(rc == null) {
+                    if (rc == null) {
                         rc = cmd;
                     }
                     if (rc.getResult() == Result.NOT_ATTEMPTED)
@@ -253,12 +253,9 @@ public class JitStaticReceivePack extends ReceivePack {
         final ReceiveCommand actualRef = cmds.getLeft();
         final ReceiveCommand testRef = cmds.getRight();
         final String refName = actualRef.getRefName();
-        if(testRef == null) {
-            sendMessage("Deleting " +refName);
-            getRepository().fireEvent(new DeleteRefEvent(refName));
-        } else {
+        if (testRef != null) {
             sendMessage("Reloading " + refName);
-            getRepository().fireEvent(new ReloadRefEvent(refName));    
+            getRepository().fireEvent(new ReloadRefEvent(refName));
         }
     }
 
@@ -269,13 +266,19 @@ public class JitStaticReceivePack extends ReceivePack {
         cmds.stream().map(cmd -> {
             final String refName = cmd.getLeft().getRefName();
             try {
-                final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> commitBranch(refName, cmd, repository, monitor));
-                if (lock.isRight()) {
-                    FailedToLock ftl = lock.getRight();
-                    cmd.getLeft().setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
-                    return ftl;
+                if (cmd.getRight() == null) {
+                    sendMessage("Deleting " + refName);
+                    getRepository().fireEvent(new DeleteRefEvent(refName));
+                    return null;
+                } else {
+                    final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> commitBranch(refName, cmd, repository, monitor));
+                    if (lock.isRight()) {
+                        FailedToLock ftl = lock.getRight();
+                        cmd.getLeft().setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
+                        return ftl;
+                    }
+                    return lock.getLeft();
                 }
-                return lock.getLeft();
             } finally {
                 monitor.endTask();
             }
