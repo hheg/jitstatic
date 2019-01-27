@@ -11,7 +11,7 @@ The Git interface is powered by JGit and offers almost full Git support (except 
 
 ### An example Use case:
 
-The use case could be used for is business configuration data where the data is not directly related to specific code. These tend to end up in a database where they are logged in some fashion. After some time they ususally gets forgotten why they are there and their purpose. Having them connected to Git could mean you can use them with your documentation or issue tracker in a more natural way than having them stored in a database. 
+The use case could be used for is business configuration data where the data is not directly related to specific code. These tend to end up in a database where they are logged in some fashion. After some time they usually gets forgotten why they are there and their purpose. Having them connected to Git could mean you can use them with your documentation or issue tracker in a more natural way than having them stored in a database. 
 
 Uses Dropwizards simple configuration.
 
@@ -40,7 +40,7 @@ hosted:
     cors:
       allowedOrigins: "*"
 ```
-storage is the key-value end point and hosted is the git end point.
+storage is the key-value end point and hosted is the Git end point.
 
 ## Hello world
 
@@ -128,7 +128,7 @@ Packing up objects: 100% (4/4), done.
 
 Warning: You seem to have cloned an empty repository
 ```
-Remember to use the values for the master user and password you chose when you started the container (in the example above it's `huser` and password is `hseCr3t`). 
+Remember to use the values for the master user and password you chose when you started the container (in the example above it's `huser` and password is `hseCr3t`). This way of handling passwords is deprecated and exists to start fast. A more secure way with hashed values are available, see the Users section.
 
 In your target directory create a key store file:
 ```bash
@@ -213,7 +213,7 @@ Or specifying a tag it's possible to do this:
 curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/tags/sometag
 ``` 
 
-## API for modifying a key
+### API for modifying a key
 
 Now there's an API for modifying a `hello_world` from an application. You do it with in three simple steps:
 
@@ -445,7 +445,7 @@ All keys are still protected by authorization. The keys are still protected by t
 ### MetaKeys
 
 Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` property.
-You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder.
+You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder. The users field is deprecated and the preferred way of ACL is to use the role based ACL described in the Users section. 
 Example:
 ```json
 {"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]}
@@ -465,7 +465,7 @@ The `.user` folder not a valid key so this can't be reached from the normal endp
 
 #### ACL
 
-There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password.
+There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password. If you use the API for creating users, the passwords will be automatically hashed when stored. If more security is needed an additional salt can be configured. If this is done, all clones must define that in it's settings to make the password work.
 
 #### Public keys
 
@@ -526,7 +526,7 @@ Content-Encoding: utf-8
 Content-Type: application/json
 Content-Length: 61
 
-{"roles":[{"role":"one"},{"role":"two"}],"basicPassword":"p"}
+{"roles":[{"role":"one"},{"role":"two"}]}
 
 ```
 
@@ -576,11 +576,11 @@ You can find a Java client for JitStatic in Maven Central with coordinates
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.10.0</version>
+    <version>0.10.2</version>
 </dependency>
 ```
 ## Disclaimer
 
-This is a project with some interesting challenges I'd like to explore while being useful at the same time. This is used in production today, but it's also a way of testing some new ideas and techniques.
+This is a project with some interesting challenges I'd like to explore while being useful at the same time. This is used in production today, but it's also a way of testing some new ideas and techniques, which haven't yet found their way to production :).
 
 

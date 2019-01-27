@@ -71,12 +71,14 @@ public class RefHolder implements RefLockHolder {
     private final String ref;
     private final Source source;
     public final int threshold;
+    private final HashService hashService;
 
-    public RefHolder(final String ref, final Source source) {
+    public RefHolder(final String ref, final Source source, final HashService hashService) {
         this.ref = ref;
         this.refCache = getStorage(MAX_ENTRIES);
         this.source = source;
         this.threshold = THREASHOLD;
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     private LinkedHashMap<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> getStorage(final int size) {
@@ -333,7 +335,7 @@ public class RefHolder implements RefLockHolder {
         return value;
     }
 
-    public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, final UserData data,
+    public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, UserData data,
             final String version) {
         final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
         Objects.requireNonNull(data);
@@ -350,8 +352,15 @@ public class RefHolder implements RefLockHolder {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }
             try {
-                final String newVersion = source.updateUser(key, ref, username, data);
-                refCache.put(key, Either.right(Pair.of(newVersion, data)));
+                UserData input;
+                if (data.getBasicPassword() != null) {
+                    input = hashService.constructUserData(data.getRoles(), data.getBasicPassword());
+                } else {
+                    final UserData current = userKeyData.getRight();
+                    input = new UserData(data.getRoles(), current.getBasicPassword(), current.getSalt(), current.getHash());
+                }
+                final String newVersion = source.updateUser(key, ref, username, input);
+                refCache.put(key, Either.right(Pair.of(newVersion, input)));
                 return newVersion;
             } catch (RefNotFoundException e) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
@@ -470,18 +479,18 @@ public class RefHolder implements RefLockHolder {
         }
     }
 
-    public void reload() {        
+    public void reload() {
         write(() -> {
-          LOG.info("Reloading {}", ref);
+            LOG.info("Reloading {}", ref);
             Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
             refCache = getStorage(refCache.size());
-            return (Runnable)() -> {
+            return (Runnable) () -> {
                 final Set<String> files = oldRefCache.entrySet().stream()
                         .filter(e -> {
                             final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
                             return (value.isLeft() && value.getLeft().isPresent());
                         }).map(Entry::getKey).collect(Collectors.toSet());
-                files.stream().forEach(key -> CompletableFuture.runAsync(()-> loadAndStore(key)));
+                files.stream().forEach(key -> CompletableFuture.runAsync(() -> loadAndStore(key)));
             };
         }).run();
     }

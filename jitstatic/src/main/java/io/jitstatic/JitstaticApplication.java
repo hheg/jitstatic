@@ -37,6 +37,7 @@ import io.jitstatic.api.UsersResource;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
@@ -47,28 +48,29 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         LOG.info("Starting {} build {}", INSTANCE.getBuildVersion(), INSTANCE.getCommitIdAbbrev());
         new JitstaticApplication().run(args);
     }
-    
+
     @Override
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
         Source source = null;
         Storage storage = null;
         try {
             source = config.build(env, GIT_REALM);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM);
             final String defaultBranch = config.getHostedFactory().getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
+            final HashService hashService = env.getApplicationContext().getBean(HashService.class);
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService);
             loginService.setUserStorage(storage);
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
-            final KeyAdminAuthenticator authenticator = config.getAddKeyAuthenticator(storage);
+            final KeyAdminAuthenticator authenticator = config.getAddKeyAuthenticator(storage, hashService);
             env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, env.getObjectMapper(),
-                    env.getValidator()));
+                    env.getValidator(), hashService));
             env.jersey().register(new JitstaticInfoResource());
-            env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch));
-            env.jersey().register(new BulkResource(storage, authenticator, defaultBranch));
-            env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch));
+            env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch, hashService));
+            env.jersey().register(new BulkResource(storage, authenticator, defaultBranch, hashService));
+            env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch, hashService));
         } catch (final Exception e) {
             closeSilently(source);
             closeSilently(storage);

@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.io.Serializable;
+
 /*-
  * #%L
  * jitstatic
@@ -27,8 +29,10 @@ import javax.validation.constraints.NotNull;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Role {
-    
+public class Role implements  Serializable {
+
+    private static final long serialVersionUID = 762144945862593404L;
+
     @NotNull
     private final String role;
 

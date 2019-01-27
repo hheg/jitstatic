@@ -63,6 +63,7 @@ import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.utils.FilesUtils;
 
 public class HostedFactory {
@@ -130,6 +131,12 @@ public class HostedFactory {
     @JsonProperty
     @Valid
     private Cors cors;
+
+    @JsonProperty
+    private String privateSalt = null;
+
+    @JsonProperty
+    private int iterations = 5;
 
     public String getServletName() {
         return servletName;
@@ -288,16 +295,9 @@ public class HostedFactory {
 
     public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
         final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
-        Path tempfolder = getTmpPath();
-        if (tempfolder == null) {
-            tempfolder = getBasePath().resolve(".git").resolve("jitstatic").resolve("tmpfolder");
-        }
-        FilesUtils.checkOrCreateFolder(tempfolder.toFile());
-        final ObjectMapper mapper = env.getObjectMapper();
-        final SimpleModule module = new SimpleModule();
-        module.addDeserializer(ObjectStreamProvider.class, new StreamingDeserializer(getThreshold(), tempfolder.toFile()));
-        mapper.registerModule(module);
-        env.getObjectMapper().registerModule(module);
+        final HashService hashService = new HashService(getPrivateSalt(), getIterations());
+        env.getApplicationContext().addBean(hashService);
+        registerCustomDeserializer(env);
 
         Objects.requireNonNull(gitRealm);
         final String base = "/" + getServletName() + "/";
@@ -349,7 +349,8 @@ public class HostedFactory {
 
         sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
-        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS);
+        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS,
+                hashService);
         sec.setLoginService(gitLoginService);
         sec.setConstraintMappings(new ConstraintMapping[] { baseMapping, infoPath, receivePath, uploadPath });
 
@@ -386,6 +387,19 @@ public class HostedFactory {
         return hostedGitRepositoryManager;
     }
 
+    private void registerCustomDeserializer(final Environment env) {
+        Path tempfolder = getTmpPath();
+        if (tempfolder == null) {
+            tempfolder = getBasePath().resolve(".git").resolve("jitstatic").resolve("tmpfolder");
+        }
+        FilesUtils.checkOrCreateFolder(tempfolder.toFile());
+        final ObjectMapper mapper = env.getObjectMapper();
+        final SimpleModule module = new SimpleModule();
+        module.addDeserializer(ObjectStreamProvider.class, new StreamingDeserializer(getThreshold(), tempfolder.toFile()));
+        mapper.registerModule(module);
+        env.getObjectMapper().registerModule(module);
+    }
+
     public Cors getCors() {
         return cors;
     }
@@ -408,6 +422,22 @@ public class HostedFactory {
 
     public void setThreshold(int threshold) {
         this.threshold = threshold;
+    }
+
+    public String getPrivateSalt() {
+        return privateSalt;
+    }
+
+    public void setPrivateSalt(String privateSalt) {
+        this.privateSalt = privateSalt;
+    }
+
+    public int getIterations() {
+        return iterations;
+    }
+
+    public void setIterations(int iterations) {
+        this.iterations = iterations;
     }
 
     private static class DropWizardHandlerWrapper implements Handler {

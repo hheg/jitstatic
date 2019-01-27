@@ -1,10 +1,10 @@
-package io.jitstatic.auth;
+package io.jitstatic.auth.constraints;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,8 @@ package io.jitstatic.auth;
  * #L%
  */
 
-public interface BasicAuthentication {
-    String getBasicPassword();
+import javax.validation.Payload;
 
-    String getSalt();
+public interface Warning extends Payload {
 
-    String getHash();
 }

@@ -1,10 +1,10 @@
-package io.jitstatic.auth;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,19 @@ package io.jitstatic.auth;
  * #L%
  */
 
-public interface BasicAuthentication {
-    String getBasicPassword();
+import static org.junit.jupiter.api.Assertions.*;
 
-    String getSalt();
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-    String getHash();
+class ReloadRefEventListenerTest {
+
+    @Test
+    void testReloadRefEventListener() {
+        Reloader reloader = Mockito.mock(Reloader.class);
+        ReloadRefEventListener listener = new ReloadRefEventListener(reloader);
+        listener.onReload("ref");
+        Mockito.verify(reloader).reload(Mockito.eq("ref"));
+    }
+
 }

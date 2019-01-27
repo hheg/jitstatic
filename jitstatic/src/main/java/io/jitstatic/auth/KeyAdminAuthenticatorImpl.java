@@ -26,6 +26,7 @@ import java.util.Objects;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 
 public class KeyAdminAuthenticatorImpl implements KeyAdminAuthenticator {
@@ -33,11 +34,14 @@ public class KeyAdminAuthenticatorImpl implements KeyAdminAuthenticator {
     private final KeyAdminAuthenticator legacyKeyAuthenticator;
     private final Storage storage;
     private final String defaultRef;
+    private final HashService hashService;
 
-    public KeyAdminAuthenticatorImpl(final Storage loginService, final KeyAdminAuthenticator addKeyAuthenticator, final String defaultRef) {
-        this.storage = Objects.requireNonNull(loginService);
-        this.legacyKeyAuthenticator = Objects.requireNonNull(addKeyAuthenticator);
-        this.defaultRef = defaultRef;
+    public KeyAdminAuthenticatorImpl(final Storage userService, final KeyAdminAuthenticator rootUserAuthenticator, final String defaultRef,
+            final HashService hashService) {
+        this.storage = Objects.requireNonNull(userService);
+        this.legacyKeyAuthenticator = Objects.requireNonNull(rootUserAuthenticator);
+        this.defaultRef = Objects.requireNonNull(defaultRef);
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @Override
@@ -54,7 +58,7 @@ public class KeyAdminAuthenticatorImpl implements KeyAdminAuthenticator {
             if (userData == null) {
                 return false;
             }
-            return userData.getBasicPassword().equals(user.getPassword());
+            return hashService.hasSamePassword(userData, user.getPassword());
         } catch (final RefNotFoundException e) {
             return false;
         }
