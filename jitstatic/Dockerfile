@@ -13,7 +13,7 @@ ARG JAR_FILE
 ENV WORK_DIR /home/jitstatic
 ENV VOL ${WORK_DIR}/db
 ENV JITSTATIC_FILE $JAR_FILE
-ENV JITSTATIC_CONF config.yml
+ENV JITSTATIC_CONF config/config.yml
 ENV JAVA_OPTS=
 
 RUN apt update && apt-mark hold dash && apt install less -y \
