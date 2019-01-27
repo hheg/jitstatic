@@ -21,7 +21,7 @@ package io.jitstatic;
  */
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -33,13 +33,13 @@ import io.jitstatic.auth.constraints.Warning;
 public class StorageParseException extends IOException {
 
     private static final long serialVersionUID = 1774575933983877566L;
-    private final String[] warnings;
-    private final String[] errors;
+    private final List<String> warnings;
+    private final List<String> errors;
 
     public StorageParseException(final String message, final IOException e) {
         super(e);
-        errors = new String[] {message};
-        warnings = new String[0];
+        errors = List.of(message);
+        warnings = List.of();
     }
 
     public <T> StorageParseException(final Set<ConstraintViolation<T>> violations) {
@@ -49,17 +49,17 @@ public class StorageParseException extends IOException {
         errors = compile(violations.stream().filter(cv -> cv.getConstraintDescriptor().getPayload().isEmpty()).collect(Collectors.toSet()));
     }
 
-    private static <T> String[] compile(final Set<ConstraintViolation<T>> violations) {
+    private static <T> List<String> compile(final Set<ConstraintViolation<T>> violations) {
         return violations.stream()
                 .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
-                .toArray(String[]::new);
+                .collect(Collectors.toList());
     }
-    
-    public String[] getWarnings() {
+
+    public List<String> getWarnings() {
         return warnings;
     }
 
-    public String[] getErrors() {
+    public List<String> getErrors() {
         return errors;
     }
 
@@ -69,7 +69,7 @@ public class StorageParseException extends IOException {
     }
 
     @Override
-    public String getMessage() {        
-        return Stream.concat(Arrays.stream(errors), Arrays.stream(warnings)).collect(Collectors.joining(System.lineSeparator()));
+    public String getMessage() {
+        return Stream.concat(errors.stream(), warnings.stream()).collect(Collectors.joining(System.lineSeparator()));
     }
 }
