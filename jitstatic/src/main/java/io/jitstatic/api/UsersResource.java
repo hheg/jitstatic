@@ -63,9 +63,10 @@ import com.spencerwi.either.Either;
 import io.dropwizard.auth.Auth;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
+//import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoginService;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
@@ -79,13 +80,16 @@ public class UsersResource {
     private final KeyAdminAuthenticator adminKeyAuthenticator;
     private final APIHelper helper;
     private final LoginService gitAuthenticator;
+    private final HashService hashService;
 
-    public UsersResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final LoginService gitAuthenticator, String defaultBranch) {
+    public UsersResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final LoginService gitAuthenticator,
+            final String defaultBranch, final HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.adminKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.gitAuthenticator = Objects.requireNonNull(gitAuthenticator);
         this.helper = new APIHelper(LOG);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
+        this.hashService = hashService;
     }
 
     @GET
@@ -108,7 +112,7 @@ public class UsersResource {
 
     private Response getUser(final String key, final String ref, final HttpHeaders headers, final String realm, String user) {
         try {
-            final Pair<String, UserData> value = storage.getUserData(key, ref, realm);
+            final Pair<String, io.jitstatic.auth.UserData> value = storage.getUserData(key, ref, realm);
             if (value == null || !value.isPresent()) {
                 throw new WebApplicationException(Status.NOT_FOUND);
             }
@@ -118,8 +122,8 @@ public class UsersResource {
             if (noChange != null) {
                 return noChange;
             }
-            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
-            return Response.ok(value.getRight()).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
+            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));            
+            return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
@@ -146,7 +150,7 @@ public class UsersResource {
 
     private Response modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm) {
         try {
-            final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
             if (userData != null && userData.isPresent()) {
                 final String version = userData.getLeft();
                 final EntityTag entityTag = new EntityTag(version);
@@ -154,7 +158,8 @@ public class UsersResource {
                 if (evaluatePreconditions != null) {
                     return evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
                 }
-                final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.update(key, ref, realm, user.getName(), data, version));
+                final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.updateUser(key, ref, realm, user.getName(),
+                        new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null), version));
 
                 if (result.isRight()) {
                     return Response.status(Status.PRECONDITION_FAILED).build();
@@ -193,9 +198,10 @@ public class UsersResource {
 
     private Response addUser(final String key, final String ref, final UserData data, final User user, String realm) {
         try {
-            final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
             if (userData == null || !userData.isPresent()) {
-                final String newVersion = helper.unwrapWithPOSTApi(() -> storage.addUser(key, ref, realm, user.getName(), data));
+                final String newVersion = helper.unwrapWithPOSTApi(
+                        () -> storage.addUser(key, ref, realm, user.getName(), hashService.constructUserData(data.getRoles(), data.getBasicPassword())));
                 if (newVersion == null) {
                     throw new WebApplicationException(Status.NOT_FOUND);
                 }
@@ -227,7 +233,7 @@ public class UsersResource {
 
     private Response delete(final String key, final String ref, final User user, String realm) {
         try {
-            final Pair<String, UserData> userData = storage.getUserData(key, ref, realm);
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
             if (userData != null && userData.isPresent()) {
                 storage.deleteUser(key, ref, realm, user.getName());
                 return Response.ok().build();

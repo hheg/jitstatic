@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -74,10 +75,18 @@ public class SourceChecker {
         if (!branchSource.isPresent()) {
             throw new RefNotFoundException(branch);
         }
+        return checkBranch(branchSource);
+    }
+
+    private List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkBranch(final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> branchSource) {
         final Pair<AnyObjectId, Set<Ref>> revCommit = branchSource.getLeft();
         final List<BranchData> branchData = branchSource.getRight();
-        final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream().parallel().map(this::readRepositoryData).flatMap(List::stream)
-                .filter(Pair::isPresent).collect(Collectors.toList());
+        final List<Pair<FileObjectIdStore, Exception>> branchErrors = branchData.stream()
+                .parallel()
+                .map(this::readRepositoryData)
+                .flatMap(List::stream)
+                .filter(Pair::isPresent)
+                .collect(Collectors.toList());
         if (branchErrors.isEmpty()) {
             return List.of();
         }
@@ -87,13 +96,17 @@ public class SourceChecker {
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
         final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
         return sources.entrySet().parallelStream()
-                .map(e -> Pair.of(e.getKey().getRight(),
-                        e.getValue().stream().map(this::readRepositoryData).flatMap(List::stream).filter(Pair::isPresent).collect(Collectors.toList())))
-                .filter(p -> !p.getRight().isEmpty()).collect(Collectors.toList());
+                .map(e -> Pair.of(e.getKey(),e.getValue()))
+                .map(this::checkBranch)
+                .filter(l -> !l.isEmpty())
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
     }
 
     private List<Pair<FileObjectIdStore, Exception>> readRepositoryData(final BranchData data) {
-        final List<Pair<FileObjectIdStore, Exception>> fileErrors = data.pair().stream().map(this::parseErrors).flatMap(s -> s)
+        final List<Pair<FileObjectIdStore, Exception>> fileErrors = data.pair().stream()
+                .map(this::parseErrors)
+                .flatMap(s -> s)
                 .collect(Collectors.toCollection(ArrayList::new));
         final RepositoryDataError fileDataError = data.getFileDataError();
         if (fileDataError != null) {

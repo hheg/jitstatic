@@ -54,6 +54,7 @@ import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.AUtils;
@@ -68,6 +69,7 @@ public class BulkResourceTest {
     private static final String BASIC_AUTH_CRED = createCreds(USER, SECRET);
 
     private Storage storage = mock(Storage.class);
+    private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
@@ -75,7 +77,9 @@ public class BulkResourceTest {
                             .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER), REF_HEADS_MASTER))
+                    new BulkResource(storage,
+                            new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER, hashService),
+                            REF_HEADS_MASTER, hashService))
             .build();
 
     @Test

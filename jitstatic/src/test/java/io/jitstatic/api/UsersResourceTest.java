@@ -78,6 +78,7 @@ import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoginService;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
@@ -101,7 +102,7 @@ public class UsersResourceTest {
                     .setAuthorizer((User u, String r) -> true)
                     .buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class)).addResource(new UsersResource(storage,
-                    authen, loginService, "refs/heads/master"))
+                    authen, loginService, "refs/heads/master", new HashService()))
             .build();
 
     @AfterEach
@@ -115,9 +116,9 @@ public class UsersResourceTest {
     public void testGetKeyAdminUser() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
 
@@ -142,9 +143,9 @@ public class UsersResourceTest {
     @Test
     public void testGetUserWithWrongUser() throws RefNotFoundException {
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(null);
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(FORBIDDEN_403, data.getStatus());
@@ -155,9 +156,9 @@ public class UsersResourceTest {
     public void testGetUserNotChanged() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
         EntityTag entityTag = data.getEntityTag();
@@ -172,15 +173,17 @@ public class UsersResourceTest {
     @Test
     public void testPutUserWithNoUser() {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
-                .put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, data.getStatus());
         data.close();
     }
 
     @Test
     public void testPutUserWithUserButNotValid() {
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, data.getStatus());
         data.close();
     }
@@ -189,8 +192,10 @@ public class UsersResourceTest {
     public void testPutUserWithUserButNotFound() {
         UserIdentity ui = mock(UserIdentity.class);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
     }
@@ -200,10 +205,12 @@ public class UsersResourceTest {
         UserIdentity ui = mock(UserIdentity.class);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "20"), APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
     }
@@ -211,34 +218,38 @@ public class UsersResourceTest {
     @Test
     public void testPutUserWithUserButFailedToLock() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
+        UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
                 .thenReturn(Either.right(new FailedToLock("ref")));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
+        verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
                 eq(userData), eq("1"));
     }
 
     @Test
     public void testPutUserWithUserButRemoved() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
+        UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), any(), eq("1")))
                 .thenReturn(Either.left(null));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
+        verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
                 eq(userData), eq("1"));
     }
 
@@ -246,17 +257,19 @@ public class UsersResourceTest {
     public void testPutUserWithUser() throws RefNotFoundException {
         try {
             UserIdentity ui = mock(UserIdentity.class);
-            UserData userData = new UserData(Set.of(new Role("role")), "22");
+            UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
             when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
             when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                    .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-            when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
+                    .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+            when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1")))
                     .thenReturn(Either.left("2"));
-            Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                    .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+            Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                    .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                    .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                    .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
             assertEquals("2", data.getEntityTag().getValue());
             data.close();
-            verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
+            verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER),
                     eq(userData), eq("1"));
         } catch (Exception e) {
             e.printStackTrace();
@@ -266,18 +279,17 @@ public class UsersResourceTest {
 
     @Test
     public void testPostUserWithNoUser() {
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, response.getStatus());
         response.close();
     }
 
     @Test
     public void testPostUserWithWrongUser() {
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
-        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, response.getStatus());
         response.close();
     }
@@ -285,12 +297,12 @@ public class UsersResourceTest {
     @Test
     public void testPostUserWithUserButExist() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(CONFLICT_409, response.getStatus());
         response.close();
     }
@@ -298,11 +310,11 @@ public class UsersResourceTest {
     @Test
     public void testPostUserWithUser() throws RefNotFoundException {
         UserIdentity ui = mock(UserIdentity.class);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
-        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData))).thenReturn("22");
-        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), any())).thenReturn("22");
+        Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());
         assertEquals("22", response.getEntityTag().getValue());
         response.close();
@@ -336,7 +348,7 @@ public class UsersResourceTest {
         UserIdentity ui = mock(UserIdentity.class);
         when(loginService.login(eq(PUSER), any(), eq(null))).thenReturn(ui);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).delete();
         assertEquals(OK_200, response.getStatus());
         verify(storage, times(1)).deleteUser(Mockito.eq("keyadmin"), eq(null), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER));
@@ -346,9 +358,9 @@ public class UsersResourceTest {
     @Test
     public void testGetKeyUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        when(storage.getUser(eq(PUSER), eq(null), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq(null), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
 
@@ -373,11 +385,12 @@ public class UsersResourceTest {
     @Test
     public void testGetKeyUserWithWrongUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(false);
-        when(storage.getUser(eq(PUSER), eq(null), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq(null), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(FORBIDDEN_403, data.getStatus());
         data.close();
     }
@@ -385,11 +398,12 @@ public class UsersResourceTest {
     @Test
     public void testGetKeyUserNotChanged() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).get();
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED).get();
         EntityTag entityTag = data.getEntityTag();
         assertNotNull(entityTag);
         data.close();
@@ -402,7 +416,7 @@ public class UsersResourceTest {
     @Test
     public void testPutKeyUserWithNoUser() {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
-                .put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, data.getStatus());
         data.close();
     }
@@ -411,7 +425,8 @@ public class UsersResourceTest {
     public void testPutKeyUserWithUserButNotValid() {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(false);
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, data.getStatus());
         data.close();
     }
@@ -419,8 +434,10 @@ public class UsersResourceTest {
     @Test
     public void testPutKeyUserWithUserButNotFound() {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
     }
@@ -429,10 +446,10 @@ public class UsersResourceTest {
     public void testPutKeyUserWithUserButFoundWrongEtag() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new UserData(Set.of(new Role("role")), "20"), APPLICATION_JSON));
+                .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"").put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "20"), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
     }
@@ -440,56 +457,61 @@ public class UsersResourceTest {
     @Test
     public void testPutKeyUserWithUserButFailedToLock() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
+        UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
                 .thenReturn(Either.right(new FailedToLock("ref")));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
+        verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
                 eq(userData), eq("1"));
     }
 
     @Test
     public void testPutKeyUserWithUserButRemoved() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
+        UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
                 .thenReturn(Either.left(null));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
+        verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
                 eq(userData), eq("1"));
     }
 
     @Test
     public void testPutKeyUserWithUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
+        UserData userData = new UserData(Set.of(new Role("role")), "22", null, null);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
-        when(storage.update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
+        when(storage.updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1")))
                 .thenReturn(Either.left("2"));
-        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"").put(Entity.entity(userData, APPLICATION_JSON));
+        Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
+                .header(AUTHORIZATION, BASIC_AUTH_CRED)
+                .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals("2", data.getEntityTag().getValue());
         data.close();
-        verify(storage, times(1)).update(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
+        verify(storage, times(1)).updateUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER),
                 eq(userData), eq("1"));
     }
 
     @Test
     public void testPostKeyUserWithNoUser() {
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, response.getStatus());
         response.close();
     }
@@ -497,9 +519,8 @@ public class UsersResourceTest {
     @Test
     public void testPostKeyUserWithWrongUser() {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(false);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, response.getStatus());
         response.close();
     }
@@ -507,11 +528,10 @@ public class UsersResourceTest {
     @Test
     public void testPostKeyUserWithUserButExist() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(CONFLICT_409, response.getStatus());
         response.close();
     }
@@ -519,10 +539,9 @@ public class UsersResourceTest {
     @Test
     public void testPostKeyUserWithUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
-        UserData userData = new UserData(Set.of(new Role("role")), "22");
-        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData))).thenReturn("22");
+        when(storage.addUser(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), any())).thenReturn("22");
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(userData, APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());
         assertEquals("22", response.getEntityTag().getValue());
         response.close();
@@ -554,7 +573,7 @@ public class UsersResourceTest {
     public void testDeleteKeyUser() throws RefNotFoundException {
         when(authen.authenticate(eq(new User(PUSER, PSECRET)), eq(null))).thenReturn(true);
         when(storage.getUserData(eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM)))
-                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22")));
+                .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED).delete();
         assertEquals(OK_200, response.getStatus());
         verify(storage, times(1)).deleteUser(Mockito.eq("keyadmin"), eq(null), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER));

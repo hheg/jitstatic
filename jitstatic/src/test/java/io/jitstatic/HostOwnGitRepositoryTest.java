@@ -432,7 +432,7 @@ public class HostOwnGitRepositoryTest {
             Path user = gitRealm.resolve(TEST_USER);
             assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
             assertTrue(gitRealm.toFile().mkdirs());
-            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234", null, null)), StandardOpenOption.CREATE);
 
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
@@ -467,7 +467,7 @@ public class HostOwnGitRepositoryTest {
             Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
             Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
-            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234")), StandardOpenOption.CREATE);
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234", null, null)), StandardOpenOption.CREATE);
             assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
@@ -495,7 +495,7 @@ public class HostOwnGitRepositoryTest {
             Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_KEYUSER_REALM);
             Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
-            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("create")), "1234")), StandardOpenOption.CREATE);
+            Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("create")), "1234", null, null)), StandardOpenOption.CREATE);
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call());

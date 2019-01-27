@@ -1,10 +1,10 @@
-package io.jitstatic.auth;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,17 @@ package io.jitstatic.auth;
  * #L%
  */
 
-public interface BasicAuthentication {
-    String getBasicPassword();
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-    String getSalt();
+class DeleteRefEventTest {
 
-    String getHash();
+    @Test
+    void testDeleteRefEvent() {
+        DeleteRef dref = Mockito.mock(DeleteRef.class);
+        DeleteRefEvent dre = new DeleteRefEvent("ref");
+        dre.dispatch(new DeleteRefEventListener(dref));
+        Mockito.verify(dref).deleteRef(Mockito.eq("ref"));
+    }
+
 }

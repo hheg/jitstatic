@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +53,6 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.CorruptedSourceException;
-import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.hosted.events.DeleteRefEvent;
 import io.jitstatic.hosted.events.ReloadRefEvent;
@@ -223,17 +221,24 @@ public class JitStaticReceivePack extends ReceivePack {
     private void checkBranchData(final String branch, final String testBranchName, final ReceiveCommand testRc) {
         try {
             sendMessage("Checking " + branch + " branch.");
-            var errors = new ArrayList<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>>();
-            errors.addAll(sourceChecker.checkTestBranchForErrors(testBranchName));
-            errors.addAll(userExtractor.checkOnTestBranch(testBranchName, branch));
-
-            if (!errors.isEmpty()) {
-                final String[] message = CorruptedSourceException.compileMessage(errors).split(System.lineSeparator());
-                message[0] = message[0].replace(testBranchName, branch);
-                for (String s : message) {
+            final Pair<List<String>, List<String>> interpretedErrorMessages = CorruptedSourceException
+                    .interpreteMessages(sourceChecker.checkTestBranchForErrors(testBranchName), testBranchName, branch);
+            final Pair<List<String>, List<String>> interpretedMessages = CorruptedSourceException
+                    .interpreteMessages(userExtractor.checkOnTestBranch(testBranchName, branch), testBranchName, branch);
+            final List<String> errors = new ArrayList<>(interpretedErrorMessages.getLeft());
+            final List<String> warnings = new ArrayList<>(interpretedErrorMessages.getRight());
+            
+            errors.addAll(interpretedMessages.getLeft());
+            warnings.addAll(interpretedMessages.getRight());
+            
+            for (String w : warnings) {
+                sendMessage(w);
+            }
+            if (!errors.isEmpty()) {               
+                for (String s : errors) {
                     sendError(s);
                 }
-                testRc.setResult(Result.REJECTED_OTHER_REASON, message[0]);
+                testRc.setResult(Result.REJECTED_OTHER_REASON, errors.get(0));
             } else {
                 sendMessage(branch + " OK!");
             }

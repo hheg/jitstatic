@@ -106,9 +106,9 @@ public class UserUpdaterTest {
         String keyAdmin = USERS + JITSTATIC_KEYADMIN_REALM + "/keyadmin";
         String keyUser = USERS + JITSTATIC_KEYUSER_REALM + "/keyuser";
 
-        UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
-        UserData keyAdminData = new UserData(Set.of(new Role("files")), "2345");
-        UserData keyUserData = new UserData(Set.of(new Role("files")), "3456");
+        UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+        UserData keyAdminData = new UserData(Set.of(new Role("files")), "2345", null, null);
+        UserData keyUserData = new UserData(Set.of(new Role("files")), "3456", null, null);
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
 
@@ -130,9 +130,9 @@ public class UserUpdaterTest {
         assertEquals(keyUserData, extractUserFromRef.getRight());
         assertEquals(updateUser.get(2).getRight(), extractUserFromRef.getLeft());
 
-        gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234"); // Full admin rights
-        keyAdminData = new UserData(Set.of(new Role("files")), "s2345");
-        keyUserData = new UserData(Set.of(new Role("files")), "s3456");
+        gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234", null, null); // Full admin rights
+        keyAdminData = new UserData(Set.of(new Role("files")), "s2345", null, null);
+        keyUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
 
         updateUser = uu.updateUser(List.of(Pair.of(gitAdmin, gitAdminData), Pair.of(keyAdmin, keyAdminData), Pair.of(keyUser, keyUserData)),
                 bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test"));
@@ -154,7 +154,7 @@ public class UserUpdaterTest {
     @Test
     public void testUpdateSingleUser() throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, RefNotFoundException, IOException {
         String gitAdmin = USERS + GIT_REALM + "/gitadmin";
-        UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
+        UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
         String updateUser = uu.updateUser(gitAdmin, bareGit.getRepository().findRef(REF_HEAD_MASTER), gitAdminData,

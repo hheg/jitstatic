@@ -54,6 +54,7 @@ import io.jitstatic.api.KeyResource;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StorageFactory;
 
@@ -87,6 +88,7 @@ public class JitstaticApplicationTest {
     @Mock
     private ObjectMapper mapper;
 
+    private HashService hashService = new HashService();
     private final JitstaticApplication app = new JitstaticApplication();
     private JitstaticConfiguration config;
 
@@ -101,9 +103,10 @@ public class JitstaticApplicationTest {
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);
-        when(storageFactory.build(any(), isA(Environment.class), any())).thenReturn(storage);
+        when(storageFactory.build(any(), isA(Environment.class), any(), any())).thenReturn(storage);
         when(environment.getApplicationContext()).thenReturn(handler);
         when(handler.getBean(Mockito.eq(LoginService.class))).thenReturn(service);
+        when(handler.getBean(Mockito.eq(HashService.class))).thenReturn(hashService);
         when(environment.getValidator()).thenReturn(validator);
         when(environment.getObjectMapper()).thenReturn(mapper);
     }
@@ -172,7 +175,7 @@ public class JitstaticApplicationTest {
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
-        when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM)).thenReturn(storage);
+        when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService)).thenReturn(storage);
         app.run(config, environment);
     }
 
@@ -183,9 +186,9 @@ public class JitstaticApplicationTest {
             doThrow(new TestException("Test exception2")).when(storage).close();
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
-            when(config.getAddKeyAuthenticator(storage)).thenThrow(new TestException("Test exception3"));
+            when(config.getAddKeyAuthenticator(storage, hashService)).thenThrow(new TestException("Test exception3"));
             when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
-            when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM)).thenReturn(storage);
+            when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService)).thenReturn(storage);
             app.run(config, environment);
         });
     }

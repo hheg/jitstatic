@@ -86,9 +86,10 @@ import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
+//import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
@@ -107,9 +108,10 @@ public class KeyResource {
     private final boolean cors;
     private final ObjectMapper mapper;
     private final Validator validator;
+    private final HashService hashService;
 
     public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final boolean cors, final String defaultBranch,
-            final ObjectMapper mapper, Validator validator) {
+            final ObjectMapper mapper, final Validator validator, HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
@@ -117,6 +119,7 @@ public class KeyResource {
         this.defaultRef = Objects.requireNonNull(defaultBranch);
         this.mapper = Objects.requireNonNull(mapper);
         this.validator = Objects.requireNonNull(validator);
+        this.hashService = hashService;
     }
 
     @GET
@@ -316,15 +319,14 @@ public class KeyResource {
     }
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
-        keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        UserData userData;
+        keyRoles = keyRoles == null ? Set.of() : keyRoles;        
         try {
-            userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            io.jitstatic.auth.UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
             if (userData == null) {
                 return false;
             }
             final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
         } catch (RefNotFoundException e) {
             return false;
         }
@@ -351,8 +353,8 @@ public class KeyResource {
             user = userHolder.get();
             if (!addKeyAuthenticator.authenticate(user, ref)) {
                 try {
-                    final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
-                    if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
+                    final io.jitstatic.auth.UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
+                    if (userData == null || !hashService.hasSamePassword(userData, user.getPassword())) {
                         LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
                         throw new WebApplicationException(Status.FORBIDDEN);
                     }

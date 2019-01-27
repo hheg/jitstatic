@@ -61,6 +61,7 @@ import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
@@ -73,12 +74,15 @@ public class MetaKeyResource {
     private final Storage storage;
     private final KeyAdminAuthenticator keyAdminAuthenticator;
     private final APIHelper helper;
+    private final HashService hashService;
 
-    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch) {
+    public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final String defaultBranch,
+            final HashService hashService) {
         this.keyAdminAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @GET
@@ -127,7 +131,7 @@ public class MetaKeyResource {
                 return false;
             }
             final Set<Role> userRoles = userData.getRoles();
-            return keyRoles.stream().allMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword());
+            return keyRoles.stream().allMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword());
         } catch (RefNotFoundException e) {
             return false;
         }

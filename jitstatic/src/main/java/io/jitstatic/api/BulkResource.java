@@ -52,6 +52,7 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
@@ -62,11 +63,13 @@ public class BulkResource {
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
     private final KeyAdminAuthenticator addKeyAuthenticator;
+    private final HashService hashService;
 
-    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch) {
+    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch, HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @POST
@@ -122,7 +125,7 @@ public class BulkResource {
                 return false;
             }
             final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData,user.getPassword()));
         } catch (RefNotFoundException e) {
             return false;
         }
