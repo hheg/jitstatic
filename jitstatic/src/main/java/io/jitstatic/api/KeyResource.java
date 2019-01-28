@@ -23,6 +23,7 @@ package io.jitstatic.api;
 import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MAIL;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MESSAGE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_NAME;
@@ -86,9 +87,10 @@ import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
+//import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
@@ -107,9 +109,10 @@ public class KeyResource {
     private final boolean cors;
     private final ObjectMapper mapper;
     private final Validator validator;
+    private final HashService hashService;
 
     public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final boolean cors, final String defaultBranch,
-            final ObjectMapper mapper, Validator validator) {
+            final ObjectMapper mapper, final Validator validator, final HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
@@ -117,6 +120,7 @@ public class KeyResource {
         this.defaultRef = Objects.requireNonNull(defaultBranch);
         this.mapper = Objects.requireNonNull(mapper);
         this.validator = Objects.requireNonNull(validator);
+        this.hashService = hashService;
     }
 
     @GET
@@ -280,7 +284,8 @@ public class KeyResource {
         }
         validateData(data);
         final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(
-                () -> storage.put(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
+                () -> storage.put(key, ref, data.getData(), currentVersion,
+                        new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE)));
 
         if (result == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -317,14 +322,13 @@ public class KeyResource {
 
     boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        UserData userData;
         try {
-            userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            io.jitstatic.auth.UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
             if (userData == null) {
                 return false;
             }
             final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && userData.getBasicPassword().equals(user.getPassword()));
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
         } catch (RefNotFoundException e) {
             return false;
         }
@@ -351,8 +355,8 @@ public class KeyResource {
             user = userHolder.get();
             if (!addKeyAuthenticator.authenticate(user, ref)) {
                 try {
-                    final UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
-                    if (userData == null || !userData.getBasicPassword().equals(user.getPassword())) {
+                    final io.jitstatic.auth.UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
+                    if (userData == null || !hashService.hasSamePassword(userData, user.getPassword())) {
                         LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, helper.setToDefaultRef(defaultRef, ref), user);
                         throw new WebApplicationException(Status.FORBIDDEN);
                     }
@@ -367,11 +371,11 @@ public class KeyResource {
                 throw new WebApplicationException(key + " already exist in " + (ref == null ? defaultRef : ref), Status.CONFLICT);
             }
         } finally {
-            data = mapper.readValue(httpRequest.getInputStream(), AddKeyData.class);            
+            data = mapper.readValue(httpRequest.getInputStream(), AddKeyData.class);
         }
         validateData(data);
         final String version = helper.unwrapWithPOSTApi(() -> storage.addKey(key, ref, data.getData(), data.getMetaData(),
-                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
+                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE)));
         LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
@@ -406,7 +410,7 @@ public class KeyResource {
         }
 
         try {
-            storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message));
+            storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), JITSTATIC_NOWHERE));
         } catch (final WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof UnsupportedOperationException) {

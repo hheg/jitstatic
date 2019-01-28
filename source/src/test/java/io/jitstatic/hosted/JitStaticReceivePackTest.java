@@ -181,7 +181,7 @@ public class JitStaticReceivePackTest {
             tn.push(NullProgressMonitor.INSTANCE, toPush);
             for (RemoteRefUpdate rru : toPush) {
                 assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
-                assertEquals("Error in branch refs/heads/newbranch", rru.getMessage());
+                assertTrue(rru.getMessage().startsWith("Error in branch refs/heads/newbranch"));
             }
         }
     }
@@ -254,7 +254,7 @@ public class JitStaticReceivePackTest {
             System.out.println(messages);
         }
         assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
-        assertEquals("Error in branch " + REF_HEADS_MASTER, rru.getMessage());
+        assertTrue(rru.getMessage().startsWith("Error in branch " + REF_HEADS_MASTER));
         assertEquals(null, errorReporter.getFault());
         final File newFolder = getFolder().toFile();
         try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {

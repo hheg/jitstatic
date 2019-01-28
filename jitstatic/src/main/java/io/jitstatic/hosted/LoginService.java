@@ -31,6 +31,7 @@ import org.eclipse.jetty.util.security.Password;
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 
 public class LoginService extends AbstractLoginService {
@@ -39,11 +40,13 @@ public class LoginService extends AbstractLoginService {
     private final UserPrincipal root;
     private final String defaultRef;
     private Storage storage;
+    private final HashService hashService;
 
-    public LoginService(final String userName, final String secret, final String realm, final String defaultRef) {
+    public LoginService(final String userName, final String secret, final String realm, final String defaultRef, HashService hashService) {
         this._name = Objects.requireNonNull(realm);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.root = new UserPrincipal(Objects.requireNonNull(userName), new Password(Objects.requireNonNull(secret)));
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @Override
@@ -67,8 +70,8 @@ public class LoginService extends AbstractLoginService {
             final UserData userData = storage.getUser(username, defaultRef, _name);
             if (userData == null) {
                 return null;
-            }            
-            return new RoleBearingUserPrincipal(username, new Password(userData.getBasicPassword()), userData.getRoles());        
+            }
+            return new RoleBearingUserPrincipal(username, new HashingCredential(hashService, userData), userData.getRoles());
         } catch (final Exception e) {
             return null;
         }
@@ -84,12 +87,37 @@ public class LoginService extends AbstractLoginService {
         private final String[] roles;
 
         public RoleBearingUserPrincipal(final String name, final Credential credential, final Set<Role> roles) {
-            super(name, credential);            
+            super(name, credential);
             this.roles = roles.stream().map(Role::getRole).toArray(String[]::new);
         }
 
         public String[] getRoles() {
             return Arrays.copyOf(roles, roles.length);
         }
+    }
+
+    private static class HashingCredential extends Credential {
+
+        private static final long serialVersionUID = 1L;
+        private final HashService service;
+        private final UserData data;
+
+        public HashingCredential(final HashService service, final UserData data) {
+            this.service = service;
+            this.data = data;
+        }
+
+        @Override
+        public boolean check(Object credentials) {
+            if (credentials instanceof char[])
+                credentials = new String((char[]) credentials);
+            if (credentials instanceof Password || credentials instanceof String) {
+                return service.hasSamePassword(data, credentials.toString());
+            } else if (credentials instanceof HashingCredential) {
+                return data.equals(((HashingCredential) credentials).data);
+            }
+            return false;
+        }
+
     }
 }

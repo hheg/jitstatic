@@ -39,8 +39,6 @@ import io.jitstatic.utils.Pair;
 public interface Storage extends AutoCloseable, CheckHealth {
     public Optional<StoreInfo> getKey(String key, String ref);
 
-//    public void reload(List<String> refsToReload);
-
     public void close();
 
     public Either<String, FailedToLock> put(String key, String ref, ObjectStreamProvider data, String version, CommitMetaData commitMetaData);
@@ -61,7 +59,7 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public Pair<MetaData, String> getMetaKey(String key, String ref);
 
-    public Either<String, FailedToLock> update(String key, String ref, String path, String username, UserData data, String version);
+    public Either<String, FailedToLock> updateUser(String key, String ref, String path, String username, UserData data, String version);
     
     public String addUser(String key, String ref, String path, String name, UserData data);
 

@@ -44,5 +44,6 @@ public class JitStaticConstants {
     public static final String X_JITSTATIC_MAIL = X_JITSTATIC + "-mail";
     public static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
     public static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
+    public static final String JITSTATIC_NOWHERE = "jitstatic@nowhere";
 
 }

@@ -64,10 +64,12 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     private final AtomicReference<Exception> fault = new AtomicReference<>();
     private final Source source;
     private final String defaultRef;
+    private final HashService hashService;
 
-    public GitStorage(final Source source, final String defaultRef) {
+    public GitStorage(final Source source, final String defaultRef, final HashService hashService) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
+        this.hashService = hashService;
     }
 
     public RefLockHolder getRefHolderLock(final String ref) {
@@ -130,7 +132,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, source));
+        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, source, hashService));
     }
 
     @Override
@@ -351,7 +353,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public Either<String, FailedToLock> update(final String key, String ref, final String realm, final String username, final UserData data,
+    public Either<String, FailedToLock> updateUser(final String key, String ref, final String realm, final String username, final UserData data,
             final String version) {
         ref = checkRef(ref);
         isRefATag(ref);
@@ -402,6 +404,6 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     @Override
     public void deleteRef(String ref) {
         LOG.info("Deleting {}", ref);
-        cache.remove(ref);        
+        cache.remove(ref);
     }
 }

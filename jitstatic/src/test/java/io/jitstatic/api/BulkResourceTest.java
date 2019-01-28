@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +55,7 @@ import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.AUtils;
@@ -68,6 +70,7 @@ public class BulkResourceTest {
     private static final String BASIC_AUTH_CRED = createCreds(USER, SECRET);
 
     private Storage storage = mock(Storage.class);
+    private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
             .addProvider(
@@ -75,18 +78,20 @@ public class BulkResourceTest {
                             .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new BulkResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER), REF_HEADS_MASTER))
+                    new BulkResource(storage,
+                            new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER, hashService),
+                            REF_HEADS_MASTER, hashService))
             .build();
 
     @Test
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
-        Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
-        Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
-        Mockito.when(storageData.getContentType()).thenReturn("application/something");
-        Mockito.when(storage.getList(Mockito.any()))
+        when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
+        when(storeInfoMock.getVersion()).thenReturn("1");
+        when(storeInfoMock.getMetaData()).thenReturn(storageData);
+        when(storageData.getContentType()).thenReturn("application/something");
+        when(storage.getList(Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER)));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(

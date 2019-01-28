@@ -61,7 +61,6 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.apache.http.client.ClientProtocolException;
-import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
@@ -579,17 +578,17 @@ public class KeyValueStorageWithHostedStorageTest {
         String pass = hostedFactory.getSecret();
         try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build()) {
             final String key = USERS + "/" + GIT_REALM + "/user";
-            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
-            assertEquals(HttpStatus.FORBIDDEN_403,
+            assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+            assertEquals(FORBIDDEN_403,
                     assertThrows(APIException.class, () -> client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"),
                             new MetaData(Set.of(new User(USER, PASSWORD)), APPLICATION_JSON, false, false, List.of()))).getStatusCode());
             assertThrows(APIException.class, () -> client.getKey(key, tf));
             assertThrows(APIException.class, () -> client.getKey(key, SECRETS, tf));
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
                 client.createKey(getData().getBytes(UTF_8), new CommitData(key, SECRETS, "msg", "info", "mail"),
                         new MetaData(Set.of(new User(USER, PASSWORD)), APPLICATION_JSON, false, false, List.of()));
             }).getStatusCode());
-            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
+            assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
         }
     }
     

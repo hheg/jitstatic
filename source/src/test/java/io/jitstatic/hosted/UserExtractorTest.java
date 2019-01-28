@@ -117,13 +117,13 @@ public class UserExtractorTest {
         Path screatorUser = creatorRealm.resolve("screatorUser");
         Path supdaterUser = updaterRealm.resolve("supdaterUser");
 
-        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
-        UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345");
-        UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456");
+        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+        UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345", null, null);
+        UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456", null, null);
 
-        UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234"); // Full admin rights
-        UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345");
-        UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456");
+        UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234", null, null); // Full admin rights
+        UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345", null, null);
+        UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
 
         write(gituser, gitUserData);
         write(creatorUser, creatorUserData);
@@ -167,13 +167,13 @@ public class UserExtractorTest {
         Path screatorUser = creatorRealm.resolve("screatorUser");
         Path supdaterUser = updaterRealm.resolve("supdaterUser");
 
-        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
-        UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345");
-        UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456");
+        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+        UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345", null, null);
+        UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456", null, null);
 
-        UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234"); // Full admin rights
-        UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345");
-        UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456");
+        UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234", null, null); // Full admin rights
+        UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345", null, null);
+        UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
 
         write(gituser, gitUserData);
         write(creatorUser, creatorUserData);
@@ -212,9 +212,9 @@ public class UserExtractorTest {
         Path sgituser = gitRealm.resolve("sgituser");
         Path tgituser = gitRealm.resolve("tgituser");
 
-        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
-        UserData sgitUserData = new UserData(Set.of(new Role("pull")), "s1234");
-        UserData tgitUserData = new UserData(Set.of(new Role("unknown")), "2345");
+        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+        UserData sgitUserData = new UserData(Set.of(new Role("pull")), "s1234", null, null);
+        UserData tgitUserData = new UserData(Set.of(new Role("unknown")), "2345", null, null);
         write(gituser, gitUserData);
         write(sgituser, sgitUserData);
         write(tgituser, tgitUserData);

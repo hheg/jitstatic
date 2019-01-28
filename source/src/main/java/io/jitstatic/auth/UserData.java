@@ -1,5 +1,7 @@
 package io.jitstatic.auth;
 
+import java.io.Serializable;
+
 /*-
  * #%L
  * jitstatic
@@ -25,25 +27,37 @@ import java.util.Set;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
-import org.hibernate.validator.constraints.NotEmpty;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.jitstatic.Role;
+import io.jitstatic.auth.constraints.DuplicatedAuthenticationMethods;
+import io.jitstatic.auth.constraints.HasPassword;
+import io.jitstatic.auth.constraints.Warning;
 
-public class UserData implements BasicAuthentication {
-    @NotEmpty
+@HasPassword
+@DuplicatedAuthenticationMethods(payload = Warning.class)
+public class UserData implements BasicAuthentication, Serializable {
+
+    private static final long serialVersionUID = -8443071109393902012L;
+
     private final String basicPassword;
-    
+
     @NotNull
     @Valid
     private final Set<Role> roles;
 
+    private final String salt;
+
+    private final String hash;
+
     @JsonCreator
-    public UserData(@JsonProperty("roles") Set<Role> roles, @JsonProperty("basicPassword") String password) {
+    public UserData(@JsonProperty("roles") Set<Role> roles, @JsonProperty("basicPassword") String password, @JsonProperty("salt") String salt,
+            @JsonProperty("hash") String hash) {
         this.basicPassword = password;
         this.roles = roles;
+        this.salt = salt;
+        this.hash = hash;
     }
 
     @Override
@@ -51,7 +65,9 @@ public class UserData implements BasicAuthentication {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((basicPassword == null) ? 0 : basicPassword.hashCode());
+        result = prime * result + ((hash == null) ? 0 : hash.hashCode());
         result = prime * result + ((roles == null) ? 0 : roles.hashCode());
+        result = prime * result + ((salt == null) ? 0 : salt.hashCode());
         return result;
     }
 
@@ -69,10 +85,20 @@ public class UserData implements BasicAuthentication {
                 return false;
         } else if (!basicPassword.equals(other.basicPassword))
             return false;
+        if (hash == null) {
+            if (other.hash != null)
+                return false;
+        } else if (!hash.equals(other.hash))
+            return false;
         if (roles == null) {
             if (other.roles != null)
                 return false;
         } else if (!roles.equals(other.roles))
+            return false;
+        if (salt == null) {
+            if (other.salt != null)
+                return false;
+        } else if (!salt.equals(other.salt))
             return false;
         return true;
     }
@@ -80,10 +106,20 @@ public class UserData implements BasicAuthentication {
     public Set<Role> getRoles() {
         return roles;
     }
-    
+
     @Override
     public String getBasicPassword() {
         return basicPassword;
+    }
+
+    @Override
+    public String getSalt() {
+        return salt;
+    }
+
+    @Override
+    public String getHash() {
+        return hash;
     }
 
 }

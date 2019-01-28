@@ -87,6 +87,7 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.tools.AUtils;
 import io.jitstatic.utils.Pair;
@@ -112,7 +113,7 @@ public class KeyResourceTest {
     private static final Map<String, Optional<StoreInfo>> DATA = new HashMap<>();
     private static String returnedDog;
     private static String returnedHorse;
-
+    private HashService hashService = new HashService();
     private Storage storage = mock(Storage.class);
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
@@ -120,8 +121,9 @@ public class KeyResourceTest {
                     .setRealm(JITSTATIC_KEYADMIN_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(
-                    new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER),
-                            false, REFS_HEADS_MASTER, MAPPER, VALIDATOR))
+                    new KeyResource(storage,
+                            new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService),
+                            false, REFS_HEADS_MASTER, MAPPER, VALIDATOR, new HashService()))
             .build();
 
     @BeforeAll
@@ -172,8 +174,8 @@ public class KeyResourceTest {
         assertEquals(compileMsg(Status.NOT_FOUND),
                 assertThrows(WebApplicationException.class,
                         () -> RESOURCES.target("/storage/cat").request()
-                        .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(MetaData.class))
-                                .getLocalizedMessage());
+                                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(MetaData.class))
+                                        .getLocalizedMessage());
     }
 
     @Test
@@ -191,7 +193,7 @@ public class KeyResourceTest {
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
         assertEquals("HTTP 403 Forbidden", assertThrows(WebApplicationException.class, () -> {
             RESOURCES.target("/storage/dog").request()
-            .header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
+                    .header(HttpHeaders.AUTHORIZATION, bac).get(JsonNode.class);
         }).getLocalizedMessage());
     }
 
@@ -208,14 +210,14 @@ public class KeyResourceTest {
     public void testKeyIsNotFoundWithMalformedBranch() throws InterruptedException {
         assertEquals(compileMsg(Status.NOT_FOUND), assertThrows(WebApplicationException.class,
                 () -> RESOURCES.target("/storage/horse")
-                .queryParam("ref", "refs/beads/branch").request().get(JsonNode.class)).getLocalizedMessage());
+                        .queryParam("ref", "refs/beads/branch").request().get(JsonNode.class)).getLocalizedMessage());
     }
 
     @Test
     public void testKeyIsNotFoundWithMalformedTag() throws InterruptedException {
         assertEquals(compileMsg(Status.NOT_FOUND), assertThrows(WebApplicationException.class,
                 () -> RESOURCES.target("/storage/horse")
-                .queryParam("ref", "refs/bads/branch").request().get(JsonNode.class)).getLocalizedMessage());
+                        .queryParam("ref", "refs/bads/branch").request().get(JsonNode.class)).getLocalizedMessage());
     }
 
     @Test
@@ -758,8 +760,7 @@ public class KeyResourceTest {
     @Test
     public void testGetMasterMetaKeyShouldFail() {
         Response response = RESOURCES.target("/storage/dog/")
-                .request
-                ().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
+                .request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
     }
@@ -855,45 +856,54 @@ public class KeyResourceTest {
     @Test
     public void testisKeyUserAllowed() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR);
-        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "p"));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
+                REFS_HEADS_MASTER,
+                MAPPER, VALIDATOR, new HashService());
+        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
+                .thenReturn(new UserData(Set.of(new Role("role")), "p", null, null));
         assertTrue(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithNoRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR);
-        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(), "p"));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
+                REFS_HEADS_MASTER,
+                MAPPER, VALIDATOR, new HashService());
+        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(), "p", null, null));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongRole() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR);
-        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("other")), "p"));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
+                REFS_HEADS_MASTER,
+                MAPPER, VALIDATOR, new HashService());
+        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
+                .thenReturn(new UserData(Set.of(new Role("other")), "p", null, null));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongPassword() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR);
-        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
+                REFS_HEADS_MASTER,
+                MAPPER, VALIDATOR, new HashService());
+        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
+                .thenReturn(new UserData(Set.of(new Role("role")), "z", null, null));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongPasswordNoBranch() throws Exception {
         KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER), false, REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR);
-        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(new Role("role")), "z"));
+                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
+                REFS_HEADS_MASTER,
+                MAPPER, VALIDATOR, new HashService());
+        when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
+                .thenReturn(new UserData(Set.of(new Role("role")), "z", null, null));
         assertFalse(kr.isKeyUserAllowed(new User("u", "p"), null, Set.of(new Role("role"))));
     }
 

@@ -22,4 +22,8 @@ package io.jitstatic.auth;
 
 public interface BasicAuthentication {
     String getBasicPassword();
+
+    String getSalt();
+
+    String getHash();
 }

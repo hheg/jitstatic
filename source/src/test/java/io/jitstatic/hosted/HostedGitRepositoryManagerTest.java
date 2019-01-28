@@ -23,9 +23,11 @@ package io.jitstatic.hosted;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
+import static io.jitstatic.JitStaticConstants.USERS;
+import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -47,7 +49,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
@@ -65,7 +66,6 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
@@ -91,7 +91,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.CommitMetaData;
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
@@ -102,7 +101,6 @@ import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.Utils;
-import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -226,8 +224,8 @@ public class HostedGitRepositoryManagerTest {
                 Git git = Git.cloneRepository().setDirectory(workFolder).setURI(tempDir.toUri().toString()).call();) {
             Path file = workFolder.toPath().resolve("other");
             Path mfile = workFolder.toPath().resolve("other" + METADATA);
-            Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE);
-            Files.write(file, getData().getBytes(UTF_8), StandardOpenOption.CREATE);
+            Files.write(mfile, getMetaData().getBytes(UTF_8), CREATE);
+            Files.write(file, getData().getBytes(UTF_8), CREATE);
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
             verifyOkPush(git.push().call());
@@ -307,8 +305,9 @@ public class HostedGitRepositoryManagerTest {
         }) {
             assertSame(RefNotFoundException.class,
                     assertThrows(WrappingAPIException.class,
-                            () -> grm.modifyKey("", "master", Utils.toProvider(new byte[] {}), "", new CommitMetaData("user", "mail", "msg")))
-                                    .getCause().getClass());
+                            () -> grm.modifyKey("", "master", Utils.toProvider(new byte[] {}), "",
+                                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)))
+                                            .getCause().getClass());
         }
     }
 
@@ -368,7 +367,7 @@ public class HostedGitRepositoryManagerTest {
 
     @Test
     public void testModifyKey() throws Exception {
-        CommitMetaData cmd = new CommitMetaData("user", "mail", "msg");
+        CommitMetaData cmd = new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE);
         File gitFolder = getFolder().toFile();
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
@@ -378,7 +377,7 @@ public class HostedGitRepositoryManagerTest {
             JsonNode firstValue = readJsonData(firstSourceInfo);
             String firstVersion = firstSourceInfo.getSourceVersion();
             byte[] modified = "{\"one\":\"two\"}".getBytes(UTF_8);
-            Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = grm.modifyKey(STORE, null, Utils.toProvider(modified), firstVersion, cmd);
+            var newVersion = grm.modifyKey(STORE, null, Utils.toProvider(modified), firstVersion, cmd);
             assertNotEquals(firstVersion, newVersion.getLeft());
             SourceInfo secondSourceInfo = grm.getSourceInfo(STORE, null);
             JsonNode secondValue = readJsonData(secondSourceInfo);
@@ -388,7 +387,7 @@ public class HostedGitRepositoryManagerTest {
             RevCommit revCommit = getRevCommit(git.getRepository(), REF_HEADS_MASTER);
             assertEquals(cmd.getMessage(), revCommit.getShortMessage());
             assertEquals(cmd.getUserInfo(), revCommit.getAuthorIdent().getName());
-            assertEquals("JitStatic API update key operation", revCommit.getCommitterIdent().getName());
+            assertEquals("Test", revCommit.getCommitterIdent().getName());
         }
     }
 
@@ -396,7 +395,8 @@ public class HostedGitRepositoryManagerTest {
     public void testModifyTag() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(UnsupportedOperationException.class, () -> {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
-                grm.modifyKey("key", "refs/tags/tag", Utils.toProvider(new byte[] { 1, 2, 3, 4 }), "1", new CommitMetaData("user", "mail", "msg"));
+                grm.modifyKey("key", "refs/tags/tag", Utils.toProvider(new byte[] { 1, 2, 3, 4 }), "1",
+                        new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Tags cannot be modified"));
     }
@@ -407,9 +407,10 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call()) {
             addFilesAndPush(localGitDir, git);
-            Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey = grm.addKey("key", REF_HEADS_MASTER,
+            var addKey = grm.addKey("key", REF_HEADS_MASTER,
                     Utils.toProvider(new byte[] { 1 }),
-                    new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg"));
+                    new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
+                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String version = addKey.getLeft().getRight();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -429,14 +430,14 @@ public class HostedGitRepositoryManagerTest {
             try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
                 grm.addKey("key", REF_HEADS_MASTER, Utils.toProvider(new byte[] { 1 }),
                         new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
-                        new CommitMetaData("user", "mail", "msg"));
+                        new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getCause(), isA(RefNotFoundException.class));
     }
 
     @Test
     public void testModifyMetaData() throws Exception {
-        CommitMetaData cmd = new CommitMetaData("user", "mail", "msg");
+        CommitMetaData cmd = new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE);
         File gitFolder = getFolder().toFile();
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
@@ -459,7 +460,7 @@ public class HostedGitRepositoryManagerTest {
             RevCommit revCommit = getRevCommit(git.getRepository(), REF_HEADS_MASTER);
             assertEquals(cmd.getMessage(), revCommit.getShortMessage());
             assertEquals(cmd.getUserInfo(), revCommit.getAuthorIdent().getName());
-            assertEquals("JitStatic API update metadata operation", revCommit.getCommitterIdent().getName());
+            assertEquals("Test", revCommit.getCommitterIdent().getName());
         }
     }
 
@@ -474,7 +475,8 @@ public class HostedGitRepositoryManagerTest {
                 secondValue = MAPPER.readValue(is, MetaData.class);
             }
             assertTrue(assertThrows(WrappingAPIException.class, () -> {
-                grm.addKey(STORE, REF_HEADS_MASTER, Utils.toProvider(new byte[] { 1 }), secondValue, new CommitMetaData("user", "mail", "msg"));
+                grm.addKey(STORE, REF_HEADS_MASTER, Utils.toProvider(new byte[] { 1 }), secondValue,
+                        new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }).getCause() instanceof KeyAlreadyExist);
         }
     }
@@ -484,7 +486,7 @@ public class HostedGitRepositoryManagerTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
             assertThrows(UnsupportedOperationException.class,
                     () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null, null), "1", STORE,
-                            "refs/tags/tag", new CommitMetaData("user", "mail", "msg")));
+                            "refs/tags/tag", new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)));
         }
     }
 
@@ -496,7 +498,7 @@ public class HostedGitRepositoryManagerTest {
             addFilesAndPush(gitFolder, git);
             SourceInfo sourceInfo = grm.getSourceInfo(STORE, null);
             assertNotNull(sourceInfo);
-            grm.deleteKey(STORE, null, new CommitMetaData("user", "mail", "msg"));
+            grm.deleteKey(STORE, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
             assertNull(sourceInfo2);
         }
@@ -559,7 +561,7 @@ public class HostedGitRepositoryManagerTest {
             assertNotNull(sourceInfo);
             SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
             assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
-            grm.deleteKey(STORE, null, new CommitMetaData("user", "mail", "msg"));
+            grm.deleteKey(STORE, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             SourceInfo sourceInfo2 = grm.getSourceInfo(STORE, null);
             assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
             sourceInfoMasterMetaData = grm.getSourceInfo("/", null);
@@ -586,7 +588,7 @@ public class HostedGitRepositoryManagerTest {
             assertNotNull(sourceInfo);
             SourceInfo sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
             assertTrue(sourceInfoMasterMetaData.isMetaDataSource() && !sourceInfoMasterMetaData.hasKeyMetaData());
-            grm.deleteKey(base + STORE, null, new CommitMetaData("user", "mail", "msg"));
+            grm.deleteKey(base + STORE, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             SourceInfo sourceInfo2 = grm.getSourceInfo(base + STORE, null);
             assertTrue(sourceInfo2.isMetaDataSource() && !sourceInfo2.hasKeyMetaData());
             sourceInfoMasterMetaData = grm.getSourceInfo(base, null);
@@ -652,7 +654,7 @@ public class HostedGitRepositoryManagerTest {
 
     @Test
     public void testHostedGitRepositoryWithUsers() throws Exception {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
         try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
 
@@ -661,53 +663,54 @@ public class HostedGitRepositoryManagerTest {
 
     private void setupGitRepoWithUsers(File base)
             throws IOException, GitAPIException, InvalidRemoteException, TransportException, JsonProcessingException, NoFilepatternException {
-        File wBase = createTempFiles();
-        Git bareGit = Git.init().setBare(true).setDirectory(base).call();
-        Git workingGit = Git.cloneRepository().setURI(bareGit.getRepository().getDirectory().toURI().toString()).setDirectory(wBase).call();
+        File wBase = createTempDirectory();
+        try (Git bareGit = Git.init().setBare(true).setDirectory(base).call();
+                Git workingGit = Git.cloneRepository().setURI(bareGit.getRepository().getDirectory().toURI().toString()).setDirectory(wBase).call();) {
 
-        Path users = wBase.toPath().resolve(JitStaticConstants.USERS);
-        assertTrue(users.toFile().mkdirs());
-        Path gitRealm = users.resolve(GIT_REALM);
+            Path users = wBase.toPath().resolve(USERS);
+            assertTrue(users.toFile().mkdirs());
+            Path gitRealm = users.resolve(GIT_REALM);
 
-        Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
-        Path updaterRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
-        mkdirs(gitRealm, creatorRealm, updaterRealm);
+            Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
+            Path updaterRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
+            mkdirs(gitRealm, creatorRealm, updaterRealm);
 
-        String gitUserKey = "gituser";
-        String creatorUserKey = "creatorUser";
-        String updaterUserKey = "updaterUser";
+            String gitUserKey = "gituser";
+            String creatorUserKey = "creatorUser";
+            String updaterUserKey = "updaterUser";
 
-        Path gituser = gitRealm.resolve(gitUserKey);
-        Path creatorUser = creatorRealm.resolve(creatorUserKey);
-        Path updaterUser = updaterRealm.resolve(updaterUserKey);
+            Path gituser = gitRealm.resolve(gitUserKey);
+            Path creatorUser = creatorRealm.resolve(creatorUserKey);
+            Path updaterUser = updaterRealm.resolve(updaterUserKey);
 
-        Path sgituser = gitRealm.resolve("sgituser");
-        Path screatorUser = creatorRealm.resolve("screatorUser");
-        Path supdaterUser = updaterRealm.resolve("supdaterUser");
+            Path sgituser = gitRealm.resolve("sgituser");
+            Path screatorUser = creatorRealm.resolve("screatorUser");
+            Path supdaterUser = updaterRealm.resolve("supdaterUser");
 
-        UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234"); // Full admin rights
-        UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345");
-        UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456");
+            UserData gitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+            UserData creatorUserData = new UserData(Set.of(new Role("files")), "2345", null, null);
+            UserData updaterUserData = new UserData(Set.of(new Role("files")), "3456", null, null);
 
-        UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234"); // Full admin rights
-        UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345");
-        UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456");
+            UserData sgitUserData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234", null, null); // Full admin rights
+            UserData screatorUserData = new UserData(Set.of(new Role("files")), "s2345", null, null);
+            UserData supdaterUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
 
-        write(gituser, gitUserData);
-        write(creatorUser, creatorUserData);
-        write(updaterUser, updaterUserData);
+            write(gituser, gitUserData);
+            write(creatorUser, creatorUserData);
+            write(updaterUser, updaterUserData);
 
-        write(sgituser, sgitUserData);
-        write(screatorUser, screatorUserData);
-        write(supdaterUser, supdaterUserData);
+            write(sgituser, sgitUserData);
+            write(screatorUser, screatorUserData);
+            write(supdaterUser, supdaterUserData);
 
-        commit(workingGit);
+            commit(workingGit);
+        }
     }
 
     @Test
     public void testGetUser()
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
         try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
             Pair<String, UserData> userDataHolder = hgrm.getUser(".users/git/gituser", REF_HEADS_MASTER);
@@ -719,7 +722,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testGetUserNotFound()
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
         try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
             assertFalse(hgrm.getUser(".users/git/kit", REF_HEADS_MASTER).isPresent());
@@ -729,40 +732,107 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testAddUser()
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
         try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
-            assertNotNull(hgrm.addUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234")));
+            assertNotNull(hgrm.addUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234", null, null)));
         }
     }
 
     @Test
     public void testUpdateUser()
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
         try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
-            assertNotNull(hgrm.updateUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234")));
+            assertNotNull(hgrm.updateUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234", null, null)));
         }
     }
 
     @Test
     public void testMountOnCorruptUser()
             throws InvalidRemoteException, TransportException, JsonProcessingException, NoFilepatternException, IOException, GitAPIException {
-        File base = createTempFiles();
+        File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        File wBase = createTempFiles();
-        Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();
+        File wBase = createTempDirectory();
+        try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
 
-        Path users = wBase.toPath().resolve(JitStaticConstants.USERS);
-        Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
-        Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, StandardOpenOption.CREATE_NEW);
-        commit(workingGit);
+            Path users = wBase.toPath().resolve(USERS);
+            Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
+            Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, CREATE_NEW);
+            commit(workingGit);
+            System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
+        }
+    }
+
+    @Test
+    public void testMountOnUserWithoutPassword() throws Exception {
+        File base = createTempDirectory();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempDirectory();
+        try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
+            Path corruptuser = wBase.toPath()
+                    .resolve(USERS)
+                    .resolve(JITSTATIC_KEYADMIN_REALM)
+                    .resolve("corruptuser");
+            write(corruptuser, new UserData(Set.of(new Role("role")), null, null, null));
+            commit(workingGit);
+        }
         System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
     }
 
+    @Test
+    public void testMountOnUserWithoutHash() throws Exception {
+        File base = createTempDirectory();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempDirectory();
+        try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
+            Path corruptuser = wBase.toPath()
+                    .resolve(USERS)
+                    .resolve(JITSTATIC_KEYADMIN_REALM)
+                    .resolve("corruptuser");
+            write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", null));
+            commit(workingGit);
+        }
+        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
+    }
+
+    @Test
+    public void testMountOnUserHashedPassword() throws Exception {
+        File base = createTempDirectory();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempDirectory();
+        try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
+            Path corruptuser = wBase.toPath()
+                    .resolve(USERS)
+                    .resolve(JITSTATIC_KEYADMIN_REALM)
+                    .resolve("corruptuser");
+            write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", "hash"));
+            commit(workingGit);
+        }
+        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        }
+    }
+
+    @Test
+    public void testMountOnUserHashedPasswordAndCtxPass() throws Exception {
+        File base = createTempDirectory();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempDirectory();
+        try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
+            Path corruptuser = wBase.toPath()
+                    .resolve(USERS)
+                    .resolve(JITSTATIC_KEYADMIN_REALM)
+                    .resolve("corruptuser");
+            write(corruptuser, new UserData(Set.of(new Role("role")), "pass", "salt", "hash"));
+            commit(workingGit);
+        }
+        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        }
+    }
+
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {
-        Files.write(userPath, MAPPER.writeValueAsBytes(userData), StandardOpenOption.CREATE);
+        Files.write(userPath, MAPPER.writeValueAsBytes(userData), CREATE);
     }
 
     private MetaData readMetaData(SourceInfo secondSourceInfo) throws IOException, JsonParseException, JsonMappingException {
@@ -777,7 +847,7 @@ public class HostedGitRepositoryManagerTest {
         workingGit.push().call();
     }
 
-    private File createTempFiles() throws IOException {
+    private File createTempDirectory() throws IOException {
         return tmpFolder.createTemporaryDirectory();
     }
 

@@ -173,7 +173,7 @@ public class SourceExtractor {
                         final String path = new String(treeWalker.getRawPath(), UTF_8);
                         final InputStreamHolder inputStreamHolder = getInputStreamFor(objectId);
                         final FileObjectIdStore fileObjectIdStore = new FileObjectIdStore(path, objectId);
-                        matchKeys(metaFiles, dataFiles, path, inputStreamHolder, fileObjectIdStore);
+                        arrangeKeys(metaFiles, dataFiles, path, inputStreamHolder, fileObjectIdStore);
                     }
                 }
             }
@@ -187,7 +187,7 @@ public class SourceExtractor {
         return key.startsWith(new String(rawPath, UTF_8) + "/");
     }
 
-    private void matchKeys(final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> dataFiles, final String path,
+    private void arrangeKeys(final Map<String, MetaFileData> metaFiles, final Map<String, SourceFileData> dataFiles, final String path,
             final InputStreamHolder inputStreamHolder, final FileObjectIdStore fileObjectIdStore) {
         final Path p = Path.of(path);
         final String lastElement = p.getLastElement();
@@ -230,7 +230,7 @@ public class SourceExtractor {
         return allRefs.entrySet().stream().map(e -> {
             final Set<Ref> refs = e.getValue().stream()
                     .filter(ref -> !ref.isSymbolic())
-                    .filter(ref -> ref.getName().startsWith(R_HEADS))
+                    .filter(ref -> ref.getName().startsWith(R_HEADS)) // TODO Remove this
                     .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
         }).map(this::fileLoader).collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));

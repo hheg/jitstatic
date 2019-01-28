@@ -26,11 +26,15 @@ public class CommitMetaData {
     private final String userInfo;
     private final String userMail;
     private final String message;
+    private final String proxyUser;
+    private final String proxyUserMail;
 
-    public CommitMetaData(final String userInfo, final String userMail, final String message) {
+    public CommitMetaData(final String userInfo, final String userMail, final String message, final String proxyUser, final String proxyUserMail) {
         this.userInfo = checkNonNullNotEmpty(userInfo, "userInfo");
         this.userMail = checkNonNullNotEmpty(userMail, "userMail");
         this.message = checkNonNullNotEmpty(message, "message");
+        this.proxyUser = checkNonNullNotEmpty(proxyUser, "proxyUser");
+        this.proxyUserMail = (proxyUserMail != null) ? proxyUserMail : JitStaticConstants.JITSTATIC_NOWHERE;
     }
 
     private static String checkNonNullNotEmpty(final String victim, final String field) {
@@ -50,5 +54,13 @@ public class CommitMetaData {
 
     public String getMessage() {
         return message;
+    }
+
+    public String getProxyUser() {
+        return proxyUser;
+    }
+
+    public String getProxyUserMail() {
+        return proxyUserMail;
     }
 }

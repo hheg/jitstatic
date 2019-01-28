@@ -21,30 +21,55 @@ package io.jitstatic;
  */
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.validation.ConstraintViolation;
+
+import io.jitstatic.auth.constraints.Warning;
 
 public class StorageParseException extends IOException {
 
     private static final long serialVersionUID = 1774575933983877566L;
+    private final List<String> warnings;
+    private final List<String> errors;
 
     public StorageParseException(final String message, final IOException e) {
-        super(message, e);
+        super(e);
+        errors = List.of(message);
+        warnings = List.of();
     }
 
-    public <T> StorageParseException(Set<ConstraintViolation<T>> violations) {
-        super(compile(violations));
+    public <T> StorageParseException(final Set<ConstraintViolation<T>> violations) {
+        warnings = compile(violations.stream()
+                .filter(cv -> cv.getConstraintDescriptor().getPayload().stream().anyMatch(Warning.class::isAssignableFrom))
+                .collect(Collectors.toSet()));
+        errors = compile(violations.stream().filter(cv -> cv.getConstraintDescriptor().getPayload().isEmpty()).collect(Collectors.toSet()));
     }
 
-    private static <T> String compile(Set<ConstraintViolation<T>> violations) {
-        return violations.stream().map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
-                .collect(Collectors.joining(System.lineSeparator()));
+    private static <T> List<String> compile(final Set<ConstraintViolation<T>> violations) {
+        return violations.stream()
+                .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
+                .collect(Collectors.toList());
+    }
+
+    public List<String> getWarnings() {
+        return warnings;
+    }
+
+    public List<String> getErrors() {
+        return errors;
     }
 
     @Override
     public Throwable fillInStackTrace() {
         return this;
+    }
+
+    @Override
+    public String getMessage() {
+        return Stream.concat(errors.stream(), warnings.stream()).collect(Collectors.joining(System.lineSeparator()));
     }
 }

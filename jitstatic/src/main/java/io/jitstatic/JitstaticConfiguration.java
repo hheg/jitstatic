@@ -37,6 +37,7 @@ import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.reporting.ReportingFactory;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.StorageFactory;
 
@@ -85,9 +86,9 @@ public class JitstaticConfiguration extends Configuration {
         return hostedFactory.build(env, gitRealm);
     }
 
-    public KeyAdminAuthenticator getAddKeyAuthenticator(final Storage storage2) {
+    public KeyAdminAuthenticator getAddKeyAuthenticator(final Storage storage, HashService hashService) {
         final HostedFactory hf = getHostedFactory();
         final User addUser = new User(hf.getUserName(), hf.getSecret());
-        return new KeyAdminAuthenticatorImpl(storage2, (user, ref) -> addUser.equals(user), hf.getBranch());
+        return new KeyAdminAuthenticatorImpl(storage, (user, ref) -> addUser.equals(user), hf.getBranch(), hashService);
     }
 }
