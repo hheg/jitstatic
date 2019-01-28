@@ -85,7 +85,7 @@ public class RepositoryUpdater {
             }
             editor.finish();
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-            final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
+            final PersonIdent commiter = new PersonIdent(commitMetaData.getProxyUser(), commitMetaData.getProxyUserMail());
             buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
             return fileVersions;
         }
@@ -161,7 +161,7 @@ public class RepositoryUpdater {
             }
             editor.finish();
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-            final PersonIdent commiter = new PersonIdent("JitStatic API " + method + " operation", "none@nowhere.org");
+            final PersonIdent commiter = new PersonIdent(commitMetaData.getProxyUser(),commitMetaData.getProxyUserMail());
             buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
             rw.dispose();
         }

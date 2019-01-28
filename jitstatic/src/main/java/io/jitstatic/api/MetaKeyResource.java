@@ -1,5 +1,9 @@
 package io.jitstatic.api;
 
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
+
 /*-
  * #%L
  * jitstatic
@@ -54,7 +58,6 @@ import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.CommitMetaData;
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
@@ -68,7 +71,7 @@ import io.jitstatic.utils.Pair;
 @Path("metakey")
 public class MetaKeyResource {
 
-    final String defaultRef;
+    private final String defaultRef;
     private static final String UTF_8 = "utf-8";
     private static final Logger LOG = LoggerFactory.getLogger(KeyResource.class);
     private final Storage storage;
@@ -94,7 +97,7 @@ public class MetaKeyResource {
     public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
             final @Context Request request, final @Context HttpHeaders headers) {
         if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
 
         helper.checkRef(ref);
@@ -124,9 +127,8 @@ public class MetaKeyResource {
 
     private boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        UserData userData;
         try {
-            userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);
             if (userData == null) {
                 return false;
             }
@@ -144,21 +146,22 @@ public class MetaKeyResource {
     @Path("/{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response modifyMetaKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
+    public Response modifyMetaKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userHolder,
             final @Valid @NotNull ModifyMetaKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
-        if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JitStaticConstants.JITSTATIC_KEYADMIN_REALM);
+        if (!userHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
         }
 
         helper.checkHeaders(headers);
 
         helper.checkRef(ref);
 
-        Pair<MetaData, String> metaKeyData = storage.getMetaKey(key, ref);
+        final Pair<MetaData, String> metaKeyData = storage.getMetaKey(key, ref);
         if (!metaKeyData.isPresent()) {
             throw new WebApplicationException(key, Status.NOT_FOUND);
         }
-        authorize(user.get(), ref, metaKeyData.getLeft().getWrite());
+        final User user = userHolder.get();
+        authorize(user, ref, metaKeyData.getLeft().getWrite());
         final String currentVersion = metaKeyData.getRight();
 
         final EntityTag tag = new EntityTag(currentVersion);
@@ -169,7 +172,7 @@ public class MetaKeyResource {
         }
 
         final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.putMetaData(key, ref, data.getMetaData(), currentVersion,
-                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage())));
+                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE)));
 
         if (result.isRight()) {
             return Response.status(Status.PRECONDITION_FAILED).tag(tag).build();
@@ -178,7 +181,7 @@ public class MetaKeyResource {
         if (newVersion == null) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
-        LOG.info("{} logged in and modified key {} in {}", user.get(), key, helper.setToDefaultRef(defaultRef, ref));
+        LOG.info("{} logged in and modified key {} in {}", userHolder.get(), key, helper.setToDefaultRef(defaultRef, ref));
         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
     }
 

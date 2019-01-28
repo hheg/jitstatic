@@ -53,6 +53,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.CommitMetaData;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.RepositoryUpdater;
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
@@ -114,7 +115,7 @@ public class UserUpdaterTest {
 
         List<Pair<String, String>> updateUser = uu.updateUser(
                 List.of(Pair.of(gitAdmin, gitAdminData), Pair.of(keyAdmin, keyAdminData), Pair.of(keyUser, keyUserData)),
-                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test"));
+                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
 
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
 
@@ -135,7 +136,7 @@ public class UserUpdaterTest {
         keyUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
 
         updateUser = uu.updateUser(List.of(Pair.of(gitAdmin, gitAdminData), Pair.of(keyAdmin, keyAdminData), Pair.of(keyUser, keyUserData)),
-                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test"));
+                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
 
         extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
         assertEquals(gitAdminData, extractUserFromRef.getRight());
@@ -158,7 +159,7 @@ public class UserUpdaterTest {
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
         String updateUser = uu.updateUser(gitAdmin, bareGit.getRepository().findRef(REF_HEAD_MASTER), gitAdminData,
-                new CommitMetaData("user", "test", "msg"));
+                new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
         Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
         assertEquals(gitAdminData, extractUserFromRef.getRight());

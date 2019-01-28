@@ -1,5 +1,7 @@
 package io.jitstatic.hosted;
 
+import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
+
 /*-
  * #%L
  * jitstatic
@@ -463,16 +465,16 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public String updateUser(final String key, String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.updateUser(key, findRef(ref), data, new CommitMetaData(username, "none@jitstatic", "update user " + key));
+        return userUpdater.updateUser(key, findRef(ref), data, new CommitMetaData(username, JITSTATIC_NOWHERE, "update user " + key, username, JITSTATIC_NOWHERE));
     }
 
     @Override
     public String addUser(final String key, final String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.addUser(key, findRef(ref), data, new CommitMetaData(username, "none@jitstatic", "add user " + key));
+        return userUpdater.addUser(key, findRef(ref), data, new CommitMetaData(username, JITSTATIC_NOWHERE, "add user " + key, username, JITSTATIC_NOWHERE));
     }
 
     @Override
     public void deleteUser(String key, String ref, String username) throws IOException {
-        userUpdater.deleteUser(key, findRef(ref), new CommitMetaData(username, "none@jitstatic", "delete user " + key));
+        userUpdater.deleteUser(key, findRef(ref), new CommitMetaData(username, JITSTATIC_NOWHERE, "delete user " + key, username, JITSTATIC_NOWHERE));
     }
 }

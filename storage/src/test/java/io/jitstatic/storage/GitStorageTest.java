@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
 import static io.jitstatic.storage.tools.Utils.toByte;
 import static io.jitstatic.storage.tools.Utils.toProvider;
 
@@ -138,7 +139,7 @@ public class GitStorageTest {
             assertTrue(gs.getMetaKey("root/", null).isPresent());
 
             MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of(), null, null);
-            Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, new CommitMetaData("user", "mail", "msg"));
+            Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD, new CommitMetaData("user", "mail", "msg", "test", JITSTATIC_NOWHERE));
             assertTrue(putMetaData.isLeft());
             assertEquals(SHA_2_MD, putMetaData.getLeft());
             gs.checkHealth();
@@ -335,7 +336,8 @@ public class GitStorageTest {
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
             assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-            Either<String, FailedToLock> put = gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
+            Either<String, FailedToLock> put = gs.put(key, null, Utils.toProvider(data), SHA_1,
+                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String newVersion = put.getLeft();
             assertEquals(SHA_2, newVersion);
             first = gs.getKey(key, null);
@@ -366,7 +368,7 @@ public class GitStorageTest {
                 StoreInfo storeInfo = first.get();
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
             gs.checkHealth();
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
@@ -412,7 +414,7 @@ public class GitStorageTest {
             assertThrows(IllegalArgumentException.class, () -> {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", ""));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "", "Test", JITSTATIC_NOWHERE));
             });
             gs.checkHealth();
         }
@@ -425,7 +427,7 @@ public class GitStorageTest {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
                 gs.checkHealth();
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getCause(), Matchers.isA(RefNotFoundException.class));
     }
@@ -450,7 +452,7 @@ public class GitStorageTest {
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
                 gs.checkHealth();
-                gs.put("other", null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg"));
+                gs.put("other", null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
@@ -463,7 +465,7 @@ public class GitStorageTest {
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             String si = gs.addKey("somekey", "refs/heads/master", Utils.toProvider(pretty),
                     new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
-                    new CommitMetaData("user", "mail", "msg"));
+                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             assertEquals("1", si);
             gs.checkHealth();
         }
@@ -487,7 +489,7 @@ public class GitStorageTest {
             assertNotNull(storeInfo);
 
             MetaData sd = new MetaData(storeInfo.getMetaData().getUsers(), "application/test", false, false, List.of(), null, null);
-            Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(), new CommitMetaData("user", "mail", "msg"));
+            Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String newVersion = put.getLeft();
             assertEquals(SHA_2_MD, newVersion);
             first = gs.getKey(key, null);
@@ -513,7 +515,7 @@ public class GitStorageTest {
             when(source.getSourceInfo(eq(key), anyString())).thenReturn(si);
             StoreInfo key2 = gs.getKey(key, null).get();
             assertNotNull(key2);
-            gs.delete(key, null, new CommitMetaData("user", "mail", "msg"));
+            gs.delete(key, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             Thread.sleep(1000);
             gs.checkHealth();
             Mockito.verify(source).deleteKey(eq(key), eq(REF_HEADS_MASTER), any());
@@ -524,7 +526,7 @@ public class GitStorageTest {
     public void testDeleteMetaKey() throws IOException {
         try (GitStorage gs = new GitStorage(source, null, hashService)) {
             assertSame(UnsupportedOperationException.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.delete("key/", null, new CommitMetaData("user", "mail", "msg"))).getCause().getClass());
+                    assertThrows(WrappingAPIException.class, () -> gs.delete("key/", null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause().getClass());
         }
     }
 
@@ -539,7 +541,7 @@ public class GitStorageTest {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             String si = gs.addKey(key, branch, Utils.toProvider(pretty), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
-                    new CommitMetaData("user", "mail", "msg"));
+                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             assertEquals("1", si);
             gs.checkHealth();
             ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
@@ -558,7 +560,7 @@ public class GitStorageTest {
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class,
                     assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, Utils.toProvider(pretty),
-                            new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg"))).getCause()
+                            new MetaData(new HashSet<>(), null, false, false, List.of(), null, null), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause()
                                     .getClass());
         }
     }
@@ -617,7 +619,7 @@ public class GitStorageTest {
     public void testAddDotFile() {
         try (GitStorage gs = new GitStorage(source, null, hashService)) {
             assertThrows(WrappingAPIException.class,
-                    () -> gs.addKey("dot/.dot", null, Utils.toProvider(new byte[] { 1 }), new MetaData(Set.of()), new CommitMetaData("d", "d", "d")));
+                    () -> gs.addKey("dot/.dot", null, Utils.toProvider(new byte[] { 1 }), new MetaData(Set.of()), new CommitMetaData("d", "d", "d", "Test", JITSTATIC_NOWHERE)));
         }
     }
 
