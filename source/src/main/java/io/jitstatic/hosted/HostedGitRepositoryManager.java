@@ -122,7 +122,7 @@ public class HostedGitRepositoryManager implements Source {
         this.userExtractor = new UserExtractor(bareRepository);
 
         final Pair<List<String>, List<String>> interpretedErrorMessages = CorruptedSourceException.interpreteMessages(checkStoreForErrors(bareRepository));
-        final Pair<List<String>, List<String>> interpretedUserErrors = CorruptedSourceException.interpreteMessages(checkForUserErrors(this.userExtractor));
+        final Pair<List<String>, List<String>> interpretedUserErrors = CorruptedSourceException.interpreteMessages(checkForUserErrors(userExtractor));
 
         final List<String> errors = new ArrayList<>(interpretedErrorMessages.getLeft());
         final List<String> warnings = new ArrayList<>(interpretedErrorMessages.getRight());
@@ -138,8 +138,8 @@ public class HostedGitRepositoryManager implements Source {
         }
         this.uploadPackExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
         checkIfDefaultBranchExist(defaultRef);
-        final RepositoryUpdater repositoryUpdater = new RepositoryUpdater(this.bareRepository);
-        this.extractor = new SourceExtractor(this.bareRepository);
+        final RepositoryUpdater repositoryUpdater = new RepositoryUpdater(bareRepository);
+        this.extractor = new SourceExtractor(bareRepository);
         this.updater = new SourceUpdater(repositoryUpdater);
         this.refLockHolderManager = new RefLockHolderManager();
         this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor);
@@ -474,6 +474,5 @@ public class HostedGitRepositoryManager implements Source {
     @Override
     public void deleteUser(String key, String ref, String username) throws IOException {
         userUpdater.deleteUser(key, findRef(ref), new CommitMetaData(username, "none@jitstatic", "delete user " + key));
-
     }
 }

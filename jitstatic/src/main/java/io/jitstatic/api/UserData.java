@@ -26,13 +26,17 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
+import org.hibernate.validator.constraints.NotEmpty;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.jitstatic.Role;
+import io.jitstatic.api.constraints.Adding;
 
 public class UserData {
-    @Size(min=1, max=100)
+    @Size(min = 1, max = 100)
+    @NotEmpty(groups = Adding.class)
     private final String basicPassword;
 
     @NotNull

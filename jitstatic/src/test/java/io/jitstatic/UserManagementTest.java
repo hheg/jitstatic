@@ -888,6 +888,51 @@ public class UserManagementTest {
         }
     }
 
+    @Test
+    public void testUpdateUserShouldHaveNotHashedPassword() throws Exception {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            Entity<io.jitstatic.api.UserData> user = client.getUser(KEYUSER, null, null, uf);
+            client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role"))), user.tag);
+            assertEquals(422, assertThrows(APIException.class,
+                    () -> client.addUser("someuser", null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role"))))).getStatusCode());
+            client.addUser("someuser", null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role")), "pass"));
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            UserData value = MAPPER.readValue(
+                    workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(KEYUSER).toFile(),
+                    UserData.class);
+            assertNull(value.getHash());
+            assertNull(value.getSalt());
+            assertNotNull(value.getBasicPassword());
+            value = MAPPER.readValue(
+                    workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve("someuser").toFile(),
+                    UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+        }
+    }
+
+    @Test
+    public void testUserWithNewHashedPassword() throws Exception {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            Entity<io.jitstatic.api.UserData> user = client.getUser(KEYUSER, null, null, uf);
+            client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role")), "newpass"), user.tag);
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            UserData value = MAPPER.readValue(
+                    workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(KEYUSER).toFile(),
+                    UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+        }
+    }
+
     private static String getData() {
         return getData(0);
     }

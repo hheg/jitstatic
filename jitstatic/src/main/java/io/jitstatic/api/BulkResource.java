@@ -92,7 +92,8 @@ public class BulkResource {
                             final Set<User> allowedUsers = storageData.getUsers();
                             final Set<Role> keyRoles = storageData.getRead();
                             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(), setToDefaultRef(ref));
+                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
+                                        setToDefaultRef(ref));
                                 return true;
                             }
                             if (!userHolder.isPresent()) {
@@ -100,7 +101,8 @@ public class BulkResource {
                             }
                             final User user = userHolder.get();
                             if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
-                                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft(), setToDefaultRef(ref));
+                                LOG.info("{} logged in and accessed key {} in {}", user,
+                                        p.getLeft().stream().map(Pair::getLeft).collect(Collectors.toList()), setToDefaultRef(ref));
                                 return true;
                             }
                             return false;
@@ -125,7 +127,7 @@ public class BulkResource {
                 return false;
             }
             final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData,user.getPassword()));
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
         } catch (RefNotFoundException e) {
             return false;
         }

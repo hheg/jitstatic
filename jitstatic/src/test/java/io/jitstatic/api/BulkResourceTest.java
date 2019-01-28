@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -86,11 +87,11 @@ public class BulkResourceTest {
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        Mockito.when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
-        Mockito.when(storeInfoMock.getVersion()).thenReturn("1");
-        Mockito.when(storeInfoMock.getMetaData()).thenReturn(storageData);
-        Mockito.when(storageData.getContentType()).thenReturn("application/something");
-        Mockito.when(storage.getList(Mockito.any()))
+        when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
+        when(storeInfoMock.getVersion()).thenReturn("1");
+        when(storeInfoMock.getMetaData()).thenReturn(storageData);
+        when(storageData.getContentType()).thenReturn("application/something");
+        when(storage.getList(Mockito.any()))
                 .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER)));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(

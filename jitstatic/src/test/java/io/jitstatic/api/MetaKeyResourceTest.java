@@ -23,7 +23,6 @@ package io.jitstatic.api;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
 import java.nio.charset.Charset;
@@ -147,22 +146,17 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        try {
-            MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
-            ModifyMetaKeyData mukd = new ModifyMetaKeyData();
-            mukd.setMessage("message");
-            mukd.setUserInfo("userinfo");
-            mukd.setUserMail("usermail");
-            mukd.setMetaData(storageData);
-            Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData, "metadataversion"));
-            Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2)
-                    .header(HttpHeaders.IF_MATCH, "\"version\"").put(Entity.json(mukd));
-            assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_FORBIDDEN));
-            put.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
-        }
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        ModifyMetaKeyData mukd = new ModifyMetaKeyData();
+        mukd.setMessage("message");
+        mukd.setUserInfo("userinfo");
+        mukd.setUserMail("usermail");
+        mukd.setMetaData(storageData);
+        Mockito.when(storage.getMetaKey("dog", null)).thenReturn(Pair.of(storageData, "metadataversion"));
+        Response put = RESOURCES.target("/metakey/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2)
+                .header(HttpHeaders.IF_MATCH, "\"version\"").put(Entity.json(mukd));
+        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_FORBIDDEN));
+        put.close();
     }
 
     @Test

@@ -31,6 +31,7 @@ import java.util.Optional;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
+import javax.validation.groups.Default;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -61,6 +62,8 @@ import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
+import io.dropwizard.validation.Validated;
+import io.jitstatic.api.constraints.Adding;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 //import io.jitstatic.auth.UserData;
@@ -122,7 +125,7 @@ public class UsersResource {
             if (noChange != null) {
                 return noChange;
             }
-            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));            
+            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
             return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(Status.NOT_FOUND);
@@ -145,7 +148,6 @@ public class UsersResource {
         final User user = remoteUserHolder.get();
         authorize(user);
         return modifyUser(key, ref, data, request, user, JITSTATIC_KEYADMIN_REALM);
-
     }
 
     private Response modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm) {
@@ -185,7 +187,8 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response post(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Valid @NotNull UserData data,
+    public Response post(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+            final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
             final @Auth Optional<User> remoteUserHolder) {
         if (!remoteUserHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(GIT_REALM);
@@ -295,7 +298,8 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response postUser(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Valid @NotNull UserData data,
+    public Response postUser(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+            final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
             final @Auth Optional<User> remoteUserHolder) {
         if (!remoteUserHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
