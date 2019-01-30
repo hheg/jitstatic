@@ -180,7 +180,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refStore = getRefHolder(finalRef);
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             SourceInfo sourceInfo = null;
-            final Optional<StoreInfo> storeInfo = refStore.getKey(key);
+            final Optional<StoreInfo> storeInfo = refStore.getKeyNoLock(key);
             if (storeInfo != null && storeInfo.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
@@ -210,7 +210,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
         SourceInfo sourceInfo = null;
         try {
-            final Optional<StoreInfo> defaultKey = refHolder.getKey(key);
+            final Optional<StoreInfo> defaultKey = refHolder.getKeyNoLock(key);
             if (defaultKey != null && defaultKey.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }

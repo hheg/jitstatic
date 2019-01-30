@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -44,6 +45,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
@@ -75,7 +77,7 @@ public class RefHolderTest {
     public void testPutGet() {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.empty());
-        assertNotNull(ref.getKey("key"));
+        assertNotNull(ref.getKeyNoLock("key"));
         assertTrue(ref.isEmpty());
     }
 
@@ -198,20 +200,24 @@ public class RefHolderTest {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.of(storeInfo));
         ref.modifyKey("key", REF, Utils.toProvider(data), "1", cmd);
-        assertEquals("2", ref.getKey("key").get().getVersion());
+        assertEquals("2", ref.getKeyNoLock("key").get().getVersion());
     }
 
     @Test
     public void testRefreshMetaData() throws IOException {
         StoreInfo storeInfo = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
+        CommitMetaData commitMetaData = mock(CommitMetaData.class);
+        when(source.modifyMetadata(any(), any(), any(), any(), any())).thenReturn("2");
         when(storeInfo.getMetaData()).thenReturn(storageData);
         when(storeInfo.getVersion()).thenReturn("1");
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshMetaData(storageData, "key", "1", "2");
-        assertEquals("2", ref.getKey("key").get().getMetaDataVersion());
+        Either<String, FailedToLock> modifyMetadata = ref.modifyMetadata(storageData, "1", commitMetaData, "key", null);
+        assertEquals("2", modifyMetadata.getLeft());
+        Optional<StoreInfo> key = ref.getKeyNoLock("key");
+        assertEquals("2", key.get().getMetaDataVersion());
     }
 
     @Test
@@ -245,7 +251,7 @@ public class RefHolderTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key");
-        assertEquals(ref.getKey("key"), loadAndStore);
+        assertEquals(ref.getKeyNoLock("key"), loadAndStore);
         assertFalse(loadAndStore.isPresent());
     }
 
@@ -258,7 +264,7 @@ public class RefHolderTest {
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key/");
-        assertEquals(ref.getKey("key/"), loadAndStore);
+        assertEquals(ref.getKeyNoLock("key/"), loadAndStore);
         assertTrue(loadAndStore.isPresent());
     }
 

@@ -92,7 +92,7 @@ public class UsersResource {
         this.gitAuthenticator = Objects.requireNonNull(gitAuthenticator);
         this.helper = new APIHelper(LOG);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
-        this.hashService = hashService;
+        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @GET
