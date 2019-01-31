@@ -466,7 +466,8 @@ public class LoadTesterIT {
     private JitStaticClient buildKeyClient(boolean cache) throws URISyntaxException {
         int localPort = DW.getLocalPort();
         JitStaticClientBuilder builder = JitStaticClient.create()
-                .setHost("localhost").setPort(localPort)
+                .setHost("localhost")
+                .setPort(localPort)
                 .setAppContext("/application/")
                 .setUser(USER).setPassword(PASSWORD);
         if (cache) {

@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import static io.jitstatic.JitStaticConstants.CREATE;
+
 /*-
  * #%L
  * jitstatic
@@ -23,6 +25,7 @@ package io.jitstatic.api;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+import static io.jitstatic.JitStaticConstants.REFS_HEADS_SECRETS;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static javax.ws.rs.core.MediaType.APPLICATION_XML;
 
@@ -51,6 +54,7 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.UserIdentity;
 import org.eclipse.jetty.util.security.Password;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.slf4j.Logger;
@@ -61,6 +65,7 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
+import ch.qos.logback.core.joran.action.ActionUtil.Scope;
 import io.dropwizard.auth.Auth;
 import io.dropwizard.validation.Validated;
 import io.jitstatic.api.constraints.Adding;
@@ -109,27 +114,8 @@ public class UsersResource {
         }
         helper.checkRef(ref);
         final User user = remoteUserHolder.get();
-        authorize(user);
+        authorize(user, null);
         return getUser(key, ref, headers, JITSTATIC_KEYADMIN_REALM, user.getName());
-    }
-
-    private Response getUser(final String key, final String ref, final HttpHeaders headers, final String realm, String user) {
-        try {
-            final Pair<String, io.jitstatic.auth.UserData> value = storage.getUserData(key, ref, realm);
-            if (value == null || !value.isPresent()) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
-
-            final EntityTag tag = new EntityTag(value.getKey());
-            final Response noChange = helper.checkETag(headers, tag);
-            if (noChange != null) {
-                return noChange;
-            }
-            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
-            return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
-        } catch (RefNotFoundException e) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
     }
 
     @PUT
@@ -146,38 +132,8 @@ public class UsersResource {
         }
         helper.checkValidRef(ref);
         final User user = remoteUserHolder.get();
-        authorize(user);
+        authorize(user, null);
         return modifyUser(key, ref, data, request, user, JITSTATIC_KEYADMIN_REALM);
-    }
-
-    private Response modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm) {
-        try {
-            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
-            if (userData != null && userData.isPresent()) {
-                final String version = userData.getLeft();
-                final EntityTag entityTag = new EntityTag(version);
-                final ResponseBuilder evaluatePreconditions = request.evaluatePreconditions(entityTag);
-                if (evaluatePreconditions != null) {
-                    return evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
-                }
-                final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.updateUser(key, ref, realm, user.getName(),
-                        new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null), version));
-
-                if (result.isRight()) {
-                    return Response.status(Status.PRECONDITION_FAILED).build();
-                }
-                final String newVersion = result.getLeft();
-
-                if (newVersion == null) {
-                    throw new WebApplicationException(Status.NOT_FOUND);
-                }
-                LOG.info("{} logged in and modified key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
-                return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-            }
-            throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
-        } catch (RefNotFoundException e) {
-            throw new WebApplicationException(HttpStatus.NOT_FOUND_404);
-        }
     }
 
     @POST
@@ -195,26 +151,8 @@ public class UsersResource {
         }
         helper.checkRef(ref);
         final User user = remoteUserHolder.get();
-        authorize(user);
+        authorize(user, null);
         return addUser(key, ref, data, user, JITSTATIC_KEYADMIN_REALM);
-    }
-
-    private Response addUser(final String key, final String ref, final UserData data, final User user, String realm) {
-        try {
-            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
-            if (userData == null || !userData.isPresent()) {
-                final String newVersion = helper.unwrapWithPOSTApi(
-                        () -> storage.addUser(key, ref, realm, user.getName(), hashService.constructUserData(data.getRoles(), data.getBasicPassword())));
-                if (newVersion == null) {
-                    throw new WebApplicationException(Status.NOT_FOUND);
-                }
-                LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
-                return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-            }
-            throw new WebApplicationException(key + " already exist", Status.CONFLICT);
-        } catch (RefNotFoundException e) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
     }
 
     @DELETE
@@ -230,27 +168,8 @@ public class UsersResource {
         }
         helper.checkRef(ref);
         final User user = remoteUserHolder.get();
-        authorize(user);
-        return delete(key, ref, user, JITSTATIC_KEYADMIN_REALM);
-    }
-
-    private Response delete(final String key, final String ref, final User user, String realm) {
-        try {
-            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
-            if (userData != null && userData.isPresent()) {
-                storage.deleteUser(key, ref, realm, user.getName());
-                return Response.ok().build();
-            }
-            throw new WebApplicationException(key, Status.NOT_FOUND);
-        } catch (RefNotFoundException e) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-    }
-
-    private void authorize(final User user) {
-        if (gitAuthenticator.login(user.getName(), new Password(user.getPassword()), null) == null) {
-            throw new WebApplicationException(Status.FORBIDDEN);
-        }
+        authorize(user, null);
+        return deleteUser(key, ref, user, JITSTATIC_KEYADMIN_REALM);
     }
 
     @GET
@@ -268,7 +187,6 @@ public class UsersResource {
         helper.checkRef(ref);
         final User user = remoteUserHolder.get();
         authorize(ref, user);
-
         return getUser(key, ref, headers, JITSTATIC_KEYUSER_REALM, user.getName());
     }
 
@@ -324,7 +242,165 @@ public class UsersResource {
         helper.checkRef(ref);
         final User user = remoteUserHolder.get();
         authorize(ref, user);
-        return delete(key, ref, user, JITSTATIC_KEYUSER_REALM);
+        return deleteUser(key, ref, user, JITSTATIC_KEYUSER_REALM);
+    }
+
+    @GET
+    @Timed(name = "get_gituser_time")
+    @Metered(name = "get_gituser_counter")
+    @ExceptionMetered(name = "get_gituser_exception")
+    @Path(GIT_REALM + "/{key : .+}")
+    @Consumes({ APPLICATION_JSON, APPLICATION_XML })
+    @Produces({ APPLICATION_JSON, APPLICATION_XML })
+    public Response getGitUser(final @PathParam("key") String key, final @Auth Optional<User> remoteUserHolder,
+            final @Context HttpHeaders headers) {
+        if (!remoteUserHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(GIT_REALM);
+        }
+        final User user = remoteUserHolder.get();
+        authorize(user, CREATE);
+        return getUser(key, REFS_HEADS_SECRETS, headers, GIT_REALM, user.getName());
+    }
+
+    @PUT
+    @Timed(name = "put_gituser_time")
+    @Metered(name = "put_gituser_counter")
+    @ExceptionMetered(name = "put_gituser_exception")
+    @Path(GIT_REALM + "/{key : .+}")
+    @Consumes({ APPLICATION_JSON, APPLICATION_XML })
+    @Produces({ APPLICATION_JSON, APPLICATION_XML })
+    public Response putGitUser(final @PathParam("key") String key, final @Valid @NotNull UserData data,
+            final @Auth Optional<User> remoteUserHolder, final @Context HttpHeaders headers, final @Context Request request) {
+        if (!remoteUserHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(GIT_REALM);
+        }
+        final User user = remoteUserHolder.get();
+        authorize(user, CREATE);
+        return modifyUser(key, REFS_HEADS_SECRETS, data, request, user, GIT_REALM);
+    }
+
+    @POST
+    @Timed(name = "post_gituser_time")
+    @Metered(name = "post_gituser_counter")
+    @ExceptionMetered(name = "post_gituser_exception")
+    @Path(GIT_REALM + "/{key : .+}")
+    @Consumes({ APPLICATION_JSON, APPLICATION_XML })
+    @Produces({ APPLICATION_JSON, APPLICATION_XML })
+    public Response postGitUser(final @PathParam("key") String key, final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
+            final @Auth Optional<User> remoteUserHolder) {
+        if (!remoteUserHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(GIT_REALM);
+        }
+        final User user = remoteUserHolder.get();
+        authorize(user, CREATE);
+        return addUser(key, REFS_HEADS_SECRETS, data, user, GIT_REALM);
+    }
+
+    @DELETE
+    @Timed(name = "delete_gituser_time")
+    @Metered(name = "delete_gituser_counter")
+    @ExceptionMetered(name = "delete_gituser_exception")
+    @Path(GIT_REALM + "/{key : .+}")
+    @Consumes({ APPLICATION_JSON, APPLICATION_XML })
+    @Produces({ APPLICATION_JSON, APPLICATION_XML })
+    public Response deleteGitUser(final @PathParam("key") String key, final @Auth Optional<User> remoteUserHolder) {
+        if (!remoteUserHolder.isPresent()) {
+            return helper.respondAuthenticationChallenge(GIT_REALM);
+        }
+        final User user = remoteUserHolder.get();
+        authorize(user, CREATE);
+        return deleteUser(key, REFS_HEADS_SECRETS, user, GIT_REALM);
+    }
+
+    private Response modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm) {
+        try {
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
+            if (userData != null && userData.isPresent()) {
+                final String version = userData.getLeft();
+                final EntityTag entityTag = new EntityTag(version);
+                final ResponseBuilder evaluatePreconditions = request.evaluatePreconditions(entityTag);
+                if (evaluatePreconditions != null) {
+                    return evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build();
+                }
+                final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.updateUser(key, ref, realm, user.getName(),
+                        new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null), version));
+
+                if (result.isRight()) {
+                    return Response.status(Status.PRECONDITION_FAILED).build();
+                }
+                final String newVersion = result.getLeft();
+
+                if (newVersion == null) {
+                    throw new WebApplicationException(Status.NOT_FOUND);
+                }
+                LOG.info("{} logged in and modified key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
+                return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+            }
+            throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(HttpStatus.NOT_FOUND_404);
+        }
+    }
+
+    private Response addUser(final String key, final String ref, final UserData data, final User user, String realm) {
+        try {
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
+            if (userData == null || !userData.isPresent()) {
+                final String newVersion = helper.unwrapWithPOSTApi(
+                        () -> storage.addUser(key, ref, realm, user.getName(), hashService.constructUserData(data.getRoles(), data.getBasicPassword())));
+                if (newVersion == null) {
+                    throw new WebApplicationException(Status.NOT_FOUND);
+                }
+                LOG.info("{} logged in and added key {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
+                return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+            }
+            throw new WebApplicationException(key + " already exist", Status.CONFLICT);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+    }
+
+    private Response deleteUser(final String key, final String ref, final User user, String realm) {
+        try {
+            final Pair<String, io.jitstatic.auth.UserData> userData = storage.getUserData(key, ref, realm);
+            if (userData != null && userData.isPresent()) {
+                storage.deleteUser(key, ref, realm, user.getName());
+                return Response.ok().build();
+            }
+            throw new WebApplicationException(key, Status.NOT_FOUND);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
+    }
+
+    private UserIdentity authorize(final User user, final String role) {
+        final UserIdentity uid = gitAuthenticator.login(user.getName(), new Password(user.getPassword()), null);
+        if (uid == null) {
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
+        if (role != null && !uid.isUserInRole(role, null)) {
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
+        return uid;
+    }
+
+    private Response getUser(final String key, final String ref, final HttpHeaders headers, final String realm, String user) {
+        try {
+            final Pair<String, io.jitstatic.auth.UserData> value = storage.getUserData(key, ref, realm);
+            if (value == null || !value.isPresent()) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+
+            final EntityTag tag = new EntityTag(value.getKey());
+            final Response noChange = helper.checkETag(headers, tag);
+            if (noChange != null) {
+                return noChange;
+            }
+            LOG.info("{} logged in and accessed {} in {}", user, key, helper.setToDefaultRef(defaultRef, ref));
+            return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(Status.NOT_FOUND);
+        }
     }
 
     private void authorize(final String ref, final User user) {

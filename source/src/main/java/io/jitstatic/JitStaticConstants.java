@@ -1,7 +1,5 @@
 package io.jitstatic;
 
-import java.util.Set;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,9 @@ import java.util.Set;
  * #L%
  */
 
+import static org.eclipse.jgit.lib.Constants.R_HEADS;
+
+import java.util.Set;
 import org.eclipse.jgit.lib.Constants;
 
 public class JitStaticConstants {
@@ -36,8 +37,9 @@ public class JitStaticConstants {
     public static final String PULL = "pull";
     public static final String PUSH = "push";
     public static final String FORCEPUSH = "forcepush";
+    public static final String CREATE = "create";
     public static final String SECRETS = "secrets";
-    public static final Set<String> ROLES = Set.of(PULL, PUSH, FORCEPUSH, SECRETS);
+    public static final Set<String> ROLES = Set.of(PULL, PUSH, FORCEPUSH, SECRETS, CREATE);
     public static final String DECLAREDHEADERS = "declaredheaders";
     public static final String DEFERREDHEADERS = "deferredheaders";
     public static final String X_JITSTATIC = "X-jitstatic";
@@ -45,5 +47,6 @@ public class JitStaticConstants {
     public static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
     public static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     public static final String JITSTATIC_NOWHERE = "jitstatic@nowhere";
+    public static final String REFS_HEADS_SECRETS = R_HEADS + SECRETS;
 
 }

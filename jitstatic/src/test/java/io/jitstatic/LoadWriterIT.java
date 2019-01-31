@@ -161,10 +161,8 @@ public class LoadWriterIT {
                     j++;
                 }
             }
-            CompletableFuture<Void> wait = CompletableFuture.allOf(jobs);
-            wait.get(60, TimeUnit.SECONDS);
+            CompletableFuture.allOf(jobs).get(60, TimeUnit.SECONDS);            
             result = Stream.of(jobs).map(CompletableFuture::join).reduce(ResultData::sum);
-
         } finally {
             service.shutdown();
         }
@@ -217,8 +215,7 @@ public class LoadWriterIT {
                 response.close();
             });
             File workingFolder = getFolderFile();
-            try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
-                    .setCredentialsProvider(getCredentials(hf)).call()) {
+            try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(getCredentials(hf)).call()) {
                 LOG.info(data.toString());
                 for (String branch : data.branches) {
                     checkoutBranch(branch, git);
@@ -323,7 +320,8 @@ public class LoadWriterIT {
             git.reset().setMode(ResetType.HARD).setRef(head.getObjectId().name()).call();
             git.clean().setCleanDirectories(true).setForce(true).call();
         }
-        CheckoutCommand checkout = git.checkout().setName(branch).setUpstreamMode(SetupUpstreamMode.TRACK)
+        CheckoutCommand checkout = git.checkout()
+                .setName(branch).setUpstreamMode(SetupUpstreamMode.TRACK)
                 .setStartPoint("origin/" + branch);
         if (head == null) {
             checkout.setCreateBranch(true);
