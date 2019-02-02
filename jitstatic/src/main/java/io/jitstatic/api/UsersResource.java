@@ -65,13 +65,11 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 import com.spencerwi.either.Either;
 
-import ch.qos.logback.core.joran.action.ActionUtil.Scope;
 import io.dropwizard.auth.Auth;
 import io.dropwizard.validation.Validated;
 import io.jitstatic.api.constraints.Adding;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-//import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.storage.HashService;
