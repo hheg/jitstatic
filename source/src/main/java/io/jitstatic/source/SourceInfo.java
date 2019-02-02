@@ -23,12 +23,14 @@ package io.jitstatic.source;
 import java.io.IOException;
 import java.io.InputStream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.MetaData;
 import io.jitstatic.check.MetaFileData;
 import io.jitstatic.check.SourceFileData;
 import io.jitstatic.hosted.InputStreamHolder;
 import io.jitstatic.hosted.SourceHandler;
-
+//TODO Remove this SpotBugs Error
+@SuppressFBWarnings(value="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",justification="This is a false positive in Java 11, should be removed")
 public class SourceInfo {
 
     private final MetaFileData metaFileData;

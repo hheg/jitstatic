@@ -48,9 +48,11 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
-
+// TODO Remove this SpotBugs Error
+@SuppressFBWarnings(value="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",justification="This is a false positive in Java 11, should be removed")
 public class RepositoryUpdater {
 
     private final Repository repository;

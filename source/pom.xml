@@ -56,8 +56,7 @@
         <dependency>
             <groupId>com.spencerwi</groupId>
             <artifactId>Either.java</artifactId>
-            <version>2.0.0</version>
-        </dependency>       
+        </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
@@ -122,31 +121,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-    <build>
-        <plugins>
-            <plugin>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <includes>
-                        <include>**/Test*.java</include>
-                        <include>**/*Test.java</include>
-                        <include>**/*Tests.java</include>
-                        <include>**/*TestCase.java</include>
-                    </includes>
-                    <properties>
-                        <!-- <includeTags>fast</includeTags> -->
-                        <excludeTags>slow</excludeTags>
-                        <!-- <configurationParameters> junit.jupiter.conditions.deactivate = * </configurationParameters> -->
-                    </properties>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.platform</groupId>
-                        <artifactId>junit-platform-surefire-provider</artifactId>
-                        <version>${junit.platform.version}</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-        </plugins>
-    </build>
 </project>
