@@ -27,12 +27,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
@@ -94,7 +92,7 @@ public class RefHolder implements RefLockHolder {
     }
 
     @Nullable
-    Optional<StoreInfo> getKey(final String key) {
+    Optional<StoreInfo> getKeyNoLock(final String key) {
         return unwrapKey(() -> refCache.get(key));
     }
 
@@ -142,24 +140,6 @@ public class RefHolder implements RefLockHolder {
 
     public boolean isEmpty() {
         return read(() -> refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true)));
-    }
-
-    public void refreshMetaData(final MetaData metaData, final String key, final String oldMetaDataVersion,
-            final String newMetaDataVersion) {
-        write(() -> {
-            final Optional<StoreInfo> storeInfo = refCache.get(key).getLeft();
-            storeInfo.ifPresent(si -> {
-                if (oldMetaDataVersion.equals(si.getMetaDataVersion())) {
-                    if (si.isMasterMetaData()) {
-                        refCache.clear();
-                        putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
-                    } else {
-                        putKey(key, Optional.of(
-                                new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
-                    }
-                }
-            });
-        });
     }
 
     Optional<StoreInfo> loadAndStore(final String key) {
@@ -241,7 +221,7 @@ public class RefHolder implements RefLockHolder {
     public Either<String, FailedToLock> modifyKey(final String key, final String finalRef, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
         return lockWrite(() -> {
-            final Optional<StoreInfo> keyHolder = getKey(key);
+            final Optional<StoreInfo> keyHolder = getKeyNoLock(key);
             if (storageIsForbidden(keyHolder)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
@@ -274,12 +254,19 @@ public class RefHolder implements RefLockHolder {
             final String key, final String finalRef) {
         return lockWrite(() -> {
             checkIfPlainKeyExist(key);
-            final Optional<StoreInfo> storeInfo = getKey(key);
+            final Optional<StoreInfo> storeInfo = getKeyNoLock(key);
             if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
             final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, key, finalRef, commitMetaData);
-            refreshMetaData(metaData, key, oldMetaDataVersion, newMetaDataVersion);
+            final StoreInfo si = storeInfo.get();
+            if (si.isMasterMetaData()) {
+                refCache.clear();
+                putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
+            } else {
+                putKey(key, Optional.of(
+                        new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
+            }
             return newMetaDataVersion;
         }, key);
     }
@@ -343,11 +330,15 @@ public class RefHolder implements RefLockHolder {
         Objects.requireNonNull(username);
         return lockWrite(() -> {
             final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
+            final Pair<String, UserData> userKeyData;
             if (keyDataHolder == null || keyDataHolder.isLeft()) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
+                userKeyData = getUser(key);
+                if(userKeyData == null) {
+                    throw new WrappingAPIException(new UnsupportedOperationException(key));
+                }
+            } else {
+                userKeyData = keyDataHolder.getRight();
             }
-
-            final Pair<String, UserData> userKeyData = keyDataHolder.getRight();
             if (!version.equals(userKeyData.getLeft())) {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }
@@ -482,15 +473,15 @@ public class RefHolder implements RefLockHolder {
     public void reload() {
         write(() -> {
             LOG.info("Reloading {}", ref);
-            Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
+            final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
             refCache = getStorage(refCache.size());
             return (Runnable) () -> {
-                final Set<String> files = oldRefCache.entrySet().stream()
+                oldRefCache.entrySet().stream()
                         .filter(e -> {
                             final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
                             return (value.isLeft() && value.getLeft().isPresent());
-                        }).map(Entry::getKey).collect(Collectors.toSet());
-                files.stream().forEach(key -> CompletableFuture.runAsync(() -> loadAndStore(key)));
+                        }).map(Entry::getKey)
+                        .forEach(key -> CompletableFuture.runAsync(() -> loadAndStore(key)));
             };
         }).run();
     }

@@ -5,7 +5,7 @@ RUN apt update && apt install wget -y
 RUN wget -o /dmp https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     && chmod +x /tini
 
-FROM openjdk:10.0.2-13-jre-slim-sid
+FROM openjdk:11.0.1-jre-slim-stretch
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 

@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import org.hibernate.validator.constraints.NotBlank;
+
 /*-
  * #%L
  * jitstatic
@@ -32,10 +34,13 @@ import io.jitstatic.utils.Pair;
 
 @SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class SearchResult {
-
+    @NotBlank
     private final String key;
+    @NotBlank
     private final String ref;
+    @NotBlank
     private final String tag;
+    @NotBlank
     private final String contentType;
 
     @JsonSerialize(using = StreamingSerializer.class)

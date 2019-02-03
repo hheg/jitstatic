@@ -109,8 +109,9 @@ public class LoginService extends AbstractLoginService {
 
         @Override
         public boolean check(Object credentials) {
-            if (credentials instanceof char[])
+            if (credentials instanceof char[]) {
                 credentials = new String((char[]) credentials);
+            }
             if (credentials instanceof Password || credentials instanceof String) {
                 return service.hasSamePassword(data, credentials.toString());
             } else if (credentials instanceof HashingCredential) {

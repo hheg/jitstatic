@@ -33,13 +33,18 @@ public class AdminConstraintSecurityHandler extends ConstraintSecurityHandler {
 
     private static final String ADMIN_ROLE = "admin";
 
-    public AdminConstraintSecurityHandler(final String userName, final String password, final boolean protectHealthChecks, final boolean protectMetrics) {
+    public AdminConstraintSecurityHandler(final String userName, final String password, final boolean protectHealthChecks, final boolean protectMetrics,
+            boolean protectTasks) {
         Objects.requireNonNull(password, "admin password cannot be null to protect /admin endpoint");
         if (protectHealthChecks) {
             addConstraintMapping(getMappingFor("/healthcheck"));
         }
         if (protectMetrics) {
             addConstraintMapping(getMappingFor("/metrics"));
+        }
+        if (protectTasks) {
+            addConstraintMapping(getMappingFor("/tasks"));
+            addConstraintMapping(getMappingFor("/tasks/*"));
         }
         setLoginService(new AdminLoginService(userName, password));
     }

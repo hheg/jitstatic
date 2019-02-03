@@ -85,6 +85,29 @@ public class AdminUrlTest {
         assertEquals(HttpStatus.OK_200, response.getStatus());
     }
 
+    @Test
+    public void testAccessTasksGc() throws Exception {
+        HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/admin/tasks/gc", DW.getLocalPort())).asString();
+        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        response = Unirest.post(String.format("http://localhost:%s/admin/tasks/gc", DW.getLocalPort()))
+                .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).asString();
+        assertEquals(HttpStatus.OK_200, response.getStatus());
+    }
+
+    @Test
+    public void testAccessTasks() throws Exception {
+        HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/admin/tasks", DW.getLocalPort())).asString();
+        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        response = Unirest.post(String.format("http://localhost:%s/admin/tasks", DW.getLocalPort()))
+                .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).asString();
+        // This is a bug in Dropwizard
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR_500, response.getStatus());
+    }
+    
     private Supplier<String> getFolder() {
         return () -> {
             try {

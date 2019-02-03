@@ -26,7 +26,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-import org.hibernate.validator.constraints.NotEmpty;
+import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -36,7 +36,7 @@ import io.jitstatic.api.constraints.Adding;
 
 public class UserData {
     @Size(min = 1, max = 100)
-    @NotEmpty(groups = Adding.class)
+    @NotBlank(groups = Adding.class)
     private final String basicPassword;
 
     @NotNull
@@ -51,37 +51,6 @@ public class UserData {
 
     public UserData(io.jitstatic.auth.UserData userData) {
         this(userData.getRoles(), userData.getHash() != null ? null : userData.getBasicPassword());
-    }
-
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((basicPassword == null) ? 0 : basicPassword.hashCode());
-        result = prime * result + ((roles == null) ? 0 : roles.hashCode());
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        UserData other = (UserData) obj;
-        if (basicPassword == null) {
-            if (other.basicPassword != null)
-                return false;
-        } else if (!basicPassword.equals(other.basicPassword))
-            return false;
-        if (roles == null) {
-            if (other.roles != null)
-                return false;
-        } else if (!roles.equals(other.roles))
-            return false;
-        return true;
     }
 
     public Set<Role> getRoles() {

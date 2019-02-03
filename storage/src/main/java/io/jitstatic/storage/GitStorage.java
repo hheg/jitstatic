@@ -65,11 +65,13 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     private final Source source;
     private final String defaultRef;
     private final HashService hashService;
+    private final String rootUser;
 
-    public GitStorage(final Source source, final String defaultRef, final HashService hashService) {
+    public GitStorage(final Source source, final String defaultRef, final HashService hashService, String rootUser) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
-        this.hashService = hashService;
+        this.hashService = Objects.requireNonNull(hashService);
+        this.rootUser = rootUser;
     }
 
     public RefLockHolder getRefHolderLock(final String ref) {
@@ -180,7 +182,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refStore = getRefHolder(finalRef);
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             SourceInfo sourceInfo = null;
-            final Optional<StoreInfo> storeInfo = refStore.getKey(key);
+            final Optional<StoreInfo> storeInfo = refStore.getKeyNoLock(key);
             if (storeInfo != null && storeInfo.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
@@ -210,7 +212,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
         SourceInfo sourceInfo = null;
         try {
-            final Optional<StoreInfo> defaultKey = refHolder.getKey(key);
+            final Optional<StoreInfo> defaultKey = refHolder.getKeyNoLock(key);
             if (defaultKey != null && defaultKey.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
@@ -279,12 +281,12 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
                 consumeError(ioe);
             }
         }
-        removeCacheRef(finalRef);
+        CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
     }
 
     private void isRefATag(final String finalRef) {
         if (finalRef.startsWith(Constants.R_TAGS)) {
-            throw new UnsupportedOperationException("Tags cannot be modified");
+            throw new WrappingAPIException(new UnsupportedOperationException("Tags cannot be modified"));
         }
     }
 
@@ -327,8 +329,8 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public UserData getUser(final String username, String ref, final String realm) throws RefNotFoundException {
-        final Pair<String, UserData> userData = getUserData(username, ref, realm);
+    public UserData getUser(final String key, String ref, final String realm) throws RefNotFoundException {
+        final Pair<String, UserData> userData = getUserData(key, ref, realm);
         if (userData != null && userData.isPresent()) {
             return userData.getRight();
         }
@@ -336,10 +338,10 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public Pair<String, UserData> getUserData(final String username, String ref, final String realm) throws RefNotFoundException {
+    public Pair<String, UserData> getUserData(final String key, String ref, final String realm) throws RefNotFoundException {
         final RefHolder refHolder = getRefHolder(checkRef(ref));
         try {
-            return refHolder.getUser(realm + "/" + username);
+            return refHolder.getUser(realm + "/" + key);
         } catch (WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof RefNotFoundException) {
@@ -353,7 +355,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public Either<String, FailedToLock> updateUser(final String key, String ref, final String realm, final String username, final UserData data,
+    public Either<String, FailedToLock> updateUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data,
             final String version) {
         ref = checkRef(ref);
         isRefATag(ref);
@@ -361,35 +363,39 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
-        return refHolder.updateUser(realm + "/" + key, username, data, version);
+        return refHolder.updateUser(realm + "/" + key, creatorUserName, data, version);
     }
 
     @Override
-    public String addUser(final String key, String ref, final String realm, final String username, final UserData data) {
+    public String addUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
-        Objects.requireNonNull(username);
+        Objects.requireNonNull(creatorUserName);
         Objects.requireNonNull(data);
-        ref = checkRef(ref);
-        isRefATag(ref);
-        final RefHolder refHolder = getRefHolder(ref);
-        final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, username, data);
+        final String finalRef = checkRef(ref);
+        isRefATag(finalRef);
+        if (rootUser.equals(key)) {
+            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+        }
+        final RefHolder refHolder = getRefHolder(finalRef);        
+        final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, creatorUserName, data);
         if (postUser.isRight()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
+            CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
+            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
         return postUser.getLeft();
     }
 
     @Override
-    public void deleteUser(final String key, String ref, final String realm, final String username) {
+    public void deleteUser(final String key, String ref, final String realm, final String creatorUserName) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
-        Objects.requireNonNull(username);
+        Objects.requireNonNull(creatorUserName);
         ref = checkRef(ref);
         isRefATag(ref);
         final RefHolder refHolder = cache.get(ref);
         if (refHolder != null) {
-            refHolder.deleteUser(realm + "/" + key, username);
+            refHolder.deleteUser(realm + "/" + key, creatorUserName);
         }
     }
 

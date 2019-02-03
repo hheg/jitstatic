@@ -35,6 +35,7 @@ import io.jitstatic.api.KeyResource;
 import io.jitstatic.api.MetaKeyResource;
 import io.jitstatic.api.UsersResource;
 import io.jitstatic.auth.KeyAdminAuthenticator;
+import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
@@ -55,10 +56,11 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         Storage storage = null;
         try {
             source = config.build(env, GIT_REALM);
-            final String defaultBranch = config.getHostedFactory().getBranch();
+            final HostedFactory hostedFactory = config.getHostedFactory();
+            final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService);
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory.getUserName());
             loginService.setUserStorage(storage);
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));

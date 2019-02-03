@@ -1,5 +1,11 @@
 package io.jitstatic.hosted;
 
+import static io.jitstatic.JitStaticConstants.CREATE;
+import static io.jitstatic.JitStaticConstants.FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.PULL;
+import static io.jitstatic.JitStaticConstants.PUSH;
+import static io.jitstatic.JitStaticConstants.SECRETS;
+
 /*-
  * #%L
  * jitstatic
@@ -109,8 +115,8 @@ public class LoginServiceTest {
     public void testLoadRoleInfo() {
         LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
         String[] loadRoleInfo = sls.loadRoleInfo(new AbstractLoginService.UserPrincipal(new String(user), new Password(new String(secret))));
-        assertTrue(loadRoleInfo.length == 4);
-        Arrays.asList(loadRoleInfo).containsAll(List.of("push", "pull", "forcepush"));
+        assertTrue(loadRoleInfo.length == 5);
+        Arrays.asList(loadRoleInfo).containsAll(List.of(PUSH, PULL, FORCEPUSH, CREATE,SECRETS));
     }
 
     @Test

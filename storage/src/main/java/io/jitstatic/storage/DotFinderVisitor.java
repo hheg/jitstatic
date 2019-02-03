@@ -50,8 +50,7 @@ public class DotFinderVisitor implements TreeVisitor<Boolean> {
 
     private boolean hasDotFile(Set<Tree> tree) {
         for (Tree leaf : tree) {
-            boolean result = leaf.accept(this);
-            if (result) {
+            if (leaf.accept(this)) {
                 return true;
             }
         }

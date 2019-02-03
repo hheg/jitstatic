@@ -88,6 +88,10 @@ INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: T
     OPTIONS /storage/{key : .+} (io.jitstatic.api.KeyResource)
     POST    /storage/{key : .+} (io.jitstatic.api.KeyResource)
     PUT     /storage/{key : .+} (io.jitstatic.api.KeyResource)
+    DELETE  /users/git/{key : .+} (io.jitstatic.api.UsersResource)
+    GET     /users/git/{key : .+} (io.jitstatic.api.UsersResource)
+    POST    /users/git/{key : .+} (io.jitstatic.api.UsersResource)
+    PUT     /users/git/{key : .+} (io.jitstatic.api.UsersResource)
     DELETE  /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
     GET     /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
     POST    /users/keyadmin/{key : .+} (io.jitstatic.api.UsersResource)
@@ -96,6 +100,7 @@ INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: T
     GET     /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
     POST    /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
     PUT     /users/keyuser/{key : .+} (io.jitstatic.api.UsersResource)
+
 
 INFO  [2018-11-23 20:26:38,495] org.eclipse.jetty.server.handler.ContextHandler: Started i.d.j.MutableServletContextHandler@2e7bb00e{/app,null,AVAILABLE}
 INFO  [2018-11-23 20:26:38,500] io.dropwizard.setup.AdminEnvironment: tasks = 
@@ -465,7 +470,7 @@ The `.user` folder not a valid key so this can't be reached from the normal endp
 
 #### ACL
 
-There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password. If you use the API for creating users, the passwords will be automatically hashed when stored. If more security is needed an additional salt can be configured. If this is done, all clones must define that in it's settings to make the password work.
+There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password. If you use the API for creating users, the passwords will be automatically hashed when stored. If more security is needed an additional salt can be configured. If this is done, all clones must define that in it's settings to have same password work across all of them.
 
 #### Public keys
 
@@ -504,7 +509,8 @@ hosted:
     adminName: admin
     adminPass: pass
     protectMetrics: true
-    protectHealthcheck: true
+    protectHealthChecks: true
+    protectTasks: true
 ```
 or by specifying arguments to the application or to `JAVA_OPTS` 
 

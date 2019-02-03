@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import static io.jitstatic.JitStaticConstants.CREATE;
+
 /*-
  * #%L
  * jitstatic
@@ -122,6 +124,7 @@ public class UserManagementTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String GITUSERPUSH = "gituserpush";
     private static final String GITUSERPUSHPASS = "3333";
+    private static final Set<Role> ALL_ROLES = Set.of(new Role(PULL), new Role(PUSH), new Role(FORCEPUSH), new Role(SECRETS), new Role(CREATE));
     private TemporaryFolder tmpFolder;
     private String rootUser;
     private String rootPassword;
@@ -162,15 +165,16 @@ public class UserManagementTest {
             Files.write(MAPPER.writeValueAsBytes(keyUserUserData), keyuser.toFile());
             Files.write(MAPPER.writeValueAsBytes(keyUserUserDataNoRole), keyusernorole.toFile());
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            Files.write(getMetaData(new MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set.of(new MetaData.Role("role")),
-                    Set.of(new MetaData.Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
+            Files.write(getMetaData(new io.jitstatic.MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set.of(new Role("role")),
+                    Set.of(new Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
             commit(git, provider);
             Path gitRealm = users.resolve(GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
             Path gitUserPush = gitRealm.resolve(GITUSERPUSH);
             Path gitUserNoPush = gitRealm.resolve(GITUSER);
-            UserData gitUserData = new UserData(Set.of(new Role(PULL), new Role(PUSH), new Role(FORCEPUSH), new Role(SECRETS)), GITUSERFULLPASS, null, null);
+            UserData gitUserData = new UserData(ALL_ROLES,
+                    GITUSERFULLPASS, null, null);
             UserData gitUserDataNoPush = new UserData(Set.of(new Role(PULL)), GITUSERPASS, null, null);
             UserData gitUserDataPush = new UserData(Set.of(new Role(PULL), new Role(PUSH)), GITUSERPUSHPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserData), gitUser.toFile());
@@ -499,7 +503,8 @@ public class UserManagementTest {
             Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, tf);
             assertNotNull(adminUser.data);
             io.jitstatic.api.UserData value = MAPPER.treeToValue(adminUser.data, io.jitstatic.api.UserData.class);
-            assertEquals(new io.jitstatic.api.UserData(keyAdminUserData.getRoles(), KEYADMINUSERPASS), value);
+            assertEquals(keyAdminUserData.getRoles(), value.getRoles());
+            assertEquals(keyAdminUserData.getBasicPassword(), value.getBasicPassword());            
             assertNotNull(adminUser.tag);
         }
     }
@@ -683,7 +688,8 @@ public class UserManagementTest {
             Entity<JsonNode> user = client.getUser(KEYUSER, null, null, tf);
             assertNotNull(user.data);
             io.jitstatic.api.UserData value = MAPPER.treeToValue(user.data, io.jitstatic.api.UserData.class);
-            assertEquals(new io.jitstatic.api.UserData(keyUserUserData.getRoles(), KEYUSERPASS), value);
+            assertEquals(keyUserUserData.getRoles(), value.getRoles());
+            assertEquals(KEYUSERPASS, value.getBasicPassword());
             assertNotNull(user.tag);
         }
     }
@@ -933,6 +939,144 @@ public class UserManagementTest {
         }
     }
 
+    @Test
+    public void testGetGitUser() throws Exception {
+        try (JitStaticClient client = buildClient().setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
+            final Entity<io.jitstatic.api.UserData> node = client.getGitUser(GITUSERFULL, uf);
+            assertNotNull(node);
+            assertNotNull(node.data.getBasicPassword()); // Old style, deprecated
+            assertEquals(ALL_ROLES, node.data.getRoles());
+        }
+    }
+
+    @Test
+    public void testAddGitUser() throws Exception {
+        String addedgituser = "gitadduser";
+        String addeduserpass = "1111";
+        try (JitStaticClient client = buildClient().setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
+            String version = client.addGitUser(addedgituser,
+                    new io.jitstatic.client.UserData(
+                            Set.of(new MetaData.Role(PULL), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE),
+                                    new MetaData.Role(SECRETS)),
+                            addeduserpass));
+            assertNotNull(version);
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(addedgituser, addeduserpass);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            assertNotNull(git.checkout().setCreateBranch(true).setName("secrets").setUpstreamMode(SetupUpstreamMode.TRACK).setStartPoint("origin/" + "secrets")
+                    .call());
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+        }
+    }
+
+    @Test
+    public void testDeleteGitUser() throws Exception {
+        String addedgituser = "gitadduser";
+        String addeduserpass = "1111";
+        try (JitStaticClient client = buildClient().setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
+            String version = client.addGitUser(addedgituser,
+                    new io.jitstatic.client.UserData(
+                            Set.of(new MetaData.Role(PULL),
+                                    new MetaData.Role(PUSH),
+                                    new MetaData.Role(FORCEPUSH),
+                                    new MetaData.Role(CREATE),
+                                    new MetaData.Role(SECRETS)),
+                            addeduserpass));
+            assertNotNull(version);
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(addedgituser, addeduserpass);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            assertNotNull(git.checkout().setCreateBranch(true).setName("secrets").setUpstreamMode(SetupUpstreamMode.TRACK).setStartPoint("origin/" + "secrets")
+                    .call());
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+        }
+        try (JitStaticClient client = buildClient().setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
+            client.deleteGitUser(addedgituser);
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getGitUser(addedgituser, uf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testSameUserAsRoot() throws Exception {
+        String addeduser = KEYADMINUSER;
+        String addeduserpass = "1111";
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            String version = client.addUser(addeduser, null,
+                    new io.jitstatic.client.UserData(
+                            Set.of(new MetaData.Role(PULL),
+                                    new MetaData.Role(PUSH),
+                                    new MetaData.Role(FORCEPUSH),
+                                    new MetaData.Role(CREATE),
+                                    new MetaData.Role(SECRETS)),
+                            addeduserpass));
+            assertNotNull(version);
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(addeduser).toFile(), UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            Entity<io.jitstatic.api.UserData> gu = client.getUser(addeduser, null, null, uf);
+            assertNotNull(gu.data.getRoles());
+            assertNotNull(gu);
+            assertNull(gu.data.getBasicPassword());
+        }
+
+        try (JitStaticClient client = buildClient().setUser(addeduser).setPassword("1111").build();) {
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> client.getUser(addeduser, null, null, uf)).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testEmailAsUserName() throws Exception {
+        String userEmail = "user@host.com";
+        String userEmailPass = "1111";
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            String version = client.addUser(userEmail, null,
+                    new io.jitstatic.client.UserData(
+                            Set.of(new MetaData.Role("role"),
+                                    new MetaData.Role(PULL),
+                                    new MetaData.Role(PUSH),
+                                    new MetaData.Role(FORCEPUSH),
+                                    new MetaData.Role(CREATE),
+                                    new MetaData.Role(SECRETS)),
+                            userEmailPass));
+            assertNotNull(version);
+        }
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(userEmail).toFile(), UserData.class);
+            assertNotNull(value.getHash());
+            assertNotNull(value.getSalt());
+            assertNull(value.getBasicPassword());
+
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            Entity<io.jitstatic.api.UserData> gu = client.getUser(userEmail, null, null, uf);
+            assertNotNull(gu);
+            assertNotNull(gu.data.getRoles());
+            assertNull(gu.data.getBasicPassword());
+        }
+        try (JitStaticClient client = buildClient().setUser(userEmail).setPassword("1111").build();) {
+            Entity<JsonNode> gu = client.getKey("file", tf);
+            assertNotNull(gu);
+            assertNotNull(gu.data.toString());
+        }
+    }
+
     private static String getData() {
         return getData(0);
     }
@@ -942,7 +1086,7 @@ public class UserManagementTest {
                 + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
 
-    private static String getMetaData(MetaData metaData) throws JsonProcessingException {
+    private static String getMetaData(io.jitstatic.MetaData metaData) throws JsonProcessingException {
         return MAPPER.writeValueAsString(metaData);
     }
 
@@ -970,12 +1114,9 @@ public class UserManagementTest {
         git.push().setCredentialsProvider(provider).call();
     }
 
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String string) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(string).setCreateBranch(true).call();
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        git.push().setCredentialsProvider(provider).call();
-
+    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
+        git.checkout().setName(ref).setCreateBranch(true).call();
+        commit(git, provider);
     }
 
     private void mkdirs(Path... paths) {

@@ -23,7 +23,7 @@ package io.jitstatic.api;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
-import org.hibernate.validator.constraints.NotEmpty;
+import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -44,16 +44,13 @@ public class AddKeyData {
     @Valid
     private final MetaData metaData;
 
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private final String message;
 
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private final String userMail;
 
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private final String userInfo;
 
     @JsonCreator

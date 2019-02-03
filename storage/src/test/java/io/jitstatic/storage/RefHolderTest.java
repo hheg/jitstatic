@@ -37,6 +37,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,12 +45,16 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
+import io.jitstatic.Role;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
@@ -58,6 +63,7 @@ import io.jitstatic.storage.tools.Utils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class RefHolderTest {
@@ -75,7 +81,7 @@ public class RefHolderTest {
     public void testPutGet() {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.empty());
-        assertNotNull(ref.getKey("key"));
+        assertNotNull(ref.getKeyNoLock("key"));
         assertTrue(ref.isEmpty());
     }
 
@@ -198,20 +204,24 @@ public class RefHolderTest {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.of(storeInfo));
         ref.modifyKey("key", REF, Utils.toProvider(data), "1", cmd);
-        assertEquals("2", ref.getKey("key").get().getVersion());
+        assertEquals("2", ref.getKeyNoLock("key").get().getVersion());
     }
 
     @Test
     public void testRefreshMetaData() throws IOException {
         StoreInfo storeInfo = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
+        CommitMetaData commitMetaData = mock(CommitMetaData.class);
+        when(source.modifyMetadata(any(), any(), any(), any(), any())).thenReturn("2");
         when(storeInfo.getMetaData()).thenReturn(storageData);
         when(storeInfo.getVersion()).thenReturn("1");
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.of(storeInfo));
-        ref.refreshMetaData(storageData, "key", "1", "2");
-        assertEquals("2", ref.getKey("key").get().getMetaDataVersion());
+        Either<String, FailedToLock> modifyMetadata = ref.modifyMetadata(storageData, "1", commitMetaData, "key", null);
+        assertEquals("2", modifyMetadata.getLeft());
+        Optional<StoreInfo> key = ref.getKeyNoLock("key");
+        assertEquals("2", key.get().getMetaDataVersion());
     }
 
     @Test
@@ -245,7 +255,7 @@ public class RefHolderTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key");
-        assertEquals(ref.getKey("key"), loadAndStore);
+        assertEquals(ref.getKeyNoLock("key"), loadAndStore);
         assertFalse(loadAndStore.isPresent());
     }
 
@@ -258,7 +268,7 @@ public class RefHolderTest {
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
         Optional<StoreInfo> loadAndStore = ref.loadAndStore("key/");
-        assertEquals(ref.getKey("key/"), loadAndStore);
+        assertEquals(ref.getKeyNoLock("key/"), loadAndStore);
         assertTrue(loadAndStore.isPresent());
     }
 
@@ -293,6 +303,33 @@ public class RefHolderTest {
         ref.putKey("key", Optional.of(storeInfo));
         assertThrows(WrappingAPIException.class, () -> ref.checkIfPlainKeyExist("key/"));
     }
+
+    @Test
+    public void testmodifyUserButNotLoaded() throws RefNotFoundException, IOException {
+        RefHolder ref = new RefHolder(REF, source, hashService);
+        assertEquals(VersionIsNotSame.class, assertThrows(WrappingAPIException.class,
+                () -> ref.updateUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1")).getCause().getClass());
+    }
+
+    @Test
+    public void testModifyUserWithNewRoles() throws RefNotFoundException, IOException {
+        Mockito.when(source.addUser(Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
+        RefHolder ref = new RefHolder(REF, source, hashService);
+        assertEquals("1", ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash")).getLeft());
+        ref.updateUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1");
+        Mockito.verify(source).updateUser(Mockito.eq(".users/user"), Mockito.anyString(), Mockito.eq("modifyinguser"),
+                Mockito.eq(new UserData(Set.of(new Role("role")), null, "salt", "hash")));
+    }
+
+    @Test
+    public void testCheckIfPlainKeyDoesExist() {
+        RefHolder ref = new RefHolder(REF, source, hashService);
+        StoreInfo si = Mockito.mock(StoreInfo.class);
+        ref.putKey("key", Optional.of(si));
+        assertEquals(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> ref.checkIfPlainKeyExist("key/")).getCause().getClass());
+    }
+    
+    
 
     private String getMetaDataHidden() {
         int i = 0;

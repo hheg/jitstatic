@@ -23,7 +23,7 @@ package io.jitstatic.api;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
-import org.hibernate.validator.constraints.NotEmpty;
+import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -32,8 +32,7 @@ import io.jitstatic.MetaData;
 public class ModifyMetaKeyData {
 
     @JsonProperty
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private String message;
 
     @JsonProperty
@@ -42,13 +41,11 @@ public class ModifyMetaKeyData {
     private MetaData metaData;
 
     @JsonProperty
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private String userMail;
 
     @JsonProperty
-    @NotNull
-    @NotEmpty
+    @NotBlank
     private String userInfo;
 
     public String getMessage() {

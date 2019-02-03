@@ -79,6 +79,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.dropwizard.auth.Auth;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.HeaderPair;
@@ -96,6 +97,8 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
+//TODO Remove this SpotBugs Error
+@SuppressFBWarnings(value="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",justification="This is a false positive in Java 11, should be removed")
 public class KeyResource {
     private final String defaultRef;
     private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
