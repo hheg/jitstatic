@@ -503,7 +503,8 @@ public class UserManagementTest {
             Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, tf);
             assertNotNull(adminUser.data);
             io.jitstatic.api.UserData value = MAPPER.treeToValue(adminUser.data, io.jitstatic.api.UserData.class);
-            assertEquals(new io.jitstatic.api.UserData(keyAdminUserData.getRoles(), KEYADMINUSERPASS), value);
+            assertEquals(keyAdminUserData.getRoles(), value.getRoles());
+            assertEquals(keyAdminUserData.getBasicPassword(), value.getBasicPassword());            
             assertNotNull(adminUser.tag);
         }
     }
@@ -687,7 +688,8 @@ public class UserManagementTest {
             Entity<JsonNode> user = client.getUser(KEYUSER, null, null, tf);
             assertNotNull(user.data);
             io.jitstatic.api.UserData value = MAPPER.treeToValue(user.data, io.jitstatic.api.UserData.class);
-            assertEquals(new io.jitstatic.api.UserData(keyUserUserData.getRoles(), KEYUSERPASS), value);
+            assertEquals(keyUserUserData.getRoles(), value.getRoles());
+            assertEquals(KEYUSERPASS, value.getBasicPassword());
             assertNotNull(user.tag);
         }
     }
