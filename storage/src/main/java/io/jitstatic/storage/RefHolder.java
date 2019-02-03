@@ -330,11 +330,15 @@ public class RefHolder implements RefLockHolder {
         Objects.requireNonNull(username);
         return lockWrite(() -> {
             final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
+            final Pair<String, UserData> userKeyData;
             if (keyDataHolder == null || keyDataHolder.isLeft()) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
+                userKeyData = getUser(key);
+                if(userKeyData == null) {
+                    throw new WrappingAPIException(new UnsupportedOperationException(key));
+                }
+            } else {
+                userKeyData = keyDataHolder.getRight();
             }
-
-            final Pair<String, UserData> userKeyData = keyDataHolder.getRight();
             if (!version.equals(userKeyData.getLeft())) {
                 throw new WrappingAPIException(new VersionIsNotSame());
             }

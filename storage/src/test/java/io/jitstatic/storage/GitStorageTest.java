@@ -764,6 +764,35 @@ public class GitStorageTest {
         }
     }
 
+    @Test
+    public void testPutMetaDataDotKey() {
+        MetaData md = mock(MetaData.class);
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+            assertEquals(UnsupportedOperationException.class,
+                    assertThrows(WrappingAPIException.class, () -> gs.putMetaData(".key", null, md, "1", cmd)).getCause().getClass());
+        }
+    }
+    
+    @Test
+    public void testPutMetaDataWithNoRef() {
+        MetaData md = mock(MetaData.class);
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+            assertEquals(RefNotFoundException.class,
+                    assertThrows(WrappingAPIException.class, () -> gs.putMetaData("key", null, md, "1", cmd)).getCause().getClass());
+        }
+    }
+    
+    @Test
+    public void testDeleteFromTag() {
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+            assertEquals(UnsupportedOperationException.class,
+                    assertThrows(WrappingAPIException.class, () -> gs.delete("key", "refs/tags/blah", cmd)).getCause().getClass());
+        }
+    }
+
     private byte[] getByteArray(int c) {
         return ("{\"data\":\"value" + c + "\"}").getBytes(UTF_8);
     }

@@ -286,7 +286,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
 
     private void isRefATag(final String finalRef) {
         if (finalRef.startsWith(Constants.R_TAGS)) {
-            throw new UnsupportedOperationException("Tags cannot be modified");
+            throw new WrappingAPIException(new UnsupportedOperationException("Tags cannot be modified"));
         }
     }
 
@@ -374,10 +374,10 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         Objects.requireNonNull(data);
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-        final RefHolder refHolder = getRefHolder(finalRef);
         if (rootUser.equals(key)) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
+        final RefHolder refHolder = getRefHolder(finalRef);        
         final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, creatorUserName, data);
         if (postUser.isRight()) {
             CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
