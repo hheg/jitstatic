@@ -127,6 +127,9 @@ public class HostedFactory {
 
     @JsonProperty
     private boolean protectHealthChecks;
+    
+    @JsonProperty
+    private boolean protectTasks;
 
     @JsonProperty
     @Valid
@@ -362,12 +365,12 @@ public class HostedFactory {
         }
         env.getApplicationContext().addBean(gitLoginService);
         env.servlets().setSecurityHandler(sec);
-        if (isProtectHealthChecks() || isProtectMetrics()) {
-            AdminConstraintSecurityHandler adminConstraintSecurityHandler = new AdminConstraintSecurityHandler(getAdminName(), getAdminPass(),
-                    isProtectHealthChecks(), isProtectMetrics());
+        if (isProtectHealthChecks() || isProtectMetrics() || isProtectTasks()) {
+            final AdminConstraintSecurityHandler adminConstraintSecurityHandler = new AdminConstraintSecurityHandler(getAdminName(), getAdminPass(),
+                    isProtectHealthChecks(), isProtectMetrics(), isProtectTasks());
             env.admin().setSecurityHandler(adminConstraintSecurityHandler);
             pathsWithUncoveredHttpMethods = adminConstraintSecurityHandler.getPathsWithUncoveredHttpMethods();
-            pathsWithUncoveredHttpMethods.stream().forEach(p -> LOG.info("Not protecting {}", p));
+            pathsWithUncoveredHttpMethods.stream().forEach(p -> LOG.warn("Not protecting {}", p));
         }
         final Cors corsConfig = getCors();
         if (corsConfig != null) {
@@ -438,6 +441,14 @@ public class HostedFactory {
 
     public void setIterations(int iterations) {
         this.iterations = iterations;
+    }
+
+    public boolean isProtectTasks() {
+        return protectTasks;
+    }
+
+    public void setProtectTasks(boolean protectTasks) {
+        this.protectTasks = protectTasks;
     }
 
     private static class DropWizardHandlerWrapper implements Handler {

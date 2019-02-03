@@ -24,5 +24,6 @@ hosted:
     adminName: admin
     adminPass: pass
     protectMetrics: true
+    protectTasks: true
     cors:
       allowedOrigins: "*" 
