@@ -195,8 +195,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response putUser(final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            final @Valid @NotNull UserData data,
+    public Response putUser(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Valid @NotNull UserData data,
             final @Auth Optional<User> remoteUserHolder, final @Context HttpHeaders headers, final @Context Request request) {
         if (!remoteUserHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
@@ -267,8 +266,8 @@ public class UsersResource {
     @Path(GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response putGitUser(final @PathParam("key") String key, final @Valid @NotNull UserData data,
-            final @Auth Optional<User> remoteUserHolder, final @Context HttpHeaders headers, final @Context Request request) {
+    public Response putGitUser(final @PathParam("key") String key, final @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
+            final @Context HttpHeaders headers, final @Context Request request) {
         if (!remoteUserHolder.isPresent()) {
             return helper.respondAuthenticationChallenge(GIT_REALM);
         }
