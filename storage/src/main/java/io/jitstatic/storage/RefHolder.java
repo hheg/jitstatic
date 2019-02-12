@@ -62,20 +62,20 @@ import io.jitstatic.utils.WrappingAPIException;
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefLockHolder {
     private static final int MAX_ENTRIES = 1000;
-    private static final int THREASHOLD = 1_000_000;
+    private static final int THRESHOLD = 1_000_000;
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
     private Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final RefLock lock = new RefLock();
     private final String ref;
     private final Source source;
-    public final int threshold;
+    private final int threshold;
     private final HashService hashService;
 
     public RefHolder(final String ref, final Source source, final HashService hashService) {
         this.ref = ref;
         this.refCache = getStorage(MAX_ENTRIES);
         this.source = source;
-        this.threshold = THREASHOLD;
+        this.threshold = THRESHOLD;
         this.hashService = Objects.requireNonNull(hashService);
     }
 

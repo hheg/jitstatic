@@ -47,10 +47,10 @@ public class StorageFactory {
                         .buildAuthFilter()));
         env.jersey().register(RolesAllowedDynamicFeature.class);
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-        final GitStorage gitStorage = new GitStorage(source, source.getDefaultRef(), hashService, rootUser);
-        source.addListener(new ReloadRefEventListener(gitStorage), ReloadRefEventListener.class);
-        source.addListener(new DeleteRefEventListener(gitStorage), DeleteRefEventListener.class);
-        source.addRefHolderFactory(gitStorage::getRefHolderLock);
-        return gitStorage;
+        final KeyStorage keyStorage = new KeyStorage(source, source.getDefaultRef(), hashService, rootUser);
+        source.addListener(new ReloadRefEventListener(keyStorage), ReloadRefEventListener.class);
+        source.addListener(new DeleteRefEventListener(keyStorage), DeleteRefEventListener.class);
+        source.addRefHolderFactory(keyStorage::getRefHolderLock);
+        return keyStorage;
     }
 }

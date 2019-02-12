@@ -80,7 +80,7 @@ import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class GitStorageTest {
+public class KeyStorageTest {
 
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final String REF_HEADS_MASTER = Constants.R_HEADS + Constants.MASTER;
@@ -101,7 +101,7 @@ public class GitStorageTest {
 
     @Test
     public void testGetAKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest1 = getMetaData();) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest1 = getMetaData();) {
             SourceInfo si1 = mock(SourceInfo.class);
             when(si1.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
             when(si1.readMetaData()).thenCallRealMethod();
@@ -110,23 +110,23 @@ public class GitStorageTest {
             when(si1.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(source.getSourceInfo(eq("key"), anyString())).thenReturn(si1);
 
-            Optional<StoreInfo> key = gs.getKey("key", null);
+            Optional<StoreInfo> key = ks.getKey("key", null);
             assertNotNull(key.get());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testGetARootKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> gs.getKey("root/", null)).getCause().getClass());
-            gs.checkHealth();
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.getKey("root/", null)).getCause().getClass());
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testPutARootKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest1 = getMetaData(); InputStream mtest2 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest1 = getMetaData(); InputStream mtest2 = getMetaData()) {
             when(source.modifyMetadata(any(), anyString(), anyString(), anyString(), any()))
                     .thenReturn(SHA_2_MD);
             SourceInfo si = mock(SourceInfo.class);
@@ -135,22 +135,22 @@ public class GitStorageTest {
             when(si.getMetadataInputStream()).thenReturn(mtest1).thenReturn(mtest2);
             when(source.getSourceInfo(eq("root/"), anyString())).thenReturn(si);
             when(source.getSourceInfo(eq("root"), anyString())).thenReturn(null);
-            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> gs.getKey("root/", null)).getCause().getClass());
-            assertTrue(gs.getMetaKey("root/", null).isPresent());
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.getKey("root/", null)).getCause().getClass());
+            assertTrue(ks.getMetaKey("root/", null).isPresent());
 
             MetaData sd = new MetaData(Set.of(new User("u", "p")), "text/plain", false, false, List.of(), null, null);
-            Either<String, FailedToLock> putMetaData = gs.putMetaData("root/", null, sd, SHA_1_MD,
+            Either<String, FailedToLock> putMetaData = ks.putMetaData("root/", null, sd, SHA_1_MD,
                     new CommitMetaData("user", "mail", "msg", "test", JITSTATIC_NOWHERE));
             assertTrue(putMetaData.isLeft());
             assertEquals(SHA_2_MD, putMetaData.getLeft());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testInitGitStorageWithNullSource() {
         assertEquals("Source cannot be null", assertThrows(NullPointerException.class, () -> {
-            try (GitStorage gs = new GitStorage(null, null, hashService, "root");) {
+            try (KeyStorage ks = new KeyStorage(null, null, hashService, "root");) {
             }
         }).getLocalizedMessage());
     }
@@ -159,7 +159,7 @@ public class GitStorageTest {
     public void testLoadCache() throws Exception {
         Set<User> users = new HashSet<>();
         users.add(new User("user", "1234"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");
                 InputStream mtest1 = getMetaData();
                 InputStream mtest2 = getMetaData();) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -177,21 +177,21 @@ public class GitStorageTest {
             when(si2.getMetaDataVersion()).thenReturn(SHA_2_MD);
             when(source.getSourceInfo(eq("key"), eq(REF_HEADS_MASTER))).thenReturn(si1).thenReturn(si2);
 
-            gs.reload(REF_HEADS_MASTER);
+            ks.reload(REF_HEADS_MASTER);
             StoreInfo storage = new StoreInfo(toProvider(readData("{\"data\":\"value1\"}")), new MetaData(users, null, false, false, List.of(), null, null),
                     SHA_1,
                     SHA_1_MD);
-            assertTrue(Arrays.equals(toByte(storage.getStreamProvider()), toByte(gs.getKey("key", null).get().getStreamProvider())));
-            RefLockHolder refHolderLock = gs.getRefHolderLock(REF_HEADS_MASTER);
+            assertTrue(Arrays.equals(toByte(storage.getStreamProvider()), toByte(ks.getKey("key", null).get().getStreamProvider())));
+            RefLockHolder refHolderLock = ks.getRefHolderLock(REF_HEADS_MASTER);
             refHolderLock.lockWriteAll(() -> {
-                gs.reload(REF_HEADS_MASTER);
+                ks.reload(REF_HEADS_MASTER);
                 return true;
             });
 
             storage = new StoreInfo(toProvider(readData("{\"data\":\"value2\"}")), new MetaData(users, null, false, false, List.of(), null, null), SHA_2,
                     SHA_2_MD);
-            assertArrayEquals(toByte(storage.getStreamProvider()), toByte(gs.getKey("key", null).get().getStreamProvider()));
-            gs.checkHealth();
+            assertArrayEquals(toByte(storage.getStreamProvider()), toByte(ks.getKey("key", null).get().getStreamProvider()));
+            ks.checkHealth();
         }
     }
 
@@ -202,7 +202,7 @@ public class GitStorageTest {
     @Test
     public void testLoadNewCache() throws Exception {
 
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");
                 InputStream mtest3 = getMetaData();
                 InputStream mtest4 = getMetaData()) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -220,11 +220,11 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(eq("key3"), anyString())).thenReturn(si1);
             when(source.getSourceInfo(eq("key4"), anyString())).thenReturn(si2);
-            Optional<StoreInfo> key3Data = gs.getKey("key3", null);
-            Optional<StoreInfo> key4Data = gs.getKey("key4", null);
+            Optional<StoreInfo> key3Data = ks.getKey("key3", null);
+            Optional<StoreInfo> key4Data = ks.getKey("key4", null);
             assertNotNull(key3Data.get());
             assertNotNull(key4Data.get());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
@@ -233,12 +233,12 @@ public class GitStorageTest {
         NullPointerException npe = new NullPointerException("Test exception");
         when(source.getSourceInfo(anyString(), anyString())).thenThrow(npe);
         assertSame(assertThrows(NullPointerException.class, () -> {
-            try (GitStorage gs = new GitStorage(source, null, hashService, "root");) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");) {
                 try {
-                    gs.getKey("", null).get();
+                    ks.getKey("", null).get();
                 } catch (Exception ignore) {
                 }
-                gs.checkHealth();
+                ks.checkHealth();
             }
         }), npe);
     }
@@ -247,10 +247,10 @@ public class GitStorageTest {
     public void testCheckHealthWithFault() throws Exception {
         RuntimeException cause = new RuntimeException("Fault reading something");
         doThrow(cause).when(source).getSourceInfo(anyString(), anyString());
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream md = getMetaData()) {
-            gs.reload(REF_HEADS_MASTER);
-            assertFalse(gs.getKey("test3.json", null).isPresent());
-            assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream md = getMetaData()) {
+            ks.reload(REF_HEADS_MASTER);
+            assertFalse(ks.getKey("test3.json", null).isPresent());
+            assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> ks.checkHealth()).getLocalizedMessage());
             Mockito.reset(source);
             SourceInfo info = mock(SourceInfo.class);
             when(info.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
@@ -259,8 +259,8 @@ public class GitStorageTest {
             when(info.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(info.getMetadataInputStream()).thenReturn(md);
             when(source.getSourceInfo(anyString(), anyString())).thenReturn(info);
-            assertNotNull(gs.getKey("test3.json", null).get());
-            gs.checkHealth();
+            assertNotNull(ks.getKey("test3.json", null).get());
+            ks.checkHealth();
         }
     }
 
@@ -270,12 +270,12 @@ public class GitStorageTest {
         doThrow(cause).when(source).getSourceInfo(anyString(), anyString());
 
         assertSame(cause, assertThrows(RuntimeException.class, () -> {
-            try (GitStorage gs = new GitStorage(source, null, hashService, "root");) {
-                gs.reload(REF_HEADS_MASTER);
-                assertFalse(gs.getKey("key", null).isPresent());
-                assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> gs.checkHealth()).getLocalizedMessage());
-                gs.getKey("key", null);
-                gs.checkHealth();
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");) {
+                ks.reload(REF_HEADS_MASTER);
+                assertFalse(ks.getKey("key", null).isPresent());
+                assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> ks.checkHealth()).getLocalizedMessage());
+                ks.getKey("key", null);
+                ks.checkHealth();
             }
         }));
     }
@@ -283,14 +283,14 @@ public class GitStorageTest {
     @Test
     public void testSourceCloseFailed() {
         doThrow(new RuntimeException()).when(source).close();
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root");) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");) {
         }
     }
 
     @Test
     public void testRefIsFoundButKeyIsNot() throws Exception {
 
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");
                 InputStream mtest3 = getMetaData();
                 InputStream mtest4 = getMetaData()) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -308,20 +308,20 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(eq("key3"), anyString())).thenReturn(si1);
             when(source.getSourceInfo(eq("key4"), anyString())).thenReturn(si2);
-            Optional<StoreInfo> key3Data = gs.getKey("key3", null);
+            Optional<StoreInfo> key3Data = ks.getKey("key3", null);
             assertNotNull(key3Data.get());
-            Optional<StoreInfo> key4Data = gs.getKey("key4", null);
+            Optional<StoreInfo> key4Data = ks.getKey("key4", null);
             assertNotNull(key4Data.get());
-            key4Data = gs.getKey("key4", REF_HEADS_MASTER);
+            key4Data = ks.getKey("key4", REF_HEADS_MASTER);
             assertNotNull(key4Data.get());
-            gs.checkHealth();
+            ks.checkHealth();
         }
 
     }
 
     @Test
     public void testPutAKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             byte[] data = readData("{\"one\" : \"two\"}");
             String key = "key3";
@@ -333,27 +333,27 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(eq("key3"), anyString())).thenReturn(si);
             when(source.modifyKey(eq(key), any(), any(), eq(SHA_1), any())).thenReturn(Pair.of(SHA_2, factory));
-            Optional<StoreInfo> first = gs.getKey(key, null);
+            Optional<StoreInfo> first = ks.getKey(key, null);
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
             assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-            Either<String, FailedToLock> put = gs.put(key, null, Utils.toProvider(data), SHA_1,
+            Either<String, FailedToLock> put = ks.put(key, null, Utils.toProvider(data), SHA_1,
                     new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String newVersion = put.getLeft();
             assertEquals(SHA_2, newVersion);
-            first = gs.getKey(key, null);
+            first = ks.getKey(key, null);
             storeInfo = first.get();
             assertNotNull(storeInfo);
             assertArrayEquals(data, toByte(storeInfo.getStreamProvider()));
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testPutAOnANonWritableKey() throws Throwable {
         assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
-            GitStorage gs = new GitStorage(source, null, hashService, "root");
-            try (gs; InputStream mtest3 = getMetaDataProtectedInputStream()) {
+            KeyStorage ks = new KeyStorage(source, null, hashService, "root");
+            try (ks; InputStream mtest3 = getMetaDataProtectedInputStream()) {
                 SourceInfo si = mock(SourceInfo.class);
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
@@ -365,33 +365,33 @@ public class GitStorageTest {
 
                 when(source.getSourceInfo(eq(key), anyString())).thenReturn(si);
                 when(source.modifyKey(eq(key), any(), any(), eq(SHA_1), any())).thenReturn(Pair.of(SHA_2, factory));
-                Optional<StoreInfo> first = gs.getKey(key, null);
+                Optional<StoreInfo> first = ks.getKey(key, null);
                 StoreInfo storeInfo = first.get();
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+                ks.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
-            gs.checkHealth();
+            ks.checkHealth();
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
 
     @Test
     public void testGetADotKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             String key = ".key3";
-            Optional<StoreInfo> first = gs.getKey(key, null);
+            Optional<StoreInfo> first = ks.getKey(key, null);
             assertFalse(first.isPresent());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testGetATrainDotKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             String key = "key/key/.key3";
-            Optional<StoreInfo> first = gs.getKey(key, null);
+            Optional<StoreInfo> first = ks.getKey(key, null);
             assertFalse(first.isPresent());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
@@ -402,33 +402,33 @@ public class GitStorageTest {
         when(si.readMetaData()).thenCallRealMethod();
         when(si.getMetadataInputStream()).thenReturn(getMetaDataHiddenInputStream());
         when(source.getSourceInfo("key", REF_HEADS_MASTER)).thenReturn(si);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            Optional<StoreInfo> key = gs.getKey("key", null);
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            Optional<StoreInfo> key = ks.getKey("key", null);
             assertFalse(key.isPresent());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testPutKeyWithEmptyMessage() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root");) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");) {
             assertThrows(IllegalArgumentException.class, () -> {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "", "Test", JITSTATIC_NOWHERE));
+                ks.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "", "Test", JITSTATIC_NOWHERE));
             });
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testPutKeyWithNoRef() {
         assertThat((RefNotFoundException) assertThrows(WrappingAPIException.class, () -> {
-            try (GitStorage gs = new GitStorage(source, null, hashService, "root");) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, "root");) {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
-                gs.checkHealth();
-                gs.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+                ks.checkHealth();
+                ks.put(key, null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getCause(), Matchers.isA(RefNotFoundException.class));
     }
@@ -436,7 +436,7 @@ public class GitStorageTest {
     @Test
     public void testPutKeyWithNoKey() throws Throwable {
         assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
-            try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
                 SourceInfo si = mock(SourceInfo.class);
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
@@ -448,12 +448,12 @@ public class GitStorageTest {
 
                 when(source.getSourceInfo(eq("key3"), anyString())).thenReturn(si);
                 when(source.modifyKey(eq(key), any(), any(), eq(SHA_1), any())).thenReturn(Pair.of(SHA_2, factory));
-                Optional<StoreInfo> first = gs.getKey(key, null);
+                Optional<StoreInfo> first = ks.getKey(key, null);
                 StoreInfo storeInfo = first.get();
                 assertNotNull(storeInfo);
                 assertNotEquals(data, toByte(storeInfo.getStreamProvider()));
-                gs.checkHealth();
-                gs.put("other", null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+                ks.checkHealth();
+                ks.put("other", null, Utils.toProvider(data), SHA_1, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getCause(), Matchers.isA(UnsupportedOperationException.class));
     }
@@ -461,20 +461,20 @@ public class GitStorageTest {
     @Test
     public void testAddKey() throws Exception {
         when(source.addKey(any(), any(), any(), any(), any())).thenReturn(Pair.of(Pair.of(factory, "1"), "1"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey("somekey", "refs/heads/master", Utils.toProvider(pretty),
+            String si = ks.addKey("somekey", "refs/heads/master", Utils.toProvider(pretty),
                     new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             assertEquals("1", si);
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testPutMetaDataKey() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             String key = "key3";
             when(si.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
@@ -485,26 +485,26 @@ public class GitStorageTest {
 
             when(source.getSourceInfo(eq(key), anyString())).thenReturn(si);
             when(source.modifyMetadata(any(), eq(SHA_1_MD), any(), any(), any())).thenReturn((SHA_2_MD));
-            Optional<StoreInfo> first = gs.getKey(key, null);
+            Optional<StoreInfo> first = ks.getKey(key, null);
             StoreInfo storeInfo = first.get();
             assertNotNull(storeInfo);
 
             MetaData sd = new MetaData(storeInfo.getMetaData().getUsers(), "application/test", false, false, List.of(), null, null);
-            Either<String, FailedToLock> put = gs.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(),
+            Either<String, FailedToLock> put = ks.putMetaData(key, null, sd, storeInfo.getMetaDataVersion(),
                     new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String newVersion = put.getLeft();
             assertEquals(SHA_2_MD, newVersion);
-            first = gs.getKey(key, null);
+            first = ks.getKey(key, null);
             storeInfo = first.get();
             assertNotNull(storeInfo);
             assertEquals(sd, storeInfo.getMetaData());
-            gs.checkHealth();
+            ks.checkHealth();
         }
     }
 
     @Test
     public void testDelete() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
 
             String key = "key3";
@@ -515,21 +515,21 @@ public class GitStorageTest {
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
 
             when(source.getSourceInfo(eq(key), anyString())).thenReturn(si);
-            StoreInfo key2 = gs.getKey(key, null).get();
+            StoreInfo key2 = ks.getKey(key, null).get();
             assertNotNull(key2);
-            gs.delete(key, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+            ks.delete(key, null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             Thread.sleep(1000);
-            gs.checkHealth();
+            ks.checkHealth();
             Mockito.verify(source).deleteKey(eq(key), eq(REF_HEADS_MASTER), any());
         }
     }
 
     @Test
     public void testDeleteMetaKey() throws IOException {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertSame(UnsupportedOperationException.class,
                     assertThrows(WrappingAPIException.class,
-                            () -> gs.delete("key/", null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause().getClass());
+                            () -> ks.delete("key/", null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause().getClass());
         }
     }
 
@@ -540,13 +540,13 @@ public class GitStorageTest {
         when(source.getSourceInfo(eq(key), eq(branch))).thenThrow(RefNotFoundException.class);
         when(source.addKey(eq(key), eq(branch), any(), any(), any()))
                 .thenReturn(Pair.of(Pair.of(factory, "1"), "1"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
-            String si = gs.addKey(key, branch, Utils.toProvider(pretty), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
+            String si = ks.addKey(key, branch, Utils.toProvider(pretty), new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                     new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             assertEquals("1", si);
-            gs.checkHealth();
+            ks.checkHealth();
             ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
             Mockito.verify(source).createRef(argument.capture());
             assertEquals(branch, argument.getValue());
@@ -558,11 +558,11 @@ public class GitStorageTest {
         String key = "somekey";
         String branch = "refs/heads/newbranch";
         when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(mock(SourceInfo.class));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.addKey(key, branch, Utils.toProvider(pretty),
+                    assertThrows(WrappingAPIException.class, () -> ks.addKey(key, branch, Utils.toProvider(pretty),
                             new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
                             new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause()
                                     .getClass());
@@ -571,7 +571,7 @@ public class GitStorageTest {
 
     @Test
     public void testGetListForRef() throws RefNotFoundException, IOException {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             when(si.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
             when(si.readMetaData()).thenCallRealMethod();
@@ -584,16 +584,16 @@ public class GitStorageTest {
 
             when(source.getList(eq(key), anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<String, Boolean>> keys = List.of(Pair.of(key, false));
-            List<Pair<String, StoreInfo>> list = gs.getListForRef(keys, REF_HEADS_MASTER);
+            List<Pair<String, StoreInfo>> list = ks.getListForRef(keys, REF_HEADS_MASTER);
             assertEquals(1, list.size());
-            list = gs.getListForRef(keys, REF_HEADS_MASTER);
+            list = ks.getListForRef(keys, REF_HEADS_MASTER);
             assertEquals(1, list.size());
         }
     }
 
     @Test
     public void testGetList() throws Exception {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             when(si.getSourceProvider()).thenReturn(toProvider(getByteArray(1)));
             when(si.readMetaData()).thenCallRealMethod();
@@ -606,12 +606,12 @@ public class GitStorageTest {
 
             when(source.getList(eq(key), anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<List<Pair<String, Boolean>>, String>> keys = List.of(Pair.of(List.of(Pair.of(key, false)), REF_HEADS_MASTER));
-            List<Pair<List<Pair<String, StoreInfo>>, String>> list = gs.getList(keys);
+            List<Pair<List<Pair<String, StoreInfo>>, String>> list = ks.getList(keys);
             assertEquals(1, list.size());
             Pair<List<Pair<String, StoreInfo>>, String> masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());
             assertFalse(masterResult.getLeft().isEmpty());
-            list = gs.getList(keys);
+            list = ks.getList(keys);
             assertEquals(1, list.size());
             masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());
@@ -621,9 +621,9 @@ public class GitStorageTest {
 
     @Test
     public void testAddDotFile() {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertThrows(WrappingAPIException.class,
-                    () -> gs.addKey("dot/.dot", null, Utils.toProvider(new byte[] { 1 }), new MetaData(Set.of()),
+                    () -> ks.addKey("dot/.dot", null, Utils.toProvider(new byte[] { 1 }), new MetaData(Set.of()),
                             new CommitMetaData("d", "d", "d", "Test", JITSTATIC_NOWHERE)));
         }
     }
@@ -631,24 +631,24 @@ public class GitStorageTest {
     @Test
     public void testGetUser() throws RefNotFoundException, IOException {
         when(source.getUser(anyString(), anyString())).thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "1234", null, null)));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            assertNotNull(gs.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            assertNotNull(ks.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
         }
     }
 
     @Test
     public void testGetListForNoKey() throws RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq("refs/heads/master"))).thenReturn(null);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            gs.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            ks.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
         }
     }
 
     @Test
     public void testGetListNoRef() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new RefNotFoundException("test"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            List<Pair<String, StoreInfo>> listForRef = gs.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
             assertTrue(listForRef.isEmpty());
         }
     }
@@ -656,29 +656,29 @@ public class GitStorageTest {
     @Test
     public void testGetListIOException() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new IOException("test"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            List<Pair<String, StoreInfo>> listForRef = gs.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
             assertTrue(listForRef.isEmpty());
         }
     }
 
     @Test
     public void testGetListForAKey() throws RefNotFoundException, IOException {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root"); InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             when(si.getMetadataInputStream()).thenReturn(mtest3);
             when(si.getSourceVersion()).thenReturn(SHA_1);
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(source.getSourceInfo(eq("key"), eq("refs/heads/master"))).thenReturn(si);
-            gs.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+            ks.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
         }
     }
 
     @Test
     public void testGetUserDataNoBranch() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new RefNotFoundException("Test"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            assertThrows(RefNotFoundException.class, () -> gs.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            assertThrows(RefNotFoundException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
     }
@@ -686,17 +686,17 @@ public class GitStorageTest {
     @Test
     public void testGetUserDataIOError() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new IOException("Test"));
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            assertThrows(UncheckedIOException.class, () -> gs.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            assertThrows(UncheckedIOException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
     }
 
     @Test
     public void testUpdateUserNoRef() {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertThrows(UnsupportedOperationException.class,
-                    () -> gs.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "p", null, null), "1"));
+                    () -> ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "p", null, null), "1"));
         }
     }
 
@@ -704,9 +704,9 @@ public class GitStorageTest {
     public void testUpdateUser() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
-            assertEquals("2", gs.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
+            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
                     .getLeft());
         }
     }
@@ -715,9 +715,9 @@ public class GitStorageTest {
     public void testUpdateUserNoKey() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
-            assertEquals("2", gs.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
+            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
                     .getLeft());
         }
     }
@@ -725,19 +725,19 @@ public class GitStorageTest {
     @Test
     public void testDeleteUser() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
-            gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
-            gs.deleteUser("kit", null, JitStaticConstants.GIT_REALM, "creator");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
+            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null));
+            ks.deleteUser("kit", null, JitStaticConstants.GIT_REALM, "creator");
         }
     }
 
     @Test
     public void testAddUserRefNotFound() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenThrow(RefNotFoundException.class);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals(UnsupportedOperationException.class,
                     assertThrows(WrappingAPIException.class,
-                            () -> gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
+                            () -> ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
                                     .getCause()
                                     .getClass());
         }
@@ -746,10 +746,10 @@ public class GitStorageTest {
     @Test
     public void testAddUserReadError() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenThrow(IOException.class);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals(IOException.class,
                     assertThrows(UncheckedIOException.class,
-                            () -> gs.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
+                            () -> ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
                                     .getCause()
                                     .getClass());
         }
@@ -757,9 +757,9 @@ public class GitStorageTest {
 
     @Test
     public void testAddUserMatchingRoot() {
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals("io.jitstatic.hosted.KeyAlreadyExist: Key 'root' already exist in branch refs/heads/master", assertThrows(WrappingAPIException.class,
-                    () -> gs.addUser("root", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
+                    () -> ks.addUser("root", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null)))
                             .getMessage());
         }
     }
@@ -768,9 +768,9 @@ public class GitStorageTest {
     public void testPutMetaDataDotKey() {
         MetaData md = mock(MetaData.class);
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals(UnsupportedOperationException.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.putMetaData(".key", null, md, "1", cmd)).getCause().getClass());
+                    assertThrows(WrappingAPIException.class, () -> ks.putMetaData(".key", null, md, "1", cmd)).getCause().getClass());
         }
     }
     
@@ -778,18 +778,18 @@ public class GitStorageTest {
     public void testPutMetaDataWithNoRef() {
         MetaData md = mock(MetaData.class);
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals(RefNotFoundException.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.putMetaData("key", null, md, "1", cmd)).getCause().getClass());
+                    assertThrows(WrappingAPIException.class, () -> ks.putMetaData("key", null, md, "1", cmd)).getCause().getClass());
         }
     }
     
     @Test
     public void testDeleteFromTag() {
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (GitStorage gs = new GitStorage(source, null, hashService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
             assertEquals(UnsupportedOperationException.class,
-                    assertThrows(WrappingAPIException.class, () -> gs.delete("key", "refs/tags/blah", cmd)).getCause().getClass());
+                    assertThrows(WrappingAPIException.class, () -> ks.delete("key", "refs/tags/blah", cmd)).getCause().getClass());
         }
     }
 

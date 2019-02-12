@@ -23,14 +23,15 @@ package io.jitstatic.storage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.cache2k.Cache;
+import org.cache2k.Cache2kBuilder;
+import org.cache2k.integration.CacheLoader;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
@@ -55,23 +56,22 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class GitStorage implements Storage, Reloader, DeleteRef {
+public class KeyStorage implements Storage, Reloader, DeleteRef {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
-    private static final Logger LOG = LoggerFactory.getLogger(GitStorage.class);
-    private final Map<String, RefHolder> cache = new ConcurrentHashMap<>();
+    private static final Logger LOG = LoggerFactory.getLogger(KeyStorage.class);
+    private final Cache<String, RefHolder> cache;
     private final AtomicReference<Exception> fault = new AtomicReference<>();
     private final Source source;
     private final String defaultRef;
-    private final HashService hashService;
     private final String rootUser;
 
-    public GitStorage(final Source source, final String defaultRef, final HashService hashService, String rootUser) {
+    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, String rootUser) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
-        this.hashService = Objects.requireNonNull(hashService);
         this.rootUser = rootUser;
+        this.cache = getMap(source, hashService);
     }
 
     public RefLockHolder getRefHolderLock(final String ref) {
@@ -134,7 +134,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.computeIfAbsent(finalRef, r -> new RefHolder(r, source, hashService));
+        return cache.get(finalRef);
     }
 
     @Override
@@ -143,6 +143,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
             source.close();
         } catch (final Exception ignore) {
         }
+        cache.close();
     }
 
     @Override
@@ -160,7 +161,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
         final String finalRef = checkRef(ref);
-        final RefHolder refHolder = cache.get(finalRef);
+        final RefHolder refHolder = cache.peek(finalRef);
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
@@ -236,7 +237,16 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         if (ref == null) {
             return;
         }
-        cache.computeIfPresent(ref, (a, b) -> b.isEmpty() ? null : b);
+        cache.invoke(ref, e -> {
+            if (e == null) {
+                return false;
+            }
+            final boolean empty = e.getValue().isEmpty();
+            if (empty) {
+                e.setValue(null);
+            }
+            return empty;
+        });
     }
 
     @Override
@@ -251,7 +261,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         }
         final String finalRef = checkRef(ref);
         isRefATag(finalRef);
-        final RefHolder refHolder = cache.get(finalRef);
+        final RefHolder refHolder = cache.peek(finalRef);
         if (refHolder == null) {
             throw new WrappingAPIException(new RefNotFoundException(finalRef));
         }
@@ -273,7 +283,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
             // We don't support deleting master .metadata files right now
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-        final RefHolder refHolder = getRefHolder(finalRef);
+        final RefHolder refHolder = cache.peek(finalRef);
         if (refHolder != null) {
             try {
                 refHolder.deleteKey(key, finalRef, commitMetaData);
@@ -359,7 +369,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
             final String version) {
         ref = checkRef(ref);
         isRefATag(ref);
-        final RefHolder refHolder = cache.get(ref);
+        final RefHolder refHolder = cache.peek(ref);
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
@@ -377,7 +387,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         if (rootUser.equals(key)) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
-        final RefHolder refHolder = getRefHolder(finalRef);        
+        final RefHolder refHolder = getRefHolder(finalRef);
         final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, creatorUserName, data);
         if (postUser.isRight()) {
             CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
@@ -393,7 +403,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         Objects.requireNonNull(creatorUserName);
         ref = checkRef(ref);
         isRefATag(ref);
-        final RefHolder refHolder = cache.get(ref);
+        final RefHolder refHolder = cache.peek(ref);
         if (refHolder != null) {
             refHolder.deleteUser(realm + "/" + key, creatorUserName);
         }
@@ -401,7 +411,7 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
 
     @Override
     public void reload(String ref) {
-        final RefHolder refHolder = cache.get(ref);
+        final RefHolder refHolder = cache.peek(ref);
         if (refHolder != null) {
             refHolder.reload();
         }
@@ -412,4 +422,18 @@ public class GitStorage implements Storage, Reloader, DeleteRef {
         LOG.info("Deleting {}", ref);
         cache.remove(ref);
     }
+
+    private static Cache<String, RefHolder> getMap(Source source, HashService hashService) {
+        return new Cache2kBuilder<String, RefHolder>() {
+        }
+                .name(KeyStorage.class)
+                .loader(new CacheLoader<String, RefHolder>() {
+                    @Override
+                    public RefHolder load(final String r) throws Exception {
+                        return new RefHolder(r, source, hashService);
+                    }
+                })
+                .build();
+    }
 }
+
