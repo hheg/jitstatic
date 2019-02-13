@@ -81,7 +81,7 @@ public class RefHolderTest {
     public void testPutGet() {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.empty());
-        assertNotNull(ref.getKeyNoLock("key"));
+        assertNotNull(ref.readKey("key"));
         assertTrue(ref.isEmpty());
     }
 
@@ -140,31 +140,6 @@ public class RefHolderTest {
     }
 
     @Test
-    public void testReadWrite() {
-        RefHolder ref = new RefHolder(REF, source, hashService);
-        ref.read(() -> "1");
-        ref.write(() -> {
-        });
-        ref.write(() -> "1");
-    }
-
-    @Test
-    public void testReloadAll() {
-        RefHolder ref = new RefHolder(REF, source, hashService);
-        ref.write(() -> {
-            ref.reloadAll(() -> {
-            });
-        });
-    }
-
-    @Test
-    public void testReloadAllWithoutLock() {
-        RefHolder ref = new RefHolder(REF, source, hashService);
-        assertFalse(ref.reloadAll(() -> {
-        }));
-    }
-
-    @Test
     public void testLockWriteAll() throws FailedToLock {
         RefHolder ref = new RefHolder(REF, source, hashService);
         AtomicBoolean b = new AtomicBoolean(true);
@@ -204,7 +179,7 @@ public class RefHolderTest {
         RefHolder ref = new RefHolder(REF, source, hashService);
         ref.putKey("key", Optional.of(storeInfo));
         ref.modifyKey("key", REF, Utils.toProvider(data), "1", cmd);
-        assertEquals("2", ref.getKeyNoLock("key").get().getVersion());
+        assertEquals("2", ref.readKey("key").get().getVersion());
     }
 
     @Test
@@ -220,7 +195,7 @@ public class RefHolderTest {
         ref.putKey("key", Optional.of(storeInfo));
         Either<String, FailedToLock> modifyMetadata = ref.modifyMetadata(storageData, "1", commitMetaData, "key", null);
         assertEquals("2", modifyMetadata.getLeft());
-        Optional<StoreInfo> key = ref.getKeyNoLock("key");
+        Optional<StoreInfo> key = ref.readKey("key");
         assertEquals("2", key.get().getMetaDataVersion());
     }
 
@@ -234,14 +209,14 @@ public class RefHolderTest {
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
-        assertTrue(ref.loadAndStore("key").isPresent());
+        assertTrue(ref.readKey("key").isPresent());
     }
 
     @Test
     public void testLoadAndStoreRefNotFound() throws IOException, RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(REF));
         RefHolder ref = new RefHolder(REF, source, hashService);
-        assertThrows(LoadException.class, () -> ref.loadAndStore("key"));
+        assertThrows(LoadException.class, () -> ref.readKey("key"));
     }
 
     @Test
@@ -254,8 +229,8 @@ public class RefHolderTest {
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
-        Optional<StoreInfo> loadAndStore = ref.loadAndStore("key");
-        assertEquals(ref.getKeyNoLock("key"), loadAndStore);
+        Optional<StoreInfo> loadAndStore = ref.readKey("key");
+        assertEquals(ref.readKey("key"), loadAndStore);
         assertFalse(loadAndStore.isPresent());
     }
 
@@ -265,10 +240,11 @@ public class RefHolderTest {
         when(sourceInfo.readMetaData()).thenCallRealMethod();
         when(sourceInfo.getMetadataInputStream()).thenReturn(asStream(getMetaData()));
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(sourceInfo.isMetaDataSource()).thenReturn(true);
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
-        Optional<StoreInfo> loadAndStore = ref.loadAndStore("key/");
-        assertEquals(ref.getKeyNoLock("key/"), loadAndStore);
+        Optional<StoreInfo> loadAndStore = ref.readKey("key/");
+        assertEquals(ref.readKey("key/"), loadAndStore);
         assertTrue(loadAndStore.isPresent());
     }
 
@@ -280,7 +256,7 @@ public class RefHolderTest {
         when(sourceInfo.getMetadataInputStream()).thenThrow(ioException);
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         RefHolder ref = new RefHolder(REF, source, hashService);
-        assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.loadAndStore("key")).getCause());
+        assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.readKey("key")).getCause());
     }
 
     @Test

@@ -582,7 +582,7 @@ You can find a Java client for JitStatic in Maven Central with coordinates
 <dependency>
     <groupId>io.jitstatic</groupId>
     <artifactId>jitstatic-client</artifactId>
-    <version>0.10.2</version>
+    <version>0.11.0</version>
 </dependency>
 ```
 ## Disclaimer

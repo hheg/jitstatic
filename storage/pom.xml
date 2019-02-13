@@ -4,19 +4,19 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.32.0</version>
+        <version>0.32.1</version>
     </parent>
     <artifactId>storage</artifactId>
     <dependencies>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.32.0</version>
+            <version>0.32.1</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.32.0</version>
+            <version>0.32.1</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -38,6 +38,12 @@
             <groupId>org.apache.shiro</groupId>
             <artifactId>shiro-crypto-hash</artifactId>
             <version>1.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.cache2k</groupId>
+            <artifactId>cache2k-base-bom</artifactId>
+            <version>1.2.0.Final</version>
+            <type>pom</type>
         </dependency>
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
@@ -88,7 +94,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.32.0</version>
+            <version>0.32.1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

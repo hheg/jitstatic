@@ -285,9 +285,10 @@ public class JitStaticReceivePack extends ReceivePack {
                     return lock.getLeft();
                 }
             } finally {
-                monitor.endTask();
-            }
+                monitor.update(1);
+            }            
         }).filter(Objects::nonNull).forEach(e -> sendError(e.getLocalizedMessage()));
+        monitor.endTask();
     }
 
     private Exception commitBranch(final String refName, final Pair<ReceiveCommand, ReceiveCommand> receiveCommandsPair, final Repository repository,

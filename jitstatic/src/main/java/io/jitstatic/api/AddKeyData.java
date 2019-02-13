@@ -30,11 +30,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.MetaData;
 import io.jitstatic.source.ObjectStreamProvider;
 
-@SuppressFBWarnings(value = { "EI_EXPOSE_REP", "EI_EXPOSE_REP2" }, justification = "Want to avoid copying the array twice")
 public class AddKeyData {
 
     @NotNull
