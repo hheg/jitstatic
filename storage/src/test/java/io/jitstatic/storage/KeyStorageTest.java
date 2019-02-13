@@ -557,10 +557,16 @@ public class KeyStorageTest {
     public void testAddKeyWithExistingKey() throws Exception {
         String key = "somekey";
         String branch = "refs/heads/newbranch";
-        when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(mock(SourceInfo.class));
+        byte[] data = getByteArray(1);
+        byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));       
+        SourceInfo sourceInfo = mock(SourceInfo.class);
+        MetaData metaData = mock(MetaData.class);
+        when(sourceInfo.readMetaData()).thenReturn(metaData);
+        when(sourceInfo.getMetaDataVersion()).thenReturn("2");
+        when(sourceInfo.getSourceVersion()).thenReturn("1");
+        when(sourceInfo.getSourceProvider()).thenReturn(toProvider(pretty));
+        when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(sourceInfo);
         try (KeyStorage ks = new KeyStorage(source, null, hashService, "root")) {
-            byte[] data = getByteArray(1);
-            byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertSame(KeyAlreadyExist.class,
                     assertThrows(WrappingAPIException.class, () -> ks.addKey(key, branch, Utils.toProvider(pretty),
                             new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
@@ -773,7 +779,7 @@ public class KeyStorageTest {
                     assertThrows(WrappingAPIException.class, () -> ks.putMetaData(".key", null, md, "1", cmd)).getCause().getClass());
         }
     }
-    
+
     @Test
     public void testPutMetaDataWithNoRef() {
         MetaData md = mock(MetaData.class);
@@ -783,7 +789,7 @@ public class KeyStorageTest {
                     assertThrows(WrappingAPIException.class, () -> ks.putMetaData("key", null, md, "1", cmd)).getCause().getClass());
         }
     }
-    
+
     @Test
     public void testDeleteFromTag() {
         CommitMetaData cmd = mock(CommitMetaData.class);

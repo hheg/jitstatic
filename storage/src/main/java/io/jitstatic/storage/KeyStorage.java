@@ -26,12 +26,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
 import org.cache2k.integration.CacheLoader;
+import org.cache2k.integration.CacheLoaderException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
@@ -66,6 +70,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     private final Source source;
     private final String defaultRef;
     private final String rootUser;
+    private final ExecutorService refCleaner = Executors.newSingleThreadExecutor();
 
     public KeyStorage(final Source source, final String defaultRef, final HashService hashService, String rootUser) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
@@ -113,7 +118,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refHolder = getRefHolder(finalRef);
         final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
         if (storeInfo == null) {
-            return refHolder.loadAndStore(key);
+            return Optional.empty();
         }
         return storeInfo;
     }
@@ -144,6 +149,12 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         } catch (final Exception ignore) {
         }
         cache.close();
+        refCleaner.shutdown();
+        try {
+            refCleaner.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // Ignore
+        }
     }
 
     @Override
@@ -183,15 +194,19 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refStore = getRefHolder(finalRef);
         final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
             SourceInfo sourceInfo = null;
-            final Optional<StoreInfo> storeInfo = refStore.getKeyNoLock(key);
-            if (storeInfo != null && storeInfo.isPresent()) {
-                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-            }
             try {
-                sourceInfo = source.getSourceInfo(key, finalRef);
-            } catch (final RefNotFoundException e) {
-                if (!defaultRef.equals(finalRef)) {
-                    sourceInfo = checkBranch(key, finalRef, getRefHolder(defaultRef));
+                final Optional<StoreInfo> storeInfo = refStore.readKey(key);
+                if (storeInfo != null && storeInfo.isPresent()) {
+                    throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+                }
+            } catch (final LoadException e) {
+                final Throwable cause = e.getCause();
+                if (cause instanceof RefNotFoundException) {
+                    if (!defaultRef.equals(finalRef)) {
+                        sourceInfo = checkBranch(key, finalRef, getRefHolder(defaultRef));
+                    }
+                } else {
+                    throw e;
                 }
             }
             if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
@@ -206,14 +221,14 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         if (result.isRight()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
-        CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
+        removeCacheRef(finalRef);
         return result.getLeft();
     }
 
     private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
         SourceInfo sourceInfo = null;
         try {
-            final Optional<StoreInfo> defaultKey = refHolder.getKeyNoLock(key);
+            final Optional<StoreInfo> defaultKey = refHolder.readKey(key);
             if (defaultKey != null && defaultKey.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
@@ -233,20 +248,23 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         return sourceInfo;
     }
 
+    // TODO Make this more efficient
     private void removeCacheRef(final String ref) {
         if (ref == null) {
             return;
         }
-        cache.invoke(ref, e -> {
-            if (e == null) {
-                return false;
-            }
-            final boolean empty = e.getValue().isEmpty();
-            if (empty) {
-                e.setValue(null);
-            }
-            return empty;
-        });
+        CompletableFuture.runAsync(() -> {
+            cache.invoke(ref, e -> {
+                if (e == null) {
+                    return false;
+                }
+                final boolean empty = e.getValue().isEmpty();
+                if (empty) {
+                    e.setValue(null);
+                }
+                return empty;
+            });
+        }, refCleaner);
     }
 
     @Override
@@ -291,7 +309,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
                 consumeError(ioe);
             }
         }
-        CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
+        removeCacheRef(finalRef);
     }
 
     private void isRefATag(final String finalRef) {
@@ -390,7 +408,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refHolder = getRefHolder(finalRef);
         final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, creatorUserName, data);
         if (postUser.isRight()) {
-            CompletableFuture.runAsync(() -> removeCacheRef(finalRef));
+            removeCacheRef(finalRef);
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
         return postUser.getLeft();
@@ -436,4 +454,3 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
                 .build();
     }
 }
-

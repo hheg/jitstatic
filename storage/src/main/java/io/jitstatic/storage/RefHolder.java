@@ -22,18 +22,23 @@ package io.jitstatic.storage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
+import java.util.stream.StreamSupport;
 
 import javax.annotation.Nullable;
 
+import org.cache2k.Cache;
+import org.cache2k.Cache2kBuilder;
+import org.cache2k.CacheEntry;
+import org.cache2k.integration.CacheLoader;
+import org.cache2k.integration.CacheLoaderException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.slf4j.Logger;
@@ -61,10 +66,10 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefLockHolder {
-    private static final int MAX_ENTRIES = 1000;
+    private static final int MAX_ENTRIES = 2000;
     private static final int THRESHOLD = 1_000_000;
     private static final Logger LOG = LoggerFactory.getLogger(RefHolder.class);
-    private Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
+    private volatile Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> refCache;
     private final RefLock lock = new RefLock();
     private final String ref;
     private final Source source;
@@ -79,59 +84,38 @@ public class RefHolder implements RefLockHolder {
         this.hashService = Objects.requireNonNull(hashService);
     }
 
-    private LinkedHashMap<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> getStorage(final int size) {
-        return new LinkedHashMap<>(size) {
-            private static final long serialVersionUID = 1L;
+    private Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> getStorage(final int size) {
 
-            @Override
-            protected boolean removeEldestEntry(
-                    final Map.Entry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> eldest) {
-                return size() > MAX_ENTRIES;
-            }
-        };
-    }
-
-    @Nullable
-    Optional<StoreInfo> getKeyNoLock(final String key) {
-        return unwrapKey(() -> refCache.get(key));
-    }
-
-    @Nullable
-    public Optional<StoreInfo> readKey(String key) {
-        return unwrapKey(() -> read(() -> refCache.get(key)));
-    }
-
-    @Nullable
-    private Optional<StoreInfo> unwrapKey(Supplier<Either<Optional<StoreInfo>, Pair<String, UserData>>> supplier) {
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> data = supplier.get();
-        if (data != null && data.isLeft()) {
-            return data.getLeft();
+        return new Cache2kBuilder<String, Either<Optional<StoreInfo>, Pair<String, UserData>>>() {
         }
-        return null;
+                .name(ref.replaceAll("/", "-") + "-" + System.currentTimeMillis())
+                .loader(new CacheLoader<String, Either<Optional<StoreInfo>, Pair<String, UserData>>>() {
+                    @Override
+                    public Either<Optional<StoreInfo>, Pair<String, UserData>> load(final String key) throws Exception {
+                        return key.startsWith(JitStaticConstants.USERS) ? mapUserKey(key) : loadKey(key);
+                    }
+                })
+                .entryCapacity(size)
+                .build();
+    }
+
+    @Nullable
+    public Optional<StoreInfo> readKey(final String key) {
+        return unwrapCacheLoaderException(() -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> data = refCache.get(key);
+            if (data != null && data.isLeft()) {
+                return data.getLeft();
+            }
+            return null;
+        });
     }
 
     public void putKey(final String key, final Optional<StoreInfo> store) {
-        write(() -> refCache.put(key, Either.left(store)));
+        refCache.put(key, Either.left(store));
     }
 
     public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key) {
         return lock.lockWrite(supplier, key, ref);
-    }
-
-    <T> T write(final Supplier<T> supplier) {
-        return lock.write(supplier);
-    }
-
-    void write(final Runnable runnable) {
-        lock.write(runnable);
-    }
-
-    <T> T read(final Supplier<T> supplier) {
-        return lock.read(supplier);
-    }
-
-    public boolean reloadAll(final Runnable runnable) {
-        return lock.reloadAll(runnable);
     }
 
     public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier) {
@@ -139,19 +123,16 @@ public class RefHolder implements RefLockHolder {
     }
 
     public boolean isEmpty() {
-        return read(() -> refCache.values().stream().noneMatch(e -> e.fold(Optional<StoreInfo>::isPresent, u -> true)));
+        return StreamSupport.stream(refCache.entries().spliterator(), true)
+                .noneMatch(e -> e.getValue().fold(Optional<StoreInfo>::isPresent, u -> true));
     }
 
-    Optional<StoreInfo> loadAndStore(final String key) {
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> value = write(
-                () -> refCache.computeIfAbsent(key, k -> {
-                    try {
-                        return Either.left(isStorable(key, load(key)));
-                    } catch (RefNotFoundException e) {
-                        throw new LoadException(e);
-                    }
-                }));
-        return value.fold(s -> s, s -> Optional.empty());
+    private Either<Optional<StoreInfo>, Pair<String, UserData>> loadKey(final String key) {
+        try {
+            return Either.left(isStorable(key, load(key)));
+        } catch (RefNotFoundException e) {
+            throw new LoadException(e);
+        }
     }
 
     @Nullable
@@ -198,20 +179,7 @@ public class RefHolder implements RefLockHolder {
     void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
-            Either<Optional<StoreInfo>, Pair<String, UserData>> compute = read(() -> refCache.get(plainKey));
-            if (compute == null) {
-                compute = write(() -> refCache.compute(plainKey, (k, v) -> {
-                    if (v == null) {
-                        try {
-                            return Either.left(Optional.ofNullable(load(k)));
-                        } catch (RefNotFoundException fnfe) {
-                            return null;
-                        }
-                    }
-                    return v;
-                }));
-            }
-
+            Either<Optional<StoreInfo>, Pair<String, UserData>> compute = refCache.get(plainKey);
             if (compute != null && compute.getLeft().isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
@@ -221,7 +189,7 @@ public class RefHolder implements RefLockHolder {
     public Either<String, FailedToLock> modifyKey(final String key, final String finalRef, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
         return lockWrite(() -> {
-            final Optional<StoreInfo> keyHolder = getKeyNoLock(key);
+            final Optional<StoreInfo> keyHolder = readKey(key);
             if (storageIsForbidden(keyHolder)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
@@ -254,7 +222,7 @@ public class RefHolder implements RefLockHolder {
             final String key, final String finalRef) {
         return lockWrite(() -> {
             checkIfPlainKeyExist(key);
-            final Optional<StoreInfo> storeInfo = getKeyNoLock(key);
+            final Optional<StoreInfo> storeInfo = readKey(key);
             if (storageIsForbidden(storeInfo)) {
                 throw new WrappingAPIException(new UnsupportedOperationException(key));
             }
@@ -295,31 +263,26 @@ public class RefHolder implements RefLockHolder {
     @Nullable
     public Pair<String, UserData> getUser(final String userKeyPath) {
         final String key = JitStaticConstants.USERS + userKeyPath;
-        Either<Optional<StoreInfo>, Pair<String, UserData>> computed = read(() -> refCache.get(key));
-        if (computed == null) {
-            computed = write(() -> refCache.compute(key, this::mapKey));
-        }
-        if (computed != null) {
-            return computed.getRight();
-        }
-        return null;
+        return unwrapCacheLoaderException(() -> {
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = refCache.get(key);
+            if (computed != null) {
+                return computed.getRight();
+            }
+            return null;
+        });
     }
 
-    private Either<Optional<StoreInfo>, Pair<String, UserData>> mapKey(final String key,
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> value) {
-        if (value == null || !value.isRight()) {
-            Pair<String, UserData> user;
-            try {
-                user = source.getUser(key, this.ref);
-            } catch (Exception e) {
-                throw new WrappingAPIException(e);
-            }
-            if (user != null && user.isPresent()) {
-                return Either.right(user);
-            }
-            return Either.right(Pair.ofNothing());
+    private Either<Optional<StoreInfo>, Pair<String, UserData>> mapUserKey(final String key) {
+        Pair<String, UserData> user;
+        try {
+            user = source.getUser(key, ref);
+        } catch (Exception e) {
+            throw new WrappingAPIException(e);
         }
-        return value;
+        if (user != null && user.isPresent()) {
+            return Either.right(user);
+        }
+        return Either.right(Pair.ofNothing());
     }
 
     public Either<String, FailedToLock> updateUser(final String userKeyPath, final String username, UserData data,
@@ -329,11 +292,11 @@ public class RefHolder implements RefLockHolder {
         Objects.requireNonNull(version);
         Objects.requireNonNull(username);
         return lockWrite(() -> {
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get(key);
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.peek(key);
             final Pair<String, UserData> userKeyData;
             if (keyDataHolder == null || keyDataHolder.isLeft()) {
                 userKeyData = getUser(key);
-                if(userKeyData == null) {
+                if (userKeyData == null) {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
             } else {
@@ -382,19 +345,21 @@ public class RefHolder implements RefLockHolder {
 
     public void deleteUser(final String userKeyPath, final String username) {
         final String key = JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
-        write(() -> {
+        lockWrite(() -> {
             try {
                 refCache.remove(key);
                 source.deleteUser(key, ref, username);
+                return null;
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to delete " + key, e);
             }
-        });
+        }, key);
     }
-
+    // This is inefficient. Plan is to remove this
     private static class RefLock {
 
-        private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+        private final ReentrantLock lock = new ReentrantLock(true);
+        private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
         private final Map<String, Thread> activeKeys = new ConcurrentHashMap<>();
 
         public <T> Either<T, FailedToLock> lockWrite(final Supplier<T> supplier, final String key, final String ref) {
@@ -408,62 +373,33 @@ public class RefHolder implements RefLockHolder {
             return Either.right(new FailedToLock(ref + "/" + key));
         }
 
-        public <T> T write(final Supplier<T> supplier) {
-            lock.writeLock().lock();
-            try {
-                return supplier.get();
-            } finally {
-                lock.writeLock().unlock();
-            }
-        }
-
-        public void write(final Runnable runnable) {
-            lock.writeLock().lock();
-            try {
-                runnable.run();
-            } finally {
-                lock.writeLock().unlock();
-            }
-        }
-
-        public <T> T read(final Supplier<T> supplier) {
-            lock.readLock().lock();
-            try {
-                return supplier.get();
-            } finally {
-                lock.readLock().unlock();
-            }
-        }
-
         private boolean tryLock(final String key) {
-            if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null
-                    || activeKeys.get(key) == Thread.currentThread()) {
-                lock.writeLock().lock();
-                return true;
+            rwLock.readLock().lock();
+            try {
+                if (activeKeys.putIfAbsent(key, Thread.currentThread()) == null
+                        || activeKeys.get(key) == Thread.currentThread()) {
+                    lock.lock();
+                    return true;
+                }
+                return false;
+            } finally {
+                rwLock.readLock().unlock();
             }
-            return false;
         }
 
         private void unlock(final String key) {
-            lock.writeLock().unlock();
+            lock.unlock();
             activeKeys.remove(key);
         }
 
-        public boolean reloadAll(final Runnable runnable) {
-            if (lock.isWriteLockedByCurrentThread()) {
-                runnable.run();
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier, String ref) {
-            if (lock.writeLock().tryLock()) {
+        public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier, final String ref) {
+            if (lock.tryLock()) {
                 try {
+                    rwLock.writeLock().lock();
                     return Either.left(supplier.get());
                 } finally {
-                    lock.writeLock().unlock();
+                    rwLock.writeLock().unlock();
+                    lock.unlock();
                 }
             }
             return Either.right(new FailedToLock(ref));
@@ -471,18 +407,43 @@ public class RefHolder implements RefLockHolder {
     }
 
     public void reload() {
-        write(() -> {
+        final Supplier<Runnable> r = () -> {
             LOG.info("Reloading {}", ref);
-            final Map<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
-            refCache = getStorage(refCache.size());
-            return (Runnable) () -> {
-                oldRefCache.entrySet().stream()
+            final Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache;
+            refCache = getStorage(MAX_ENTRIES);
+            return () -> {
+                StreamSupport.stream(oldRefCache.entries().spliterator(), true)
                         .filter(e -> {
                             final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
                             return (value.isLeft() && value.getLeft().isPresent());
-                        }).map(Entry::getKey)
-                        .forEach(key -> CompletableFuture.runAsync(() -> loadAndStore(key)));
+                        }).map(CacheEntry<String, Either<Optional<StoreInfo>, Pair<String, UserData>>>::getKey)
+                        .forEach(key -> CompletableFuture.runAsync(() -> refCache.get(key)));
+                oldRefCache.close();
             };
-        }).run();
+        };
+        r.get().run();
+    }
+
+    private <T> T unwrapCacheLoaderException(final Supplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (CacheLoaderException cle) {
+            final Throwable cause = cle.getCause();
+            if (cause != null) {
+                if (cause instanceof LoadException) {
+                    throw (LoadException) cause;
+                }
+                if (cause instanceof UncheckedIOException) {
+                    throw (UncheckedIOException) cause;
+                }
+                if (cause instanceof WrappingAPIException) {
+                    throw (WrappingAPIException) cause;
+                }
+                if (cause instanceof RuntimeException) {
+                    throw (RuntimeException) cause;
+                }
+            }
+            throw cle;
+        }
     }
 }
