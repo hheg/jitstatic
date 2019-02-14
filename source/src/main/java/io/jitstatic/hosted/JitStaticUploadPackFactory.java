@@ -20,6 +20,10 @@ package io.jitstatic.hosted;
  * #L%
  */
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -31,13 +35,18 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.transport.PreUploadHookChain;
 import org.eclipse.jgit.transport.UploadPack;
+import org.eclipse.jgit.transport.WantNotValidException;
 import org.eclipse.jgit.transport.UploadPack.RequestPolicy;
+import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServletRequest> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(UploadPack.class);
     private final ExecutorService executorService;
 
     public JitStaticUploadPackFactory(ExecutorService executorService) {
@@ -56,10 +65,24 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
     @Override
     public UploadPack create(final HttpServletRequest req, final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         if (db.getConfig().get(ServiceConfig::new).enabled) {
-            final PackConfig cfg = new PackConfig(db.getConfig());            
+            final PackConfig cfg = new PackConfig(db.getConfig());
             cfg.setExecutor(executorService);
-            final UploadPack jitStaticUploadPack = new UploadPack(db);
-            jitStaticUploadPack.setRequestPolicy(RequestPolicy.ANY);
+            final UploadPack jitStaticUploadPack = new UploadPack(db) {
+                @Override
+                public void upload(final InputStream input, final OutputStream output, final OutputStream messages) throws IOException {
+                    try {
+                        super.upload(input, output, messages);
+                    } catch (UploadPackInternalServerErrorException wnve) {
+                        final Throwable cause = wnve.getCause();
+                        if (cause instanceof WantNotValidException) {
+                            LOG.info("{}, aborting...", cause.getMessage());
+                        } else {
+                            throw wnve;
+                        }
+                    }
+                }
+            };
+            jitStaticUploadPack.setRequestPolicy(RequestPolicy.ADVERTISED);
             jitStaticUploadPack.setPackConfig(cfg);
             jitStaticUploadPack.setPreUploadHook(PreUploadHookChain.newChain(List.of(new LogoPoster())));
             jitStaticUploadPack.setRefFilter(new JitStaticRefFilter(req));
