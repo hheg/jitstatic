@@ -333,10 +333,11 @@ public class CorsIT {
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
         assertEquals(
-                toSet(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                toSet(Arrays.asList(("X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
                         + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
-                        + JitStaticConstants.X_JITSTATIC_NAME).stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(Collectors.toList())),
+                        + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(Collectors.toList())),
                 toSet(headers.get("Access-Control-Allow-Headers")));
+
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
 
@@ -373,6 +374,87 @@ public class CorsIT {
         assertNotNull(responseHeaders.get("Content-Length"));
     }
 
+    @Test
+    public void testGetShouldntHaveCORSHeaders() throws UnirestException {
+        Map<String, String> headers = Map.of("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
+                .asString();
+        Headers responseHeaders = response.getHeaders();
+        assertEquals(null, responseHeaders.get("Access-Control-Expose-Headers"));
+    }
+
+    @Test
+    public void testMultipleDeclaredAccessHeaders() throws UnirestException {
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort()))
+                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Access-Control-Request-Method", "DELETE")
+                .header("Access-Control-Request-Headers", "content-type,if-match")
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MESSAGE)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_NAME)
+                .header("Origin", "http://localhost")
+                .asString();
+        Headers headers = response.getHeaders();
+        printHeaders(headers);
+        assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
+        assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
+        assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
+        assertEquals(
+                toSet(Arrays.asList(("x-test,X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                        + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
+                        + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(Collectors.toList())),
+                toSet(headers.get("Access-Control-Allow-Headers")));
+        assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
+    }
+
+    @Test
+    public void testMetaDataResource() throws UnirestException {
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/file2", DW.getLocalPort()))
+                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Access-Control-Request-Method", "PUT")
+                .header("Access-Control-Request-Headers", "content-type,if-match")
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MESSAGE)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_NAME)
+                .header("Origin", "http://localhost")
+                .asString();
+        Headers headers = response.getHeaders();
+        printHeaders(headers);
+        assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
+        assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
+        assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
+        assertEquals(
+                Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toList())),
+                Set.of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
+                        .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
+        assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
+    }
+
+    @Test
+    public void testUserDataResource() throws UnirestException {
+        HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/users/keyuser/keyuser", DW.getLocalPort()))
+                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Access-Control-Request-Method", "PUT")
+                .header("Access-Control-Request-Headers", "content-type,if-match")
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MESSAGE)
+                .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_NAME)
+                .header("Origin", "http://localhost")
+                .asString();
+        Headers headers = response.getHeaders();
+        printHeaders(headers);
+        assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
+        assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
+        assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
+        assertEquals(
+                Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toList())),
+                Set.of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
+                        .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
+        assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
+    }
+    
     private void printHeaders(Headers result) {
         result.entrySet().forEach(System.out::println);
     }

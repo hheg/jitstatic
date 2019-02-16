@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -98,10 +99,12 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @Path("storage")
 //TODO Remove this SpotBugs Error
-@SuppressFBWarnings(value="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",justification="This is a false positive in Java 11, should be removed")
+@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class KeyResource {
-    private final String defaultRef;
     private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
+    private static final String COMMA_REGEX = ",";
+    private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+    private final String defaultRef;
     private static final String LOGGED_IN_AND_ACCESSED_KEY = "{} logged in and accessed key {} in {}";
     private static final String RESOURCE_IS_DENIED_FOR_USER = "Resource {} in {} is denied for user {}";
     private static final String UTF_8 = "utf-8";
@@ -205,8 +208,9 @@ public class KeyResource {
             return Response.status(Status.NOT_FOUND).build();
         }
 
-        return Response
-                .ok(new KeyDataWrapper(list.stream().map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p)).collect(Collectors.toList())))
+        return Response.ok(new KeyDataWrapper(list.stream()
+                .map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p))
+                .collect(Collectors.toList())))
                 .build();
     }
 
@@ -216,25 +220,11 @@ public class KeyResource {
                 is.transferTo(output);
             }
         };
-        final ResponseBuilder responseBuilder = Response.ok(so).header(HttpHeaders.CONTENT_TYPE, data.getContentType())
-                .header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag);
-        final List<HeaderPair> headers = data.getHeaders();
-        if (headers != null) {
-            final Set<String> declaredHeaders = new HashSet<>();
-            for (HeaderPair headerPair : headers) {
-                final String header = headerPair.getHeader();
-                responseBuilder.header(header, headerPair.getValue());
-                declaredHeaders.add(header.toLowerCase(Locale.ROOT));
-            }
-            if (cors && !declaredHeaders.isEmpty()) {
-                final String defaultExposedHeaders = response.getHeader(ACCESS_CONTROL_EXPOSE_HEADERS);
-                final Set<String> exposedHeaders = defaultExposedHeaders != null
-                        ? Arrays.stream(defaultExposedHeaders.split(",")).map(deh -> deh.toLowerCase(Locale.ROOT)).collect(Collectors.toSet())
-                        : Set.of();
-                declaredHeaders.addAll(exposedHeaders);
-                response.setHeader(ACCESS_CONTROL_EXPOSE_HEADERS, declaredHeaders.stream().collect(Collectors.joining(",")));
-            }
-        }
+        final ResponseBuilder responseBuilder = Response.ok(so)
+                .header(HttpHeaders.CONTENT_TYPE, data.getContentType())
+                .header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+                .tag(tag);
+        extractResponseHeaders(data, response, responseBuilder);
         return responseBuilder.build();
     }
 
@@ -435,12 +425,12 @@ public class KeyResource {
         if (!cors) {
             return;
         }
-        List<String> declared = new ArrayList<>();
-        if (requestingDelete(request.getHeader("Access-Control-Request-Method"))) {
+        final List<String> declared = new ArrayList<>();
+        if (requestingDelete(request.getHeader(ACCESS_CONTROL_REQUEST_METHOD))) {
             if (ref != null && ref.startsWith("refs/tags/")) {
                 return;
             }
-            declared = Arrays.asList(X_JITSTATIC_NAME, X_JITSTATIC_MESSAGE, X_JITSTATIC_MAIL);
+            declared.addAll(List.of(X_JITSTATIC_NAME, X_JITSTATIC_MESSAGE, X_JITSTATIC_MAIL));
         }
 
         final Pair<MetaData, String> metaKey = storage.getMetaKey(key, ref);
@@ -460,7 +450,7 @@ public class KeyResource {
         if (requestMethod == null) {
             return false;
         }
-        final String[] methods = requestMethod.split(",");
+        final String[] methods = requestMethod.split(COMMA_REGEX);
         for (String m : methods) {
             if ("DELETE".equalsIgnoreCase(m.trim())) {
                 return true;
@@ -479,5 +469,27 @@ public class KeyResource {
             throw new WebApplicationException("Missing " + headerName, Status.BAD_REQUEST);
         }
         return headers;
+    }
+    
+    private void extractResponseHeaders(final MetaData data, final HttpServletResponse response, final ResponseBuilder responseBuilder) {
+        final List<HeaderPair> headers = data.getHeaders();
+        if (headers != null) {
+            final Set<String> declaredHeaders = new HashSet<>();
+            for (HeaderPair headerPair : headers) {
+                final String header = headerPair.getHeader();
+                responseBuilder.header(header, headerPair.getValue());
+                declaredHeaders.add(header.toLowerCase(Locale.ROOT));
+            }
+            final Collection<String> accessControlExposeHeaders = response.getHeaders(ACCESS_CONTROL_EXPOSE_HEADERS);
+            if (cors && !declaredHeaders.isEmpty() && (accessControlExposeHeaders != null && !accessControlExposeHeaders.isEmpty())) {
+                final Set<String> exposedHeaders = accessControlExposeHeaders.stream()
+                        .map(aceh -> Arrays.stream(aceh.split(","))
+                                .map(deh -> deh.trim().toLowerCase(Locale.ROOT)))
+                        .flatMap(s -> s)
+                        .collect(Collectors.toSet());
+                declaredHeaders.addAll(exposedHeaders);
+                response.setHeader(ACCESS_CONTROL_EXPOSE_HEADERS, declaredHeaders.stream().collect(Collectors.joining(",")));
+            }
+        }
     }
 }
