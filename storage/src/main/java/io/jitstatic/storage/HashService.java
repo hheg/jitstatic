@@ -49,7 +49,7 @@ public class HashService implements Serializable {
     private static final long serialVersionUID = 7794693770611224576L;
 
     public boolean hasSamePassword(final UserData data, final String password) {
-        if (data.getBasicPassword() == null) {
+        if (data.getBasicPassword() == null || (data.getHash() != null && data.getSalt() != null)) {
             final DefaultHashService hasher = new DefaultHashService();
             if (privateSalt != null) {
                 hasher.setPrivateSalt(ByteSource.Util.bytes(privateSalt));

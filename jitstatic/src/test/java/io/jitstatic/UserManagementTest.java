@@ -504,7 +504,7 @@ public class UserManagementTest {
             assertNotNull(adminUser.data);
             io.jitstatic.api.UserData value = MAPPER.treeToValue(adminUser.data, io.jitstatic.api.UserData.class);
             assertEquals(keyAdminUserData.getRoles(), value.getRoles());
-            assertEquals(keyAdminUserData.getBasicPassword(), value.getBasicPassword());            
+            assertEquals(keyAdminUserData.getBasicPassword(), value.getBasicPassword());
             assertNotNull(adminUser.tag);
         }
     }
@@ -1074,6 +1074,35 @@ public class UserManagementTest {
             Entity<JsonNode> gu = client.getKey("file", tf);
             assertNotNull(gu);
             assertNotNull(gu.data.toString());
+        }
+    }
+
+    @Test
+    public void testUserWithBothPasswordAnd() throws Exception {
+        try (JitStaticClient client = buildClient().setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            Entity<io.jitstatic.api.UserData> user = client.getUser(KEYUSER, "refs/heads/master", null, uf);
+            client.modifyUser(KEYUSER, "refs/heads/master", from(user.data.getRoles(), "111"), user.tag);
+        }
+
+        Path workingFolder = getFolder();
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPUSH, GITUSERPUSHPASS);
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+
+            Path users = workingFolder.resolve(USERS);
+            Path keyUserRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
+
+            Path keyUserNoPush = keyUserRealm.resolve(KEYUSER);
+            UserData userData = MAPPER.readValue(keyUserNoPush.toFile(), UserData.class);
+            UserData modified = new UserData(userData.getRoles(), "222", userData.getSalt(), userData.getHash());
+            Files.write(MAPPER.writeValueAsBytes(modified), keyUserNoPush.toFile());
+            commit(git, provider);
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword("111").build();) {
+            Entity<JsonNode> user = client.getKey("file", "refs/heads/master", null, tf);
+            assertTrue(user != null);
+        }
+        try (JitStaticClient client = buildClient().setUser(KEYUSER).setPassword("222").build();) {
+            assertThrows(APIException.class, () -> client.getKey("file", "refs/heads/master", null, tf));
         }
     }
 
