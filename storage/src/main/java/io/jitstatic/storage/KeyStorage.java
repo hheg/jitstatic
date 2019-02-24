@@ -135,7 +135,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     }
 
     private boolean checkKeyIsDotFile(final String key) {
-        return Tree.of(List.of(Pair.of(key, false))).accept(new DotFinderVisitor());
+        return Tree.of(List.of(Pair.of(key, false))).accept(new Tree.DotFinder());
     }
 
     private RefHolder getRefHolder(final String finalRef) {
@@ -322,7 +322,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
         Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
-        return Tree.of(keyPairs).accept(new PathBuilderVisitor())
+        return Tree.of(keyPairs).accept(new Tree.Extractor())
                 .parallelStream()
                 .map(pair -> {
                     final String key = pair.getLeft();

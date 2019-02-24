@@ -4,7 +4,7 @@ package io.jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,23 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import io.jitstatic.storage.Tree.Branch;
-import io.jitstatic.storage.Tree.Leaf;
+import io.jitstatic.storage.Tree.AnchorNode;
+import io.jitstatic.storage.Tree.BranchNode;
+import io.jitstatic.storage.Tree.LeafNode;
+import io.jitstatic.storage.Tree.LevelNode;
+import io.jitstatic.storage.Tree.RootNode;
+import io.jitstatic.storage.Tree.StarNode;
 
-public interface TreeVisitor<T> {
-    public T visit(Tree tree);
+public interface TreeVisitor<U extends Comparable<U>, X, T> {
+    public T visit(RootNode<U, X> node);
 
-    public T visit(Branch tree);
+    public T visit(BranchNode<U, X> node);
 
-    public T visit(Leaf tree);
+    public T visit(LeafNode<U, X> node);
+
+    public T visit(AnchorNode<U, X> node);
+
+    public T visit(StarNode<U, X> node);
+
+    public T visit(LevelNode<U, X> node);
 }

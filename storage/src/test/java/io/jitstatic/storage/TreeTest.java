@@ -4,7 +4,7 @@ package io.jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ package io.jitstatic.storage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -30,124 +31,317 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import io.jitstatic.storage.Tree.Extractor;
+import io.jitstatic.storage.Tree.Node;
 import io.jitstatic.utils.Pair;
 
 public class TreeTest {
-    // @formatter:off
     private List<Pair<String, Boolean>> data = List.of(
-            Pair.of("/", false), 
+            Pair.of("/", false),
             Pair.of("dir0/dir1/dir3/file1", false),
-            Pair.of("dir0/dir1/dir3/file8", false), 
-            Pair.of("dir0/dir1/dir3/file9", false), 
+            Pair.of("dir0/dir1/dir3/file8", false),
+            Pair.of("dir0/dir1/dir3/file9", false),
             Pair.of("dir0/dir1/file2", false),
-            Pair.of("dir0/dir1/", false), 
-            Pair.of("dir0/dir2/file3", false), 
+            Pair.of("dir0/dir1/", false),
+            Pair.of("dir0/dir2/file3", false),
+            Pair.of("dir0/dir2/file3", false),
             Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
-            Pair.of("dir0/dir1/file4", true), 
-            Pair.of("file5", false), 
+            Pair.of("dir0/dir1/file4", false),
+            Pair.of("dir0/dir2/", true),
+            Pair.of("file5", false),
+            Pair.of("dir0/dir2/file4", false),
+            Pair.of("dir0/dir2/file5", false),
             Pair.of("dir6/file7", false));
-    // @formatter:on
+    private List<Pair<String, Boolean>> expected = List.of(
+            Pair.of("/", false),
+            Pair.of("dir0/dir1/", false),
+            Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
+            Pair.of("dir0/dir1/dir3/file1", false),
+            Pair.of("dir0/dir1/dir3/file8", false),
+            Pair.of("dir0/dir1/dir3/file9", false),
+            Pair.of("dir0/dir2/", true),
+            Pair.of("dir6/file7", false));
 
     @Test
-    public void testDeboneFolderWithFile() {
-        Tree tree = Tree.of(List.of(Pair.of("dir6/file7", false)));
-        assertTrue(tree.getBranches().size() == 1);
-        Tree branch = tree.getBranches().iterator().next();
-        assertTrue(branch.getName().equals("dir6"));
-        assertTrue(branch.getBranches().isEmpty());
-        assertTrue(branch.getLeafs().size() == 1);
-        Tree leaf = branch.getLeafs().iterator().next();
-        assertTrue(leaf.getName().equals("file7"));
+    public void testGeneral2() {
+        Tree t = Tree.of(data);
+        List<Pair<String, Boolean>> actual = t.accept(new Tree.Extractor());
+        assertEquals(expected, actual);
     }
 
     @Test
-    public void testDeboneFolderWithLevel() {
-        Tree tree = Tree.of(List.of(Pair.of("dir6/file7", false), Pair.of("dir6/", false), Pair.of("dir6/dir7/file10", false)));
-        ByteArrayOutputStream byteArrayOutputStream1 = new ByteArrayOutputStream();
-        tree.accept(new PrintingVisitor(byteArrayOutputStream1));
-        Tree expected = Tree.of(List.of(Pair.of("dir6/dir7/file10", false), Pair.of("dir6/", false)));
-        assertEquals(expected, tree);
-        ByteArrayOutputStream byteArrayOutputStream2 = new ByteArrayOutputStream();
-        tree.accept(new PrintingVisitor(byteArrayOutputStream2));
-        assertEquals(new String(byteArrayOutputStream1.toByteArray()), new String(byteArrayOutputStream2.toByteArray()));
+    public void testOrderingAndStarNode() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/", true),
+                Pair.of("dir0/dir2/file4", false),
+                Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
+                Pair.of("dir0/dir2/", true));
+        assertEquals(expected, actual);
     }
 
     @Test
-    public void testDeboneFolderWithAll() {
-        Tree tree = Tree.of(List.of(Pair.of("dir6/file7", false), Pair.of("dir6/", true), Pair.of("dir6/dir7/file10", false)));
-        tree.accept(new PrintingVisitor(System.out));
-        assertTrue(tree.getBranches().size() == 1);
-        Tree branch = tree.getBranches().iterator().next();
-        assertTrue(branch.getName().equals("dir6"));
-        assertTrue(branch.getBranches().isEmpty());
-        assertTrue(branch.getLeafs().isEmpty());
+    public void testAllFilesInSubfolder() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/", false),
+                Pair.of("dir0/dir2/file4", false),
+                Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir2/", false),
+                Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testAllFilesInSubfolder2() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/file3", false),
+                Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false),
+                Pair.of("dir0/dir2/", false),
+                Pair.of("dir0/dir2/file4", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir2/", false),
+                Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testLevelRoot() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/", false),
+                Pair.of("file1", false),
+                Pair.of("dir0/file1", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", false),
+                Pair.of("dir0/file1", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testStarRoot() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/", true),
+                Pair.of("dir0/file1", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", true));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testNameClash() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testNameClashReverse() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1", false),
+                Pair.of("dir0/dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testPrePendedSlash() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/dir0/dir1", false),
+                Pair.of("dir0/dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testPrePendedSlashAndMiddle() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("///dir0/dir1", false),
+                Pair.of("dir0//dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testNodeEquals() {
+        Node<String, Void> n1 = new Tree.BranchNode<>("1");
+        Node<String, Void> n11 = new Tree.BranchNode<>("1");
+        assertEquals(n1, n11);
+    }
+
+    @Test
+    public void testNodeSame() {
+        Node<String, Void> n1 = new Tree.BranchNode<>("1");
+        assertSame(n1, n1);
+    }
+
+    @Test
+    public void testNodeNotEquals() {
+        Node<String, Void> n1 = new Tree.BranchNode<>("1");
+        Node<String, Void> n2 = new Tree.BranchNode<>("2");
+        assertNotEquals(n1, n2);
     }
 
     @Test
     public void testDeboneFolderWithLevelAndFiles() {
-        // @formatter:off
-        Tree tree = Tree.of(List.of(
-                Pair.of("dir0/dir1/dir3/file1", false), 
+        Tree data = Tree.of(List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
                 Pair.of("dir0/dir1/dir3/file8", false),
-                Pair.of("dir0/dir1/dir3/file9", false), 
-                Pair.of("dir0/dir1/file2", false), 
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false)));
-        tree.accept(new PrintingVisitor(System.out));
-        Tree expected = Tree.of(List.of(
-                Pair.of("dir0/dir1/dir3/file1", false), 
+        List<Pair<String, Boolean>> actual = data.accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
                 Pair.of("dir0/dir1/dir3/file8", false),
-                Pair.of("dir0/dir1/dir3/file9", false), 
+                Pair.of("dir0/dir1/dir3/file9", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testNotEqualsTrees() {
+        Tree data = Tree.of(List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false)));
-        // @formatter:on
-        assertEquals(expected, tree);
+        List<Pair<String, Boolean>> actual = data.accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/dir3/file7", false),
+                Pair.of("dir0/dir1/", false));
+        assertNotEquals(expected, actual);
     }
 
     @Test
-    public void testPrintStream() {
-        Tree tree = Tree.of(data);
-        tree.accept(new PrintingVisitor(System.out));
-        System.out.println(tree);
+    public void testHasRootDot() {
+        Tree tree = Tree.of(List.of(Pair.of(".users/git/blah", false)));
+        assertTrue(tree.accept(new Tree.DotFinder()));
     }
 
     @Test
-    public void testEquals() {
-        Tree tree1 = Tree.of(data);
-        Tree tree2 = Tree.of(data);
-        assertEquals(tree1, tree2);
-        assertEquals(tree1.hashCode(), tree2.hashCode());
+    public void testDirHasDot() {
+        Tree tree = Tree.of(List.of(Pair.of("users/.git/blah", false)));
+        assertTrue(tree.accept(new Tree.DotFinder()));
     }
 
     @Test
-    public void testNotEquals() {
-        Tree tree1 = Tree.of(data);
-        Tree tree2 = Tree.of(List.of(Pair.of("dir0/dir1/", false)));
-        assertNotEquals(tree2, tree1);
+    public void testFileHasDot() {
+        Tree tree = Tree.of(List.of(Pair.of("users/git/.blah", false)));
+        assertTrue(tree.accept(new Tree.DotFinder()));
     }
 
     @Test
-    public void testIdempotency() {
-        Tree tree = Tree.of(data);
-        List<Pair<String, Boolean>> shuffled = new ArrayList<>(data);
-        Collections.shuffle(shuffled);
-        Tree shuffledTree = Tree.of(shuffled);
-        assertEquals(tree, shuffledTree);
+    public void testHasNoDot() {
+        Tree tree = Tree.of(List.of(Pair.of("users/git/blah", false)));
+        assertFalse(tree.accept(new Tree.DotFinder()));
     }
 
     @Test
-    public void testAll() {
-        Tree tree = Tree.of(List.of(Pair.of("/", true), Pair.of("file1", false), Pair.of("dir1/file2", false)));
-        assertTrue(tree.getBranches().isEmpty());
-        assertTrue(tree.getLeafs().isEmpty());
-        assertEquals("/", tree.getName());
+    public void testLastDirHasDot() {
+        Tree tree = Tree.of(List.of(Pair.of("users/git/.blah/", false)));
+        assertTrue(tree.accept(new Tree.DotFinder()));
     }
 
     @Test
-    public void testTreeAllAndLevel() {
-        Tree all = Tree.of(List.of(Pair.of("/", true)));
-        Tree level = Tree.of(List.of(Pair.of("/", false)));
-        assertFalse(all.equals(level));
+    public void testStarNodeLastDirHasDot() {
+        Tree tree = Tree.of(List.of(Pair.of("users/git/.blah/", true)));
+        assertTrue(tree.accept(new Tree.DotFinder()));
     }
 
+    @Test
+    public void testBuildPathWithDirectoryAndFile() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testBuildPathWithRootDirectoryAndFile() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testBuildPathWithRootDirectoryAll() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/", true),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", true));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testBuildPathWithLeafs() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", true),
+                Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
+                Pair.of("dir0/dir1/file4", true),
+                Pair.of("file5", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        var expected = List.of(
+                Pair.of("dir0/dir1/", true), 
+                Pair.of("file5", false));
+        assertEquals(expected, actual);
+    }
 }
