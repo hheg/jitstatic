@@ -4,7 +4,7 @@ package io.jitstatic.storage;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,6 @@ package io.jitstatic.storage;
  * #L%
  */
 
-public interface TreeVisitable {
-    public <T> T accept(TreeVisitor<T> visitor);
+public interface TreeVisitable<U extends Comparable<U>, X> {
+    public <T> T accept(TreeVisitor<U, X, T> visitor);
 }
