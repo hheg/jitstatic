@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
 import org.cache2k.integration.CacheLoader;
-import org.cache2k.integration.CacheLoaderException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
@@ -135,7 +134,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     }
 
     private boolean checkKeyIsDotFile(final String key) {
-        return Tree.of(List.of(Pair.of(key, false))).accept(new Tree.DotFinder());
+        return Tree.of(List.of(Pair.of(key, false))).accept(Tree.DOT_FINDER);
     }
 
     private RefHolder getRefHolder(final String finalRef) {

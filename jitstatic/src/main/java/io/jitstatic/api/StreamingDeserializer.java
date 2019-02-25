@@ -45,7 +45,7 @@ import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.FilesUtils;
 
 public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider> {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(StreamingDeserializer.class);
     private static final int DEFAULT_MAX_BYTE_SIZE = 10_000_000;
     private static final int MAX_FILE_SIZE = Integer.MAX_VALUE - 1;
@@ -110,7 +110,8 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
                 if (dfos.isInMemory()) {
                     return new ByteArrayInputStream(dfos.getData());
                 }
-                return new ProxyInputStream(Files.newInputStream(dfos.getFile().toPath(), StandardOpenOption.READ)) {
+                final Path tmpPath = dfos.getFile().toPath();
+                return new ProxyInputStream(Files.newInputStream(tmpPath, StandardOpenOption.READ)) {
                     @Override
                     public void close() throws IOException {
                         try {
@@ -118,12 +119,11 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
                         } finally {
                             CompletableFuture.runAsync(() -> {
                                 try {
-                                    Path path = dfos.getFile().toPath();
-                                    if (!Files.deleteIfExists(path)) {
-                                        Files.delete(path);
+                                    if (!Files.deleteIfExists(tmpPath)) {
+                                        Files.delete(tmpPath);
                                     }
                                 } catch (IOException e) {
-                                   LOG.warn("Error deleting temporary file",e);
+                                    LOG.warn("Error deleting temporary file", e);
                                 }
                             });
                         }

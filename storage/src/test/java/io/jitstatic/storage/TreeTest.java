@@ -26,15 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.storage.Tree.Extractor;
 import io.jitstatic.storage.Tree.Node;
 import io.jitstatic.utils.Pair;
 
@@ -66,7 +61,7 @@ public class TreeTest {
             Pair.of("dir6/file7", false));
 
     @Test
-    public void testGeneral2() {
+    public void testGeneral() {
         Tree t = Tree.of(data);
         List<Pair<String, Boolean>> actual = t.accept(new Tree.Extractor());
         assertEquals(expected, actual);
@@ -131,10 +126,61 @@ public class TreeTest {
     }
 
     @Test
+    public void testLevelRootReverse() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("file1", false),
+                Pair.of("dir0/file1", false),
+                Pair.of("/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", false),
+                Pair.of("dir0/file1", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testLevelInsertion() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/file3", false),
+                Pair.of("dir0/dir1/file3", false),
+                Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
+                Pair.of("dir0/dir1/file4", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("file5", false),
+                Pair.of("dir0/dir1/file4", false),
+                Pair.of("dir0/dir1/file5", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("file5", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void testStarRoot() {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("/", true),
                 Pair.of("dir0/file1", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", true));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testStarRootReverse() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/file1", false),
+                Pair.of("/", true));
         List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", true));
@@ -187,21 +233,34 @@ public class TreeTest {
 
     @Test
     public void testNodeEquals() {
-        Node<String, Void> n1 = new Tree.BranchNode<>("1");
-        Node<String, Void> n11 = new Tree.BranchNode<>("1");
+        Node<String, Void> r = new Tree.AnchorNode<>("");
+        Node<String, Void> n1 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
+        Node<String, Void> n11 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
         assertEquals(n1, n11);
     }
 
     @Test
     public void testNodeSame() {
-        Node<String, Void> n1 = new Tree.BranchNode<>("1");
+        Node<String, Void> r = new Tree.AnchorNode<>("");
+        Node<String, Void> n1 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
         assertSame(n1, n1);
     }
 
     @Test
     public void testNodeNotEquals() {
-        Node<String, Void> n1 = new Tree.BranchNode<>("1");
-        Node<String, Void> n2 = new Tree.BranchNode<>("2");
+        Node<String, Void> r = new Tree.AnchorNode<>("");
+        Node<String, Void> n1 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
+        Node<String, Void> n2 = new Tree.BranchNode<>("2", r.findNodeWith("/").get());
+        assertNotEquals(n1, n2);
+    }
+
+    @Test
+    public void testLeafNodeEquals() {
+        Node<String, Void> r = new Tree.AnchorNode<>("");
+        Node<String, Void> p1 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
+        Node<String, Void> p2 = new Tree.BranchNode<>("2", r.findNodeWith("/").get());
+        Node<String, Void> n1 = new Tree.LeafNode<>("1", p1);
+        Node<String, Void> n2 = new Tree.LeafNode<>("2", p2);
         assertNotEquals(n1, n2);
     }
 
@@ -243,37 +302,37 @@ public class TreeTest {
     @Test
     public void testHasRootDot() {
         Tree tree = Tree.of(List.of(Pair.of(".users/git/blah", false)));
-        assertTrue(tree.accept(new Tree.DotFinder()));
+        assertTrue(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
     public void testDirHasDot() {
         Tree tree = Tree.of(List.of(Pair.of("users/.git/blah", false)));
-        assertTrue(tree.accept(new Tree.DotFinder()));
+        assertTrue(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
     public void testFileHasDot() {
         Tree tree = Tree.of(List.of(Pair.of("users/git/.blah", false)));
-        assertTrue(tree.accept(new Tree.DotFinder()));
+        assertTrue(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
     public void testHasNoDot() {
         Tree tree = Tree.of(List.of(Pair.of("users/git/blah", false)));
-        assertFalse(tree.accept(new Tree.DotFinder()));
+        assertFalse(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
     public void testLastDirHasDot() {
         Tree tree = Tree.of(List.of(Pair.of("users/git/.blah/", false)));
-        assertTrue(tree.accept(new Tree.DotFinder()));
+        assertTrue(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
     public void testStarNodeLastDirHasDot() {
         Tree tree = Tree.of(List.of(Pair.of("users/git/.blah/", true)));
-        assertTrue(tree.accept(new Tree.DotFinder()));
+        assertTrue(tree.accept(Tree.DOT_FINDER));
     }
 
     @Test
@@ -328,6 +387,63 @@ public class TreeTest {
     }
 
     @Test
+    public void testRootStarAndLabelMixed() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("/", true),
+                Pair.of("/", false),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", true));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testRootStarAndLabelMixed2() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir2/file1", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/dir2/", true),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/dir2/file2", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir2/", true),
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testSeveralLevelOfLevels() {
+        List<Pair<String, Boolean>> data = List.of(
+                Pair.of("dir0/dir1/dir3/file1", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/", false),
+                Pair.of("dir0/dir1/dir3/file8", false),
+                Pair.of("dir0/dir1/dir3/file9", false),
+                Pair.of("dir0/dir1/file2", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("/", false));
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> expected = List.of(
+                Pair.of("/", false),
+                Pair.of("dir0/dir1/", false),
+                Pair.of("dir0/dir1/dir3/", false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void testBuildPathWithLeafs() {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("dir0/dir1/dir3/file1", false),
@@ -340,8 +456,18 @@ public class TreeTest {
                 Pair.of("file5", false));
         List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
         var expected = List.of(
-                Pair.of("dir0/dir1/", true), 
+                Pair.of("dir0/dir1/", true),
                 Pair.of("file5", false));
         assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testSearchNode() {
+        Node<String, Void> r = new Tree.AnchorNode<>("");
+        Node<String, Void> n1 = new Tree.BranchNode<>("1", r.findNodeWith("/").get());
+        Node<String, Void> n2 = new Tree.SearchNode<>("1");
+        assertEquals(n1, n2);
+        assertEquals(n2, n1);
+        assertEquals(n1.hashCode(), n2.hashCode());
     }
 }
