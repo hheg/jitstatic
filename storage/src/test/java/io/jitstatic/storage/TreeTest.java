@@ -62,9 +62,7 @@ public class TreeTest {
 
     @Test
     public void testGeneral() {
-        Tree t = Tree.of(data);
-        List<Pair<String, Boolean>> actual = t.accept(new Tree.Extractor());
-        assertEquals(expected, actual);
+        assertEquals(expected, Tree.of(data).accept(new Tree.Extractor()));
     }
 
     @Test
