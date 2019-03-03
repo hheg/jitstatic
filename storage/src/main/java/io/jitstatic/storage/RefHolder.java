@@ -295,7 +295,7 @@ public class RefHolder implements RefLockHolder {
             final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.peek(key);
             final Pair<String, UserData> userKeyData;
             if (keyDataHolder == null || keyDataHolder.isLeft()) {
-                userKeyData = getUser(key);
+                userKeyData = getUser(userKeyPath);
                 if (userKeyData == null) {
                     throw new WrappingAPIException(new UnsupportedOperationException(key));
                 }
