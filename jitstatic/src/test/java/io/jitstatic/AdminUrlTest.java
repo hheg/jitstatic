@@ -104,8 +104,7 @@ public class AdminUrlTest {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.post(String.format("http://localhost:%s/admin/tasks", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).asString();
-        // This is a bug in Dropwizard
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR_500, response.getStatus());
+        assertEquals(HttpStatus.NOT_FOUND_404, response.getStatus());
     }
     
     private Supplier<String> getFolder() {

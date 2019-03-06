@@ -26,11 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import io.jitstatic.utils.Pair;
 
 public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
+    public static final DotFinder DOT_FINDER = new DotFinder();
     private final Node<String, Pair<String, Boolean>> root;
     private static final String FWD_SLASH = "/";
 
@@ -38,11 +40,10 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         final Node<String, Pair<String, Boolean>> node = new AnchorNode<>(FWD_SLASH);
         for (Pair<String, Boolean> p : data) {
             String key = p.getLeft().replaceAll("/+", "/");
-            p = Pair.of(key, p.getRight());
             if (key.startsWith("/") && key.length() > 1) {
-                p = Pair.of(key.replaceFirst("^/+", ""), p.getRight());
+                key = key.replaceFirst("^/+", "");
             }
-            node.accept(new Inserter(p));
+            node.accept(new Inserter(Pair.of(key, p.getRight())));
         }
         this.root = node;
     }
@@ -52,7 +53,6 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
     }
 
     abstract static class Node<T extends Comparable<T>, X> implements TreeVisitable<T, X>, Comparable<Node<T, X>> {
-        protected final Collection<Node<T, X>> children;
         protected final T value;
         protected Node<T, X> parent;
 
@@ -61,12 +61,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         }
 
         Node(final T value, final Node<T, X> parent) {
-            this(value, parent, new TreeSet<>());
-        }
-
-        Node(final T value, final Node<T, X> parent, final Collection<Node<T, X>> children) {
             this.value = value;
-            this.children = children;
             this.parent = parent;
             if (parent != null) {
                 parent.addChild(this);
@@ -77,11 +72,11 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             if (child == this) {
                 throw new IllegalArgumentException("node can't be child and it's own parent");
             }
-            children.add(child);
+            getChildren().add(child);
         }
 
         protected void removeChild(final Node<T, X> child) {
-            children.remove(child);
+            getChildren().remove(child);
         }
 
         Node<T, X> createOrGetLeaf(final T value) {
@@ -92,12 +87,17 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             return findNodeWith(value).orElseGet(() -> new BranchNode<>(value, this));
         }
 
-        public boolean isLeaf() {
-            return children.isEmpty();
-        }
+        protected abstract Collection<Node<T, X>> getChildren();
 
-        private Optional<Node<T, X>> findNodeWith(final T value) {
-            return children.stream().filter(c -> c.value.equals(value)).findFirst();
+        protected abstract Optional<Node<T, X>> findNodeWith(final T value);
+
+        private static <T extends Comparable<T>, X> Optional<Node<T, X>> extractFromTreeSet(final TreeSet<Node<T, X>> children, final T value) {
+            final SortedSet<Node<T, X>> tailSet = children.tailSet(new SearchNode<>(value));
+            if (tailSet.isEmpty()) {
+                return Optional.empty();
+            }
+            final Node<T, X> first = tailSet.first();
+            return first.value.equals(value) ? Optional.of(first) : Optional.empty();
         }
 
         @Override
@@ -114,8 +114,10 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
                 return true;
             if (obj == null)
                 return false;
-            if (getClass() != obj.getClass())
-                return false;
+            if (getClass() != SearchNode.class && obj.getClass() != SearchNode.class) {
+                if (getClass() != obj.getClass())
+                    return false;
+            }
             @SuppressWarnings("rawtypes")
             Node other = (Node) obj;
             if (value == null) {
@@ -133,29 +135,81 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             }
             return this.value.compareTo(o.value);
         }
+    }
 
+    static final class SearchNode<T extends Comparable<T>, X> extends Node<T, X> {
+        private final Collection<Node<T, X>> children = List.of();
+
+        SearchNode(T value) {
+            super(value, null);
+
+        }
+
+        @Override
+        public <U> U accept(TreeVisitor<T, X, U> visitor) {
+            throw new UnsupportedOperationException(getClass() + ".accept(Treevisitor) is not supported");
+        }
+
+        @Override
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            throw new UnsupportedOperationException(getClass() + ".findNodeWith(T) is not supported");
+        }
+
+        @Override
+        public Node<T, X> createOrGetBranch(final T value) {
+            throw new UnsupportedOperationException(getClass() + ".createOrGetBranch(T) is not supported");
+        }
+
+        @Override
+        public Node<T, X> createOrGetLeaf(final T value) {
+            throw new UnsupportedOperationException(getClass() + ".createOrGetLeaf(T) is not supported");
+        }
+
+        @Override
+        protected void removeChild(final Node<T, X> child) {
+            throw new UnsupportedOperationException(getClass() + ".removeChild(Node) is not supported");
+        }
+
+        @Override
+        protected void addChild(final Node<T, X> child) {
+            throw new UnsupportedOperationException(getClass() + ".addChild(Node) is not supported");
+        }
+
+        @Override
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
+        }
     }
 
     static class BranchNode<T extends Comparable<T>, X> extends Node<T, X> {
-
-        public BranchNode(T value) {
-            this(value, null);
-        }
+        private final TreeSet<Node<T, X>> children;
 
         BranchNode(final T value, final Node<T, X> parent) {
-            super(value, parent);
+            super(value, Objects.requireNonNull(parent));
+            children = new TreeSet<>();
         }
 
         @Override
         public <U> U accept(final TreeVisitor<T, X, U> visitor) {
             return visitor.visit(this);
         }
+
+        @Override
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            return Node.extractFromTreeSet(children, value);
+        }
+
+        @Override
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
+        }
     }
 
-    static class AnchorNode<T extends Comparable<T>, X> extends Node<T, X> {
+    static final class AnchorNode<T extends Comparable<T>, X> extends Node<T, X> {
+        private final List<Node<T, X>> children = new ArrayList<>(1);
 
         AnchorNode(T value) {
-            super(null, null, new ArrayList<>(1));
+            super(null, null);
             new RootNode<>(value, this);
         }
 
@@ -170,18 +224,30 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         @Override
         public <U> U accept(final TreeVisitor<T, X, U> visitor) {
             // Skip visit this
-            return children.iterator().next().accept(visitor);
+            return getChildren().iterator().next().accept(visitor);
+        }
+
+        @Override
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            return Optional.of(children.get(0));
+        }
+
+        @Override
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
         }
     }
 
     static class LevelNode<T extends Comparable<T>, X> extends Node<T, X> {
+        private final TreeSet<Node<T, X>> children;
 
-        LevelNode(final T value, final Node<T, X> parent, final Collection<Node<T, X>> children) {
-            super(value, parent, children);
-            final Iterator<Node<T, X>> iterator = children.iterator();
+        LevelNode(final T value, final Node<T, X> parent, final TreeSet<Node<T, X>> inheritedChildren) {
+            super(value, parent);
+            children = inheritedChildren;
+            final Iterator<Node<T, X>> iterator = inheritedChildren.iterator();
             while (iterator.hasNext()) {
                 final Node<T, X> child = iterator.next();
-                if (child.isLeaf() && !(child instanceof StarNode)) {
+                if (child instanceof LeafNode && !(child instanceof StarNode)) {
                     iterator.remove();
                 } else {
                     child.parent = this;
@@ -189,7 +255,40 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             }
         }
 
+        public LevelNode(final T value, final Collection<Node<T, X>> childrenToCopy, final Node<T, X> node) {
+            this(value, node, new TreeSet<>(childrenToCopy));
+        }
+
         LevelNode(final T value, final Node<T, X> parent) {
+            this(value, parent, new TreeSet<>());
+        }
+
+        @Override
+        public <U> U accept(final TreeVisitor<T, X, U> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public Node<T, X> createOrGetLeaf(final T value) {
+            return null;
+        }
+
+        @Override
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            return Node.extractFromTreeSet(children, value);
+        }
+
+        @Override
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
+        }
+    }
+
+    static class LeafNode<T extends Comparable<T>, X> extends Node<T, X> {
+
+        private final List<Node<T, X>> children = List.of();
+
+        LeafNode(final T value, final Node<T, X> parent) {
             super(value, parent);
         }
 
@@ -200,48 +299,17 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public Node<T, X> createOrGetLeaf(final T value) {
-            return new NullNode<>();
-        }
-
-        @Override
-        public boolean isLeaf() {
-            return false;
-        }
-    }
-
-    static class LeafNode<T extends Comparable<T>, X> extends Node<T, X> {
-        LeafNode(final T value, final Node<T, X> parent) {
-            super(value, parent, List.of());
-        }
-
-        @Override
-        public <U> U accept(final TreeVisitor<T, X, U> visitor) {
-            return visitor.visit(this);
-        }
-
-        @Override
-        public Node<T, X> createOrGetBranch(final T value) {
-            throw new UnsupportedOperationException(getClass() + ".createOrGetBranch(Node) is not supported");
-        }
-
-        @Override
-        public Node<T, X> createOrGetLeaf(final T value) {
             throw new UnsupportedOperationException(getClass() + ".createOrGetLeaf(Node) is not supported");
         }
 
         @Override
-        protected void removeChild(final Node<T, X> child) {
-            throw new UnsupportedOperationException(getClass() + ".removeChild(Node) is not supported");
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            return Optional.empty();
         }
 
         @Override
-        protected void addChild(final Node<T, X> child) {
-            throw new UnsupportedOperationException(getClass() + ".addChild(Node) is not supported");
-        }
-
-        @Override
-        public boolean isLeaf() {
-            return true;
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
         }
     }
 
@@ -252,20 +320,17 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         }
 
         @Override
-        public boolean isLeaf() {
-            return true;
-        }
-
-        @Override
         public <U> U accept(final TreeVisitor<T, X, U> visitor) {
             return visitor.visit(this);
         }
     }
 
-    static class RootNode<T extends Comparable<T>, X> extends Node<T, X> {
+    static final class RootNode<T extends Comparable<T>, X> extends Node<T, X> {
+        private final TreeSet<Node<T, X>> children;
 
         RootNode(final T value, final Node<T, X> parent) {
-            super(value, parent);
+            super(value, Objects.requireNonNull(parent));
+            children = new TreeSet<>();
         }
 
         @Override
@@ -273,17 +338,16 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             return visitor.visit(this);
         }
 
-    }
-
-    private static class NullNode<T extends Comparable<T>, X> extends LeafNode<T, X> {
-        public NullNode() {
-            super(null, null);
+        @Override
+        protected Optional<Node<T, X>> findNodeWith(T value) {
+            return Node.extractFromTreeSet(children, value);
         }
 
         @Override
-        public boolean isLeaf() {
-            throw new UnsupportedOperationException(getClass() + ".isLeaf() is not supported");
+        protected Collection<Node<T, X>> getChildren() {
+            return children;
         }
+
     }
 
     private static class Inserter implements TreeVisitor<String, Pair<String, Boolean>, Void> {
@@ -297,26 +361,22 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         public Void visitNode(final Node<String, Pair<String, Boolean>> parent) {
             final String element = p.getLeft();
             final int firstSlash = element.indexOf(FWD_SLASH);
-            if (firstSlash == -1) {
-                parent.createOrGetLeaf(element);
-            } else {
+            if (firstSlash > -1) {
                 final String head = element.substring(0, firstSlash);
-                if (element.length() == firstSlash + 1) {
+                if (element.length() != firstSlash + 1) {
+                    return parent.createOrGetBranch(head)
+                            .accept(new Inserter(Pair.of(extractTail(element, firstSlash), p.getRight())));
+                } else {
                     if (p.getRight()) {
                         parent.findNodeWith(head).ifPresent(parent::removeChild);
                         new StarNode<>(head, parent);
                     } else {
-                        parent.findNodeWith(head).ifPresentOrElse(n -> {
-                            if (n instanceof LeafNode || n instanceof BranchNode) {
-                                parent.removeChild(n);
-                                new LevelNode<>(head, parent, n.children);
-                            }
-                        }, () -> new LevelNode<>(head, parent));
+                        parent.findNodeWith(head)
+                                .ifPresentOrElse(n -> n.accept(new LevelNodeInserter(head)), () -> new LevelNode<>(head, parent));
                     }
-                } else {
-                    return parent.createOrGetBranch(head)
-                            .accept(new Inserter(Pair.of(extractTail(element, firstSlash), p.getRight())));
                 }
+            } else {
+                parent.createOrGetLeaf(element);
             }
             return null;
         }
@@ -326,38 +386,38 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         }
 
         @Override
-        public Void visit(final RootNode<String, Pair<String, Boolean>> parent) {
+        public Void visit(final RootNode<String, Pair<String, Boolean>> node) {
             final String element = p.getLeft();
             if (FWD_SLASH.equals(element)) {
-                parent.parent.children.remove(parent);
+                node.parent.getChildren().remove(node);
                 if (p.getRight()) {
-                    new StarNode<>(element, parent.parent);
+                    new StarNode<>(element, node.parent);
                 } else {
-                    new LevelNode<>(element, parent.parent);
+                    new LevelNode<>(element, node.parent, node.children);
                 }
                 return null;
             } else {
-                return visitNode(parent);
+                return visitNode(node);
             }
         }
 
         @Override
-        public Void visit(final BranchNode<String, Pair<String, Boolean>> parent) {
-            return visitNode(parent);
+        public Void visit(final BranchNode<String, Pair<String, Boolean>> node) {
+            return visitNode(node);
         }
 
         @Override
-        public Void visit(final LeafNode<String, Pair<String, Boolean>> parent) {
+        public Void visit(final LeafNode<String, Pair<String, Boolean>> node) {
             return null;
         }
 
         @Override
-        public Void visit(final AnchorNode<String, Pair<String, Boolean>> parent) {
-            return parent.children.iterator().next().accept(this);
+        public Void visit(final AnchorNode<String, Pair<String, Boolean>> node) {
+            return node.getChildren().iterator().next().accept(this);
         }
 
         @Override
-        public Void visit(final StarNode<String, Pair<String, Boolean>> parent) {
+        public Void visit(final StarNode<String, Pair<String, Boolean>> node) {
             return null;
         }
 
@@ -376,7 +436,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public List<Pair<String, Boolean>> visit(final RootNode<String, Pair<String, Boolean>> node) {
-            final Iterator<Node<String, Pair<String, Boolean>>> iterator = node.children.iterator();
+            final Iterator<Node<String, Pair<String, Boolean>>> iterator = node.getChildren().iterator();
             final List<Pair<String, Boolean>> retVal = new ArrayList<>();
             while (iterator.hasNext()) {
                 retVal.addAll(iterator.next().accept(this));
@@ -386,7 +446,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public List<Pair<String, Boolean>> visit(final BranchNode<String, Pair<String, Boolean>> node) {
-            return visitChildren(new ArrayList<>(), node.value + FWD_SLASH, node.children);
+            return visitChildren(new ArrayList<>(), node.value + FWD_SLASH, node.getChildren());
         }
 
         @Override
@@ -396,7 +456,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public List<Pair<String, Boolean>> visit(final AnchorNode<String, Pair<String, Boolean>> node) {
-            return node.children.iterator().next().accept(this);
+            return node.getChildren().iterator().next().accept(this);
         }
 
         @Override
@@ -408,11 +468,11 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         public List<Pair<String, Boolean>> visit(final LevelNode<String, Pair<String, Boolean>> node) {
             final List<Pair<String, Boolean>> retVal = new ArrayList<>();
             retVal.add(Pair.of(checkValueForSlash(node.value, FWD_SLASH), false));
-            return visitChildren(retVal, checkValueForSlash(node.value, ""), node.children);
+            return visitChildren(retVal, checkValueForSlash(node.value, ""), node.getChildren());
         }
 
-        private List<Pair<String, Boolean>> visitChildren(final List<Pair<String, Boolean>> retVal, String value,
-                Collection<Node<String, Pair<String, Boolean>>> children) {
+        private List<Pair<String, Boolean>> visitChildren(final List<Pair<String, Boolean>> retVal, final String value,
+                final Collection<Node<String, Pair<String, Boolean>>> children) {
             for (var n : children) {
                 final List<Pair<String, Boolean>> accepted = n.accept(this);
                 for (var a : accepted) {
@@ -431,7 +491,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public Boolean visit(RootNode<String, Pair<String, Boolean>> node) {
-            return visitChildren(node.children);
+            return visitChildren(node.getChildren());
         }
 
         @Override
@@ -439,7 +499,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
             if (hasDot(node)) {
                 return true;
             }
-            return visitChildren(node.children);
+            return visitChildren(node.getChildren());
         }
 
         private boolean hasDot(Node<String, Pair<String, Boolean>> node) {
@@ -453,7 +513,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         @Override
         public Boolean visit(AnchorNode<String, Pair<String, Boolean>> node) {
-            return node.children.iterator().next().accept(this);
+            return node.getChildren().iterator().next().accept(this);
         }
 
         @Override
@@ -467,14 +527,58 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         }
 
         private boolean visitChildren(final Collection<Node<String, Pair<String, Boolean>>> children) {
-            for (Node<String, Pair<String, Boolean>> node2 : children) {
-                if (node2.accept(this)) {
+            for (Node<String, Pair<String, Boolean>> node : children) {
+                if (node.accept(this)) {
                     return true;
                 }
             }
             return false;
         }
+    }
 
+    private static class LevelNodeInserter implements TreeVisitor<String, Pair<String, Boolean>, Void> {
+
+        final String head;
+
+        public LevelNodeInserter(final String head) {
+            this.head = head;
+        }
+
+        @Override
+        public Void visit(BranchNode<String, Pair<String, Boolean>> node) {
+            node.parent.removeChild(node);
+            new LevelNode<>(head, node.parent, node.children);
+            return null;
+        }
+
+        @Override
+        public Void visit(LeafNode<String, Pair<String, Boolean>> node) {
+            node.parent.removeChild(node);
+            new LevelNode<>(head, node.getChildren(), node.parent);
+            return null;
+        }
+
+        @Override
+        public Void visit(RootNode<String, Pair<String, Boolean>> node) {
+            node.parent.removeChild(node);
+            new LevelNode<>(head, node.parent, node.children);
+            return null;
+        }
+
+        @Override
+        public Void visit(AnchorNode<String, Pair<String, Boolean>> node) {
+            return null;
+        }
+
+        @Override
+        public Void visit(StarNode<String, Pair<String, Boolean>> node) {
+            return null;
+        }
+
+        @Override
+        public Void visit(LevelNode<String, Pair<String, Boolean>> node) {
+            return null;
+        }
     }
 
 }
