@@ -127,7 +127,7 @@ public class RepositoryUpdater {
         final RefUpdate ru = repository.updateRef(ref.getName());
         ru.setRefLogIdent(commiter);
         ru.setNewObjectId(newCommit);
-        ru.setForceRefLog(true);
+        ru.setForceRefLog(false);
         ru.setRefLogMessage("jitstatic " + method, true);
         ru.setExpectedOldObjectId(ref.getObjectId());
         checkResult(ru.update(rw), ref.getName());

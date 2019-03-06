@@ -247,7 +247,6 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         return sourceInfo;
     }
 
-    // TODO Make this more efficient
     private void removeCacheRef(final String ref) {
         if (ref == null) {
             return;

@@ -24,6 +24,7 @@ import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.version.ProjectVersion.INSTANCE;
 
+import org.eclipse.jgit.util.SystemReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +36,7 @@ import io.jitstatic.api.KeyResource;
 import io.jitstatic.api.MetaKeyResource;
 import io.jitstatic.api.UsersResource;
 import io.jitstatic.auth.KeyAdminAuthenticator;
+import io.jitstatic.git.OverridingSystemReader;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
@@ -55,6 +57,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         Source source = null;
         Storage storage = null;
         try {
+            SystemReader.setInstance(new OverridingSystemReader());
             source = config.build(env, GIT_REALM);
             final HostedFactory hostedFactory = config.getHostedFactory();
             final String defaultBranch = hostedFactory.getBranch();
