@@ -30,18 +30,18 @@ import io.jitstatic.utils.Functions.ThrowingSupplier;
 
 public class InputStreamHolder {
     private final ThrowingSupplier<ObjectLoader, IOException> loaderFactory;
-    private final Exception e;
+    private final IOException e;
 
     public InputStreamHolder(final ThrowingSupplier<ObjectLoader, IOException> loaderFactory) {
         this(loaderFactory, null);
     }
 
-    private InputStreamHolder(final ThrowingSupplier<ObjectLoader, IOException> loaderFactory, final Exception e) {
+    private InputStreamHolder(final ThrowingSupplier<ObjectLoader, IOException> loaderFactory, final IOException e) {
         this.loaderFactory = loaderFactory;
         this.e = e;
     }
 
-    public InputStreamHolder(final Exception e) {
+    public InputStreamHolder(final IOException e) {
         this(null, e);
     }
 
@@ -56,7 +56,7 @@ public class InputStreamHolder {
         throw new NoSuchElementException();
     }
 
-    public Exception exception() {
+    public IOException exception() {
         if (!isPresent()) {
             return e;
         }
@@ -71,7 +71,7 @@ public class InputStreamHolder {
     }
 
     public ThrowingSupplier<InputStream, IOException> getInputStreamProvider() {
-        return () -> inputStream();
+        return this::inputStream;
     }
 
 }

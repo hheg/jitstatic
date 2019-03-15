@@ -52,7 +52,7 @@ public class InputStreamHolderTest {
 
     @Test
     public void testInputStreamHolderException() throws IOException {
-        InputStreamHolder ish = new InputStreamHolder(new Exception());
+        InputStreamHolder ish = new InputStreamHolder(new IOException());
         assertFalse(ish.isPresent());
         assertNotNull(ish.exception());
         assertThrows(NoSuchElementException.class, () -> ish.inputStream());
