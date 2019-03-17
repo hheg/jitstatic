@@ -35,10 +35,14 @@ public class RepositoryDataError extends FileData {
 
 	@Override
 	public InputStream getInputStream() throws IOException {
-		throw new RuntimeException(getInputStreamHolder().exception());
+		throw getException();
 	}
 
 	public FileObjectIdStore getFileObjectIdStore() {
 		return getFileInfo();
+	}
+	
+	public IOException getException() {
+	    return getInputStreamHolder().exception();
 	}
 }

@@ -93,11 +93,11 @@ public class SourceExtractor {
         }
         final Pair<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> source = fileLoader(Pair.of(branchRef.getObjectId(), Set.of(branchRef)), key);
         final List<BranchData> sourceInfo = source.getRight();
-        final BranchData repositoryData = sourceInfo.get(0);
-        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair();
+        final BranchData repositoryData = sourceInfo.get(0);        
         if (repositoryData.getFileDataError() != null) {
-            throw new RuntimeException(repositoryData.getFileDataError().getInputStreamHolder().exception());
+            throw repositoryData.getFileDataError().getException();
         }
+        final Pair<MetaFileData, SourceFileData> pair = repositoryData.getFirstPair();
         if (pair.isPresent()) {
             return new SourceInfo(pair.getLeft(), pair.getRight());
         }

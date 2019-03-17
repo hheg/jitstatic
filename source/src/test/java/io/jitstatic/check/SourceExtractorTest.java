@@ -539,7 +539,7 @@ public class SourceExtractorTest {
         RepositoryDataError fileDataError = branchData.getFileDataError();
         assertNotNull(fileDataError);
         assertSame(e, fileDataError.getInputStreamHolder().exception());
-        assertSame(e, assertThrows(RuntimeException.class, () -> fileDataError.getInputStream()).getCause());
+        assertSame(e, assertThrows(IOException.class, () -> fileDataError.getInputStream()));
         assertNotNull(fileDataError.getFileObjectIdStore());
     }
 

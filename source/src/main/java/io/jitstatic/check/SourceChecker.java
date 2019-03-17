@@ -110,7 +110,7 @@ public class SourceChecker {
                 .collect(Collectors.toCollection(ArrayList::new));
         final RepositoryDataError fileDataError = data.getFileDataError();
         if (fileDataError != null) {
-            fileErrors.add(Pair.of(fileDataError.getFileInfo(), fileDataError.getInputStreamHolder().exception()));
+            fileErrors.add(Pair.of(fileDataError.getFileInfo(), fileDataError.getException()));
         }
         return fileErrors;
     }
