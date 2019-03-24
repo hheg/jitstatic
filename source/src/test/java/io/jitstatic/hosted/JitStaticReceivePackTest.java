@@ -268,7 +268,7 @@ public class JitStaticReceivePackTest {
         Repository remoteRepository = spy(remoteBareGit.getRepository());
         final String errormsg = "Triggered fault";
         RefDatabase refDatabase = mock(RefDatabase.class);
-        when(refDatabase.getRef(Mockito.anyString())).thenThrow(new IOException(errormsg));
+        when(refDatabase.firstExactRef(any())).thenThrow(new IOException(errormsg));
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
 
         RemoteTestUtils.copy("/test3.json", storePath);
@@ -313,7 +313,7 @@ public class JitStaticReceivePackTest {
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate);
-        when(refDatabase.getRef(eq(REF_HEADS_MASTER))).thenThrow(new IOException(errormsg));
+        when(refDatabase.firstExactRef(any())).thenThrow(new IOException(errormsg));
 
         rp.executeCommands();
 
@@ -352,7 +352,7 @@ public class JitStaticReceivePackTest {
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate).thenReturn(batchRefUpdate);
         doThrow(new IOException(errormsg)).when(batchRefUpdate).execute(any(), any());
-        when(refDatabase.getRef(eq(REF_HEADS_MASTER))).thenReturn(mock);
+        when(refDatabase.firstExactRef(any())).thenReturn(mock);
         when(mock.getObjectId()).thenReturn(oldRef);
         when(remoteRepository.updateRef(eq(REF_HEADS_MASTER))).thenReturn(ru);
         when(ru.update()).thenReturn(RefUpdate.Result.FAST_FORWARD);
@@ -452,7 +452,7 @@ public class JitStaticReceivePackTest {
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate);
-        when(refDatabase.getRef(eq(REF_HEADS_MASTER))).thenReturn(null);
+        when(refDatabase.firstExactRef(any())).thenReturn(null);
 
         rp.executeCommands();
         assertEquals(Result.REJECTED_MISSING_OBJECT, rc.getResult());
@@ -479,7 +479,7 @@ public class JitStaticReceivePackTest {
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate);
-        when(refDatabase.getRef(eq(REF_HEADS_MASTER))).thenReturn(mock);
+        when(refDatabase.firstExactRef(any())).thenReturn(mock);
         when(mock.getObjectId()).thenReturn(ObjectId.fromString(SHA_1));
 
         rp.executeCommands();
@@ -593,7 +593,7 @@ public class JitStaticReceivePackTest {
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate);
-        when(refDatabase.getRef(eq(REF_HEADS_MASTER))).thenReturn(ref);
+        when(refDatabase.firstExactRef(any())).thenReturn(ref);
         when(ref.getObjectId()).thenReturn(oldRef);
 
         rp.executeCommands();
