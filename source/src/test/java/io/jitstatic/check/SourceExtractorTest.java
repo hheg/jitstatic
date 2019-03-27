@@ -526,7 +526,7 @@ public class SourceExtractorTest {
         ObjectReader reader = Mockito.mock(ObjectReader.class);
         Ref ref = Mockito.mock(Ref.class);
         RefDatabase refDatabase = Mockito.mock(RefDatabase.class);
-        Mockito.when(refDatabase.getRef(Mockito.anyString())).thenReturn(ref);
+        Mockito.when(refDatabase.firstExactRef(Mockito.any())).thenReturn(ref);
         Mockito.when(repo.getRefDatabase()).thenReturn(refDatabase);
         Mockito.when(ref.getObjectId()).thenReturn(ObjectId.zeroId());
         Mockito.when(repo.newObjectReader()).thenReturn(reader);

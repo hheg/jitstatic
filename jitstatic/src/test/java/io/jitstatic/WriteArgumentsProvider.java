@@ -29,27 +29,34 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 
 public class WriteArgumentsProvider implements ArgumentsProvider {
 
-    @Override
-    public Stream<? extends Arguments> provideArguments(ExtensionContext arg0) throws Exception {
-        return Stream.of(
-                new WriteData(List.of("master"), List.of("a")), new WriteData(List.of("master"), List.of("a", "b", "c")),
-                new WriteData(List.of("master", "develop", "other"), List.of("a")),
-                new WriteData(List.of("master", "develop", "other"), List.of("a", "b", "c")),
-                new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"), List.of("a")),
-                new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"), List.of("a", "b", "c", "d", "e", "f")),
-                new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"), List.of("a")),
-                new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"),
-                        List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "x", "y")),
-                new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"),
-                        List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "x", "y")),
-                new FatWriteData(List.of("master"), List.of("a")), 
-                new FatWriteData(List.of("master"), List.of("a", "b", "c")),
-                new FatWriteData(List.of("master", "develop", "other"), List.of("a")),
-                new FatWriteData(List.of("master", "develop", "other"), List.of("a", "b", "c")),                
-                new FatWriteData(List.of("master", "develop", "other", "next", "more", "evenmore"),
-                        List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "x", "y"))
-                )
-                .map(Arguments::of);
-    }
+	@Override
+	public Stream<? extends Arguments> provideArguments(ExtensionContext arg0) throws Exception {
+		return Stream.of(new WriteData(List.of("master"), List.of("a")),
+				new WriteData(List.of("master"), List.of("a", "b", "c")),
+				new WriteData(List.of("master", "develop", "other"), List.of("a")),
+				new WriteData(List.of("master", "develop", "other"), List.of("a", "b", "c")),
+				new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"), List.of("a")),
+				new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"),
+						List.of("a", "b", "c", "d", "e", "f")),
+				new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"), List.of("a")),
+				new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore"),
+						List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+								"r", "s", "t", "u", "v", "x", "y")),
+				new WriteData(
+						List.of("master", "develop", "other", "next", "more", "evenmore", "a1", "a2", "a3", "a4", "a5",
+								"a6", "a7", "a8", "a9", "a10"),
+						List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+								"r", "s", "t", "u", "v", "x", "y")),
+				new WriteData(List.of("master", "develop", "other", "next", "more", "evenmore", "a1", "a2", "a3", "a4",
+						"a5", "a6", "a7", "a8", "a9", "a10"), List.of("a")),
+				new FatWriteData(List.of("master"), List.of("a")),
+				new FatWriteData(List.of("master"), List.of("a", "b", "c")),
+				new FatWriteData(List.of("master", "develop", "other"), List.of("a")),
+				new FatWriteData(List.of("master", "develop", "other"), List.of("a", "b", "c")),
+				new FatWriteData(List.of("master", "develop", "other", "next", "more", "evenmore"),
+						List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+								"r", "s", "t", "u", "v", "x", "y")))
+				.map(Arguments::of);
+	}
 
 }
