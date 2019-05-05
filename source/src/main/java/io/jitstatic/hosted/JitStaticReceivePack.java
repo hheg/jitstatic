@@ -276,7 +276,7 @@ public class JitStaticReceivePack extends ReceivePack {
                     getRepository().fireEvent(new DeleteRefEvent(refName));
                     return null;
                 } else {
-                    final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> commitBranch(refName, cmd, repository, monitor));
+                    final Either<Exception, FailedToLock> lock = bus.getRefHolder(refName).lockWriteAll(() -> commitBranch(refName, cmd, repository));
                     if (lock.isRight()) {
                         FailedToLock ftl = lock.getRight();
                         cmd.getLeft().setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
@@ -291,8 +291,7 @@ public class JitStaticReceivePack extends ReceivePack {
         monitor.endTask();
     }
 
-    private Exception commitBranch(final String refName, final Pair<ReceiveCommand, ReceiveCommand> receiveCommandsPair, final Repository repository,
-            final ProgressMonitor monitor) {
+    private Exception commitBranch(final String refName, final Pair<ReceiveCommand, ReceiveCommand> receiveCommandsPair, final Repository repository) {
         final ReceiveCommand orig = receiveCommandsPair.getLeft();
         final ReceiveCommand test = receiveCommandsPair.getRight();
         try {
@@ -326,8 +325,6 @@ public class JitStaticReceivePack extends ReceivePack {
             final RepositoryException repoException = new RepositoryException(msg, e);
             setFault(repoException);
             return repoException;
-        } finally {
-            monitor.update(1);
         }
     }
 

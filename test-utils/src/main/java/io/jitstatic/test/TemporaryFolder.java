@@ -30,15 +30,13 @@ public class TemporaryFolder {
     private final ThreadLocal<TemporaryFolderFactory> tlfactory;
 
     public TemporaryFolder() {
-        this.tlfactory = new ThreadLocal<>() {
-            protected TemporaryFolderFactory initialValue() {
-                try {
-                    return new TemporaryFolderFactory();
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+        this.tlfactory = ThreadLocal.withInitial(() -> {
+            try {
+                return new TemporaryFolderFactory();
+            } catch (IOException e1) {
+                throw new UncheckedIOException(e1);
             }
-        };
+        });
     }
 
     public File createTemporaryDirectory() throws IOException {
