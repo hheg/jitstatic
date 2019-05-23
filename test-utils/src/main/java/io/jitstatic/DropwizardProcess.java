@@ -4,7 +4,7 @@ package io.jitstatic;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,25 +20,26 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.List;
+import java.io.File;
+import java.io.IOException;
 
-import org.apache.commons.lang3.RandomStringUtils;
+public interface DropwizardProcess {
 
-public class FatWriteData extends WriteData {
-
-    private final String data;
-
-    FatWriteData(List<String> branches, List<String> names) {
-        super(branches, names);
-        data = RandomStringUtils.random(1_000_000, true, true);
-    }
-
-    public String fill() {
-        return data;
-    }
+        String getMetrics();
     
-    @Override
-    public String toString() {
-        return "FatWriteData [branches=" + branches + ", names=" + names + "]";
-    }
+        String getGitAddress();
+    
+        String getStorageAdress();
+    
+        int getLocalPort();
+    
+        String getPassword();
+    
+        String getUser();
+
+        String getAdminAddress();
+
+        File getFolderFile() throws IOException;
+
+        void checkContainerForErrors();
 }
