@@ -31,9 +31,9 @@ ADD $JITSTATIC_FILE $JITSTATIC_FILE
 
 ADD docker_dw_setup.yml ${JITSTATIC_CONF}
 
-RUN touch /var/log/jitstatic.log /var/log/jitstatic-request.log \
+RUN mkdir -p /var/log/jitstatic \
     && mkdir -p /home/jitstatic/db \
-    && chown jitstatic:jitstatic /var/log/jitstatic.log /var/log/jitstatic-request.log /home/jitstatic/db
+    && chown jitstatic:jitstatic /var/log/jitstatic /home/jitstatic/db
 
 USER jitstatic
 
