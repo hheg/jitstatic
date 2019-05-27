@@ -1,7 +1,5 @@
 package io.jitstatic;
 
-import java.util.Arrays;
-
 /*-
  * #%L
  * jitstatic
@@ -22,23 +20,25 @@ import java.util.Arrays;
  * #L%
  */
 
+import java.util.List;
+
 import org.apache.commons.lang3.RandomStringUtils;
 
-public class FatTestData extends TestData {
+public class FatWriteData extends WriteData {
 
     private final String data;
 
-    public FatTestData(String[] names, String[] branches, boolean cache, int clients, int updaters) {
-        super(names, branches, cache, clients, updaters);
+    FatWriteData(List<String> branches, List<String> names) {
+        super(branches, names);
         data = RandomStringUtils.random(1_000_000, true, true);
     }
-
+    @Override
     public String fill() {
-        return data + super.fill();
+        return data;
     }
+    
     @Override
     public String toString() {
-        return "FatTestData [names=" + Arrays.toString(names) + ", branches=" + Arrays.toString(branches) + ", cache=" + cache + ", clients=" + clients + ", updaters=" + updaters + "]";
+        return "FatWriteData [branches=" + branches + ", names=" + names + "]";
     }
-
 }

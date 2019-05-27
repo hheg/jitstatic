@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.32.10</version>
+        <version>0.32.11</version>
     </parent>
     <artifactId>jitstatic</artifactId>
 
@@ -95,22 +95,22 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.32.10</version>
+            <version>0.32.11</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>storage</artifactId>
-            <version>0.32.10</version>
+            <version>0.32.11</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>version</artifactId>
-            <version>0.32.10</version>
+            <version>0.32.11</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.32.10</version>
+            <version>0.32.11</version>
         </dependency>
         <dependency>
             <groupId>javax.activation</groupId>
@@ -253,7 +253,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.32.10</version>
+            <version>0.32.11</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -330,6 +330,16 @@
                         <id>integration-test</id>
                         <goals>
                             <goal>integration-test</goal>
+                        </goals>
+                        <configuration>
+                            <reuseForks>false</reuseForks>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>verify</goal>
                         </goals>
                     </execution>
                 </executions>

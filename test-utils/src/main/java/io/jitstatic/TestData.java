@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.nio.charset.StandardCharsets;
+
 /*-
  * #%L
  * jitstatic
@@ -45,7 +47,7 @@ public class TestData {
 
     byte[] getData(int c) {
         String s = "{\"data\":" + c + ",\"salt\":\"" + fill() + "\"}";
-        return s.getBytes(LoadTesterIT.UTF_8);
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 
     public String fill() {        
@@ -54,6 +56,6 @@ public class TestData {
 
     byte[] getMetaData() {
         String md = "{\"users\":[],\"contentType\":\"application/json\",\"protected\":false,\"hidden\":false,\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}";
-        return md.getBytes(LoadTesterIT.UTF_8);
+        return md.getBytes(StandardCharsets.UTF_8);
     }
 }
