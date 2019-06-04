@@ -46,10 +46,9 @@ storage is the key-value end point and hosted is the Git end point.
 
 ### Docker:
 ```bash
-docker pull hheg/jitstatic:latest
 docker run -e USER=huser -e PASS=hseCr3t -v $PWD:/home/jitstatic/db -d -p 8085:8085 hheg/jitstatic:latest
 ```
-The container is reachable on port 8085. Remember to run the container in an empty directory or change $PWD to a directory of your liking.
+The container is reachable on port 8085. Remember to run the container in an empty directory or change $PWD to a directory of your liking. The directory must be owned by a user with id 1000 and group 1000
 
 ### Manually: 
 To setup an instance you download a jitstatic.jar and store the above example configuration in a file, lets say `config.yaml`
