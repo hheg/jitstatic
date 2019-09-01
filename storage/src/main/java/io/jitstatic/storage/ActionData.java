@@ -28,7 +28,7 @@ import io.jitstatic.storage.events.StorageEvent;
 
 public class ActionData {
     public static final ActionData PLACEHOLDER = new ActionData();
-    private StorageEvent type;
+    private final StorageEvent type;
     private String key;
     private String ref;
     private String oldVersion;
@@ -40,75 +40,91 @@ public class ActionData {
     private String oldId;
     private String tipId;
 
-    public ActionData(String key, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData) {
-        this.type = StorageEvent.ADD_KEY;
-        this.key = key;
-        this.data = data;
-        this.metaData = metaData;
-        this.commitMetaData = commitMetaData;
+    static ActionData addKey(String key, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData) {
+        return new ActionData(StorageEvent.ADD_KEY, key, data, metaData, commitMetaData);
     }
 
-    public ActionData(String key, ObjectStreamProvider data, String oldVersion, CommitMetaData commitMetaData) {
-        this.type = StorageEvent.UPDATE_KEY;
+    private ActionData(StorageEvent addKeyEvent, String key2, ObjectStreamProvider data2, MetaData metaData2, CommitMetaData commitMetaData2) {
+        this.type = addKeyEvent;
+        this.key = key2;
+        this.data = data2;
+        this.metaData = metaData2;
+        this.commitMetaData = commitMetaData2;
+    }
+
+    static ActionData updateKey(String key, ObjectStreamProvider data, String oldVersion, CommitMetaData commitMetaData) {
+        return new ActionData(StorageEvent.UPDATE_KEY, key, data, oldVersion, commitMetaData);
+    }
+
+    private ActionData(StorageEvent updateKey, String key, ObjectStreamProvider data, String oldVersion, CommitMetaData commitMetaData) {
+        this.type = updateKey;
         this.data = data;
         this.key = key;
         this.oldVersion = oldVersion;
         this.commitMetaData = commitMetaData;
     }
 
-    public ActionData(String key, CommitMetaData commitMetaData) {
-        this.type = StorageEvent.DELETE_KEY;
+    static ActionData deleteKey(String key, CommitMetaData commitMetaData) {
+        return new ActionData(StorageEvent.DELETE_KEY, key, commitMetaData);
+    }
+
+    private ActionData(StorageEvent deleteKey, String key, CommitMetaData commitMetaData) {
+        this.type = deleteKey;
         this.key = key;
         this.commitMetaData = commitMetaData;
     }
 
-    public ActionData(String key, MetaData metaData, String oldMetaDataVersion, CommitMetaData commitMetaData) {
-        this.type = StorageEvent.UPDATE_METAKEY;
+    static ActionData updateMetakey(String key, MetaData metaData, String oldMetaDataVersion, CommitMetaData commitMetaData) {
+        return new ActionData(StorageEvent.UPDATE_METAKEY, key, metaData, oldMetaDataVersion, commitMetaData);
+    }
+
+    private ActionData(StorageEvent updateMetakey, String key, MetaData metaData, String oldMetaDataVersion, CommitMetaData commitMetaData) {
+        this.type = updateMetakey;
         this.key = key;
         this.metaData = metaData;
         this.oldVersion = oldMetaDataVersion;
         this.commitMetaData = commitMetaData;
     }
 
-    public ActionData(String userKeyPath, String userName, UserData userData) {
-        this.type = StorageEvent.ADD_USER;
+    static ActionData addUser(String userKeyPath, String userName, UserData userData) {
+        return new ActionData(StorageEvent.ADD_USER, userKeyPath, userName, userData);
+    }
+
+    private ActionData(StorageEvent addUser, String userKeyPath, String userName, UserData userData) {
+        this.type = addUser;
         this.key = userKeyPath;
         this.userName = userName;
         this.userData = userData;
     }
 
-    public ActionData(String userKeyPath, String userName, UserData userData, String oldVersion) {
-        this.type = StorageEvent.UPDATE_USER;
+    static ActionData updateUser(String userKeyPath, String userName, UserData userData, String oldVersion) {
+        return new ActionData(StorageEvent.UPDATE_USER, userKeyPath, userName, userData, oldVersion);
+    }
+
+    private ActionData(StorageEvent updateUser, String userKeyPath, String userName, UserData userData, String oldVersion) {
+        this.type = updateUser;
         this.key = userKeyPath;
         this.userName = userName;
         this.userData = userData;
         this.oldVersion = oldVersion;
     }
 
-    public ActionData(String userKeyPath, String userName) {
-        this.type = StorageEvent.DELETE_USER;
+    static ActionData deleteUser(String userKeyPath, String userName) {
+        return new ActionData(StorageEvent.DELETE_USER, userKeyPath, userName);
+    }
+
+    private ActionData(StorageEvent deleteUser, String userKeyPath, String userName) {
+        this.type = deleteUser;
         this.key = userKeyPath;
         this.userName = userName;
     }
 
-    public ActionData(ObjectStreamProvider data, String oldId, String tipId) {
+    private ActionData() {
         this.type = StorageEvent.WRITE_REPO;
-        this.key = null;
-        this.data = data;
-        this.oldId = oldId;
-        this.tipId = tipId;
-    }
-
-    public ActionData() {
-        // NOOP
     }
 
     public StorageEvent getType() {
         return type;
-    }
-
-    public void setType(StorageEvent type) {
-        this.type = type;
     }
 
     public String getKey() {

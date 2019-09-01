@@ -52,8 +52,8 @@ public class LocalRefLockService implements RefLockService {
     }
 
     @Override
-    public synchronized void returnLock(final LockService keys, final String ref) {
-        refLockMap.put(ref, keys);
+    public synchronized void returnLock(final LockService keys) {
+        refLockMap.put(keys.getRef(), keys);
     }
 
     private static class LocalLock implements LockService {
@@ -77,7 +77,7 @@ public class LocalRefLockService implements RefLockService {
 
         @Override
         public void close() {
-            refLockService.returnLock(this, ref);
+            refLockService.returnLock(this);
         }
 
         @Override
@@ -98,7 +98,7 @@ public class LocalRefLockService implements RefLockService {
                         }
                     }, refLockService.getRepoWriter());
                 } else {
-                    return CompletableFuture.completedFuture(Either.<String, FailedToLock>right(new FailedToLock(ref, key)));
+                    return CompletableFuture.completedFuture(Either.<String, FailedToLock>right(new FailedToLock(getRef(), key)));
                 }
             }, refLockService.getRepoWriter()).thenCompose(c -> c);
         }
@@ -157,6 +157,10 @@ public class LocalRefLockService implements RefLockService {
                     return CompletableFuture.completedFuture(Either.<String, FailedToLock>right(new FailedToLock(ref)));
                 }
             }, refLockService.getRepoWriter()).thenCompose(c -> c);
+        }
+
+        public String getRef() {
+            return ref;
         }
     }
 

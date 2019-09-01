@@ -26,7 +26,7 @@ public interface RefLockService extends AutoCloseable {
 
     public LockService getLockService(String ref);
 
-    public void returnLock(LockService keys, String ref);
+    public void returnLock(LockService keys);
 
     public ExecutorService getRepoWriter();
 

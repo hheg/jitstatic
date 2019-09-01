@@ -208,7 +208,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> addKey(final String key, final ObjectStreamProvider data, final MetaData metaData,
             final CommitMetaData commitMetaData) {
-        return lock.fireEvent(key, new ActionData(key, data, metaData, commitMetaData));
+        return lock.fireEvent(key, ActionData.addKey(key, data, metaData, commitMetaData));
     }
 
     String internalAddKey(final String key, ObjectStreamProvider data, final MetaData metaData, final CommitMetaData commitMetaData) {
@@ -239,7 +239,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> modifyKey(final String key, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
-        return lock.fireEvent(key, new ActionData(key, data, oldVersion, commitMetaData));
+        return lock.fireEvent(key, ActionData.updateKey(key, data, oldVersion, commitMetaData));
     }
 
     String internalModifyKey(final String key, final ObjectStreamProvider data, final String oldVersion,
@@ -264,7 +264,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     }
 
     public CompletableFuture<Either<String, FailedToLock>> deleteKey(final String key, final CommitMetaData commitMetaData) {
-        return lock.fireEvent(key, new ActionData(key, commitMetaData));
+        return lock.fireEvent(key, ActionData.deleteKey(key, commitMetaData));
     }
 
     // TODO Should return something more useful?
@@ -276,8 +276,8 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> modifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
-        return lock.fireEvent(key, new ActionData(Objects.requireNonNull(key), Objects.requireNonNull(metaData), Objects.requireNonNull(oldMetaDataVersion),
-                Objects.requireNonNull(commitMetaData)));
+        return lock.fireEvent(key, ActionData.updateMetakey(Objects.requireNonNull(key), Objects.requireNonNull(metaData),
+                Objects.requireNonNull(oldMetaDataVersion), Objects.requireNonNull(commitMetaData)));
     }
 
     String internalModifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
@@ -337,11 +337,11 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         }
     }
 
-    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String userKeyPath, final String username, final UserData data,
+    public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         final String key = createFullUserKeyPath(userKeyPath);
         return lock.fireEvent(key,
-                new ActionData(userKeyPath, Objects.requireNonNull(username), Objects.requireNonNull(data), Objects.requireNonNull(version)));
+                ActionData.updateUser(userKeyPath, Objects.requireNonNull(username), Objects.requireNonNull(data), Objects.requireNonNull(version)));
     }
 
     String internalUpdateUser(final String userKeyPath, final String username, final UserData data,
@@ -385,7 +385,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> addUser(final String userKeyPath, final String username, final UserData data) {
         final String key = createFullUserKeyPath(userKeyPath);
-        return lock.fireEvent(key, new ActionData(userKeyPath, username, data));
+        return lock.fireEvent(key, ActionData.addUser(userKeyPath, username, data));
     }
 
     String internalAddUser(final String userKeyPath, final String username, final UserData data) {
@@ -408,7 +408,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> deleteUser(final String userKeyPath, final String userName) {
         final String key = createFullUserKeyPath(userKeyPath);
-        return lock.fireEvent(key, new ActionData(userKeyPath, userName));
+        return lock.fireEvent(key, ActionData.deleteUser(userKeyPath, userName));
     }
 
     String internalDeleteUser(final String userKeyPath, final String username) {

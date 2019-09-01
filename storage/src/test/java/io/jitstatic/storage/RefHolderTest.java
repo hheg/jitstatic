@@ -240,7 +240,7 @@ public class RefHolderTest {
         try (RefHolder ref = new RefHolder(REF, source, hashService, repoWriter, clusterService);) {
             ref.start();
             CompletionException ex = assertThrows(CompletionException.class,
-                    () -> ref.updateUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
+                    () -> ref.modifyUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
                             .join());
             assertEquals(WrappingAPIException.class, ex.getCause().getClass());
             assertEquals(VersionIsNotSame.class, ex.getCause().getCause().getClass());
@@ -256,7 +256,7 @@ public class RefHolderTest {
             assertEquals("1",
                     ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash")).orTimeout(5, TimeUnit.SECONDS).join()
                             .getLeft());
-            ref.updateUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS).join();
+            ref.modifyUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS).join();
             verify(source).updateUser(eq(".users/user"), eq(REF), eq("modifyinguser"), eq(new UserData(Set.of(new Role("role")), null, "salt", "hash")));
         }
     }

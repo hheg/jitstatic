@@ -317,7 +317,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
-        return refHolder.updateUser(realm + "/" + key, creatorUserName, data, version);
+        return refHolder.modifyUser(realm + "/" + key, creatorUserName, data, version);
     }
 
     @Override

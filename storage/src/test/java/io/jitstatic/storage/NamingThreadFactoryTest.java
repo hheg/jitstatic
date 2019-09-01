@@ -20,24 +20,24 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.spencerwi.either.Either;
+import org.junit.jupiter.api.Test;
 
-import io.jitstatic.hosted.DistributedData;
-import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.ErrorReporter;
 
-public interface LockService extends AutoCloseable {
+class NamingThreadFactoryTest {
 
-    void close();
+    @Test
+    void testThrowException() throws InterruptedException {
+        var rt = new RuntimeException("Test exception");
+        NamingThreadFactory ntf = new NamingThreadFactory("name");
+        Thread t = ntf.newThread(() -> {
+            throw rt;
+        });
+        t.start();
+        t.join();
+        assertSame(rt, ErrorReporter.INSTANCE.getFault());
+    }
 
-    void register(RefHolder refHolder);
-
-    CompletableFuture<Either<String, FailedToLock>> fireEvent(String key, ActionData data);
-
-    CompletableFuture<Either<String, FailedToLock>> fireEvent(String ref, Supplier<Exception> preRequisite, Supplier<DistributedData> action, Consumer<Exception> postAction);
-    
-    String getRef();
 }

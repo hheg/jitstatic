@@ -83,7 +83,7 @@ public class ReadOnlyRefHolder extends RefHolder {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String userKeyPath, final String username, final UserData data,
+    public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         throw new WrappingAPIException(new UnsupportedOperationException("update user " + TAGS_CANNOT_BE_MODIFIED));
     }
