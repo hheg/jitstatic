@@ -20,10 +20,15 @@ package io.jitstatic.hosted;
  * #L%
  */
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.spencerwi.either.Either;
 
 public interface RefLockHolder {
-    public <T> Either<T, FailedToLock> lockWriteAll(final Supplier<T> supplier);
+
+    public <T> CompletableFuture<Either<T, FailedToLock>> enqueueAndReadBlock(final Supplier<T> supplier);
+
+    public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action, Consumer<Exception> postAction);
 }

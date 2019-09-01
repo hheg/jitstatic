@@ -23,8 +23,9 @@ package io.jitstatic;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.Set;
+import java.util.TimeZone;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -51,8 +52,9 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
+
 // TODO Remove this SpotBugs Error
-@SuppressFBWarnings(value="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",justification="This is a false positive in Java 11, should be removed")
+@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class RepositoryUpdater {
 
     private final Repository repository;
@@ -60,35 +62,39 @@ public class RepositoryUpdater {
     public RepositoryUpdater(final Repository repository) {
         this.repository = repository;
     }
-    
-    public List<Pair<String, ObjectId>> commit(final Ref ref, final CommitMetaData commitMetaData, final String method,
-            final List<Pair<String, ObjectStreamProvider>> files)
-            throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {        
+
+    public List<Pair<String, ObjectId>> buildDirCache(final CommitMetaData commitMetaData, final List<Pair<String, ObjectStreamProvider>> files, final String ref)
+            throws IOException, MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException {
         final List<Pair<String, ObjectId>> fileVersions = new ArrayList<>(files.size());
+        final Ref foundRef = repository.findRef(ref);
         try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
-            final DirCache inCoreIndex = getCurrentDirCache(rw, ref);
+
+            final DirCache inCoreIndex = getCurrentDirCache(rw, foundRef);
             final DirCacheEditor editor = inCoreIndex.editor();
+
             for (Pair<String, ObjectStreamProvider> pair : files) {
+                final String keyName = pair.getLeft();
                 if (pair.isPresent()) {
-                    final String keyName = pair.getLeft();
                     final ObjectStreamProvider data = pair.getRight();
                     try (InputStream is = data.getInputStream()) {
                         final ObjectId blobId = objectInserter.insert(Constants.OBJ_BLOB, data.getSize(), is);
                         editor.add(new DirCacheEditor.PathEdit(keyName) {
                             @Override
                             public void apply(DirCacheEntry ent) {
-                                ent.setFileMode(FileMode.REGULAR_FILE);                                
+                                ent.setFileMode(FileMode.REGULAR_FILE);
                                 ent.setObjectId(blobId);
                             }
                         });
-                        fileVersions.add(Pair.of(pair.getLeft(), blobId));
+                        fileVersions.add(Pair.of(keyName, blobId));
                     }
+                } else if (keyName != null) {
+                    editor.add(new DirCacheEditor.DeletePath(keyName));
                 }
             }
             editor.finish();
             final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-            final PersonIdent commiter = new PersonIdent(commitMetaData.getProxyUser(), commitMetaData.getProxyUserMail());
-            buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
+            final ObjectId insertedCommit = buildCommit(foundRef.getObjectId(), commitMetaData, objectInserter, fullTree);
+            updateRef(foundRef, rw, insertedCommit);
             return fileVersions;
         }
     }
@@ -98,39 +104,38 @@ public class RepositoryUpdater {
         RevTree tree = revision != null ? rw.parseTree(revision) : null;
         return getIndex(tree);
     }
-    
+
     private DirCache getIndex(RevTree tree) throws IOException {
-        if(tree == null) {
+        if (tree == null) {
             return DirCache.newInCore();
         }
         try (ObjectReader reader = repository.newObjectReader()) {
             return DirCache.read(reader, tree);
         }
     }
-
-    private void buildCommit(final Ref ref, final CommitMetaData commitMetaData, final String method, final RevWalk rw, final ObjectInserter objectInserter,
-            final ObjectId fullTree, final PersonIdent commiter) throws IOException, MissingObjectException, IncorrectObjectTypeException {
-        final CommitBuilder commitBuilder = new CommitBuilder();
-        commitBuilder.setAuthor(new PersonIdent(commitMetaData.getUserInfo(), (commitMetaData.getUserMail() != null ? commitMetaData.getUserMail() : "")));
-        commitBuilder.setMessage(commitMetaData.getMessage());
-        commitBuilder.setCommitter(commiter);
-        commitBuilder.setTreeId(fullTree);
-        commitBuilder.setParentId(ref.getObjectId());
-        final ObjectId insertedCommit = objectInserter.insert(commitBuilder);
-        objectInserter.flush();
-        updateRef(ref, method, rw, commiter, insertedCommit);
-    }
-
-    private void updateRef(final Ref ref, final String method, final RevWalk rw, final PersonIdent commiter, final ObjectId insertedCommit)
+    
+    private void updateRef(final Ref ref, final RevWalk rw, final ObjectId insertedCommit)
             throws MissingObjectException, IncorrectObjectTypeException, IOException {
         final RevCommit newCommit = rw.parseCommit(insertedCommit);
         final RefUpdate ru = repository.updateRef(ref.getName());
-        ru.setRefLogIdent(commiter);
+        ru.disableRefLog();
         ru.setNewObjectId(newCommit);
-        ru.setForceRefLog(false);
-        ru.setRefLogMessage("jitstatic " + method, true);
         ru.setExpectedOldObjectId(ref.getObjectId());
         checkResult(ru.update(rw), ref.getName());
+    }
+
+    private ObjectId buildCommit(final ObjectId parent, final CommitMetaData commitMetaData, final ObjectInserter objectInserter, final ObjectId fullTree)
+            throws IOException {
+        final PersonIdent committer = new PersonIdent(commitMetaData.getProxyUser(), commitMetaData.getProxyUserMail(),
+                Date.from(commitMetaData.getTimeStamp()), TimeZone.getTimeZone("UTC"));
+        final CommitBuilder commitBuilder = new CommitBuilder();
+        commitBuilder.setAuthor(new PersonIdent(commitMetaData.getUserInfo(), (commitMetaData.getUserMail() != null ? commitMetaData.getUserMail() : ""),
+                Date.from(commitMetaData.getTimeStamp()), TimeZone.getTimeZone("UTC")));
+        commitBuilder.setMessage(commitMetaData.getMessage());
+        commitBuilder.setCommitter(committer);
+        commitBuilder.setTreeId(fullTree);
+        commitBuilder.setParentId(parent);
+        return objectInserter.insert(commitBuilder);
     }
 
     private void checkResult(final Result update, final String ref) {
@@ -150,22 +155,6 @@ public class RepositoryUpdater {
         case RENAMED:
         default:
             throw new UpdateFailedException(update, ref);
-        }
-    }
-
-    public void deleteKeys(final Set<String> filesToDelete, final Ref ref, final CommitMetaData commitMetaData) throws IOException {
-        final String method = "delete";
-        try (final RevWalk rw = new RevWalk(repository); final ObjectInserter objectInserter = repository.newObjectInserter()) {
-            final DirCache inCoreIndex = getCurrentDirCache(rw, ref);
-            final DirCacheEditor editor = inCoreIndex.editor();
-            for (String file : filesToDelete) {
-                editor.add(new DirCacheEditor.DeletePath(file));
-            }
-            editor.finish();
-            final ObjectId fullTree = inCoreIndex.writeTree(objectInserter);
-            final PersonIdent commiter = new PersonIdent(commitMetaData.getProxyUser(),commitMetaData.getProxyUserMail());
-            buildCommit(ref, commitMetaData, method, rw, objectInserter, fullTree, commiter);
-            rw.dispose();
         }
     }
 

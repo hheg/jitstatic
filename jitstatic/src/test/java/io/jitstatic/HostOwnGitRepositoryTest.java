@@ -233,7 +233,7 @@ public class HostOwnGitRepositoryTest {
                 List<String> call = git.branchDelete().setBranchNames("newbranch").setForce(true).call();
                 assertTrue(call.stream().allMatch(b -> b.equals(REFS_HEADS_NEWBRANCH)));
 
-                verifyOkPush(git.push().setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call(), REFS_HEADS_NEWBRANCH);
+                verifyOkPush(git.push().setForce(true).setCredentialsProvider(provider).setRefSpecs(new RefSpec(":" + REFS_HEADS_NEWBRANCH)).call(), REFS_HEADS_NEWBRANCH);
                 assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(STORE, REFS_HEADS_NEWBRANCH, tf)).getStatusCode());
                 refs = git.lsRemote().setCredentialsProvider(provider).callAsMap();
                 assertNull(refs.get(REFS_HEADS_NEWBRANCH));

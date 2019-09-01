@@ -1,10 +1,10 @@
-package io.jitstatic.hosted;
+package io.jitstatic.storage;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,14 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-public class KeyAlreadyExist extends RuntimeException {
+import java.util.concurrent.ExecutorService;
 
-    private static final long serialVersionUID = 3551414727296198256L;
+public interface RefLockService extends AutoCloseable {
 
-    public KeyAlreadyExist(final String key, final String branch) {
-        super("Key '"+ key + "' already exist in branch " + branch);
-    }
+    public LockService getLockService(String ref);
 
-    @Override
-    public Throwable fillInStackTrace() {
-        return this;
-    }
+    public void returnLock(LockService keys, String ref);
+
+    public ExecutorService getRepoWriter();
+
 }

@@ -26,14 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.source.ObjectStreamProvider;
-import io.jitstatic.tools.AUtils;
 
 public class SearchResultTest {
 
     @Test
     public void testSearchResult() {
         byte[] content = new byte[] { 1 };
-        ObjectStreamProvider ddd = AUtils.toProvider(content);
+        ObjectStreamProvider ddd = ObjectStreamProvider.toProvider(content);
         SearchResult sr1 = new SearchResult("key", "tag", "type", "ref", ddd);
         SearchResult sr2 = new SearchResult("key", "tag", "type", "ref", ddd);
         SearchResult sr3 = new SearchResult("other", "tag", "type", "ref", ddd);

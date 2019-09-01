@@ -86,7 +86,7 @@ public class JitstaticConfiguration extends Configuration {
         return hostedFactory.build(env, gitRealm);
     }
 
-    public KeyAdminAuthenticator getAddKeyAuthenticator(final Storage storage, HashService hashService) {
+    public KeyAdminAuthenticator getKeyAdminAuthenticator(final Storage storage, HashService hashService) {
         final HostedFactory hf = getHostedFactory();
         final User addUser = new User(hf.getUserName(), hf.getSecret());
         return new KeyAdminAuthenticatorImpl(storage, (user, ref) -> addUser.equals(user), hf.getBranch(), hashService);

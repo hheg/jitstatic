@@ -45,8 +45,8 @@ public class JitStaticRefFilter implements RefFilter {
     public Map<String, Ref> filter(final Map<String, Ref> refs) {
         if (refs != null) {
             if (!req.isUserInRole(JitStaticConstants.SECRETS)) {
-                Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
-                Ref head = refs.get("HEAD");
+                final Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
+                final Ref head = refs.get("HEAD");
                 if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
                     refs.remove("HEAD");
                 }

@@ -29,9 +29,4 @@ public class UpdateFailedException extends RuntimeException {
     public UpdateFailedException(final Result update, final String ref) {
         super(String.format("Got error %s when updating %s", update.name(), ref));
     }
-
-    @Override
-    public Throwable fillInStackTrace() {
-        return this;
-    }
 }

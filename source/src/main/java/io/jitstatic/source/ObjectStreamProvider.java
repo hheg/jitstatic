@@ -1,5 +1,7 @@
 package io.jitstatic.source;
 
+import java.io.ByteArrayInputStream;
+
 /*-
  * #%L
  * jitstatic
@@ -22,6 +24,7 @@ package io.jitstatic.source;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 
 import org.eclipse.jgit.lib.ObjectLoader;
 
@@ -31,17 +34,39 @@ public interface ObjectStreamProvider {
 
     InputStream getInputStream() throws IOException;
 
-    long getSize() throws IOException;
+    long getSize();
+    
+    byte[] asByteArray() throws IOException;
 
-    public default ObjectStreamProvider getObjectStreamProvider(final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory, final int threshold)
-            throws IOException {
+    public default ObjectStreamProvider getObjectStreamProvider(final ThrowingSupplier<ObjectLoader, IOException> objectLoaderFactory, final int threshold) {
         final long size = getSize();
         if (size < threshold) {
             return this;
         } else {
-            return new LargeObjectStreamProvider(() -> {
-                return objectLoaderFactory.get().openStream();
-            }, size);
+            return new LargeObjectStreamProvider(() -> objectLoaderFactory.get().openStream(), size);
         }
+    }
+    
+    public static ObjectStreamProvider toProvider(byte[] data) {
+        return new ObjectStreamProvider() {
+
+            @Override
+            public long getSize() {
+                return data.length;
+            }
+
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return new ByteArrayInputStream(data);
+            }
+
+            @Override
+            public byte[] asByteArray() {
+                return Arrays.copyOf(data, data.length);
+            }
+        };
+    }
+    public static byte[] toByte(final ObjectStreamProvider provider) throws IOException {
+        return provider.asByteArray();
     }
 }

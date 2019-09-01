@@ -41,7 +41,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         for (Pair<String, Boolean> p : data) {
             String key = p.getLeft().replaceAll("/+", "/");
             if (key.startsWith("/") && key.length() > 1) {
-                key = key.replaceFirst("^/+", "");
+                key = key.substring(1);
             }
             node.accept(new Inserter(Pair.of(key, p.getRight())));
         }
@@ -473,10 +473,10 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         private List<Pair<String, Boolean>> visitChildren(final List<Pair<String, Boolean>> retVal, final String value,
                 final Collection<Node<String, Pair<String, Boolean>>> children) {
-            for (var n : children) {
-                final List<Pair<String, Boolean>> accepted = n.accept(this);
-                for (var a : accepted) {
-                    retVal.add(Pair.of(value + a.getLeft(), a.getRight()));
+            for (Node<String, Pair<String, Boolean>> child : children) {
+                final List<Pair<String, Boolean>> accepted = child.accept(this);
+                for (Pair<String, Boolean> pair : accepted) {
+                    retVal.add(Pair.of(value + pair.getLeft(), pair.getRight()));
                 }
             }
             return retVal;

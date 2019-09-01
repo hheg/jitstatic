@@ -43,11 +43,13 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     private final ErrorReporter errorReporter;
     private final RefLockHolderManager bus;
     private final UserExtractor userExtractor;
+    private final RepoInserter inserter;
 
-    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RefLockHolderManager bus, UserExtractor userExtractor) {
+    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RefLockHolderManager bus, UserExtractor userExtractor, RepoInserter inserter) {
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.errorReporter = Objects.requireNonNull(reporter);
         this.bus = Objects.requireNonNull(bus);
+        this.inserter = Objects.requireNonNull(inserter);
         this.userExtractor = userExtractor;
     }
 
@@ -82,7 +84,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     }
 
     protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {        
-        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req.isUserInRole(JitStaticConstants.FORCEPUSH));
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req.isUserInRole(JitStaticConstants.FORCEPUSH), inserter);
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));

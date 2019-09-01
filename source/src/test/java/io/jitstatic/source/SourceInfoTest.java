@@ -57,7 +57,7 @@ public class SourceInfoTest {
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
         SourceInfo si = new SourceInfo(mfd, sdf);
-        assertArrayEquals(toByteArray(new ByteArrayInputStream(new byte[] { 1 })), toByteArray(si.getSourceProvider().getInputStream()));
+        assertArrayEquals(toByteArray(new ByteArrayInputStream(new byte[] { 1 })), toByteArray(si.getStreamProvider().getInputStream()));
         assertEquals(SHA_1, si.getSourceVersion());
     }
     
@@ -76,7 +76,7 @@ public class SourceInfoTest {
         when(inputStreamHolder.getInputStreamProvider()).thenReturn(() -> new ByteArrayInputStream(new byte[] { 1 }));
         when(sourceFileData.getInputStreamHolder()).thenReturn(inputStreamHolder);
         SourceInfo si = new SourceInfo(metaFileData, sourceFileData);
-        ObjectStreamProvider sourceProvider = si.getSourceProvider();
+        ObjectStreamProvider sourceProvider = si.getStreamProvider();
         assertTrue(sourceProvider instanceof LargeObjectStreamProvider);
         assertTrue(sourceProvider.getSize() == 1_000_000L);
     }
@@ -89,7 +89,7 @@ public class SourceInfoTest {
         when(inputStreamHolder.getInputStreamProvider()).thenReturn(() -> new ByteArrayInputStream(new byte[] { 1 }));
         when(sourceFileData.getInputStreamHolder()).thenReturn(inputStreamHolder);
         SourceInfo si = new SourceInfo(metaFileData, sourceFileData);
-        ObjectStreamProvider sourceProvider = si.getSourceProvider();
+        ObjectStreamProvider sourceProvider = si.getStreamProvider();
         assertTrue(sourceProvider instanceof SmallObjectStreamProvider);
         assertTrue(sourceProvider.getSize() == 1L);
     }
@@ -105,7 +105,7 @@ public class SourceInfoTest {
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
         SourceInfo si = new SourceInfo(mfd, sdf);
-        assertThrows(RuntimeException.class, () -> si.getSourceProvider().getInputStream());
+        assertThrows(RuntimeException.class, () -> si.getStreamProvider().getInputStream());
     }
 
     @Test
@@ -119,7 +119,7 @@ public class SourceInfoTest {
         SourceFileData sdf = new SourceFileData(fois, ish);
         MetaFileData mfd = new MetaFileData(fois2, ish2);
         SourceInfo si = new SourceInfo(mfd, sdf);
-        assertThrows(RuntimeException.class, () -> si.getSourceProvider().getInputStream());
+        assertThrows(RuntimeException.class, () -> si.getStreamProvider().getInputStream());
     }
 
     @Test

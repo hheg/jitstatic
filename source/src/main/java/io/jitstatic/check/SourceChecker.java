@@ -87,16 +87,13 @@ public class SourceChecker {
                 .flatMap(List::stream)
                 .filter(Pair::isPresent)
                 .collect(Collectors.toList());
-        if (branchErrors.isEmpty()) {
-            return List.of();
-        }
-        return List.of(Pair.of(revCommit.getRight(), branchErrors));
+        return branchErrors.isEmpty() ? List.of() : List.of(Pair.of(revCommit.getRight(), branchErrors));
     }
 
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
         final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
         return sources.entrySet().parallelStream()
-                .map(e -> Pair.of(e.getKey(),e.getValue()))
+                .map(Pair::new)
                 .map(this::checkBranch)
                 .filter(l -> !l.isEmpty())
                 .flatMap(List::stream)

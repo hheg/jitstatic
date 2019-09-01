@@ -232,7 +232,6 @@ public class InterceptingCrossOriginFilterTest {
         verify(response, times(1)).setHeader("Access-Control-Allow-Headers", null);
     }
 
-    @SuppressWarnings("unused")
     private static Stream<Arguments> injector() {
         Supplier<CrossOriginFilter> f1 = () -> new CrossOriginFilter();
         Supplier<CrossOriginFilter> f2 = () -> new InterceptingCrossOriginFilter();

@@ -31,7 +31,7 @@ public class WrappingAPIExceptionTest {
 
 	@Test
 	public void testWrappingAPIException() {
-		VersionIsNotSame v = new VersionIsNotSame();
+		VersionIsNotSame v = new VersionIsNotSame("","");
 		WrappingAPIException w = new WrappingAPIException(v);
 		assertEquals(v, w.getCause());
 	}

@@ -35,12 +35,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
@@ -50,6 +49,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.events.RepositoryListener;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -71,14 +71,13 @@ import io.jitstatic.check.CorruptedSourceException;
 import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.check.SourceExtractor;
+import io.jitstatic.hosted.events.AddRefEvent;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
-import io.jitstatic.utils.VersionIsNotSame;
-import io.jitstatic.utils.WrappingAPIException;
 
 public class HostedGitRepositoryManager implements Source {
 
@@ -96,6 +95,7 @@ public class HostedGitRepositoryManager implements Source {
     private final UserExtractor userExtractor;
     private final UserUpdater userUpdater;
     private final ExecutorService uploadPackExecutor;
+    private final RepoInserter repoInserter;
 
     HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter)
             throws CorruptedSourceException, IOException {
@@ -131,7 +131,7 @@ public class HostedGitRepositoryManager implements Source {
 
         errors.addAll(interpretedUserErrors.getLeft());
         warnings.addAll(interpretedUserErrors.getRight());
-        
+
         for (String w : warnings) {
             LOG.warn(w);
         }
@@ -144,8 +144,9 @@ public class HostedGitRepositoryManager implements Source {
         this.extractor = new SourceExtractor(bareRepository);
         this.updater = new SourceUpdater(repositoryUpdater);
         this.refLockHolderManager = new RefLockHolderManager();
-        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor);
-        this.uploadPackFactory = new JitStaticUploadPackFactory(uploadPackExecutor);
+        this.repoInserter = new RepoInserter(bareRepository);
+        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor, repoInserter);
+        this.uploadPackFactory = new JitStaticUploadPackFactory(uploadPackExecutor, refLockHolderManager, defaultRef);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
         this.userUpdater = new UserUpdater(repositoryUpdater);
@@ -153,7 +154,7 @@ public class HostedGitRepositoryManager implements Source {
 
     public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
             throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef, new ErrorReporter());
+        this(workingDirectory, endPointName, defaultRef, ErrorReporter.INSTANCE);
     }
 
     private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkForUserErrors(UserExtractor userExtractor) {
@@ -200,8 +201,8 @@ public class HostedGitRepositoryManager implements Source {
         try {
             this.uploadPackExecutor.shutdown();
             this.uploadPackExecutor.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (Exception ignore) {
-            // NOOP
+        } catch (InterruptedException ignore) {
+            Thread.currentThread().interrupt();
         }
         try {
             this.bareRepository.close();
@@ -245,9 +246,9 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public void checkHealth() {
-        final Exception fault = this.errorReporter.getFault();
+        final Throwable fault = errorReporter.getFault();
         if (fault != null) {
-            throw new RuntimeException(fault);
+            throw new HealthCheckException(fault);
         }
     }
 
@@ -282,26 +283,15 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final ObjectStreamProvider data,
-            final String version, final CommitMetaData commitMetaData) {
+            final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
-        Objects.requireNonNull(version);
         Objects.requireNonNull(key);
-        final String finalRef = checkRef(ref);
-        checkIfTag(finalRef);
+        checkIfTag(checkRef(ref));
         try {
-            final Ref actualRef = findRef(finalRef);
-            return updater.updateKey(key, actualRef, data, commitMetaData);
+            return updater.modifyKey(key, data, commitMetaData, ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private Ref findRef(final String finalRef) throws IOException {
-        final Ref actualRef = bareRepository.findRef(finalRef);
-        if (actualRef == null) {
-            throw new WrappingAPIException(new RefNotFoundException(finalRef));
-        }
-        return actualRef;
     }
 
     private String checkRef(String ref) {
@@ -311,19 +301,6 @@ public class HostedGitRepositoryManager implements Source {
         return ref;
     }
 
-    @Deprecated
-    private boolean checkMetaDataVersion(final String version, final String key, final String ref) {
-        try {
-            final SourceInfo sourceInfo = getSourceInfo(key, ref);
-            if (sourceInfo == null) {
-                return false;
-            }
-            return version.equals(sourceInfo.getMetaDataVersion());
-        } catch (final RefNotFoundException e) {
-            throw new WrappingAPIException(e);
-        }
-    }
-
     @Override
     public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(final String key, String ref, final ObjectStreamProvider data,
             final MetaData metaData, final CommitMetaData commitMetaData) {
@@ -331,26 +308,11 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(key);
         Objects.requireNonNull(metaData);
         Objects.requireNonNull(commitMetaData);
-        final String finalRef = checkRef(ref);
-        checkIfTag(finalRef);
-        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(metaData);
+        checkIfTag(checkRef(ref));
         try {
-            final Ref actualRef = findRef(finalRef);
-            checkIfKeyAlreadyExist(key, finalRef);
-            return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + METADATA, unwrap(metaDataConverter))), actualRef, commitMetaData);
+            return updater.addKey(Pair.of(Pair.of(key, data), Pair.of(key + METADATA, convertMetaData(metaData))), commitMetaData, ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
-        }
-    }
-
-    private void checkIfKeyAlreadyExist(final String key, final String finalRef) {
-        try {
-            final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
-            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
-                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-            }
-        } catch (final RefNotFoundException e) {
-            throw new WrappingAPIException(e);
         }
     }
 
@@ -360,16 +322,9 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
         Objects.requireNonNull(metaData);
-        Objects.requireNonNull(metaDataVersion);
-        final String finalRef = checkRef(ref);
-        checkIfTag(finalRef);
-        final CompletableFuture<byte[]> metaDataConverter = convertMetaData(Objects.requireNonNull(metaData));
+        checkIfTag(checkRef(ref));
         try {
-            final Ref actualRef = findRef(finalRef);
-            if (!checkMetaDataVersion(metaDataVersion, key, finalRef)) {
-                throw new WrappingAPIException(new VersionIsNotSame());
-            }
-            return updater.updateMetaData(key + METADATA, actualRef, unwrap(metaDataConverter), commitMetaData);
+            return updater.updateMetaData(key + METADATA, convertMetaData(Objects.requireNonNull(metaData)), commitMetaData, ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -381,26 +336,12 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    private static <T> T unwrap(final CompletableFuture<T> future) {
+    private byte[] convertMetaData(final MetaData metaData) {
         try {
-            return future.join();
-        } catch (final CompletionException ce) {
-            final Throwable cause = ce.getCause();
-            if (cause instanceof WrappingAPIException) {
-                throw (WrappingAPIException) cause;
-            }
-            throw ce;
+            return MAPPER.writeValueAsBytes(metaData);
+        } catch (final JsonProcessingException e1) {
+            throw new ShouldNeverHappenException("", e1);
         }
-    }
-
-    private CompletableFuture<byte[]> convertMetaData(final MetaData metaData) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return MAPPER.writeValueAsBytes(metaData);
-            } catch (final JsonProcessingException e1) {
-                throw new ShouldNeverHappenException("", e1);
-            }
-        });
     }
 
     public UploadPackFactory<HttpServletRequest> getUploadPackFactory() {
@@ -408,19 +349,17 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public void deleteKey(final String key, final String ref, CommitMetaData commitMetaData) {
+    public void deleteKey(final String key, final String ref, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
         final String finalRef = checkRef(ref);
         checkIfTag(finalRef);
-
         try {
-            final Ref actualRef = findRef(finalRef);
             final SourceInfo sourceInfo = getSourceInfo(key, finalRef);
             if (sourceInfo == null) {
                 return;
             }
-            updater.deleteKey(key, actualRef, commitMetaData, sourceInfo.hasKeyMetaData());
+            updater.deleteKey(key, commitMetaData, sourceInfo.hasKeyMetaData(),ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         } catch (final RefNotFoundException e) {
@@ -449,13 +388,13 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public List<String> getList(final String key, String ref, boolean recursive) throws RefNotFoundException, IOException {
+    public List<String> getList(final String key, String ref, final boolean recursive) throws RefNotFoundException, IOException {
         Objects.requireNonNull(key);
         ref = checkRef(ref);
         if (!key.endsWith("/")) {
             throw new IllegalArgumentException(String.format("%s doesn't end with /", key));
         }
-        return extractor.getListForKey(key, ref, recursive).stream().filter(k -> !k.endsWith(METADATA)).collect(Collectors.toList());
+        return extractor.getListForKey(key, ref, recursive).stream().filter(Predicate.not(k -> k.endsWith(METADATA))).collect(Collectors.toList());
     }
 
     @Override
@@ -465,16 +404,38 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public String updateUser(final String key, String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.updateUser(key, findRef(ref), data, new CommitMetaData(username, JITSTATIC_NOWHERE, "update user " + key, username, JITSTATIC_NOWHERE));
+        return userUpdater.updateUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "update user " + key, username, JITSTATIC_NOWHERE),ref);
     }
 
     @Override
-    public String addUser(final String key, final String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.addUser(key, findRef(ref), data, new CommitMetaData(username, JITSTATIC_NOWHERE, "add user " + key, username, JITSTATIC_NOWHERE));
+    public String addUser(final String key, String ref, final String username, final UserData data) throws IOException {
+        return userUpdater.addUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "add user " + key, username, JITSTATIC_NOWHERE),ref);
     }
 
     @Override
-    public void deleteUser(String key, String ref, String username) throws IOException {
-        userUpdater.deleteUser(key, findRef(ref), new CommitMetaData(username, JITSTATIC_NOWHERE, "delete user " + key, username, JITSTATIC_NOWHERE));
+    public void deleteUser(final String key, String ref, final String username) throws IOException {
+        userUpdater.deleteUser(key, new CommitMetaData(username, JITSTATIC_NOWHERE, "delete user " + key, username, JITSTATIC_NOWHERE),ref);
+    }
+
+    @Override
+    public void readAllRefs() throws IOException {
+        bareRepository.getRefDatabase().getRefs()
+                .parallelStream()
+                .filter(Predicate.not(Ref::isSymbolic))
+                .map(Ref::getName).forEach(ref -> bareRepository.fireEvent(new AddRefEvent(ref)));
+    }
+
+    @Override
+    public void write(final DistributedData data, final String ref) throws IOException {
+//        repoInserter.parse(new ByteArrayInputStream(data.getData()));
+        repoInserter.moveRef(ObjectId.fromString(data.getOld()), ObjectId.fromString(data.getTip()), ref);
+    }
+    
+    private static class HealthCheckException extends RuntimeException {
+        public HealthCheckException(Throwable fault) {
+            super(fault);
+        }
+
+        private static final long serialVersionUID = 1L;
     }
 }

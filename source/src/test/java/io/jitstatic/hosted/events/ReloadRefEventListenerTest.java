@@ -27,7 +27,7 @@ class ReloadRefEventListenerTest {
 
     @Test
     void testReloadRefEventListener() {
-        Reloader reloader = Mockito.mock(Reloader.class);
+        ReloadRef reloader = Mockito.mock(ReloadRef.class);
         ReloadRefEventListener listener = new ReloadRefEventListener(reloader);
         listener.onReload("ref");
         Mockito.verify(reloader).reload(Mockito.eq("ref"));

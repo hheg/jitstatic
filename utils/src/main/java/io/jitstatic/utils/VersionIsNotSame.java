@@ -22,14 +22,14 @@ package io.jitstatic.utils;
 
 public class VersionIsNotSame extends Exception {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public VersionIsNotSame() {
-		super();
-	}
-	
-	@Override
-	public Throwable fillInStackTrace() {
-		return this;
-	}
+    public VersionIsNotSame(final String askedVersion, final String actualVersion) {
+        super(String.format("Asked version=%s, actual version=%s", askedVersion, actualVersion));
+    }
+
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
+    }
 }

@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.doNothing;
@@ -47,8 +48,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.awaitility.Awaitility;
+import org.awaitility.Duration;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -89,7 +95,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
@@ -136,7 +141,7 @@ public class JitStaticReceivePackTest {
         bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db),
-                    false);
+                    false, new RepoInserter(db));
             return receivePack;
 
         });
@@ -148,7 +153,7 @@ public class JitStaticReceivePackTest {
         remoteBareGit.close();
         clientGit.close();
         Transport.unregister(protocol);
-        Exception fault = errorReporter.getFault();
+        Throwable fault = errorReporter.getFault();
         if (fault != null) {
             fault.printStackTrace();
         }
@@ -319,7 +324,7 @@ public class JitStaticReceivePackTest {
 
         assertEquals(errormsg, rc.getMessage());
         assertEquals(Result.REJECTED_OTHER_REASON, rc.getResult());
-        Exception fault = errorReporter.getFault();
+        Throwable fault = errorReporter.getFault();
         assertNotNull(fault);
         assertTrue(fault instanceof RepositoryException);
         assertEquals("Error while writing commit, repo is in an unknown state", fault.getMessage());
@@ -358,15 +363,17 @@ public class JitStaticReceivePackTest {
         when(ru.update()).thenReturn(RefUpdate.Result.FAST_FORWARD);
 
         rp.executeCommands();
-        Exception e;
-        int tries = 0;
-        while ((e = errorReporter.getFault()) == null && tries < 10) {
-            Thread.sleep(100);
-            tries++;
-        }
-        assertNotNull(e);
-        assertEquals("General error while deleting branches.", e.getMessage());
-        assertEquals(errormsg, e.getCause().getMessage());
+
+        AtomicReference<Throwable> e = new AtomicReference<>();
+        Awaitility.await().atMost(Duration.TEN_SECONDS).until(() -> {
+            Throwable fault = errorReporter.getFault();
+            e.set(fault);
+            return fault != null;
+        });
+        Throwable exception = e.get();
+        assertNotNull(exception);
+        assertEquals("General error while deleting branches.", exception.getMessage());
+        assertEquals(errormsg, exception.getCause().getMessage());
     }
 
     @Test
@@ -386,7 +393,7 @@ public class JitStaticReceivePackTest {
         UserExtractor ue = mock(UserExtractor.class);
 
         JitStaticReceivePack rp = initUnit(remoteRepository, sourceChecker, ue, rc, bus);
-        when(sourceChecker.checkTestBranchForErrors(Mockito.anyString())).thenThrow(new RuntimeException(errormsg));
+        when(sourceChecker.checkTestBranchForErrors(anyString())).thenThrow(new RuntimeException(errormsg));
         when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
         when(testUpdate.forceUpdate()).thenReturn(RefUpdate.Result.FORCED);
         BatchRefUpdate spyBatchRefUpdate = getSpyingBatchRefUpdate(refDatabase);
@@ -444,7 +451,7 @@ public class JitStaticReceivePackTest {
         when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = mock(SourceChecker.class);
         UserExtractor ue = mock(UserExtractor.class);
-        when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        when(ue.checkOnTestBranch(anyString(), anyString())).thenReturn(List.of());
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, bus);
         when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
         when(testUpdate.forceUpdate()).thenReturn(RefUpdate.Result.FORCED);
@@ -484,7 +491,7 @@ public class JitStaticReceivePackTest {
 
         rp.executeCommands();
 
-        verify(rc).setResult(eq(Result.REJECTED_NONFASTFORWARD), Mockito.anyString());
+        verify(rc).setResult(eq(Result.REJECTED_NONFASTFORWARD), anyString());
     }
 
     @Test
@@ -501,7 +508,7 @@ public class JitStaticReceivePackTest {
         RefDatabase refDatabase = mock(RefDatabase.class);
         UserExtractor ue = mock(UserExtractor.class);
         RefLockHolderManager repobus = mock(RefLockHolderManager.class);
-        when(ue.checkOnTestBranch(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        when(ue.checkOnTestBranch(anyString(), anyString())).thenReturn(List.of());
         RefLockHolder refholder = mock(RefLockHolder.class);
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, repobus);
         when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
@@ -511,11 +518,11 @@ public class JitStaticReceivePackTest {
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate);
         when(repobus.getRefHolder(eq(REF_HEADS_MASTER))).thenReturn(refholder);
-        when(refholder.lockWriteAll(any())).thenReturn(Either.right(new FailedToLock("")));
+        when(refholder.enqueueAndBlock(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(Either.right(new FailedToLock(""))));
 
         rp.executeCommands();
 
-        verify(rc).setResult(eq(Result.LOCK_FAILURE), Mockito.anyString());
+        verify(rc).setResult(eq(Result.LOCK_FAILURE), anyString());
     }
 
     @Test
@@ -545,7 +552,7 @@ public class JitStaticReceivePackTest {
         rp.executeCommands();
 
         verify(rc).setResult(eq(Result.REJECTED_OTHER_REASON), eq(errormsg));
-        Exception e = errorReporter.getFault();
+        Throwable e = errorReporter.getFault();
         assertTrue(e instanceof RepositoryException);
         assertEquals(errormsg, e.getCause().getMessage());
     }
@@ -587,8 +594,8 @@ public class JitStaticReceivePackTest {
         ReceiveCommand rc = spy(new ReceiveCommand(oldRef, ObjectId.zeroId(), "refs/heads/abranch", Type.DELETE));
 
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, bus);
-        when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
-        when(testUpdate.forceUpdate()).thenReturn(RefUpdate.Result.FORCED);
+        when(testUpdate.delete(any())).thenReturn(RefUpdate.Result.FAST_FORWARD);
+        when(remoteRepository.updateRef("refs/heads/abranch")).thenReturn(testUpdate);
         BatchRefUpdate spyBatchRefUpdate = getSpyingBatchRefUpdate(refDatabase);
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
@@ -613,7 +620,7 @@ public class JitStaticReceivePackTest {
         SourceChecker sc = mock(SourceChecker.class);
         UserExtractor ue = mock(UserExtractor.class);
         when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
-        ReceiveCommand rc = spy(new ReceiveCommand(oldRef, ObjectId.zeroId(), "refs/heads/abranch", Type.DELETE));
+        ReceiveCommand rc = spy(new ReceiveCommand(oldRef, ObjectId.fromString(SHA_1), "refs/heads/abranch", Type.UPDATE));
 
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, bus);
         when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
@@ -641,7 +648,8 @@ public class JitStaticReceivePackTest {
     }
 
     private JitStaticReceivePack initUnit(Repository remoteRepository, SourceChecker sc, UserExtractor ue, ReceiveCommand rc, RefLockHolderManager bus) {
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false,
+                mock(RepoInserter.class)) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
@@ -657,9 +665,29 @@ public class JitStaticReceivePackTest {
 
     RefLockHolder refHolderFactory(String ref) {
         return new RefLockHolder() {
+
             @Override
-            public <T> Either<T, FailedToLock> lockWriteAll(Supplier<T> supplier) {
-                return Either.left(supplier.get());
+            public <T> CompletableFuture<Either<T, FailedToLock>> enqueueAndReadBlock(Supplier<T> supplier) {
+                return CompletableFuture.completedFuture(Either.left(supplier.get()));
+            }
+
+            @Override
+            public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action,
+                    Consumer<Exception> postAction) {
+                return CompletableFuture.supplyAsync(() -> {
+                    Exception exception = preRequisite.get();
+                    try {
+                        if (exception == null) {
+                            DistributedData holder = action.get();
+                            return Either.left(holder.getTip());
+                        }
+                    } finally {
+                        postAction.accept(exception);
+                    }
+                    FailedToLock ftl = new FailedToLock(ref);
+                    ftl.addSuppressed(exception);
+                    return Either.right(ftl);
+                });
             }
         };
     }

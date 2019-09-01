@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.time.Instant;
+
 /*-
  * #%L
  * jitstatic
@@ -28,6 +30,7 @@ public class CommitMetaData {
     private final String message;
     private final String proxyUser;
     private final String proxyUserMail;
+    private final Instant timeStamp;
 
     public CommitMetaData(final String userInfo, final String userMail, final String message, final String proxyUser, final String proxyUserMail) {
         this.userInfo = checkNonNullNotEmpty(userInfo, "userInfo");
@@ -35,6 +38,7 @@ public class CommitMetaData {
         this.message = checkNonNullNotEmpty(message, "message");
         this.proxyUser = checkNonNullNotEmpty(proxyUser, "proxyUser");
         this.proxyUserMail = (proxyUserMail != null) ? proxyUserMail : JitStaticConstants.JITSTATIC_NOWHERE;
+        this.timeStamp = Instant.now();
     }
 
     private static String checkNonNullNotEmpty(final String victim, final String field) {
@@ -62,5 +66,9 @@ public class CommitMetaData {
 
     public String getProxyUserMail() {
         return proxyUserMail;
+    }
+
+    public Instant getTimeStamp() {
+        return timeStamp;
     }
 }

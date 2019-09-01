@@ -1,9 +1,5 @@
 package io.jitstatic.source;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.function.Function;
-
 /*-
  * #%L
  * jitstatic
@@ -24,6 +20,10 @@ import java.util.function.Function;
  * #L%
  */
 
+import java.io.IOException;
+import java.util.List;
+import java.util.function.Function;
+
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.events.RepositoryListener;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -31,6 +31,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
+import io.jitstatic.hosted.DistributedData;
 import io.jitstatic.hosted.RefLockHolder;
 import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
@@ -45,11 +46,11 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public String getDefaultRef();
 
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, ObjectStreamProvider data, String version, CommitMetaData commitMetaData);
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, ObjectStreamProvider data, CommitMetaData commitMetaData);
 
-    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String finalRef, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
+    public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String ref, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
 
-    public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String finalRef, CommitMetaData commitMetaData);
+    public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String ref, CommitMetaData commitMetaData);
 
     public void deleteKey(String key, String ref, CommitMetaData commitMetaData);
 
@@ -70,5 +71,9 @@ public interface Source extends AutoCloseable, CheckHealth {
     public void deleteUser(String key, String ref, String username) throws IOException;
 
     <T extends RepositoryListener> void addListener(T listener, Class<T> type);
+
+    public void readAllRefs() throws IOException;
+
+    public void write(DistributedData data, String ref) throws IOException;
 
 }

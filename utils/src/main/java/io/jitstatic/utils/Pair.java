@@ -28,9 +28,12 @@ public class Pair<L, R> implements Map.Entry<L, R> {
     private final L left;
     private final R right;
 
+    public Pair(Map.Entry<L, R> entry) {
+        this(entry.getKey(), entry.getValue());
+    }
+
     public Pair() {
-        this.left = null;
-        this.right = null;
+        this(null, null);
     }
 
     public Pair(final L t, final R u) {

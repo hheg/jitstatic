@@ -23,7 +23,7 @@ package io.jitstatic;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
-import static io.jitstatic.tools.AUtils.toByte;
+import static io.jitstatic.source.ObjectStreamProvider.toByte;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -340,16 +340,12 @@ public class KeyValueStorageWithHostedStorageTest {
         String user = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
         String data = getData(3);
-        String createdKeyTag;
-        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();) {
-            createdKeyTag = client.createKey(data.getBytes(UTF_8), new CommitData("key", REFS_HEADS_NEWBRANCH, "new key", "user", "mail"),
-                    new MetaData(APPLICATION_JSON));
-        }
-        try (JitStaticClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
-            Entity<JsonNode> key = client.getKey("key", REFS_HEADS_NEWBRANCH, tf);
-            assertEquals(data, key.data.toString());
-            assertEquals(createdKeyTag, key.tag);
-        }
+        assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> {
+            try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();) {
+                client.createKey(data.getBytes(UTF_8), new CommitData("key", REFS_HEADS_NEWBRANCH, "new key", "user", "mail"),
+                        new MetaData(APPLICATION_JSON));
+            }
+        }).getStatusCode());
     }
 
     @Test
@@ -591,7 +587,7 @@ public class KeyValueStorageWithHostedStorageTest {
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, tf)).getStatusCode());
         }
     }
-    
+
     private Supplier<String> getFolder() {
         return () -> {
             try {

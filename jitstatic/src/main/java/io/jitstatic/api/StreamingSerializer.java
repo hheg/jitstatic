@@ -32,7 +32,7 @@ import io.jitstatic.source.ObjectStreamProvider;
 public class StreamingSerializer extends JsonSerializer<ObjectStreamProvider> {
 
     @Override
-    public void serialize(ObjectStreamProvider provider, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(final ObjectStreamProvider provider, final JsonGenerator gen, final SerializerProvider serializers) throws IOException {
         long size = provider.getSize();
         if (size > Integer.MAX_VALUE) {
             size = -1;

@@ -36,11 +36,11 @@ import io.jitstatic.source.ObjectStreamProvider;
 public class AddKeyData {
 
     @NotNull
-    private final ObjectStreamProvider data;
-
-    @NotNull
     @Valid
     private final MetaData metaData;
+    
+    @NotNull
+    private final ObjectStreamProvider data;
 
     @NotBlank
     private final String message;

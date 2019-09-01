@@ -57,7 +57,8 @@ public class HashService implements Serializable {
             hasher.setHashIterations(iterations);
             final HashRequest request = new HashRequest.Builder()
                     .setSource(ByteSource.Util.bytes(password))
-                    .setSalt(ByteSource.Util.bytes(Hex.decode(data.getSalt()))).build();
+                    .setSalt(ByteSource.Util.bytes(Hex.decode(data.getSalt())))
+                    .build();
             final Hash computedHash = hasher.computeHash(request);
             return computedHash.toHex().equals(data.getHash());
         } else {
@@ -74,7 +75,8 @@ public class HashService implements Serializable {
         final ByteSource salt = hasher.getRandomNumberGenerator().nextBytes(64);
         final HashRequest request = new HashRequest.Builder()
                 .setSource(ByteSource.Util.bytes(password))
-                .setSalt(salt).build();
+                .setSalt(salt)
+                .build();
         final Hash computedHash = hasher.computeHash(request);
         return new UserData(roles, null, salt.toHex(), computedHash.toHex());
     }

@@ -75,8 +75,9 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactory() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
+        RepoInserter inserter = mock(RepoInserter.class);
         JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()));
+                new UserExtractor(git.getRepository()), inserter);
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);
         ReceivePack create = jsrpf.create(req, git.getRepository());
@@ -91,9 +92,10 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactoryNoUser() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String host = "remotehost";
+        RepoInserter inserter = mock(RepoInserter.class);
         assertThat(assertThrows(ServiceNotAuthorizedException.class, () -> {
             JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                    new UserExtractor(git.getRepository()));
+                    new UserExtractor(git.getRepository()), inserter);
             when(req.getRemoteHost()).thenReturn(host);
             jsrpf.create(req, git.getRepository());
         }).getLocalizedMessage(), CoreMatchers.containsString("Unauthorized"));
@@ -102,9 +104,10 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactoryReceivePackTurnedOff() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
+        RepoInserter inserter = mock(RepoInserter.class);
         assertThat(assertThrows(ServiceNotEnabledException.class, () -> {
             JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                    new UserExtractor(git.getRepository()));
+                    new UserExtractor(git.getRepository()), inserter);
             git.getRepository().getConfig().setString("http", null, "receivepack", "false");
             when(req.getRemoteUser()).thenReturn(user);
             when(req.getRemoteHost()).thenReturn(host);
@@ -115,8 +118,9 @@ public class JitStaticReceivePackFactoryTest {
     @Test
     public void testJitStaticReceivePackFactoryReceivePackTurnedOn() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
+        RepoInserter inserter = mock(RepoInserter.class);
         JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()));
+                new UserExtractor(git.getRepository()), inserter);
         git.getRepository().getConfig().setString("http", null, "receivepack", "true");
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);
@@ -134,13 +138,14 @@ public class JitStaticReceivePackFactoryTest {
         String user = "user";
         Ref secrets = mock(Ref.class);
         Ref head = mock(Ref.class);
+        RepoInserter inserter = mock(RepoInserter.class);
         ObjectId oid = ObjectId.fromString("5f12e3846fef8c259efede1a55e12667effcc461");
         when(secrets.getObjectId()).thenReturn(oid);
         when(head.getObjectId()).thenReturn(oid);
         when(req.getRemoteUser()).thenReturn(user);
 
         JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()));
+                new UserExtractor(git.getRepository()), inserter);
 
         ReceivePack up = jsrpf.create(req, git.getRepository());
         Map<String, Ref> map = new HashMap<>();

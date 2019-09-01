@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
@@ -39,18 +38,12 @@ class ObjectStreamProviderTest {
     void testGetLargeObjectStreamProvider() throws IOException {
         ObjectLoader ol = Mockito.mock(ObjectLoader.class);
         ObjectStream mock = Mockito.mock(ObjectStream.class);
+        ObjectStreamProvider osp = Mockito.mock(ObjectStreamProvider.class);
         when(ol.openStream()).thenReturn(mock);
-        ObjectStreamProvider osp = new ObjectStreamProvider() {
-            @Override
-            public long getSize() throws IOException {
-                return 2;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(new byte[] { 1 });
-            }
-        };
+        when(osp.getSize()).thenReturn(2L);
+        when(osp.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[] { 1 }));
+        when(osp.getObjectStreamProvider(Mockito.any(), Mockito.anyInt())).thenCallRealMethod();
+        
         ObjectStreamProvider objectStreamProvider = osp.getObjectStreamProvider(() -> ol, 1);
         assertEquals(LargeObjectStreamProvider.class, objectStreamProvider.getClass());
         assertSame(mock, objectStreamProvider.getInputStream());
@@ -59,17 +52,10 @@ class ObjectStreamProviderTest {
     @Test
     void testGetSmallObjectStreamProvider() throws IOException {
         ObjectLoader ol = Mockito.mock(ObjectLoader.class);
-        ObjectStreamProvider osp = new ObjectStreamProvider() {
-            @Override
-            public long getSize() throws IOException {
-                return 1;
-            }
-
-            @Override
-            public InputStream getInputStream() throws IOException {
-                return new ByteArrayInputStream(new byte[] { 1 });
-            }
-        };
+        ObjectStreamProvider osp = Mockito.mock(ObjectStreamProvider.class);
+        when(osp.getSize()).thenReturn(1L);
+        when(osp.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[] { 1 }));
+        when(osp.getObjectStreamProvider(Mockito.any(), Mockito.anyInt())).thenCallRealMethod();
         assertEquals(osp.getClass(), osp.getObjectStreamProvider(() -> ol, 2).getClass());
     }
 }

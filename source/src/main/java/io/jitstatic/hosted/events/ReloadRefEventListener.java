@@ -24,9 +24,9 @@ import org.eclipse.jgit.events.RepositoryListener;
 
 public class ReloadRefEventListener implements RepositoryListener {
 
-    private final Reloader reloader;
+    private final ReloadRef reloader;
 
-    public ReloadRefEventListener(final Reloader reloader) {  
+    public ReloadRefEventListener(final ReloadRef reloader) {  
         this.reloader = reloader;
     }
     

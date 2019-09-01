@@ -23,6 +23,8 @@ package io.jitstatic.api;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
 import javax.ws.rs.WebApplicationException;
@@ -35,11 +37,15 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 
+import io.jitstatic.JitStaticConstants;
+import io.jitstatic.Role;
 import io.jitstatic.UpdateFailedException;
-import io.jitstatic.hosted.KeyAlreadyExist;
+import io.jitstatic.auth.User;
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.storage.HashService;
+import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -52,31 +58,34 @@ class APIHelper {
         this.log = log;
     }
 
-    <T> T unwrapWithPOSTApi(final Supplier<T> add) {
-        try {
-            return add.get();
-        } catch (final WrappingAPIException e) {
+    Response exceptionHandlerPOSTAPI(Throwable e) {
+        if (e instanceof WebApplicationException) {
+            WebApplicationException wae = (WebApplicationException) e;
+            return wae.getResponse();
+        }
+        if (e instanceof CompletionException) {
+            return exceptionHandlerPOSTAPI(e.getCause());
+        }
+        if (e instanceof WrappingAPIException) {
             final Throwable apiException = e.getCause();
             if (apiException instanceof KeyAlreadyExist) {
-                throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+                return new WebApplicationException(apiException.getMessage(), Status.CONFLICT).getResponse();
             } else if (apiException instanceof RefNotFoundException) {
-                // Error message here means that the branch is not found.
                 RefNotFoundException rnfe = (RefNotFoundException) apiException;
-                throw new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.NOT_FOUND);
+                return new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.NOT_FOUND).getResponse();
             } else if (apiException instanceof UnsupportedOperationException) {
-                throw new WebApplicationException(Status.FORBIDDEN);
+                return new WebApplicationException(Status.FORBIDDEN).getResponse();
             } else if (apiException instanceof IOException) {
                 log.error("IO Error while executing command", e);
-                throw new WebApplicationException("Data is malformed", 422);
+                return new WebApplicationException("Data is malformed", 422).getResponse();
             }
-            log.error(UNHANDLED_ERROR, e);
-        } catch (final Exception e) {
-            log.error(UNHANDLED_ERROR, e);
         }
-        throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+        log.error(UNHANDLED_ERROR, e);
+        return new WebApplicationException(Status.INTERNAL_SERVER_ERROR).getResponse();
+
     }
 
-    void checkHeaders(final HttpHeaders headers) {
+    static void checkHeaders(final HttpHeaders headers) {
         final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
         if (header == null || header.isEmpty()) {
             throw new WebApplicationException(Status.BAD_REQUEST);
@@ -90,7 +99,7 @@ class APIHelper {
         }
     }
 
-    void checkValidRef(final String ref) {
+    static void checkValidRef(final String ref) {
         if (ref != null) {
             checkRef(ref);
             if (ref.startsWith(Constants.R_TAGS)) {
@@ -99,72 +108,85 @@ class APIHelper {
         }
     }
 
-    <T> T unwrapWithPUTApi(final Supplier<T> supplier) {
-        try {
-            return supplier.get();
-        } catch (final WrappingAPIException e) {
+    Response execptionHandler(Throwable e) {
+        if (e instanceof WebApplicationException) {
+            WebApplicationException wae = (WebApplicationException) e;
+            return wae.getResponse();
+        }
+        if (e instanceof CompletionException) {
+            return execptionHandler(e.getCause());
+        }
+        if (e instanceof WrappingAPIException) {
             final Throwable apiException = e.getCause();
             if (apiException instanceof UnsupportedOperationException) {
-                throw new WebApplicationException(Status.NOT_FOUND);
+                return new WebApplicationException(Status.NOT_FOUND).getResponse();
             }
-            if (apiException instanceof RefNotFoundException) {
-                return null;
+        }
+        log.error(UNHANDLED_ERROR, e);
+        return new WebApplicationException(Status.INTERNAL_SERVER_ERROR).getResponse();
+    }
+
+    Response exceptionHandlerPUTAPI(Throwable e) {
+        if (e instanceof WebApplicationException) {
+            WebApplicationException wae = (WebApplicationException) e;
+            return wae.getResponse();
+        }
+        if (e instanceof CompletionException) {
+            return exceptionHandlerPUTAPI(e.getCause());
+        }
+        if (e instanceof WrappingAPIException) {
+            final Throwable apiException = e.getCause();
+            if (apiException instanceof UnsupportedOperationException || apiException instanceof RefNotFoundException) {
+                return new WebApplicationException(Status.NOT_FOUND).getResponse();
             }
             if (apiException instanceof VersionIsNotSame) {
-                throw new WebApplicationException(apiException.getMessage(), Status.PRECONDITION_FAILED);
+                return new WebApplicationException(apiException.getMessage(), Status.PRECONDITION_FAILED).getResponse();
             }
             if (apiException instanceof KeyAlreadyExist) {
-                throw new WebApplicationException(apiException.getMessage(), Status.CONFLICT);
+                return new WebApplicationException(apiException.getMessage(), Status.CONFLICT).getResponse();
             }
             log.error(UNHANDLED_ERROR, e);
-            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
-        } catch (final UpdateFailedException e) {
-            throw new WebApplicationException("Key is being updated", Status.PRECONDITION_FAILED);
-        } catch (final Exception e) {
+            return new WebApplicationException(Status.INTERNAL_SERVER_ERROR).getResponse();
+        } else if (e instanceof UpdateFailedException) {
+            return new WebApplicationException("Key is being updated", Status.PRECONDITION_FAILED).getResponse();
+        } else {
             log.error(UNHANDLED_ERROR, e);
-            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+            return new WebApplicationException(Status.INTERNAL_SERVER_ERROR).getResponse();
         }
     }
 
-    <T> Optional<T> unwrap(final Supplier<Optional<T>> supplier) {
+    <T> T unwrap(final Supplier<T> supplier, final Supplier<T> alternative) {
         try {
             return supplier.get();
         } catch (WrappingAPIException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof UnsupportedOperationException) {
                 throw new WebApplicationException(Status.FORBIDDEN);
+            } if (cause instanceof RefNotFoundException) {
+                throw new WebApplicationException(Status.NOT_FOUND);
             }
             log.error("Unknown api error", e);
-            return Optional.empty();
+            return alternative.get();
         } catch (Exception e) {
             log.error(UNHANDLED_ERROR, e);
-            return Optional.empty();
+            return alternative.get();
         }
     }
 
-    <T, V> Pair<T, V> unwrapPair(final Supplier<Pair<T, V>> supplier) {
-        try {
-            return supplier.get();
-        } catch (WrappingAPIException e) {
-            final Throwable cause = e.getCause();
-            if (cause instanceof UnsupportedOperationException) {
-                throw new WebApplicationException(Status.FORBIDDEN);
-            }
-            log.error("Unknown api error", e);
-            return Pair.ofNothing();
-        } catch (Exception e) {
-            log.error(UNHANDLED_ERROR, e);
-            return Pair.ofNothing();
+    static void checkRef(final String ref) {
+        if (ref == null) {
+            return;
         }
-    }
-
-    void checkRef(final String ref) {
-        if (ref != null && !(ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS))) {
+        if (!isRef(ref)) {
             throw new WebApplicationException(Status.NOT_FOUND);
         }
     }
 
-    Response checkETag(final HttpHeaders headers, final EntityTag tag) {
+    static boolean isRef(final String ref) {
+        return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
+    }
+
+    static Response checkETag(final HttpHeaders headers, final EntityTag tag) {
         final List<String> requestHeaders = headers.getRequestHeader(HttpHeaders.IF_MATCH);
         if (requestHeaders == null) {
             return null;
@@ -180,15 +202,31 @@ class APIHelper {
         return null;
     }
 
-    Response respondAuthenticationChallenge(final String realm) {
-        return Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build();
+    static WebApplicationException createAuthenticationChallenge(String realm) {
+        return new WebApplicationException(
+                Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build());
     }
 
-    StoreInfo checkIfKeyExist(final String key, final String ref, Storage storage) {
-        return unwrap(() -> storage.getKey(key, ref)).orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND));
+    StoreInfo checkIfKeyExist(final String key, final String ref, final Storage storage) {
+        final Optional<StoreInfo> storeInfo = unwrap(() -> storage.getKey(key, ref), Optional::empty);
+        return storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND));
     }
-    
-    String setToDefaultRef(final String defaultRef, final String ref) {
+
+    static String setToDefaultRefIfNull(final String ref, final String defaultRef) {
         return ref == null ? defaultRef : ref;
+    }
+
+    static boolean isKeyUserAllowed(final Storage storage, final HashService hashService, final User user, final String ref, Set<Role> keyRoles) {
+        keyRoles = keyRoles == null ? Set.of() : keyRoles;
+        try {
+            final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
+            if (userData == null) {
+                return false;
+            }
+            final Set<Role> userRoles = userData.getRoles();
+            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
+        } catch (RefNotFoundException e) {
+            return false;
+        }
     }
 }

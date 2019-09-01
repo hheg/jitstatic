@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -106,7 +107,7 @@ public class SourceExtractor {
         }
         return null;
     }
-
+    
     private Ref findBranch(final String refName) throws IOException, RefNotFoundException {
         final Ref branchRef = repository.findRef(refName);
         if (branchRef == null) {
@@ -229,8 +230,8 @@ public class SourceExtractor {
         final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
         return allRefs.entrySet().stream().map(e -> {
             final Set<Ref> refs = e.getValue().stream()
-                    .filter(ref -> !ref.isSymbolic())
-                    .filter(ref -> ref.getName().startsWith(R_HEADS)) // TODO Remove this
+                    .filter(Predicate.not(Ref::isSymbolic))
+                    .filter(ref -> ref.getName().startsWith(R_HEADS))
                     .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
         }).map(this::fileLoader).collect(Collectors.toMap(branchErrors -> branchErrors.getLeft(), branchErrors -> branchErrors.getRight()));

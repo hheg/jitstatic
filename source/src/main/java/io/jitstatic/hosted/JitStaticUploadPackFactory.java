@@ -26,6 +26,7 @@ import java.io.OutputStream;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 
 import javax.servlet.http.HttpServletRequest;
@@ -48,9 +49,13 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
 
     private static final Logger LOG = LoggerFactory.getLogger(UploadPack.class);
     private final ExecutorService executorService;
+    private final RefLockHolderManager refLockHolderManager;
+    private final String defaultRef;
 
-    public JitStaticUploadPackFactory(ExecutorService executorService) {
+    public JitStaticUploadPackFactory(final ExecutorService executorService, final RefLockHolderManager refLockHolderManager, final String defaultRef) {
         this.executorService = Objects.requireNonNull(executorService);
+        this.refLockHolderManager = Objects.requireNonNull(refLockHolderManager);
+        this.defaultRef = Objects.requireNonNull(defaultRef);
     }
 
     static class ServiceConfig {
@@ -71,13 +76,25 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
                 @Override
                 public void upload(final InputStream input, final OutputStream output, final OutputStream messages) throws IOException {
                     try {
-                        super.upload(input, output, messages);
-                    } catch (UploadPackInternalServerErrorException wnve) {
-                        final Throwable cause = wnve.getCause();
-                        if (cause instanceof WantNotValidException) {
-                            LOG.info("{}, aborting...", cause.getMessage());
+                        refLockHolderManager.getRefHolder(defaultRef).enqueueAndReadBlock(() -> {
+                            try {
+                                super.upload(input, output, messages);
+                            } catch (IOException e) {
+                                throw new UnwrapException(e);
+                            }
+                            return "upload-pack OK";
+                        }).join();
+                    } catch (CompletionException ce) {
+                        final Throwable cause = ce.getCause().getCause();
+                        if (cause instanceof UploadPackInternalServerErrorException) {
+                            final Throwable wnve = cause.getCause();
+                            if (wnve instanceof WantNotValidException) {
+                                LOG.info("{}, aborting...", wnve.getMessage());
+                            } else {
+                                throw (IOException) cause;
+                            }
                         } else {
-                            throw wnve;
+                            throw (IOException) cause;
                         }
                     }
                 }
@@ -89,6 +106,14 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
             return jitStaticUploadPack;
         } else
             throw new ServiceNotEnabledException();
+    }
+
+    private static class UnwrapException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public UnwrapException(IOException e) {
+            super(e);
+        }
     }
 
 }

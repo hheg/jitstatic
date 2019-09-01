@@ -36,11 +36,6 @@ import io.jitstatic.MetaData;
 public class SourceHandler {
     private static final JsonFactory MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS).getFactory();
 
-    public static byte[] readStorageData(final InputStream is) throws IOException {
-        Objects.requireNonNull(is);
-        return is.readAllBytes();
-    }
-
     public static MetaData readMetaData(final InputStream storageStream) throws IOException {
         Objects.requireNonNull(storageStream);
         try (final JsonParser parser = MAPPER.createParser(storageStream);) {
