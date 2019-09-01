@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -79,17 +78,16 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     final int threshold;
     private final HashService hashService;
     private final LockService lock;
-    private final RefLockService clusterService;
+    private final RefLockService refLockService;
 
-    public RefHolder(final String ref, final Source source, final HashService hashService, final ExecutorService repoWriter,
-            final RefLockService clusterService) {
+    public RefHolder(final String ref, final Source source, final HashService hashService, final RefLockService refLockService) {
         this.ref = Objects.requireNonNull(ref);
         this.refCache = new AtomicReference<>(getStorage(MAX_ENTRIES));
-        this.clusterService = clusterService;
+        this.refLockService = refLockService;
         this.source = Objects.requireNonNull(source);
         this.threshold = THRESHOLD;
         this.hashService = Objects.requireNonNull(hashService);
-        this.lock = clusterService.getLockService(ref);
+        this.lock = refLockService.getLockService(ref);
     }
 
     public void start() {
@@ -491,7 +489,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     @Override
     public <T> CompletableFuture<Either<T, FailedToLock>> enqueueAndReadBlock(final Supplier<T> supplier) {
-        return CompletableFuture.supplyAsync(() -> Either.left(supplier.get()), clusterService.getRepoWriter());
+        return CompletableFuture.supplyAsync(() -> Either.left(supplier.get()), refLockService.getRepoWriter());
     }
 
     @Override

@@ -62,7 +62,7 @@ public class TreeTest {
 
     @Test
     public void testGeneral() {
-        assertEquals(expected, Tree.of(data).accept(new Tree.Extractor()));
+        assertEquals(expected, Tree.of(data).accept(Tree.EXTRACTOR));
     }
 
     @Test
@@ -73,7 +73,7 @@ public class TreeTest {
                 Pair.of("dir0/dir2/", true),
                 Pair.of("dir0/dir2/file4", false),
                 Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
                 Pair.of("dir0/dir2/", true));
@@ -88,7 +88,7 @@ public class TreeTest {
                 Pair.of("dir0/dir2/", false),
                 Pair.of("dir0/dir2/file4", false),
                 Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir2/", false),
                 Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
@@ -103,7 +103,7 @@ public class TreeTest {
                 Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false),
                 Pair.of("dir0/dir2/", false),
                 Pair.of("dir0/dir2/file4", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir2/", false),
                 Pair.of("dir0/dir2/dir3/dir4/dir5/file6", false));
@@ -116,7 +116,7 @@ public class TreeTest {
                 Pair.of("/", false),
                 Pair.of("file1", false),
                 Pair.of("dir0/file1", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", false),
                 Pair.of("dir0/file1", false));
@@ -129,7 +129,7 @@ public class TreeTest {
                 Pair.of("file1", false),
                 Pair.of("dir0/file1", false),
                 Pair.of("/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", false),
                 Pair.of("dir0/file1", false));
@@ -152,7 +152,7 @@ public class TreeTest {
                 Pair.of("file5", false),
                 Pair.of("dir0/dir1/file4", false),
                 Pair.of("dir0/dir1/file5", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
@@ -168,7 +168,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("/", true),
                 Pair.of("dir0/file1", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", true));
         assertEquals(expected, actual);
@@ -179,7 +179,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("dir0/file1", false),
                 Pair.of("/", true));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", true));
         assertEquals(expected, actual);
@@ -190,7 +190,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false));
         assertEquals(expected, actual);
@@ -201,7 +201,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("dir0/dir1", false),
                 Pair.of("dir0/dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false));
         assertEquals(expected, actual);
@@ -212,7 +212,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("/dir0/dir1", false),
                 Pair.of("dir0/dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false));
         assertEquals(expected, actual);
@@ -223,7 +223,7 @@ public class TreeTest {
         List<Pair<String, Boolean>> data = List.of(
                 Pair.of("///dir0/dir1", false),
                 Pair.of("dir0//dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false));
         assertEquals(expected, actual);
@@ -270,7 +270,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/file9", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false)));
-        List<Pair<String, Boolean>> actual = data.accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = data.accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1/dir3/file1", false),
@@ -287,7 +287,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/file9", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false)));
-        List<Pair<String, Boolean>> actual = data.accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = data.accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/dir3/file1", false),
                 Pair.of("dir0/dir1/dir3/file8", false),
@@ -341,7 +341,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/file9", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1/dir3/file1", false),
@@ -359,7 +359,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/file9", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", false),
                 Pair.of("dir0/dir1/", false),
@@ -378,7 +378,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/file9", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", true));
         assertEquals(expected, actual);
@@ -395,7 +395,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false),
                 Pair.of("/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", true));
         assertEquals(expected, actual);
@@ -412,7 +412,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/dir2/file2", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("dir0/dir1/", false),
                 Pair.of("dir0/dir1/dir2/", true),
@@ -433,7 +433,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/file2", false),
                 Pair.of("dir0/dir1/", false),
                 Pair.of("/", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         List<Pair<String, Boolean>> expected = List.of(
                 Pair.of("/", false),
                 Pair.of("dir0/dir1/", false),
@@ -452,7 +452,7 @@ public class TreeTest {
                 Pair.of("dir0/dir1/dir3/dir4/dir5/file6", false),
                 Pair.of("dir0/dir1/file4", true),
                 Pair.of("file5", false));
-        List<Pair<String, Boolean>> actual = Tree.of(data).accept(new Tree.Extractor());
+        List<Pair<String, Boolean>> actual = Tree.of(data).accept(Tree.EXTRACTOR);
         var expected = List.of(
                 Pair.of("dir0/dir1/", true),
                 Pair.of("file5", false));

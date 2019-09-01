@@ -33,6 +33,7 @@ import io.jitstatic.utils.Pair;
 
 public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
     public static final DotFinder DOT_FINDER = new DotFinder();
+    public static final Extractor EXTRACTOR = new Extractor();
     private final Node<String, Pair<String, Boolean>> root;
     private static final String FWD_SLASH = "/";
 

@@ -69,14 +69,12 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     private final String defaultRef;
     private final String rootUser;
     private final ExecutorService refCleaner = Executors.newSingleThreadExecutor(new NamingThreadFactory("RefCleaner"));
-    private final ExecutorService repoWriter;
 
     public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
         this.rootUser = Objects.requireNonNull(rootUser);
-        this.repoWriter = clusterService.getRepoWriter();
-        this.cache = getMap(source, hashService, repoWriter, clusterService);
+        this.cache = getMap(source, hashService, clusterService);
         addRef(this.defaultRef);
     }
 
@@ -158,7 +156,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         }
     }
 
-    public static void shutDownExecutor(final ExecutorService service) {
+    static void shutDownExecutor(final ExecutorService service) {
         service.shutdown();
         try {
             service.awaitTermination(10, TimeUnit.SECONDS);
@@ -249,7 +247,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
         Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
-        return Tree.of(keyPairs).accept(new Tree.Extractor())
+        return Tree.of(keyPairs).accept(Tree.EXTRACTOR)
                 .parallelStream()
                 .map(pair -> {
                     final String key = pair.getLeft();
@@ -371,8 +369,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     }
 
-    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, final ExecutorService repoWriter,
-            RefLockService clusterService) {
+    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, RefLockService refLockService) {
         return new Cache2kBuilder<String, RefHolder>() {
         }
                 .name(KeyStorage.class)
@@ -380,9 +377,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                     @Override
                     public RefHolder load(final String r) throws Exception {
                         if (r.startsWith("refs/tags/")) {
-                            return new ReadOnlyRefHolder(r, source, hashService, repoWriter, clusterService);
+                            return new ReadOnlyRefHolder(r, source, hashService, refLockService);
                         }
-                        final RefHolder refHolder = new RefHolder(r, source, hashService, repoWriter, clusterService);
+                        final RefHolder refHolder = new RefHolder(r, source, hashService, refLockService);
                         refHolder.start();
                         return refHolder;
                     }

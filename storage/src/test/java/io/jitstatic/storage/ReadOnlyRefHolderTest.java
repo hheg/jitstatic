@@ -23,7 +23,6 @@ package io.jitstatic.storage;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -45,7 +44,6 @@ class ReadOnlyRefHolderTest {
         UserData userData = Mockito.mock(UserData.class);
         
         try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", Mockito.mock(Source.class), Mockito.mock(HashService.class),
-                Mockito.mock(ExecutorService.class),
                 Mockito.mock(RefLockService.class));) {
             assertThrows(WrappingAPIException.class, () -> ref.addKey("key", osp, metaData, cmd));
             assertThrows(WrappingAPIException.class, () -> ref.addUser("user", "user", userData));
