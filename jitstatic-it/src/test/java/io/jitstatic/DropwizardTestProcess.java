@@ -26,7 +26,7 @@ import java.io.IOException;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 class DropwizardTestProcess implements DropwizardProcess {
     
@@ -40,12 +40,6 @@ class DropwizardTestProcess implements DropwizardProcess {
     @Override
     public String getUser() {
         return DW.getConfiguration().getHostedFactory().getUserName();
-    }
-
-    @Override
-    public String getStorageAdress() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -81,6 +75,10 @@ class DropwizardTestProcess implements DropwizardProcess {
 
     @Override
     public void checkContainerForErrors() {
-        AUtils.checkContainerForErrors(DW);
+        ContainerUtils.checkContainerForErrors(DW);
+    }
+    @Override
+    public void close() throws Exception {
+        // NOOP
     }
 }

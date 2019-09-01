@@ -21,8 +21,8 @@ package io.jitstatic.hosted;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -115,8 +115,7 @@ public class UserUpdaterTest {
 
         List<Pair<String, String>> updateUser = uu.updateUser(
                 List.of(Pair.of(gitAdmin, gitAdminData), Pair.of(keyAdmin, keyAdminData), Pair.of(keyUser, keyUserData)),
-                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
-
+                new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE), REF_HEAD_MASTER);
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
 
         Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
@@ -134,10 +133,8 @@ public class UserUpdaterTest {
         gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "s1234", null, null); // Full admin rights
         keyAdminData = new UserData(Set.of(new Role("files")), "s2345", null, null);
         keyUserData = new UserData(Set.of(new Role("files")), "s3456", null, null);
-
         updateUser = uu.updateUser(List.of(Pair.of(gitAdmin, gitAdminData), Pair.of(keyAdmin, keyAdminData), Pair.of(keyUser, keyUserData)),
-                bareGit.getRepository().findRef(REF_HEAD_MASTER), new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
-
+                new CommitMetaData("test", "testmail", "test", "Test", JitStaticConstants.JITSTATIC_NOWHERE), REF_HEAD_MASTER);
         extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
         assertEquals(gitAdminData, extractUserFromRef.getRight());
         assertEquals(updateUser.get(0).getRight(), extractUserFromRef.getLeft());
@@ -149,7 +146,6 @@ public class UserUpdaterTest {
         extractUserFromRef = ue.extractUserFromRef(keyUser, REF_HEAD_MASTER);
         assertEquals(keyUserData, extractUserFromRef.getRight());
         assertEquals(updateUser.get(2).getRight(), extractUserFromRef.getLeft());
-
     }
 
     @Test
@@ -158,12 +154,26 @@ public class UserUpdaterTest {
         UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
-        String updateUser = uu.updateUser(gitAdmin, bareGit.getRepository().findRef(REF_HEAD_MASTER), gitAdminData,
-                new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE));
+        String updateUser = uu.updateUser(gitAdmin, gitAdminData, new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE),
+                REF_HEAD_MASTER);
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
         Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
         assertEquals(gitAdminData, extractUserFromRef.getRight());
         assertEquals(updateUser, extractUserFromRef.getLeft());
+    }
+
+    @Test
+    public void testDeleteUser() throws Exception {
+        String gitAdmin = USERS + GIT_REALM + "/gitadmin";
+        UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
+        UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
+        uu.addUser(gitAdmin, gitAdminData, new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE), REF_HEAD_MASTER);
+        UserExtractor ue = new UserExtractor(bareGit.getRepository());
+        Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
+        assertTrue(extractUserFromRef.isPresent());
+        uu.deleteUser(gitAdmin, new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE), REF_HEAD_MASTER);
+        extractUserFromRef = ue.extractUserFromRef(gitAdmin, REF_HEAD_MASTER);
+        assertTrue(!extractUserFromRef.isPresent());
     }
 
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {

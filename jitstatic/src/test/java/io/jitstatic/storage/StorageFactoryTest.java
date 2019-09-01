@@ -51,13 +51,14 @@ public class StorageFactoryTest {
     private JerseyEnvironment jersey = mock(JerseyEnvironment.class);
     private Source source = mock(Source.class);
     private HashService hashService = new HashService();
+    private RefLockService clusterService = new LocalRefLockService();
 
     private StorageFactory sf = new StorageFactory();
 
     @Test
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root");) {
+        try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root", clusterService);) {
             assertEquals(Optional.empty(), storage.getKey("key", null));
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));
@@ -69,7 +70,7 @@ public class StorageFactoryTest {
     public void testEmptyStoragePath() {
         when(env.jersey()).thenReturn(jersey);
         assertEquals(assertThrows(NullPointerException.class, () -> {
-            try (Storage storage = sf.build(null, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root");) {
+            try (Storage storage = sf.build(null, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root", clusterService);) {
             }
         }).getLocalizedMessage(), "Source cannot be null");
     }
@@ -77,7 +78,7 @@ public class StorageFactoryTest {
     @Test
     public void testListener() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root");) {
+        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root", clusterService);) {
             ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
             verify(source).addListener(c.capture(), Mockito.eq(ReloadRefEventListener.class));
             c.getValue().onReload("refs/heads/master");
@@ -87,7 +88,7 @@ public class StorageFactoryTest {
     @Test
     public void testListenerWithNullArgument() {
         when(env.jersey()).thenReturn(jersey);
-        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root");) {
+        try (Storage build = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root", clusterService);) {
             ArgumentCaptor<ReloadRefEventListener> c = ArgumentCaptor.forClass(ReloadRefEventListener.class);
             verify(source).addListener(c.capture(), Mockito.eq(ReloadRefEventListener.class));
             assertThrows(NullPointerException.class, () -> c.getValue().onReload(null));

@@ -24,6 +24,7 @@ import javax.validation.constraints.NotNull;
 
 import org.hibernate.validator.constraints.NotBlank;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -32,53 +33,42 @@ import io.jitstatic.source.ObjectStreamProvider;
 
 public class ModifyKeyData {
 
-    @JsonProperty
-    @NotBlank
-    private String message;
-
-    @JsonProperty
     @NotNull
-    @JsonDeserialize(using = StreamingDeserializer.class)
-    @JsonSerialize(using= StreamingSerializer.class)
-    private ObjectStreamProvider data;
+    private final ObjectStreamProvider data;
 
-    @JsonProperty
     @NotBlank
-    private String userMail;
+    private final String message;
 
-    @JsonProperty
     @NotBlank
-    private String userInfo;
+    private final String userMail;
+
+    @NotBlank
+    private final String userInfo;
+
+    @JsonCreator
+    public ModifyKeyData(
+            @JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
+            @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
+            @JsonProperty("userMail") final String userMail) {
+        this.data = data;
+        this.message = message;
+        this.userMail = userMail;
+        this.userInfo = userInfo;
+    }
 
     public ObjectStreamProvider getData() {
         return data;
-    }
-
-    public void setData(final ObjectStreamProvider data) {
-        this.data = data;
     }
 
     public String getMessage() {
         return message;
     }
 
-    public void setMessage(final String message) {
-        this.message = message;
-    }
-
     public String getUserMail() {
         return userMail;
     }
 
-    public void setUserMail(final String userMail) {
-        this.userMail = userMail;
-    }
-
     public String getUserInfo() {
         return userInfo;
-    }
-
-    public void setUserInfo(final String userInfo) {
-        this.userInfo = userInfo;
     }
 }

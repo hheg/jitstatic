@@ -23,13 +23,11 @@ package io.jitstatic;
 import java.io.File;
 import java.io.IOException;
 
-public interface DropwizardProcess {
+public interface DropwizardProcess extends AutoCloseable {
 
         String getMetrics();
     
         String getGitAddress();
-    
-        String getStorageAdress();
     
         int getLocalPort();
     

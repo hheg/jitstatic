@@ -4,19 +4,19 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.32.12</version>
+        <version>0.33.0</version>
     </parent>
     <artifactId>storage</artifactId>
     <dependencies>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.32.12</version>
+            <version>0.33.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.32.12</version>
+            <version>0.33.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -42,13 +42,13 @@
         <dependency>
             <groupId>org.cache2k</groupId>
             <artifactId>cache2k-base-bom</artifactId>
-            <version>1.2.0.Final</version>
+            <version>1.2.1.Final</version>
             <type>pom</type>
         </dependency>
         <dependency>
             <groupId>org.cache2k</groupId>
             <artifactId>cache2k-api</artifactId>
-            <version>1.2.0.Final</version>
+            <version>1.2.1.Final</version>
         </dependency>
         <dependency>
             <groupId>org.apache.shiro</groupId>
@@ -91,6 +91,10 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
@@ -118,7 +122,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.32.12</version>
+            <version>0.33.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -22,6 +22,7 @@ package io.jitstatic.storage;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 
@@ -41,13 +42,15 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public void close();
 
-    public Either<String, FailedToLock> put(String key, String ref, ObjectStreamProvider data, String version, CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> putKey(String key, String ref, ObjectStreamProvider data, String version,
+            CommitMetaData commitMetaData);
 
-    public String addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
+    public CompletableFuture<String> addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
 
-    public Either<String, FailedToLock> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion, CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion,
+            CommitMetaData commitMetaData);
 
-    public void delete(String key, String ref, CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> delete(String key, String ref, CommitMetaData commitMetaData);
 
     public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
 
@@ -59,9 +62,9 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public Pair<MetaData, String> getMetaKey(String key, String ref);
 
-    public Either<String, FailedToLock> updateUser(String key, String ref, String path, String username, UserData data, String version);
-    
-    public String addUser(String key, String ref, String path, String name, UserData data);
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(String key, String ref, String path, String username, UserData data, String version);
+
+    public CompletableFuture<String> addUser(String key, String ref, String path, String name, UserData data);
 
     public void deleteUser(String key, String ref, String jitstaticKeyadminRealm, String name);
 }

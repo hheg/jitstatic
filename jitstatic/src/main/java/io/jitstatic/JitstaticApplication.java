@@ -41,6 +41,8 @@ import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
+import io.jitstatic.storage.LocalRefLockService;
+import io.jitstatic.storage.RefLockService;
 import io.jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
@@ -56,38 +58,44 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
         Source source = null;
         Storage storage = null;
+        RefLockService refLockService = null;
         try {
             SystemReader.setInstance(new OverridingSystemReader());
-            source = config.build(env, GIT_REALM);
             final HostedFactory hostedFactory = config.getHostedFactory();
+            refLockService = new LocalRefLockService();
+            source = config.build(env, GIT_REALM);
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory.getUserName());
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory.getUserName(), refLockService);
             loginService.setUserStorage(storage);
+            source.readAllRefs();
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
+            env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(refLockService));
+
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
-            final KeyAdminAuthenticator authenticator = config.getAddKeyAuthenticator(storage, hashService);
-            boolean cors = config.getHostedFactory().getCors() != null;
-            env.jersey().register(new KeyResource(storage, authenticator, cors, defaultBranch, env.getObjectMapper(),
+            final KeyAdminAuthenticator authenticator = config.getKeyAdminAuthenticator(storage, hashService);
+            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, env.getObjectMapper(),
                     env.getValidator(), hashService));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch, hashService));
             env.jersey().register(new BulkResource(storage, authenticator, defaultBranch, hashService));
             env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch, hashService));
-        } catch (final Exception e) {
+        } catch (final RuntimeException e) {
+            closeSilently(refLockService);
             closeSilently(source);
             closeSilently(storage);
+
             throw e;
         }
     }
 
-    private void closeSilently(final AutoCloseable source) {
-        if (source != null) {
+    private void closeSilently(final AutoCloseable closeable) {
+        if (closeable != null) {
             try {
-                source.close();
+                closeable.close();
             } catch (final Exception ignore) {
                 // NOOP
             }

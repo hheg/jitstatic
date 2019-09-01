@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.validation.Valid;
@@ -36,7 +37,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,12 +46,10 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
@@ -81,56 +79,38 @@ public class BulkResource {
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public Response fetch(@NotNull @NotEmpty @Valid final List<BulkSearch> searches, final @Auth Optional<User> userHolder) {
         final List<SearchResult> result = storage.getList(searches.stream()
+                .filter(bs -> APIHelper.isRef(bs.getRef()))
                 .map(bs -> Pair.of(bs.getPaths().stream()
                         .map(sp -> Pair.of(sp.getPath(), sp.isRecursively()))
                         .collect(Collectors.toList()), bs.getRef()))
                 .collect(Collectors.toList())).stream()
                 .map(p -> p.getKey().stream()
                         .filter(data -> {
-                            final String ref = p.getRight();
+                            final String ref = APIHelper.setToDefaultRefIfNull(p.getRight(), defaultRef);
                             final MetaData storageData = data.getRight().getMetaData();
                             final Set<User> allowedUsers = storageData.getUsers();
                             final Set<Role> keyRoles = storageData.getRead();
                             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                                LOG.info("{} logged in and accessed key {} in {}", userHolder.isPresent() ? userHolder.get() : "anonymous", data.getLeft(),
-                                        setToDefaultRef(ref));
+                                LOG.info("{} logged in and accessed key {} in {}", userHolder.orElse(new User("anonymous", null)), data.getLeft(), ref);
                                 return true;
                             }
                             if (!userHolder.isPresent()) {
                                 return false;
                             }
                             final User user = userHolder.get();
-                            if (allowedUsers.contains(user) || isKeyUserAllowed(user, ref, keyRoles) || addKeyAuthenticator.authenticate(user, ref)) {
-                                LOG.info("{} logged in and accessed key {} in {}", user,
-                                        p.getLeft().stream().map(Pair::getLeft).collect(Collectors.toList()), setToDefaultRef(ref));
+                            if (allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, keyRoles)
+                                    || addKeyAuthenticator.authenticate(user, ref)) {
+                                LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft().stream().map(Pair::getLeft).collect(Collectors.toList()),
+                                        ref);
                                 return true;
                             }
                             return false;
                         }).map(ps -> new SearchResult(ps, p.getRight())))
-                .flatMap(s -> s)
+                .flatMap(Function.identity())
                 .collect(Collectors.toList());
         if (result.isEmpty()) {
             Response.status(Status.NOT_FOUND).build();
         }
         return Response.ok(new SearchResultWrapper(result)).build();
     }
-
-    public String setToDefaultRef(final String ref) {
-        return ref == null ? defaultRef : ref;
-    }
-
-    boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
-        keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        try {
-            final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
-            if (userData == null) {
-                return false;
-            }
-            final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
-        } catch (RefNotFoundException e) {
-            return false;
-        }
-    }
-
 }

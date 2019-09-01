@@ -20,6 +20,7 @@ package io.jitstatic.api;
  * #L%
  */
 
+import static io.jitstatic.source.ObjectStreamProvider.toProvider;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,7 +59,6 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
@@ -87,7 +87,7 @@ public class BulkResourceTest {
     public void testFetch() {
         StoreInfo storeInfoMock = mock(StoreInfo.class);
         MetaData storageData = mock(MetaData.class);
-        when(storeInfoMock.getStreamProvider()).thenReturn(AUtils.toProvider(new byte[] { 1 }));
+        when(storeInfoMock.getStreamProvider()).thenReturn(toProvider(new byte[] { 1 }));
         when(storeInfoMock.getVersion()).thenReturn("1");
         when(storeInfoMock.getMetaData()).thenReturn(storageData);
         when(storageData.getContentType()).thenReturn("application/something");

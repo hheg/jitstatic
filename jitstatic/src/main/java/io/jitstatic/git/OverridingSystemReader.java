@@ -28,6 +28,7 @@ import java.net.UnknownHostException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
 
@@ -140,6 +141,7 @@ public class OverridingSystemReader extends org.eclipse.jgit.util.SystemReader {
                 if (ex instanceof ConfigInvalidException) {
                     throw (ConfigInvalidException) ex;
                 }
+                throw new ReadConfigurationException(ex);
             }
         }
 
@@ -147,6 +149,34 @@ public class OverridingSystemReader extends org.eclipse.jgit.util.SystemReader {
         public boolean isOutdated() {
             return false;
         }
+    }
 
+    private static class ReadConfigurationException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        public ReadConfigurationException(Exception ex) {
+            super(ex);
+        }
+    }
+
+    @Override
+    public StoredConfig getSystemConfig()
+            throws IOException, ConfigInvalidException {
+        FileBasedConfig c = openSystemConfig(null, FS.DETECTED);
+        if (c.isOutdated()) {
+            c.load();
+        }
+        return c;
+    }
+
+    @Override
+    public StoredConfig getUserConfig()
+            throws IOException, ConfigInvalidException {
+        FileBasedConfig c = openUserConfig(getSystemConfig(), FS.DETECTED);
+        if (c.isOutdated()) {
+            c.load();
+        }
+        return c;
     }
 }

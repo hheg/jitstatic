@@ -52,7 +52,6 @@ public class LoadTesterIT {
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             ResourceHelpers.resourceFilePath("simpleserver_silent.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
 
-    
     @ParameterizedTest
     @ArgumentsSource(WriteArgumentsProvider.class)
     public void testWrite(WriteData data) throws URISyntaxException, ClientProtocolException, APIException, IOException,
@@ -61,7 +60,7 @@ public class LoadTesterIT {
         runner.testWrite(data);
         runner.after();
     }
-    
+
     @ParameterizedTest
     @ArgumentsSource(DataArgumentProvider.class)
     public void testLoad(TestData data) throws Exception {

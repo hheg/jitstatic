@@ -22,10 +22,13 @@ package io.jitstatic.source;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
-
+// TODO Remove this error
+@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class LargeObjectStreamProvider implements ObjectStreamProvider {
 
     private final ThrowingSupplier<InputStream, IOException> inputStreamProvider;
@@ -42,8 +45,19 @@ public class LargeObjectStreamProvider implements ObjectStreamProvider {
     }
 
     @Override
-    public long getSize() throws IOException {
+    public long getSize() {
         return size;
     }
 
+    @Override
+    // TODO Check this
+    public byte[] asByteArray() throws IOException {
+        try (InputStream initialStream = getInputStream()) {
+            ByteBuffer byteBuffer = ByteBuffer.allocate((int) getSize());
+            while (initialStream.available() > 0) {
+                byteBuffer.put((byte) initialStream.read());
+            }
+            return byteBuffer.array();
+        }
+    }
 }

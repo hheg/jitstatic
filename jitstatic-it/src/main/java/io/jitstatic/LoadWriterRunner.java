@@ -20,6 +20,8 @@ package io.jitstatic;
  * #L%
  */
 
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,7 +35,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -87,9 +88,8 @@ public class LoadWriterRunner {
     private static final String METADATA = ".metadata";
     static final String MASTER = "master";
 
-    
     private WriteData writeData;
-    private Optional<ResultData> result;
+    private Optional<ResultData> result = Optional.empty();
 
     private final DropwizardProcess process;
 
@@ -114,14 +114,14 @@ public class LoadWriterRunner {
                         try (JitStaticClient buildKeyClient = buildKeyClient(false);) {
                             String tag = setupRun(buildKeyClient, branch, key);
                             ResultData resultData = execute(buildKeyClient, branch, key, tag, data);
-                            printStats(resultData);
+                            printStats(resultData, resultData.iterations);
                             return resultData;
                         }
                     }, service);
                     j++;
                 }
             }
-            CompletableFuture.allOf(jobs).get(60, TimeUnit.SECONDS);
+            CompletableFuture.allOf(jobs).get(200, TimeUnit.SECONDS);
             result = Stream.of(jobs).map(CompletableFuture::join).reduce(ResultData::sum);
         } finally {
             service.shutdown();
@@ -153,7 +153,7 @@ public class LoadWriterRunner {
         } catch (Exception e) {
             LOG.error("Error ", e);
         }
-        return new ResultData(i, (stop - start), bytes);
+        return new ResultData(i - 1, (stop - start), bytes);
     }
 
     private String setupRun(JitStaticClient buildKeyClient, String branch, final String key) {
@@ -165,28 +165,34 @@ public class LoadWriterRunner {
     }
 
     public void after() throws GitAPIException, IOException {
-
         File workingFolder = process.getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(process.getGitAddress())
                 .setCredentialsProvider(getCredentials(process.getUser(), process.getPassword())).call()) {
-            LOG.info(writeData.toString());
+            LOG.info("{}", writeData);
+            int total = 0;
+            LOG.info("Checking repository...");
             for (String branch : writeData.branches) {
                 checkoutBranch(branch, git);
                 LOG.info("##### {} #####", branch);
                 Map<String, Integer> pairs = pairNamesWithData(workingFolder);
                 Map<String, Integer> cnt = new HashMap<>();
                 for (RevCommit rc : git.log().call()) {
-                    String msg = matchData(pairs, cnt, rc);
+                    String msg = matchData(pairs, cnt, rc, branch);
                     log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
                 }
+                total += pairs.values().stream().mapToInt(Integer::intValue).sum();
             }
-            result.ifPresent(this::printStats);
+            final int ftotal = total;
+            result.ifPresent(r -> {
+                printStats(r, ftotal);
+                assertEquals(r.iterations, ftotal, "Total iterations doesn't match");
+            });
         }
         process.checkContainerForErrors();
     }
 
-    private void printStats(ResultData r) {
-        LOG.info("Thread: {}  Iters: {} time: {}ms length: {}B Writes: {}/s Bytes: {}B/s", Thread.currentThread().getName(), r.iterations,
+    private void printStats(ResultData r, int total) {
+        LOG.info("Thread: {}  Iters: {}/{} time: {} ms length: {} B Writes: {} /s Bytes: {} B/s", Thread.currentThread().getName(), r.iterations, total,
                 r.duration, r.bytes, divide(r.iterations, r.duration), divide(r.bytes, r.duration));
     }
 
@@ -201,6 +207,7 @@ public class LoadWriterRunner {
             assertTrue(verifyOkPush(git.push().setCredentialsProvider(provider).call(), MASTER, c));
             pushBranches(provider, testData, git, c);
         }
+        LOG.info("Done setting up repo");
     }
 
     private void pushBranches(UsernamePasswordCredentialsProvider provider, WriteData testData, Git git, int c)
@@ -233,15 +240,12 @@ public class LoadWriterRunner {
         Path path = Paths.get(workingFolder.toURI());
         Path user = path.resolve(USERS).resolve(JITSTATIC_KEYADMIN_REALM).resolve(USER);
         assertTrue(user.getParent().toFile().mkdirs());
-        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8),
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8), CREATE_NEW,
+                TRUNCATE_EXISTING);
 
         for (String name : testData.names) {
-            Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.TRUNCATE_EXISTING);
-            Files.write(Paths.get(workingFolder.toURI()).resolve(name + METADATA), getMetaData(), StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, CREATE_NEW, TRUNCATE_EXISTING);
+            Files.write(Paths.get(workingFolder.toURI()).resolve(name + METADATA), getMetaData(), CREATE_NEW, TRUNCATE_EXISTING);
         }
     }
 
@@ -278,7 +282,7 @@ public class LoadWriterRunner {
         return head;
     }
 
-    private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc) {
+    private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc, String ref) {
         String msg = rc.getShortMessage();
         Matcher matcher = PAT.matcher(msg);
         if (matcher.matches()) {
@@ -286,7 +290,7 @@ public class LoadWriterRunner {
             Integer value = cnt.get(split[1]);
             Integer newValue = Integer.valueOf(split[2]);
             if (value != null) {
-                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, msg);
+                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, ref + " " + msg);
             } else {
                 assertEquals(data.get(split[1]), newValue, msg);
             }

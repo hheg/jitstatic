@@ -25,6 +25,7 @@ import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -39,7 +40,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.http.impl.client.HttpClients;
@@ -69,7 +75,6 @@ import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.junit.jupiter.api.AfterEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +82,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 
@@ -110,54 +114,88 @@ public class LoadTesterRunner {
     static final Charset UTF_8 = StandardCharsets.UTF_8;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private String gitAdress;
     private TestData testData;
     private Counters putCounters;
     private Counters gitCounters;
-    private final DropwizardProcess process;
+    private final List<DropwizardProcess> processes;
 
     public LoadTesterRunner(DropwizardProcess process) {
-        this.process = process;
-        gitAdress = process.getGitAddress();
+        this(List.of(process));
     }
 
-    @AfterEach
-    public void after() throws IOException, GitAPIException {
-        log(() -> {
-            HttpResponse<String> response;
+    public LoadTesterRunner(List<DropwizardProcess> processes) {
+        if (processes.isEmpty()) {
+            throw new IllegalArgumentException("The number of processes need to be more than one");
+        }
+        this.processes = processes;
+    }
+
+    public void after() throws IOException {
+        log(() -> processes.stream().forEach(p -> {
             try {
-                response = Unirest.get(process.getMetrics()).queryString("pretty", true).asString();
-                LOG.info(response.getBody());
+                LOG.info(Unirest.get(p.getMetrics()).queryString("pretty", true).asString().getBody());
             } catch (UnirestException e) {
                 throw new RuntimeException(e);
             }
-        });
-        File workingFolder = process.getFolderFile();
-        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress)
-                .setCredentialsProvider(getCredentials(process.getUser(), process.getPassword())).call()) {
-            LOG.info(testData.toString());
-            for (String branch : testData.branches) {
-                try {
-                    checkoutBranch(branch, git);
-                    LOG.info("##### {} #####", branch);
-                    Map<String, Integer> data = pairNamesWithData(workingFolder);
-                    Map<String, Integer> cnt = new HashMap<>();
-                    for (RevCommit rc : git.log().call()) {
-                        String msg = matchData(data, cnt, rc);
-                        log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
-                    }
-                } catch (IOException | GitAPIException e) {
-                    LOG.error("Caught error when trying to read repository", e);
+        }));
+
+        LOG.info("Checking repositories...");
+        LOG.info("{}", testData);
+        List<List<RevCommit>> branchTips = processes.stream().map(dp -> {
+            File workingFolder;
+            try {
+                workingFolder = dp.getFolderFile();
+                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(dp.getGitAddress())
+                        .setCredentialsProvider(getCredentials(processes.get(0).getUser(), processes.get(0).getPassword())).call()) {
+                    LOG.info("{}", dp.getGitAddress());
+                    return Stream.of(testData.branches).map(branch -> {
+                        try {
+                            checkoutBranch(branch, git);
+                            LOG.info("##### {} #####", branch);
+                            Map<String, Integer> data = pairNamesWithData(workingFolder);
+                            Map<String, Integer> cnt = new HashMap<>();
+                            RevCommit last = null;
+                            for (RevCommit rc : git.log().call()) {
+                                String msg = matchData(data, cnt, rc, branch);
+                                log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
+                                if (last == null) {
+                                    last = rc;
+                                }
+                            }
+                            return last;
+                        } catch (IOException | GitAPIException e) {
+                            LOG.error("Caught error when trying to read repository", e);
+                            return null;
+                        }
+                    }).filter(Objects::nonNull).collect(Collectors.toList());
+                } catch (GitAPIException e1) {
+                    LOG.error("Failed to check repo", e1);
+                    return List.<RevCommit>of();
+                }
+            } catch (IOException e2) {
+                LOG.error("Failed to check repo", e2);
+                return List.<RevCommit>of();
+            }
+        }).collect(Collectors.toList());
+        List<RevCommit> firstResult = branchTips.get(0);
+        assertEquals(firstResult.size(), testData.branches.length, "The first result doesn't match the number of recorded branches");
+        if (branchTips.size() > 1) {
+            List<List<RevCommit>> remaining = branchTips.subList(1, branchTips.size());
+            for (int j = 0; j < remaining.size(); j++) {
+                List<RevCommit> part = remaining.get(j);
+                assertEquals(firstResult.size(), part.size(), "Results doesn't contain the same branches");
+                for (int i = 0; i < firstResult.size(); i++) {
+                    assertEquals(firstResult.get(i), part.get(i), "Result were different in " + processes.get(i).getGitAddress());
                 }
             }
         }
-
+        LOG.info("###########");
         LOG.info("Git updates: {}", gitCounters.updates);
         LOG.info("Git failures: {}", gitCounters.failiures);
         LOG.info("Put updates: {}", putCounters.updates);
         LOG.info("Put failures: {}", putCounters.failiures);
         LOG.info("Data sent: {}", putCounters.data);
-        process.checkContainerForErrors();
+        processes.stream().forEach(DropwizardProcess::checkContainerForErrors);
     }
 
     private static void log(Runnable r) {
@@ -166,7 +204,7 @@ public class LoadTesterRunner {
         }
     }
 
-    private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc) {
+    private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc, String ref) {
         String msg = rc.getShortMessage();
         Matcher matcher = PAT.matcher(msg);
         if (matcher.matches()) {
@@ -174,7 +212,7 @@ public class LoadTesterRunner {
             Integer value = cnt.get(split[1]);
             Integer newValue = Integer.valueOf(split[2]);
             if (value != null) {
-                assertEquals(Integer.valueOf(value.intValue() - 1), newValue, msg);
+                assertEquals(newValue, Integer.valueOf(value.intValue() - 1), ref + " " + msg);
             } else {
                 assertEquals(data.get(split[1]), newValue, msg);
             }
@@ -191,7 +229,7 @@ public class LoadTesterRunner {
 
     private Map<String, Integer> pairNamesWithData(File workingFolder) throws IOException {
         Map<String, Integer> data = new HashMap<>();
-        for (String name : this.testData.names) {
+        for (String name : testData.names) {
             int d = readData(Paths.get(workingFolder.toURI()).resolve(name)).get("data").asInt();
             data.put(name, d);
             LOG.info("{} contains {}", name, d);
@@ -206,13 +244,17 @@ public class LoadTesterRunner {
 
         ExecutorService clientPool = Executors.newFixedThreadPool(Math.max(1, data.clients));
         ExecutorService updaterPool = Executors.newFixedThreadPool(Math.max(1, data.updaters));
+        Random rand = new Random();
         try {
-            initRepo(getCredentials(process.getUser(), process.getPassword()), data);
+            String user2 = processes.get(0).getUser();
+            String password2 = processes.get(0).getPassword();
+            initRepo(getCredentials(user2, password2), data);
             for (int i = 0; i < data.clients; i++) {
-                clients.add(new JitStaticUpdater(buildKeyClient(data.cache)));
+                clients.add(new JitStaticUpdater(buildKeyClient(data.cache, processes.get(rand.nextInt(processes.size())))));
             }
             for (int i = 0; i < data.updaters; i++) {
-                GitClientUpdater gitClientUpdater = new GitClientUpdater(gitAdress, process.getUser(), process.getPassword(), process.getFolderFile());
+                GitClientUpdater gitClientUpdater = new GitClientUpdater(processes.get(rand.nextInt(processes.size())).getGitAddress(), user2, password2,
+                        processes.get(0).getFolderFile());
                 gitClientUpdater.initRepo();
                 updaters.add(gitClientUpdater);
             }
@@ -227,6 +269,7 @@ public class LoadTesterRunner {
                 try {
                     c.close();
                 } catch (Exception e1) {
+                    fail(e1);
                 }
             });
             CompletableFuture.allOf(
@@ -241,7 +284,7 @@ public class LoadTesterRunner {
             try {
                 pool.awaitTermination(10, TimeUnit.SECONDS);
             } catch (InterruptedException e1) {
-                // Ignore
+                Thread.currentThread().interrupt();
             }
         };
     }
@@ -275,6 +318,7 @@ public class LoadTesterRunner {
             LOG.info("Waiting for {}...", type);
             jobs.get(100, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            Thread.currentThread().interrupt();
             LOG.error("Failed to wait {}", type, e);
         } finally {
             LOG.info("Waited {} ms to terminate {}", (System.currentTimeMillis() - start), type);
@@ -296,6 +340,7 @@ public class LoadTesterRunner {
                         }
                     } catch (Exception e) {
                         LOG.error("TestSuiteError: Repo error ", e);
+                        fail();
                     } finally {
                         updaters.add(cu);
                     }
@@ -309,11 +354,14 @@ public class LoadTesterRunner {
         for (int i = 0; i < clientJobs.length; i++) {
             CompletableFuture<?> f = clientJobs[i];
             if (f == null || f.isDone()) {
+                if (f != null && f.isCompletedExceptionally()) {
+                    f.join();
+                }
                 clientJobs[i] = CompletableFuture.runAsync(() -> {
                     try {
                         clientCode(clients, testData);
                     } catch (IOException e) {
-                        LOG.error("TestSuiteError: Interrupted ", e);
+                        throw new UncheckedIOException(e);
                     }
                 }, clientPool);
             }
@@ -322,8 +370,8 @@ public class LoadTesterRunner {
 
     private void initRepo(UsernamePasswordCredentialsProvider provider, TestData testData) throws GitAPIException, IOException {
         LOG.info("Setting up repo");
-        File workingFolder = process.getFolderFile();
-        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(gitAdress).setCredentialsProvider(provider).call()) {
+        File workingFolder = processes.get(0).getFolderFile();
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(processes.get(0).getGitAddress()).setCredentialsProvider(provider).call()) {
             int c = 0;
             byte[] data = testData.getData(c);
             writeFiles(testData, workingFolder, data);
@@ -377,14 +425,14 @@ public class LoadTesterRunner {
                     String ref = "refs/heads/" + branch;
                     try {
                         Entity entity = client.getKey(name, ref, LoadTesterRunner::read);
-                        String readValue = entity.getValue().toString();
                         if (Math.random() < 0.5) {
-                            client.modifyKey(testData, branch, name, ref, entity, readValue);
+                            client.modifyKey(testData, branch, name, ref, entity);
                         }
                     } catch (SocketException se) {
                         LOG.error("Got socker error {}", se.getLocalizedMessage());
                     } catch (Exception e) {
                         LOG.error("TestSuiteError: Failed with ", e);
+                        fail(e);
                     }
                 }
             }
@@ -399,6 +447,8 @@ public class LoadTesterRunner {
             try {
                 TimeUnit.MILLISECONDS.sleep(10);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                fail();
             }
         }
         return client;
@@ -415,7 +465,7 @@ public class LoadTesterRunner {
         return false;
     }
 
-    private JitStaticClient buildKeyClient(boolean cache) throws URISyntaxException {
+    private JitStaticClient buildKeyClient(boolean cache, DropwizardProcess process) throws URISyntaxException {
         int localPort = process.getLocalPort();
         JitStaticClientBuilder builder = JitStaticClient.create()
                 .setHost("localhost")
@@ -472,15 +522,15 @@ public class LoadTesterRunner {
             return updater.getKey(name, ref, object);
         }
 
-        private void modifyKey(TestData testData, String branch, String name, String ref, Entity entity, String readValue) {
+        private void modifyKey(TestData testData, String branch, String name, String ref, Entity entity) {
             int c = entity.getValue().get("data").asInt() + 1;
             byte[] data2 = testData.getData(c);
             CountingInputStream cis = new CountingInputStream(new ByteArrayInputStream(data2));
             try {
-                String newTag = updater.modifyKey(cis, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"),
-                        entity.getTag());
+                String oldTag = entity.getTag();
+                String newTag = updater.modifyKey(cis, new CommitData(name, ref, "m:" + name + ":" + c, "user's name", "mail"), oldTag);
                 counter.updates++;
-                log(() -> LOG.info("Ok modified {}:{} with {}", name, branch, c));
+                log(() -> LOG.info("Ok modified {}:{} with {} old={}, new={}", name, branch, c, oldTag, newTag));
                 if (Math.random() < 0.5) {
                     updater.getKey(name, branch, newTag, LoadTesterRunner::read);
                 }

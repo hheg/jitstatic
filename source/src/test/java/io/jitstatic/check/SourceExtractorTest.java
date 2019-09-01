@@ -203,7 +203,7 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo branch = se.openBranch(REFS_HEADS_MASTER, key);
-        try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceProvider().getInputStream(), UTF_8));) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getStreamProvider().getInputStream(), UTF_8));) {
             assertNotNull(is);
             String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
@@ -238,7 +238,7 @@ public class SourceExtractorTest {
         }
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo tag = se.openTag(Constants.R_TAGS + "tag", key);
-        try (final BufferedReader is = new BufferedReader(new InputStreamReader(tag.getSourceProvider().getInputStream(), UTF_8));) {
+        try (final BufferedReader is = new BufferedReader(new InputStreamReader(tag.getStreamProvider().getInputStream(), UTF_8));) {
             assertNotNull(is);
             String parsed = is.lines().collect(Collectors.joining());
             assertEquals(getData(), parsed);
@@ -259,7 +259,7 @@ public class SourceExtractorTest {
             }
             SourceExtractor se = new SourceExtractor(git.getRepository());
             SourceInfo branch = se.openBranch(Constants.R_HEADS + "notexisting", key);
-            try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getSourceProvider().getInputStream(), UTF_8));) {
+            try (final BufferedReader is = new BufferedReader(new InputStreamReader(branch.getStreamProvider().getInputStream(), UTF_8));) {
                 assertNotNull(is);
                 String parsed = is.lines().collect(Collectors.joining());
                 assertEquals(getData(), parsed);
@@ -393,7 +393,7 @@ public class SourceExtractorTest {
         try (InputStream is = openBranch.getMetadataInputStream()) {
             assertNotNull(is);
         }
-        try (InputStream is = openBranch.getSourceProvider().getInputStream()) {
+        try (InputStream is = openBranch.getStreamProvider().getInputStream()) {
             assertNotNull(is);
         }
     }
@@ -422,11 +422,11 @@ public class SourceExtractorTest {
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo keydata = se.openBranch(REFS_HEADS_MASTER, key1);
         assertNotNull(keydata);
-        assertEquals(getData(), readData(keydata.getSourceProvider().getInputStream()));
+        assertEquals(getData(), readData(keydata.getStreamProvider().getInputStream()));
         assertEquals(getMetaData(), readData(keydata.getMetadataInputStream()));
         SourceInfo keydata2 = se.openBranch(REFS_HEADS_MASTER, key2);
         assertNotNull(keydata2);
-        assertEquals(getData(2), readData(keydata2.getSourceProvider().getInputStream()));
+        assertEquals(getData(2), readData(keydata2.getStreamProvider().getInputStream()));
         assertEquals(getMetaData(2), readData(keydata2.getMetadataInputStream()));
     }
 
@@ -471,17 +471,17 @@ public class SourceExtractorTest {
         SourceExtractor se = new SourceExtractor(git.getRepository());
         SourceInfo keydata = se.openBranch(REFS_HEADS_MASTER, key1);
         assertNotNull(keydata);
-        assertEquals(getData(), readData(keydata.getSourceProvider().getInputStream()));
+        assertEquals(getData(), readData(keydata.getStreamProvider().getInputStream()));
         assertEquals(getMetaData(), readData(keydata.getMetadataInputStream()));
         SourceInfo keydata2 = se.openBranch(REFS_HEADS_MASTER, key2);
         assertNotNull(keydata2);
-        assertEquals(getData(2), readData(keydata2.getSourceProvider().getInputStream()));
+        assertEquals(getData(2), readData(keydata2.getStreamProvider().getInputStream()));
         assertEquals(getMetaData(2), readData(keydata2.getMetadataInputStream()));
         SourceInfo usersKeydata = se.openBranch(REFS_HEADS_MASTER, ".users/key1");
         assertNull(usersKeydata);
         SourceInfo somedirKey = se.openBranch(REFS_HEADS_MASTER, "somedir/.users/key1");
         assertNotNull(somedirKey);
-        assertEquals(getData(4), readData(somedirKey.getSourceProvider().getInputStream()));
+        assertEquals(getData(4), readData(somedirKey.getStreamProvider().getInputStream()));
         assertEquals(getMetaData(4), readData(somedirKey.getMetadataInputStream()));
     }
 
@@ -498,7 +498,7 @@ public class SourceExtractorTest {
         try (InputStream is = openBranch.getMetadataInputStream()) {
             assertNotNull(is);
         }
-        try (InputStream is = openBranch.getSourceProvider().getInputStream()) {
+        try (InputStream is = openBranch.getStreamProvider().getInputStream()) {
             assertNotNull(is);
         }
     }
@@ -516,7 +516,7 @@ public class SourceExtractorTest {
         try (InputStream is = openBranch.getMetadataInputStream()) {
             assertNotNull(is);
         }
-        assertNull(openBranch.getSourceProvider());
+        assertNull(openBranch.getStreamProvider());
     }
 
     @Test

@@ -33,6 +33,7 @@ import io.jitstatic.utils.Pair;
 
 public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
     public static final DotFinder DOT_FINDER = new DotFinder();
+    public static final Extractor EXTRACTOR = new Extractor();
     private final Node<String, Pair<String, Boolean>> root;
     private static final String FWD_SLASH = "/";
 
@@ -41,7 +42,7 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
         for (Pair<String, Boolean> p : data) {
             String key = p.getLeft().replaceAll("/+", "/");
             if (key.startsWith("/") && key.length() > 1) {
-                key = key.replaceFirst("^/+", "");
+                key = key.substring(1);
             }
             node.accept(new Inserter(Pair.of(key, p.getRight())));
         }
@@ -473,10 +474,10 @@ public class Tree implements TreeVisitable<String, Pair<String, Boolean>> {
 
         private List<Pair<String, Boolean>> visitChildren(final List<Pair<String, Boolean>> retVal, final String value,
                 final Collection<Node<String, Pair<String, Boolean>>> children) {
-            for (var n : children) {
-                final List<Pair<String, Boolean>> accepted = n.accept(this);
-                for (var a : accepted) {
-                    retVal.add(Pair.of(value + a.getLeft(), a.getRight()));
+            for (Node<String, Pair<String, Boolean>> child : children) {
+                final List<Pair<String, Boolean>> accepted = child.accept(this);
+                for (Pair<String, Boolean> pair : accepted) {
+                    retVal.add(Pair.of(value + pair.getLeft(), pair.getRight()));
                 }
             }
             return retVal;

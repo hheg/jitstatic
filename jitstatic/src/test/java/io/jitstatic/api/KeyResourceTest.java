@@ -21,8 +21,8 @@ package io.jitstatic.api;
  */
 
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-import static io.jitstatic.tools.AUtils.toByte;
-import static io.jitstatic.tools.AUtils.toProvider;
+import static io.jitstatic.source.ObjectStreamProvider.toProvider;
+import static io.jitstatic.source.ObjectStreamProvider.toByte;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import javax.validation.Validation;
 import javax.validation.Validator;
@@ -85,11 +86,10 @@ import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
-import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.HashService;
+import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.tools.AUtils;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
@@ -154,7 +154,7 @@ public class KeyResourceTest {
     @Test
     public void testGettingKeyFromResource() throws InterruptedException {
         Optional<StoreInfo> expected = DATA.get("dog");
-        when(storage.getKey("dog", null)).thenReturn(expected);
+        when(storage.getKey("dog", REFS_HEADS_MASTER)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/dog").request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(JsonNode.class);
         assertEquals(returnedDog, response.toString());
@@ -163,7 +163,7 @@ public class KeyResourceTest {
     @Test
     public void testGettingKeyFromResourceWithNoAuthentication() {
         Optional<StoreInfo> expected = DATA.get("dog");
-        when(storage.getKey("dog", null)).thenReturn(expected);
+        when(storage.getKey("dog", REFS_HEADS_MASTER)).thenReturn(expected);
         assertThat(assertThrows(WebApplicationException.class, () -> RESOURCES.target("/storage/dog").request().get(JsonNode.class)).getLocalizedMessage(),
                 Matchers.containsString(Status.UNAUTHORIZED.toString()));
     }
@@ -181,7 +181,7 @@ public class KeyResourceTest {
     @Test
     public void testNoAuthorizationOnPermittedResource() throws InterruptedException {
         Optional<StoreInfo> expected = DATA.get("horse");
-        when(storage.getKey("horse", null)).thenReturn(expected);
+        when(storage.getKey("horse", REFS_HEADS_MASTER)).thenReturn(expected);
         JsonNode response = RESOURCES.target("/storage/horse").request().get(JsonNode.class);
         assertEquals(returnedHorse, response.toString());
     }
@@ -189,7 +189,7 @@ public class KeyResourceTest {
     @Test
     public void testKeyIsFoundButWrongUser() {
         Optional<StoreInfo> expected = DATA.get("dog");
-        when(storage.getKey("dog", null)).thenReturn(expected);
+        when(storage.getKey("dog", REFS_HEADS_MASTER)).thenReturn(expected);
         final String bac = "Basic " + Base64.getEncoder().encodeToString(("anotheruser:" + SECRET).getBytes(UTF_8));
         assertEquals("HTTP 403 Forbidden", assertThrows(WebApplicationException.class, () -> {
             RESOURCES.target("/storage/dog").request()
@@ -269,12 +269,8 @@ public class KeyResourceTest {
     @Test
     public void testPutAKeyWithNoUser() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
-        ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.IF_MATCH, "\"1\"")
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON)).invoke();
@@ -286,13 +282,9 @@ public class KeyResourceTest {
     @Test
     public void testPutADeletedKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
-        ModifyKeyData data = new ModifyKeyData();
         when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(Optional.empty());
         byte[] readTree = "{\"food\" : [\"treats\",\"meat\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
@@ -308,14 +300,11 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(expected);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("mail");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -332,14 +321,11 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(expected);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -356,13 +342,10 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(expected);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -375,12 +358,8 @@ public class KeyResourceTest {
     public void testPutAMissingKey() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
         when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(Optional.empty());
-        ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -394,13 +373,9 @@ public class KeyResourceTest {
     public void testPutAKeyWithNoUsers() throws IOException {
         WebTarget target = RESOURCES.target("/storage/horse");
         Optional<StoreInfo> storeInfo = DATA.get("horse");
-        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(null))).thenReturn(storeInfo);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -414,13 +389,9 @@ public class KeyResourceTest {
     public void testPutAKeyWithWrongUser() throws IOException {
         WebTarget target = RESOURCES.target("/storage/cat");
         Optional<StoreInfo> storeInfo = DATA.get("cat");
-        when(storage.getKey(Mockito.eq("cat"), Mockito.eq(null))).thenReturn(storeInfo);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.getKey(Mockito.eq("cat"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
         byte[] readTree = "{\"food\" : [\"wheat\",\"carrots\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"1\"")
@@ -434,13 +405,10 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(Mockito.eq("dog"), Mockito.any())).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.any(), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(null);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.putKey(Mockito.eq("dog"), Mockito.any(), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(null));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -455,14 +423,10 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
-                .thenThrow(new WrappingAPIException(new RefNotFoundException("")));
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenThrow(new WrappingAPIException(new RefNotFoundException("Test ref not found")));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -477,14 +441,10 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
-                .thenThrow(new WrappingAPIException(new UnsupportedOperationException("")));
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenThrow(new WrappingAPIException(new UnsupportedOperationException("Test operation")));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -498,15 +458,11 @@ public class KeyResourceTest {
     public void testPutKeyButVersionIsChangedWhilst() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn((storeInfo));
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
-                .thenThrow((new WrappingAPIException(new VersionIsNotSame())));
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn((storeInfo));
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenThrow((new WrappingAPIException(new VersionIsNotSame("", ""))));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, "application/json")
@@ -521,15 +477,11 @@ public class KeyResourceTest {
     public void testPutKeyGeneralError() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(null))).thenReturn((storeInfo));
-        when(storage.put(Mockito.eq("dog"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn((storeInfo));
+        when(storage.putKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.eq("1"), Mockito.any()))
                 .thenThrow(new WrappingAPIException(new Exception("Test exception")));
-        ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -541,12 +493,8 @@ public class KeyResourceTest {
     @Test
     public void testPutKeyOnTag() throws IOException {
         WebTarget target = RESOURCES.target("/storage/dog").queryParam("ref", "refs/tags/tag");
-        ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -559,7 +507,7 @@ public class KeyResourceTest {
     @Test
     public void testNotModified() {
         Optional<StoreInfo> expected = DATA.get("dog");
-        when(storage.getKey("dog", null)).thenReturn(expected);
+        when(storage.getKey("dog", REFS_HEADS_MASTER)).thenReturn(expected);
         Response response = RESOURCES.target("/storage/dog").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(returnedDog, response.readEntity(JsonNode.class).toString());
         assertEquals(DATA.get("dog").get().getVersion(), response.getEntityTag().getValue());
@@ -573,7 +521,7 @@ public class KeyResourceTest {
     @Test
     public void testGetapplicatiOnoctetstream() {
         Optional<StoreInfo> expected = DATA.get("book");
-        when(storage.getKey("book", null)).thenReturn(expected);
+        when(storage.getKey("book", REFS_HEADS_MASTER)).thenReturn(expected);
         Response response = RESOURCES
                 .target("/storage/book")
                 .request()
@@ -586,19 +534,16 @@ public class KeyResourceTest {
     @Test
     public void testModifyApplicatiOnoctetStream() {
         Optional<StoreInfo> expected = DATA.get("book");
-        when(storage.getKey("book", null)).thenReturn(expected);
-        when(storage.put(Mockito.eq("book"), Mockito.eq(null), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(Either.left("2"));
+        when(storage.getKey(Mockito.eq("book"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(expected);
+        when(storage.putKey(Mockito.eq("book"), Mockito.eq(REFS_HEADS_MASTER), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(Either.left("2")));
         Response response = RESOURCES.target("/storage/book").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.OK.getStatusCode(), response.getStatus());
         assertArrayEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, response.readEntity(byte[].class));
         EntityTag entityTag = response.getEntityTag();
         response.close();
-        ModifyKeyData data = new ModifyKeyData();
-        data.setMessage("message");
         byte[] byteData = new byte[] { 8, 7, 6, 5, 4, 3, 2, 1 };
-        data.setData(AUtils.toProvider(byteData));
-        data.setUserMail("u@m");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(byteData), "message", "user", "mail");
         response = RESOURCES.target("/storage/book")
                 .request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
@@ -615,8 +560,8 @@ public class KeyResourceTest {
         StoreInfo si = new StoreInfo(toProvider(new byte[] { 1 }), new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "1",
                 "1");
         when(storage.getKey(Mockito.eq("test"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(Optional.empty());
-        when(storage.addKey(Mockito.eq("test"), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
-        AddKeyData addKeyData = new AddKeyData(AUtils.toProvider(new byte[] { 1 }),
+        when(storage.addKey(Mockito.eq("test"), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture("1"));
+        AddKeyData addKeyData = new AddKeyData(toProvider(new byte[] { 1 }),
                 new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage/test")
                 .request()
@@ -631,7 +576,7 @@ public class KeyResourceTest {
     @Test
     public void testAddRootKey() {
         Mockito.when(storage.getKey(Mockito.anyString(), Mockito.anyString())).thenThrow(new WrappingAPIException(new UnsupportedOperationException("test/")));
-        AddKeyData addKeyData = new AddKeyData(AUtils.toProvider(new byte[] { 1 }),
+        AddKeyData addKeyData = new AddKeyData(toProvider(new byte[] { 1 }),
                 new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage/test/")
                 .request()
@@ -644,7 +589,7 @@ public class KeyResourceTest {
     @Test
     public void testAddKeyNoUser() {
         Response response = RESOURCES.target("/storage/test").request()
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(new byte[] { 1 }),
+                .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "testmessage", "user", "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
         assertEquals("Basic realm=\"" + JITSTATIC_KEYADMIN_REALM + "\", charset=\"UTF-8\"", response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
@@ -654,11 +599,11 @@ public class KeyResourceTest {
     @Test
     public void testAddKeyWrongUser() {
         byte[] data = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
+        when(storage.addKey(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture("1"));
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(data),
+                .post(Entity.json(new AddKeyData(toProvider(data),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(Status.FORBIDDEN.getStatusCode(), response.getStatus());
         response.close();
@@ -671,7 +616,7 @@ public class KeyResourceTest {
                 .request()
                 .accept(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(new byte[] { 1 }),
+                .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(403, response.getStatus());
         response.close();
@@ -687,7 +632,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(data),
+                .post(Entity.json(new AddKeyData(toProvider(data),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
         response.close();
@@ -702,7 +647,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(data),
+                .post(Entity.json(new AddKeyData(toProvider(data),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
         response.close();
@@ -717,7 +662,7 @@ public class KeyResourceTest {
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(data),
+                .post(Entity.json(new AddKeyData(toProvider(data),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(422, response.getStatus());
         response.close();
@@ -725,12 +670,13 @@ public class KeyResourceTest {
 
     @Test
     public void testAddKeyDataWithNodata() {
-        when(storage.addKey(Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn("1");
+        when(storage.addKey(Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture("1"));
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .accept(MediaType.APPLICATION_JSON)
-                .post(Entity.json(new AddKeyData(AUtils.toProvider(new byte[] {}),
+                .post(Entity.json(new AddKeyData(toProvider(new byte[] {}),
                         new MetaData(new HashSet<>(), APPLICATION_JSON, false, false, List.of(), null, null), "test", "user", "test@test.com")));
         assertEquals(200, response.getStatus());
     }
@@ -741,13 +687,10 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
-        when(storage.put(Mockito.eq("dog"), Mockito.isNull(), Mockito.any(), Mockito.eq("1"), Mockito.any())).thenReturn(expected);
-        ModifyKeyData data = new ModifyKeyData();
+        when(storage.putKey(Mockito.eq("dog"), Mockito.isNull(), Mockito.any(), Mockito.eq("1"), Mockito.any()))
+                .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("mail");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -768,13 +711,8 @@ public class KeyResourceTest {
     @Test
     public void testPutOnMasterMetaKeyShouldFail() {
         WebTarget target = RESOURCES.target("/storage/dog/");
-
-        ModifyKeyData data = new ModifyKeyData();
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
-        data.setMessage("message");
-        data.setData(AUtils.toProvider(readTree));
-        data.setUserMail("mail");
-        data.setUserInfo("user");
+        ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = target.request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
@@ -787,7 +725,7 @@ public class KeyResourceTest {
     @Test
     public void testDeleteKey() {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
-        when(storage.getKey(Mockito.eq("dog"), Mockito.isNull())).thenReturn(storeInfo);
+        when(storage.getKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/dog")
                 .request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
@@ -813,7 +751,7 @@ public class KeyResourceTest {
     @Test
     public void testDeleteKeyNoUserKey() {
         Optional<StoreInfo> storeInfo = DATA.get("horse");
-        when(storage.getKey(Mockito.eq("horse"), Mockito.isNull())).thenReturn(storeInfo);
+        when(storage.getKey(Mockito.eq("horse"), Mockito.eq(REFS_HEADS_MASTER))).thenReturn(storeInfo);
         Response delete = RESOURCES.target("/storage/horse").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header("X-jitstatic-name", "user")
                 .header("X-jitstatic-mail", "mail").header("X-jitstatic-message", "msg").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).delete();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), delete.getStatus());
@@ -855,56 +793,36 @@ public class KeyResourceTest {
 
     @Test
     public void testisKeyUserAllowed() throws Exception {
-        KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
-                REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR, new HashService());
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
                 .thenReturn(new UserData(Set.of(new Role("role")), "p", null, null));
-        assertTrue(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
+        assertTrue(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithNoRole() throws Exception {
-        KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
-                REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR, new HashService());
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(new UserData(Set.of(), "p", null, null));
-        assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
+        assertFalse(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongRole() throws Exception {
-        KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
-                REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR, new HashService());
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
                 .thenReturn(new UserData(Set.of(new Role("other")), "p", null, null));
-        assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
+        assertFalse(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongPassword() throws Exception {
-        KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
-                REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR, new HashService());
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
                 .thenReturn(new UserData(Set.of(new Role("role")), "z", null, null));
-        assertFalse(kr.isKeyUserAllowed(new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
+        assertFalse(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 
     @Test
     public void testisKeyUserAllowedWithWrongPasswordNoBranch() throws Exception {
-        KeyResource kr = new KeyResource(storage,
-                new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(PUSER, PSECRET).equals(user), REFS_HEADS_MASTER, hashService), false,
-                REFS_HEADS_MASTER,
-                MAPPER, VALIDATOR, new HashService());
         when(storage.getUser(Mockito.anyString(), Mockito.anyString(), Mockito.anyString()))
                 .thenReturn(new UserData(Set.of(new Role("role")), "z", null, null));
-        assertFalse(kr.isKeyUserAllowed(new User("u", "p"), null, Set.of(new Role("role"))));
+        assertFalse(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), null, Set.of(new Role("role"))));
     }
 
     private static String createCreds(String user, String secret) {

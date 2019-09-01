@@ -22,14 +22,12 @@ package io.jitstatic.hosted;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.lib.Ref;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +52,7 @@ public class UserUpdater {
         this.repositoryUpdater = repositoryUpdater;
     }
 
-    public List<Pair<String, String>> updateUser(final List<Pair<String, UserData>> userData, final Ref ref, final CommitMetaData commitMetaData)
+    public List<Pair<String, String>> updateUser(final List<Pair<String, UserData>> userData, final CommitMetaData commitMetaData, final String ref)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, IOException {
         final List<Pair<String, ObjectStreamProvider>> convertedData = userData.stream().parallel().map(p -> {
             try {
@@ -64,7 +62,8 @@ public class UserUpdater {
                 return Pair.of(p.getKey(), (ObjectStreamProvider) null);
             }
         }).collect(Collectors.toList());
-        return repositoryUpdater.commit(ref, commitMetaData, "update user", convertedData).stream().map(m -> Pair.of(m.getLeft(), m.getRight().name()))
+        return repositoryUpdater.buildDirCache(commitMetaData, convertedData, ref).stream()
+                .map(m -> Pair.of(m.getLeft(), m.getRight().name()))
                 .collect(Collectors.toList());
     }
 
@@ -72,18 +71,18 @@ public class UserUpdater {
         return Pair.of(user, new SmallObjectStreamProvider(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(data)));
     }
 
-    public String updateUser(final String userName, final Ref ref, final UserData userData, final CommitMetaData commitMetaData)
+    public String updateUser(final String userName, final UserData userData, final CommitMetaData commitMetaData, final String ref)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return updateUser(List.of(Pair.of(userName, userData)), ref, commitMetaData).get(0).getRight();
+        return updateUser(List.of(Pair.of(userName, userData)), commitMetaData, ref).get(0).getRight();
     }
 
-    public String addUser(final String key, final Ref ref, final UserData data, final CommitMetaData commitMetaData)
+    public String addUser(final String key, final UserData data, final CommitMetaData commitMetaData, final String ref)
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, JsonProcessingException, IOException {
-        return repositoryUpdater.commit(ref, commitMetaData, "add user", List.of(writeData(key, data))).get(0).getRight().name();
+        return repositoryUpdater.buildDirCache(commitMetaData, List.of(writeData(key, data)), ref).get(0).getRight().name();
     }
 
-    public void deleteUser(final String key, final Ref ref, final CommitMetaData commitMetaData) throws IOException {
-        repositoryUpdater.deleteKeys(Set.of(key), ref, commitMetaData);
+    public void deleteUser(final String key, final CommitMetaData commitMetaData, final String ref) throws IOException {
+        repositoryUpdater.buildDirCache(commitMetaData, List.of(Pair.of(key, (ObjectStreamProvider) null)), ref);
     }
 
 }

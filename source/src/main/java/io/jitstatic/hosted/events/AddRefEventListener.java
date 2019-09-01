@@ -20,6 +20,10 @@ package io.jitstatic.hosted.events;
  * #L%
  */
 
-public interface Reloader {
-    void reload(String ref);
+import org.eclipse.jgit.events.RepositoryListener;
+
+public interface AddRefEventListener extends RepositoryListener {
+
+    void onAddRef(String ref);
+
 }

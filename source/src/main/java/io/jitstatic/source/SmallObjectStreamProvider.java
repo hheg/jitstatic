@@ -21,8 +21,8 @@ package io.jitstatic.source;
  */
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Objects;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -41,8 +41,12 @@ public class SmallObjectStreamProvider implements ObjectStreamProvider {
     }
 
     @Override
-    public long getSize() throws IOException {
+    public long getSize() {
         return buffer.length;
+    }
+    @Override
+    public byte[] asByteArray() {
+        return Arrays.copyOf(buffer, buffer.length);
     }
 
 }

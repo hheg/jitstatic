@@ -5,7 +5,7 @@ RUN apt update && apt install wget -y
 RUN wget -o /dmp https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     && chmod +x /tini
 
-FROM openjdk:11.0.3-jre-slim-stretch
+FROM adoptopenjdk:11-jre-hotspot
 
 LABEL maintainer="H.Hegardt <henrikhegardtgithub@gmail.com>"
 
@@ -43,5 +43,5 @@ EXPOSE 8085
 
 ENTRYPOINT ["/tini","--"]
 
-CMD /usr/bin/java ${JAVA_OPTS} -Ddw.hosted.basePath=${VOL} -Ddw.hosted.userName=${USER} -Ddw.hosted.secret=${PASS} -jar ${WORK_DIR}/${JITSTATIC_FILE} server ${WORK_DIR}/${JITSTATIC_CONF}
+CMD java ${JAVA_OPTS} -Ddw.hosted.basePath=${VOL} -Ddw.hosted.userName=${USER} -Ddw.hosted.secret=${PASS} -jar ${WORK_DIR}/${JITSTATIC_FILE} server ${WORK_DIR}/${JITSTATIC_CONF}
  

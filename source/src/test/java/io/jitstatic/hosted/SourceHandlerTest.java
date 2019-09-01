@@ -4,7 +4,7 @@ package io.jitstatic.hosted;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -39,13 +38,6 @@ public class SourceHandlerTest {
         MetaData metaData = SourceHandler.readMetaData(new ByteArrayInputStream(getMetaData().getBytes(StandardCharsets.UTF_8)));
         User user = new User("user1", "1234");
         assertTrue(metaData.getUsers().contains(user));
-    }
-
-    @Test
-    public void testSourceStorageData() throws IOException {
-        byte[] bytes = getMetaData().getBytes(StandardCharsets.UTF_8);
-        byte[] expected = SourceHandler.readStorageData(new ByteArrayInputStream(bytes));
-        assertArrayEquals(bytes, expected);
     }
 
     private String getMetaData() {

@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
@@ -46,20 +47,18 @@ import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
-import io.jitstatic.hosted.KeyAlreadyExist;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.RefLockHolder;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.hosted.events.AddRef;
 import io.jitstatic.hosted.events.DeleteRef;
-import io.jitstatic.hosted.events.Reloader;
+import io.jitstatic.hosted.events.ReloadRef;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
-import io.jitstatic.source.SourceInfo;
 import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class KeyStorage implements Storage, Reloader, DeleteRef {
+public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
@@ -69,13 +68,14 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     private final Source source;
     private final String defaultRef;
     private final String rootUser;
-    private final ExecutorService refCleaner = Executors.newSingleThreadExecutor();
+    private final ExecutorService refCleaner = Executors.newSingleThreadExecutor(new NamingThreadFactory("RefCleaner"));
 
-    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, String rootUser) {
+    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
-        this.rootUser = rootUser;
-        this.cache = getMap(source, hashService);
+        this.rootUser = Objects.requireNonNull(rootUser);
+        this.cache = getMap(source, hashService, clusterService);
+        addRef(this.defaultRef);
     }
 
     public RefLockHolder getRefHolderLock(final String ref) {
@@ -99,7 +99,7 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
             }
             return getKeyDirect(key, ref);
         } catch (LoadException e) {
-            removeCacheRef(ref);
+            LOG.warn("Trying to access non existent ref {}", ref, e);
         } catch (WrappingAPIException e) {
             throw e;
         } catch (Exception e) {
@@ -125,7 +125,6 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     @Override
     public Pair<MetaData, String> getMetaKey(final String key, final String ref) {
         final Optional<StoreInfo> keyDirect = getKeyDirect(key, ref);
-
         if (!keyDirect.isPresent()) {
             return Pair.ofNothing();
         }
@@ -138,21 +137,31 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     }
 
     private RefHolder getRefHolder(final String finalRef) {
-        return cache.get(finalRef);
+        final RefHolder refHolder = cache.peek(finalRef);
+        if (refHolder == null) {
+            throw new WrappingAPIException(new RefNotFoundException(finalRef));
+        }
+        return refHolder;
     }
 
     @Override
     public void close() {
+        shutDownExecutor(refCleaner);
+        StreamSupport.stream(cache.entries().spliterator(), true).forEach(ce -> ce.getValue().close());
+        cache.close();
         try {
             source.close();
-        } catch (final Exception ignore) {
+        } catch (final Exception e) {
+            LOG.warn("Error when closing source during shutdown", e);
         }
-        cache.close();
-        refCleaner.shutdown();
+    }
+
+    static void shutDownExecutor(final ExecutorService service) {
+        service.shutdown();
         try {
-            refCleaner.awaitTermination(10, TimeUnit.SECONDS);
+            service.awaitTermination(10, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            // Ignore
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -165,21 +174,18 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public Either<String, FailedToLock> put(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
+    public CompletableFuture<Either<String, FailedToLock>> putKey(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
-        final String finalRef = checkRef(ref);
-        final RefHolder refHolder = cache.peek(finalRef);
-        if (refHolder == null) {
-            throw new WrappingAPIException(new RefNotFoundException(finalRef));
-        }
-        return refHolder.modifyKey(key, finalRef, data, oldVersion, commitMetaData);
+        final RefHolder refHolder = getRefHolder(checkRef(ref));
+        return refHolder.modifyKey(key, data, oldVersion, commitMetaData);
     }
 
     @Override
-    public String addKey(final String key, String branch, final ObjectStreamProvider data, final MetaData metaData, final CommitMetaData commitMetaData) {
+    public CompletableFuture<String> addKey(final String key, String branch, final ObjectStreamProvider data, final MetaData metaData,
+            final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -189,84 +195,17 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         }
 
         final String finalRef = checkRef(branch);
-        isRefATag(finalRef);
         final RefHolder refStore = getRefHolder(finalRef);
-        final Either<String, FailedToLock> result = refStore.lockWrite(() -> {
-            SourceInfo sourceInfo = null;
-            try {
-                final Optional<StoreInfo> storeInfo = refStore.readKey(key);
-                if (storeInfo != null && storeInfo.isPresent()) {
-                    throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-                }
-            } catch (final LoadException e) {
-                final Throwable cause = e.getCause();
-                if (cause instanceof RefNotFoundException) {
-                    if (!defaultRef.equals(finalRef)) {
-                        sourceInfo = checkBranch(key, finalRef, getRefHolder(defaultRef));
-                    }
-                } else {
-                    throw e;
-                }
-            }
-            if (sourceInfo != null && !sourceInfo.isMetaDataSource()) {
+        return refStore.addKey(key, data, metaData, commitMetaData).thenApplyAsync(result -> {
+            if (result.isRight()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
-            try {
-                return refStore.addKey(key, finalRef, data, metaData, commitMetaData);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }, key);
-        if (result.isRight()) {
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
-        removeCacheRef(finalRef);
-        return result.getLeft();
-    }
-
-    private SourceInfo checkBranch(final String key, final String ref, final RefHolder refHolder) {
-        SourceInfo sourceInfo = null;
-        try {
-            final Optional<StoreInfo> defaultKey = refHolder.readKey(key);
-            if (defaultKey != null && defaultKey.isPresent()) {
-                throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
-            }
-            sourceInfo = source.getSourceInfo(key, defaultRef);
-        } catch (final RefNotFoundException e1) {
-            throw new ShouldNeverHappenException("Default branch " + defaultRef + " is not found");
-        }
-        if (sourceInfo == null) {
-            try {
-                source.createRef(ref);
-            } catch (final IOException e1) {
-                consumeError(e1);
-                throw new UncheckedIOException(e1);
-            }
-
-        }
-        return sourceInfo;
-    }
-
-    private void removeCacheRef(final String ref) {
-        if (ref == null) {
-            return;
-        }
-        CompletableFuture.runAsync(() -> {
-            cache.invoke(ref, e -> {
-                if (e == null) {
-                    return false;
-                }
-                final boolean empty = e.getValue().isEmpty();
-                if (empty) {
-                    e.setValue(null);
-                }
-                return empty;
-            });
-        }, refCleaner);
+            return result.getLeft();
+        });
     }
 
     @Override
-    public Either<String, FailedToLock> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -275,17 +214,12 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         if (checkKeyIsDotFile(key)) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-        final String finalRef = checkRef(ref);
-        isRefATag(finalRef);
-        final RefHolder refHolder = cache.peek(finalRef);
-        if (refHolder == null) {
-            throw new WrappingAPIException(new RefNotFoundException(finalRef));
-        }
-        return refHolder.modifyMetadata(metaData, oldMetaDataVersion, commitMetaData, key, finalRef);
+        final RefHolder refHolder = getRefHolder(checkRef(ref));
+        return refHolder.modifyMetadata(key, metaData, oldMetaDataVersion, commitMetaData);
     }
 
     @Override
-    public void delete(final String key, final String ref, final CommitMetaData commitMetaData) {
+    public CompletableFuture<Either<String, FailedToLock>> delete(final String key, final String ref, final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
 
@@ -294,7 +228,6 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         }
 
         final String finalRef = checkRef(ref);
-        isRefATag(finalRef);
         if (key.endsWith("/")) {
             // We don't support deleting master .metadata files right now
             throw new WrappingAPIException(new UnsupportedOperationException(key));
@@ -302,25 +235,19 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
         final RefHolder refHolder = cache.peek(finalRef);
         if (refHolder != null) {
             try {
-                refHolder.deleteKey(key, finalRef, commitMetaData);
-            } catch (final UncheckedIOException ioe) {
+               return refHolder.deleteKey(key, commitMetaData);
+            } catch (UncheckedIOException ioe) {
                 consumeError(ioe);
             }
         }
-        removeCacheRef(finalRef);
-    }
-
-    private void isRefATag(final String finalRef) {
-        if (finalRef.startsWith(Constants.R_TAGS)) {
-            throw new WrappingAPIException(new UnsupportedOperationException("Tags cannot be modified"));
-        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
         Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
-        return Tree.of(keyPairs).accept(new Tree.Extractor())
+        return Tree.of(keyPairs).accept(Tree.EXTRACTOR)
                 .parallelStream()
                 .map(pair -> {
                     final String key = pair.getLeft();
@@ -381,47 +308,43 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     }
 
     @Override
-    public Either<String, FailedToLock> updateUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data,
-            final String version) {
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String key, String ref, final String realm, final String creatorUserName,
+            final UserData data, final String version) {
         ref = checkRef(ref);
-        isRefATag(ref);
         final RefHolder refHolder = cache.peek(ref);
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
-        return refHolder.updateUser(realm + "/" + key, creatorUserName, data, version);
+        return refHolder.modifyUser(realm + "/" + key, creatorUserName, data, version);
     }
 
     @Override
-    public String addUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data) {
+    public CompletableFuture<String> addUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(creatorUserName);
         Objects.requireNonNull(data);
         final String finalRef = checkRef(ref);
-        isRefATag(finalRef);
         if (rootUser.equals(key)) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
         }
         final RefHolder refHolder = getRefHolder(finalRef);
-        final Either<String, FailedToLock> postUser = refHolder.addUser(realm + "/" + key, creatorUserName, data);
-        if (postUser.isRight()) {
-            removeCacheRef(finalRef);
-            throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
-        }
-        return postUser.getLeft();
+        return refHolder.addUser(realm + "/" + key, creatorUserName, data).thenApplyAsync(postUser -> {
+            if (postUser.isRight()) {
+                throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
+            }
+            return postUser.getLeft();
+        });
     }
 
     @Override
-    public void deleteUser(final String key, String ref, final String realm, final String creatorUserName) {
+    public void deleteUser(final String key, final String ref, final String realm, final String creatorUserName) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(creatorUserName);
-        ref = checkRef(ref);
-        isRefATag(ref);
-        final RefHolder refHolder = cache.peek(ref);
+        final RefHolder refHolder = cache.peek(checkRef(ref));
         if (refHolder != null) {
-            refHolder.deleteUser(realm + "/" + key, creatorUserName);
+            refHolder.deleteUser(realm + "/" + key, creatorUserName).join();
         }
     }
 
@@ -436,19 +359,40 @@ public class KeyStorage implements Storage, Reloader, DeleteRef {
     @Override
     public void deleteRef(String ref) {
         LOG.info("Deleting {}", ref);
-        cache.remove(ref);
+        final RefHolder removedValue = cache.peekAndRemove(ref);
+        CompletableFuture.runAsync(() -> {
+            if (removedValue != null) {
+                removedValue.close();
+                LOG.info("Ref {} is disposed", ref);
+            }
+        }, refCleaner);
+
     }
 
-    private static Cache<String, RefHolder> getMap(Source source, HashService hashService) {
+    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, RefLockService refLockService) {
         return new Cache2kBuilder<String, RefHolder>() {
         }
                 .name(KeyStorage.class)
                 .loader(new CacheLoader<String, RefHolder>() {
                     @Override
                     public RefHolder load(final String r) throws Exception {
-                        return new RefHolder(r, source, hashService);
+                        if (r.startsWith("refs/tags/")) {
+                            return new ReadOnlyRefHolder(r, source, hashService, refLockService);
+                        }
+                        final RefHolder refHolder = new RefHolder(r, source, hashService, refLockService);
+                        refHolder.start();
+                        return refHolder;
                     }
                 })
                 .build();
+    }
+
+    @Override
+    public void addRef(String ref) {
+        RefHolder refHolder = cache.peek(ref);
+        if (refHolder == null) {
+            LOG.info("Adding ref {}", ref);
+            cache.get(ref);
+        }
     }
 }

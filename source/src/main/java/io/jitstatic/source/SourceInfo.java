@@ -70,7 +70,7 @@ public class SourceInfo {
         return metaFileData.isKeyMetaFile();
     }
 
-    public ObjectStreamProvider getSourceProvider() throws IOException {
+    public ObjectStreamProvider getStreamProvider() throws IOException {
         if(sourceFileData == null) {
             return null;
         }
@@ -78,7 +78,7 @@ public class SourceInfo {
         final long size = inputStreamHolder.getSize();        
         if (size < threshold) {
             try (InputStream storageStream = inputStreamHolder.getInputStreamProvider().get()) {
-                return new SmallObjectStreamProvider(SourceHandler.readStorageData(storageStream));
+                return new SmallObjectStreamProvider(storageStream.readAllBytes());
             }
         } else {
             return new LargeObjectStreamProvider(inputStreamHolder.getInputStreamProvider(), size);

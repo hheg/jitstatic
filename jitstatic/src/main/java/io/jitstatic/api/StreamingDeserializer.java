@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import java.io.BufferedOutputStream;
+
 /*-
  * #%L
  * jitstatic
@@ -92,8 +94,8 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
     @Override
     public ObjectStreamProvider deserialize(final JsonParser p, final DeserializationContext ctxt) throws IOException, JsonProcessingException {
         final DeferredFileOutputStream dfos = getOutPutStream();
-        try {
-            p.readBinaryValue(dfos);
+        try (BufferedOutputStream bos = new BufferedOutputStream(dfos)) {
+            p.readBinaryValue(bos);
         } catch (FileTooLargeException ftle) {
             ctxt.reportInputMismatch(ObjectStreamProvider.class, "Input is too large > " + MAX_FILE_SIZE);
         } finally {
@@ -101,8 +103,19 @@ public class StreamingDeserializer extends JsonDeserializer<ObjectStreamProvider
         }
         return new ObjectStreamProvider() {
             @Override
-            public long getSize() throws IOException {
+            public long getSize() {
                 return dfos.getByteCount();
+            }
+
+            @Override
+            public byte[] asByteArray() throws IOException {
+                byte[] data = dfos.getData();
+                if (data != null) {
+                    return data;
+                }
+                try (InputStream is = Files.newInputStream(dfos.getFile().toPath(), StandardOpenOption.READ)) {
+                    return is.readAllBytes();
+                }
             }
 
             @Override

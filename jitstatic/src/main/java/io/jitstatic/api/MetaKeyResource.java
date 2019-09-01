@@ -27,7 +27,11 @@ import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 
+import javax.inject.Inject;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -38,6 +42,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.HttpHeaders;
@@ -54,7 +60,6 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
-import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.jitstatic.CommitMetaData;
@@ -63,7 +68,6 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.auth.UserData;
-import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
@@ -78,6 +82,8 @@ public class MetaKeyResource {
     private final KeyAdminAuthenticator keyAdminAuthenticator;
     private final APIHelper helper;
     private final HashService hashService;
+    @Inject
+    private ExecutorService executor;
 
     public MetaKeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final String defaultBranch,
             final HashService hashService) {
@@ -94,29 +100,76 @@ public class MetaKeyResource {
     @ExceptionMetered(name = "get_metakey_exception")
     @Path("/{key : .+}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> user,
-            final @Context Request request, final @Context HttpHeaders headers) {
-        if (!user.isPresent()) {
-            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
-        }
+    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userHolder, final @Context Request request, final @Context HttpHeaders headers) {
+        final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
+        APIHelper.checkRef(askedRef);
+        final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
+        CompletableFuture.supplyAsync(() -> {
+            final Pair<MetaData, String> metaDataInfo = helper.unwrap(() -> storage.getMetaKey(key, ref), Pair::ofNothing);
+            if (!metaDataInfo.isPresent()) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+            return metaDataInfo;
+        }, executor).thenApplyAsync(metaDataInfo -> {
+            final MetaData metaData = metaDataInfo.getLeft();
+            authorize(user, ref, metaData.getRead());
 
-        helper.checkRef(ref);
+            final EntityTag tag = new EntityTag(metaDataInfo.getRight());
+            final Response noChange = APIHelper.checkETag(headers, tag);
+            if (noChange != null) {
+                return noChange;
+            }
+            LOG.info("{} logged in and accessed key {} in {}", user, key, ref);
+            return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag)
+                    .build();
+        }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+    }
 
-        final Pair<MetaData, String> metaDataInfo = helper.unwrapPair(() -> storage.getMetaKey(key, ref));
-        if (!metaDataInfo.isPresent()) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        final MetaData metaData = metaDataInfo.getLeft();
-        final Set<Role> roles = metaData.getRead();
-        authorize(user.get(), ref, roles);
+    @PUT
+    @Timed(name = "put_metakey_time")
+    @Metered(name = "put_metakey_counter")
+    @ExceptionMetered(name = "put_metakey_exception")
+    @Path("/{key : .+}")
+    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    public void modifyMetaKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userHolder, final @Valid @NotNull ModifyMetaKeyData data, final @Context Request request,
+            final @Context HttpHeaders headers) {
+        final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
+        final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
+        CompletableFuture.supplyAsync(() -> {
+            APIHelper.checkHeaders(headers);
+            APIHelper.checkRef(ref);
+            return storage.getMetaKey(key, ref);
+        }, executor).thenApplyAsync(metaKeyData -> {
+            if (!metaKeyData.isPresent()) {
+                throw new WebApplicationException(key, Status.NOT_FOUND);
+            }
 
-        final EntityTag tag = new EntityTag(metaDataInfo.getRight());
-        final Response noChange = helper.checkETag(headers, tag);
-        if (noChange != null) {
-            return noChange;
-        }
-        LOG.info("{} logged in and accessed key {} in {}", user.get(), key, helper.setToDefaultRef(defaultRef, ref));
-        return Response.ok(metaData).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build();
+            authorize(user, ref, metaKeyData.getLeft().getWrite());
+            final String currentVersion = metaKeyData.getRight();
+
+            final EntityTag tag = new EntityTag(currentVersion);
+            final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
+
+            if (noChangeBuilder != null) {
+                throw new WebApplicationException(noChangeBuilder.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build());
+            }
+
+            return storage.putMetaData(key, ref, data.getMetaData(), currentVersion,
+                    new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE));
+        }, executor).thenComposeAsync(Function.identity(), executor).thenApplyAsync(result -> {
+            if (result.isRight()) {
+                throw new WebApplicationException(Response.status(Status.PRECONDITION_FAILED).build());
+            }
+            final String newVersion = result.getLeft();
+            if (newVersion == null) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+            LOG.info("{} logged in and modified key {} in {}", user, key, ref);
+            return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+        }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
     }
 
     private void authorize(final User user, final String ref, final Set<Role> roles) {
@@ -138,51 +191,4 @@ public class MetaKeyResource {
             return false;
         }
     }
-
-    @PUT
-    @Timed(name = "put_metakey_time")
-    @Metered(name = "put_metakey_counter")
-    @ExceptionMetered(name = "put_metakey_exception")
-    @Path("/{key : .+}")
-    @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public Response modifyMetaKey(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth Optional<User> userHolder,
-            final @Valid @NotNull ModifyMetaKeyData data, final @Context Request request, final @Context HttpHeaders headers) {
-        if (!userHolder.isPresent()) {
-            return helper.respondAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM);
-        }
-
-        helper.checkHeaders(headers);
-
-        helper.checkRef(ref);
-
-        final Pair<MetaData, String> metaKeyData = storage.getMetaKey(key, ref);
-        if (!metaKeyData.isPresent()) {
-            throw new WebApplicationException(key, Status.NOT_FOUND);
-        }
-        final User user = userHolder.get();
-        authorize(user, ref, metaKeyData.getLeft().getWrite());
-        final String currentVersion = metaKeyData.getRight();
-
-        final EntityTag tag = new EntityTag(currentVersion);
-        final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
-
-        if (noChangeBuilder != null) {
-            return noChangeBuilder.tag(tag).build();
-        }
-
-        final Either<String, FailedToLock> result = helper.unwrapWithPUTApi(() -> storage.putMetaData(key, ref, data.getMetaData(), currentVersion,
-                new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE)));
-
-        if (result.isRight()) {
-            return Response.status(Status.PRECONDITION_FAILED).tag(tag).build();
-        }
-        final String newVersion = result.getLeft();
-        if (newVersion == null) {
-            throw new WebApplicationException(Status.NOT_FOUND);
-        }
-        LOG.info("{} logged in and modified key {} in {}", userHolder.get(), key, helper.setToDefaultRef(defaultRef, ref));
-        return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-    }
-
 }

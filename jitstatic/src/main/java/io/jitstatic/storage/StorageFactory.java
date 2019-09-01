@@ -30,13 +30,15 @@ import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.auth.ConfiguratedAuthenticator;
 import io.jitstatic.auth.User;
+import io.jitstatic.hosted.events.AddRefEventListener;
 import io.jitstatic.hosted.events.DeleteRefEventListener;
 import io.jitstatic.hosted.events.ReloadRefEventListener;
+import io.jitstatic.hosted.events.StorageAddRefEventListener;
 import io.jitstatic.source.Source;
 
 public class StorageFactory {
 
-    public Storage build(final Source source, final Environment env, final String storageRealm, final HashService hashService, final String rootUser) {
+    public Storage build(final Source source, final Environment env, final String storageRealm, final HashService hashService, final String rootUser, RefLockService clusterService) {
         Objects.requireNonNull(source, "Source cannot be null");
         Objects.requireNonNull(rootUser);
         env.jersey().register(new AuthDynamicFeature(
@@ -45,11 +47,14 @@ public class StorageFactory {
                         .setAuthorizer((user, role) -> true)
                         .setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null"))
                         .buildAuthFilter()));
+        
         env.jersey().register(RolesAllowedDynamicFeature.class);
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-        final KeyStorage keyStorage = new KeyStorage(source, source.getDefaultRef(), hashService, rootUser);
+        
+        final KeyStorage keyStorage = new KeyStorage(source, source.getDefaultRef(), hashService, clusterService, rootUser);
         source.addListener(new ReloadRefEventListener(keyStorage), ReloadRefEventListener.class);
         source.addListener(new DeleteRefEventListener(keyStorage), DeleteRefEventListener.class);
+        source.addListener(new StorageAddRefEventListener(keyStorage), AddRefEventListener.class);
         source.addRefHolderFactory(keyStorage::getRefHolderLock);
         return keyStorage;
     }

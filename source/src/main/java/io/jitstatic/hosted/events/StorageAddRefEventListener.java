@@ -1,10 +1,10 @@
-package io.jitstatic.hosted;
+package io.jitstatic.hosted.events;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,16 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-public class KeyAlreadyExist extends RuntimeException {
+public class StorageAddRefEventListener implements AddRefEventListener {
 
-    private static final long serialVersionUID = 3551414727296198256L;
-
-    public KeyAlreadyExist(final String key, final String branch) {
-        super("Key '"+ key + "' already exist in branch " + branch);
+    private final AddRef source;
+    
+    public StorageAddRefEventListener(final AddRef refAdder) {
+        this.source = refAdder;
     }
-
+    
     @Override
-    public Throwable fillInStackTrace() {
-        return this;
+    public void onAddRef(String ref) {
+        source.addRef(ref);
     }
 }

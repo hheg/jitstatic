@@ -28,8 +28,18 @@ public class FailedToLock extends Exception {
         super(ref);
     }
 
+    public FailedToLock(final String ref, final String key) {
+        super(ref + ":" + key);
+    }
+
     @Override
     public Throwable fillInStackTrace() {
         return this;
+    }
+
+    public static FailedToLock create(final Throwable t, final String ref) {
+        FailedToLock ftl = new FailedToLock(ref);
+        ftl.addSuppressed(t);
+        return ftl;
     }
 }
