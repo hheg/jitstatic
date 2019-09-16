@@ -1,7 +1,5 @@
 package io.jitstatic.storage;
 
-import static io.jitstatic.source.ObjectStreamProvider.toProvider;
-
 /*-
  * #%L
  * jitstatic
@@ -22,6 +20,7 @@ import static io.jitstatic.source.ObjectStreamProvider.toProvider;
  * #L%
  */
 
+import static io.jitstatic.source.ObjectStreamProvider.toProvider;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,8 +42,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
