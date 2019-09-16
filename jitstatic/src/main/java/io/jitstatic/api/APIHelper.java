@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.ws.rs.WebApplicationException;
@@ -58,7 +60,7 @@ class APIHelper {
         this.log = log;
     }
 
-    Response exceptionHandlerPOSTAPI(Throwable e) {
+    Response exceptionHandlerPOSTAPI(final Throwable e) {
         if (e instanceof WebApplicationException) {
             WebApplicationException wae = (WebApplicationException) e;
             return wae.getResponse();
@@ -108,7 +110,7 @@ class APIHelper {
         }
     }
 
-    Response execptionHandler(Throwable e) {
+    Response execptionHandler(final Throwable e) {
         if (e instanceof WebApplicationException) {
             WebApplicationException wae = (WebApplicationException) e;
             return wae.getResponse();
@@ -119,7 +121,7 @@ class APIHelper {
         if (e instanceof WrappingAPIException) {
             final Throwable apiException = e.getCause();
             if (apiException instanceof UnsupportedOperationException) {
-                return new WebApplicationException(Status.NOT_FOUND).getResponse();
+                return new WebApplicationException(Status.METHOD_NOT_ALLOWED).getResponse();
             }
         }
         log.error(UNHANDLED_ERROR, e);
@@ -155,22 +157,26 @@ class APIHelper {
         }
     }
 
-    <T> T unwrap(final Supplier<T> supplier, final Supplier<T> alternative) {
-        try {
-            return supplier.get();
-        } catch (WrappingAPIException e) {
-            final Throwable cause = e.getCause();
+    <T> Function<Throwable, T> keyExceptionHandler(final Supplier<T> alternative) {
+        return t -> unwrap(t, alternative);
+    }
+    
+    private <T> T unwrap(final Throwable t, final Supplier<T> alternative) {
+        if (t instanceof CompletionException) {
+            return unwrap(t.getCause(), alternative);
+        } else if (t instanceof WrappingAPIException) {
+            final Throwable cause = t.getCause();
             if (cause instanceof UnsupportedOperationException) {
-                throw new WebApplicationException(Status.FORBIDDEN);
-            } if (cause instanceof RefNotFoundException) {
+                throw new WebApplicationException(Status.METHOD_NOT_ALLOWED);
+            }
+            if (cause instanceof RefNotFoundException) {
                 throw new WebApplicationException(Status.NOT_FOUND);
             }
-            log.error("Unknown api error", e);
-            return alternative.get();
-        } catch (Exception e) {
-            log.error(UNHANDLED_ERROR, e);
+            log.error("Unknown api error", t);
             return alternative.get();
         }
+        log.error(UNHANDLED_ERROR, t);
+        return alternative.get();
     }
 
     static void checkRef(final String ref) {
@@ -186,7 +192,8 @@ class APIHelper {
         return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
     }
 
-    static Response checkETag(final HttpHeaders headers, final EntityTag tag) {
+    static Response checkETag(final HttpHeaders headers,
+            final EntityTag tag) {
         final List<String> requestHeaders = headers.getRequestHeader(HttpHeaders.IF_MATCH);
         if (requestHeaders == null) {
             return null;
@@ -202,21 +209,29 @@ class APIHelper {
         return null;
     }
 
-    static WebApplicationException createAuthenticationChallenge(String realm) {
-        return new WebApplicationException(
-                Response.status(Status.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build());
+    static WebApplicationException createAuthenticationChallenge(final String realm) {
+        return new WebApplicationException(Response.status(Status.UNAUTHORIZED)
+                .header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build());
     }
 
-    StoreInfo checkIfKeyExist(final String key, final String ref, final Storage storage) {
-        final Optional<StoreInfo> storeInfo = unwrap(() -> storage.getKey(key, ref), Optional::empty);
-        return storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND));
+    CompletableFuture<StoreInfo> checkIfKeyExist(final String key,
+            final String ref,
+            final Storage storage) {
+        return storage.getKey(key, ref)
+                .exceptionally(this.keyExceptionHandler(Optional::empty))
+                .thenApply(storeInfo -> storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND)));
     }
 
-    static String setToDefaultRefIfNull(final String ref, final String defaultRef) {
+    static String setToDefaultRefIfNull(final String ref,
+            final String defaultRef) {
         return ref == null ? defaultRef : ref;
     }
 
-    static boolean isKeyUserAllowed(final Storage storage, final HashService hashService, final User user, final String ref, Set<Role> keyRoles) {
+    static boolean isKeyUserAllowed(final Storage storage,
+            final HashService hashService,
+            final User user,
+            final String ref,
+            Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
         try {
             final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);

@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import java.util.Objects;
+
 /*-
  * #%L
  * jitstatic
@@ -33,7 +35,6 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 
-
 @JsonInclude(Include.NON_NULL)
 public class KeyData {
 
@@ -42,7 +43,7 @@ public class KeyData {
 
     @NotBlank
     private final String type;
-    
+
     @JsonSerialize(using = StreamingSerializer.class)
     private final ObjectStreamProvider data;
 
@@ -84,12 +85,7 @@ public class KeyData {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + key.hashCode();
-        result = prime * result + tag.hashCode();
-        result = prime * result + type.hashCode();
-        return result;
+        return Objects.hash(key, tag, type);
     }
 
     @Override
@@ -101,11 +97,7 @@ public class KeyData {
         if (getClass() != obj.getClass())
             return false;
         KeyData other = (KeyData) obj;
-        if (!key.equals(other.key))
-            return false;
-        if (!tag.equals(other.tag))
-            return false;
-        return (type.equals(other.type));
+        return Objects.equals(key, other.key) && Objects.equals(tag, other.tag) && Objects.equals(type, other.type);
     }
 
     @Override

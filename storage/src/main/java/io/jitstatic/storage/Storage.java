@@ -38,7 +38,7 @@ import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
 public interface Storage extends AutoCloseable, CheckHealth {
-    public Optional<StoreInfo> getKey(String key, String ref);
+    public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref);
 
     public void close();
 
@@ -60,7 +60,7 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public Pair<String, UserData> getUserData(String username, String defaultRef, String realm) throws RefNotFoundException;
 
-    public Pair<MetaData, String> getMetaKey(String key, String ref);
+    public CompletableFuture<Pair<MetaData, String>> getMetaKey(String key, String ref);
 
     public CompletableFuture<Either<String, FailedToLock>> updateUser(String key, String ref, String path, String username, UserData data, String version);
 

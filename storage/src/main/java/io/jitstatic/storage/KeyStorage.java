@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -64,7 +65,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
     private static final Logger LOG = LoggerFactory.getLogger(KeyStorage.class);
     private final Cache<String, RefHolder> cache;
-    private final AtomicReference<Exception> fault = new AtomicReference<>();
+    private final AtomicReference<Throwable> fault = new AtomicReference<>();
     private final Source source;
     private final String defaultRef;
     private final String rootUser;
@@ -82,9 +83,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         return getRefHolder(ref);
     }
 
-    private void consumeError(final Exception e) {
-        fault.getAndSet(e);
-        LOG.warn("Error occourred ", e);
+    private void consumeError(final Throwable t) {
+        fault.getAndSet(t);
+        LOG.warn("Error occourred ", t);
     }
 
     private String checkRef(final String ref) {
@@ -92,44 +93,59 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public Optional<StoreInfo> getKey(final String key, final String ref) {
-        try {
-            if (key.endsWith("/")) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
-            }
-            return getKeyDirect(key, ref);
-        } catch (LoadException e) {
-            LOG.warn("Trying to access non existent ref {}", ref, e);
-        } catch (WrappingAPIException e) {
-            throw e;
-        } catch (Exception e) {
-            consumeError(e);
+    public CompletableFuture<Optional<StoreInfo>> getKey(final String key,
+            final String ref) {
+        if (key.endsWith("/")) {
+            throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
-        return Optional.empty();
+        return getKeyDirect(key, ref);
     }
 
-    private Optional<StoreInfo> getKeyDirect(final String key, final String ref) {
+    private CompletableFuture<Optional<StoreInfo>> getKeyDirect(final String key,
+            final String ref) {
         if (checkKeyIsDotFile(key)) {
-            return Optional.empty();
+            return CompletableFuture.completedFuture(Optional.empty());
         }
 
-        final String finalRef = checkRef(ref);
-        final RefHolder refHolder = getRefHolder(finalRef);
-        final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
-        if (storeInfo == null) {
-            return Optional.empty();
+        return CompletableFuture.supplyAsync(() -> {
+            final String finalRef = checkRef(ref);
+            final RefHolder refHolder = getRefHolder(finalRef);
+            final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
+            if (storeInfo == null) {
+                return Optional.<StoreInfo>empty();
+            }
+            return storeInfo;
+        }).handleAsync((o,t) -> unwrap(o, t, ref));
+    }
+
+    private Optional<StoreInfo> unwrap(final Optional<StoreInfo> o,
+            final Throwable t,
+            final String ref) {
+        if (t != null) {
+            if (t instanceof CompletionException) {
+                return this.unwrap(o, t.getCause(), ref);
+            } else if (t instanceof LoadException) {
+                LOG.warn("Trying to access non existent ref {}", ref, t);
+            } else if (t instanceof WrappingAPIException) {
+                throw (WrappingAPIException) t;
+            } else {
+                consumeError(t);
+            }
+            return Optional.<StoreInfo>empty();
         }
-        return storeInfo;
+        return o;
     }
 
     @Override
-    public Pair<MetaData, String> getMetaKey(final String key, final String ref) {
-        final Optional<StoreInfo> keyDirect = getKeyDirect(key, ref);
-        if (!keyDirect.isPresent()) {
-            return Pair.ofNothing();
-        }
-        final StoreInfo storeInfo = keyDirect.get();
-        return Pair.of(storeInfo.getMetaData(), storeInfo.getMetaDataVersion());
+    public CompletableFuture<Pair<MetaData, String>> getMetaKey(final String key,
+            final String ref) {
+        return getKeyDirect(key, ref).thenApply(keyDirect -> {
+            if (!keyDirect.isPresent()) {
+                return Pair.ofNothing();
+            }
+            final StoreInfo storeInfo = keyDirect.get();
+            return Pair.of(storeInfo.getMetaData(), storeInfo.getMetaDataVersion());
+        });
     }
 
     private boolean checkKeyIsDotFile(final String key) {
@@ -166,15 +182,18 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public void checkHealth() throws Exception {
-        final Exception old = fault.getAndSet(null);
+    public void checkHealth() throws Throwable {
+        final Throwable old = fault.getAndSet(null);
         if (old != null) {
             throw old;
         }
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> putKey(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
+    public CompletableFuture<Either<String, FailedToLock>> putKey(final String key,
+            String ref,
+            final ObjectStreamProvider data,
+            final String oldVersion,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
@@ -184,7 +203,10 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<String> addKey(final String key, String branch, final ObjectStreamProvider data, final MetaData metaData,
+    public CompletableFuture<String> addKey(final String key,
+            String branch,
+            final ObjectStreamProvider data,
+            final MetaData metaData,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
@@ -205,7 +227,10 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key,
+            String ref,
+            final MetaData metaData,
+            final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -219,7 +244,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> delete(final String key, final String ref, final CommitMetaData commitMetaData) {
+    public CompletableFuture<Either<String, FailedToLock>> delete(final String key,
+            final String ref,
+            final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
 
@@ -235,7 +262,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         final RefHolder refHolder = cache.peek(finalRef);
         if (refHolder != null) {
             try {
-               return refHolder.deleteKey(key, commitMetaData);
+                return refHolder.deleteKey(key, commitMetaData);
             } catch (UncheckedIOException ioe) {
                 consumeError(ioe);
             }
@@ -244,7 +271,8 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs, final String ref) {
+    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs,
+            final String ref) {
         Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
         return Tree.of(keyPairs).accept(Tree.EXTRACTOR)
@@ -254,7 +282,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                     if (key.endsWith("/")) {
                         try {
                             return source.getList(key, finalRef, pair.getRight()).parallelStream()
-                                    .map(k -> Pair.of(k, getKey(k, finalRef)))
+                                    .map(k -> Pair.of(k, getKey(k, finalRef).join()))
                                     .filter(Pair::isPresent)
                                     .filter(pa -> pa.getRight().isPresent())
                                     .map(pa -> Pair.of(pa.getLeft(), pa.getRight().get()))
@@ -266,11 +294,12 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                             return List.<Pair<String, StoreInfo>>of();
                         }
                     }
-                    final Optional<StoreInfo> keyContent = getKey(key, finalRef);
-                    if (keyContent.isPresent()) {
-                        return List.of(Pair.of(key, keyContent.get()));
-                    }
-                    return List.<Pair<String, StoreInfo>>of();
+                    return getKey(key, finalRef).thenApply(keyContent -> {
+                        if (keyContent.isPresent()) {
+                            return List.of(Pair.of(key, keyContent.get()));
+                        }
+                        return List.<Pair<String, StoreInfo>>of();
+                    }).join();
                 }).flatMap(List::stream).collect(Collectors.toList());
     }
 
@@ -282,7 +311,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public UserData getUser(final String key, String ref, final String realm) throws RefNotFoundException {
+    public UserData getUser(final String key,
+            String ref,
+            final String realm) throws RefNotFoundException {
         final Pair<String, UserData> userData = getUserData(key, ref, realm);
         if (userData != null && userData.isPresent()) {
             return userData.getRight();
@@ -291,7 +322,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public Pair<String, UserData> getUserData(final String key, String ref, final String realm) throws RefNotFoundException {
+    public Pair<String, UserData> getUserData(final String key,
+            String ref,
+            final String realm) throws RefNotFoundException {
         final RefHolder refHolder = getRefHolder(checkRef(ref));
         try {
             return refHolder.getUser(realm + "/" + key);
@@ -308,8 +341,12 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String key, String ref, final String realm, final String creatorUserName,
-            final UserData data, final String version) {
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String key,
+            String ref,
+            final String realm,
+            final String creatorUserName,
+            final UserData data,
+            final String version) {
         ref = checkRef(ref);
         final RefHolder refHolder = cache.peek(ref);
         if (refHolder == null) {
@@ -319,7 +356,11 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<String> addUser(final String key, String ref, final String realm, final String creatorUserName, final UserData data) {
+    public CompletableFuture<String> addUser(final String key,
+            String ref,
+            final String realm,
+            final String creatorUserName,
+            final UserData data) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(creatorUserName);
@@ -338,7 +379,10 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public void deleteUser(final String key, final String ref, final String realm, final String creatorUserName) {
+    public void deleteUser(final String key,
+            final String ref,
+            final String realm,
+            final String creatorUserName) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(creatorUserName);
@@ -369,7 +413,9 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     }
 
-    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, RefLockService refLockService) {
+    private static Cache<String, RefHolder> getMap(final Source source,
+            final HashService hashService,
+            RefLockService refLockService) {
         return new Cache2kBuilder<String, RefHolder>() {
         }
                 .name(KeyStorage.class)

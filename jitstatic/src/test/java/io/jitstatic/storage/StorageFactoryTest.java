@@ -59,7 +59,7 @@ public class StorageFactoryTest {
     public void testBuild() throws InterruptedException, ExecutionException, IOException {
         when(env.jersey()).thenReturn(jersey);
         try (Storage storage = sf.build(source, env, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, "root", clusterService);) {
-            assertEquals(Optional.empty(), storage.getKey("key", null));
+            assertEquals(Optional.empty(), storage.getKey("key", null).join());
         }
         verify(jersey).register(isA(AuthDynamicFeature.class));
         verify(jersey).register(RolesAllowedDynamicFeature.class);

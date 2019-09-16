@@ -139,11 +139,16 @@ public class KeyResource {
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
     @Path("{key : .+}")
-    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth Optional<User> userHolder, final @Context HttpHeaders headers, final @Context HttpServletResponse response) {
+    public void get(@Suspended AsyncResponse asyncResponse,
+            final @PathParam("key") String key,
+            final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userHolder,
+            final @Context HttpHeaders headers,
+            final @Context HttpServletResponse response) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         CompletableFuture.supplyAsync(() -> helper.checkIfKeyExist(key, ref, storage), executor)
+                .thenCompose(s -> s)
                 .thenApplyAsync(storeInfo -> {
                     final EntityTag tag = new EntityTag(storeInfo.getVersion());
                     final Response noChange = APIHelper.checkETag(headers, tag);
@@ -171,8 +176,11 @@ public class KeyResource {
 
     @GET
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void getRootList(@Suspended AsyncResponse asyncResponse, final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
-            @QueryParam("light") final boolean light, final @Auth Optional<User> user) {
+    public void getRootList(@Suspended AsyncResponse asyncResponse,
+            final @QueryParam("ref") String ref,
+            @QueryParam("recursive") boolean recursive,
+            @QueryParam("light") final boolean light,
+            final @Auth Optional<User> user) {
         getList(asyncResponse, "/", ref, recursive, light, user);
     }
 
@@ -182,8 +190,12 @@ public class KeyResource {
     @ExceptionMetered(name = "get_list_exception")
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void getList(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth Optional<User> userHolder) {
+    public void getList(@Suspended AsyncResponse asyncResponse,
+            final @PathParam("key") String key,
+            final @QueryParam("ref") String askedRef,
+            @QueryParam("recursive") boolean recursive,
+            @QueryParam("light") final boolean light,
+            final @Auth Optional<User> userHolder) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         CompletableFuture.supplyAsync(() -> storage.getListForRef(List.of(Pair.of(key, recursive)), ref), executor)
@@ -210,10 +222,9 @@ public class KeyResource {
                     if (list.isEmpty()) {
                         return Response.status(Status.NOT_FOUND).build();
                     }
-                    return Response.ok(new KeyDataWrapper(
-                            list.stream()
-                                    .map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p))
-                                    .collect(Collectors.toList())))
+                    return Response.ok(new KeyDataWrapper(list.stream()
+                            .map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p))
+                            .collect(Collectors.toList())))
                             .build();
                 }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
     }
@@ -224,8 +235,12 @@ public class KeyResource {
     @ExceptionMetered(name = "put_storage_exception")
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void modifyKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth Optional<User> userholder, final @Context HttpServletRequest httpRequest, final @Context Request request,
+    public void modifyKey(@Suspended AsyncResponse asyncResponse,
+            final @PathParam("key") String key,
+            final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userholder,
+            final @Context HttpServletRequest httpRequest,
+            final @Context Request request,
             final @Context HttpHeaders headers) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
@@ -236,27 +251,29 @@ public class KeyResource {
         CompletableFuture.supplyAsync(() -> {
             APIHelper.checkHeaders(headers);
             return helper.checkIfKeyExist(key, ref, storage);
-        }, executor).thenApplyAsync(storeInfo -> {
-            final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
-            final Set<Role> roles = storeInfo.getMetaData().getWrite();
-            final boolean isAuthenticated = addKeyAuthenticator.authenticate(user, ref);
-            if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty()) && !isAuthenticated) {
-                throw new WebApplicationException(Status.BAD_REQUEST);
-            }
-            if (!(isAuthenticated || allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, roles))) {
-                LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
-                throw new WebApplicationException(Status.FORBIDDEN);
-            }
-            final String currentVersion = storeInfo.getVersion();
-            final EntityTag entityTag = new EntityTag(currentVersion);
-            final ResponseBuilder response = request.evaluatePreconditions(entityTag);
-            if (response != null) {
-                throw new WebApplicationException(response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
-            }
-            return currentVersion;
         }, executor)
-                .thenCombineAsync(dataLoader, (currentVersion, data) -> storage.putKey(key, ref, data.getData(), currentVersion,
-                        new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE)), executor)
+                .thenComposeAsync(s -> s)
+                .thenApplyAsync(storeInfo -> {
+                    final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
+                    final Set<Role> roles = storeInfo.getMetaData().getWrite();
+                    final boolean isAuthenticated = addKeyAuthenticator.authenticate(user, ref);
+                    if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty()) && !isAuthenticated) {
+                        throw new WebApplicationException(Status.BAD_REQUEST);
+                    }
+                    if (!(isAuthenticated || allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, roles))) {
+                        LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
+                        throw new WebApplicationException(Status.FORBIDDEN);
+                    }
+                    final String currentVersion = storeInfo.getVersion();
+                    final EntityTag entityTag = new EntityTag(currentVersion);
+                    final ResponseBuilder response = request.evaluatePreconditions(entityTag);
+                    if (response != null) {
+                        throw new WebApplicationException(response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
+                    }
+                    return currentVersion;
+                }, executor)
+                .thenCombineAsync(dataLoader, (currentVersion, data) -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
+                                .getMessage(), user.getName(), JITSTATIC_NOWHERE)), executor)
                 .thenComposeAsync(Function.identity())
                 .thenApplyAsync(result -> {
                     if (result == null) {
@@ -282,8 +299,11 @@ public class KeyResource {
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public void addKey(@Suspended AsyncResponse asyncResponse, @NotNull final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Context HttpServletRequest httpRequest, final @Auth Optional<User> userHolder) throws JsonParseException, JsonMappingException, IOException {
+    public void addKey(@Suspended AsyncResponse asyncResponse,
+            @NotNull final @PathParam("key") String key,
+            final @QueryParam("ref") String askedRef,
+            final @Context HttpServletRequest httpRequest,
+            final @Auth Optional<User> userHolder) throws JsonParseException, JsonMappingException, IOException {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
@@ -301,14 +321,16 @@ public class KeyResource {
                 }
             }
         }, executor)
-                .thenApplyAsync(ignore -> helper.unwrap(() -> storage.getKey(key, ref), Optional::empty), executor)
+                .thenComposeAsync(ignore -> storage.getKey(key, ref).exceptionally(helper.keyExceptionHandler(Optional::empty)), executor)
                 .thenCombineAsync(dataLoader, (storeInfo, data) -> {
                     if (storeInfo.isPresent()) {
                         throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
                     }
-                    return storage.addKey(key, ref, data.getData(), data.getMetaData(),
-                            new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE));
-                }, executor).thenComposeAsync(Function.identity(), executor).thenApplyAsync(version -> {
+                    return storage.addKey(key, ref, data.getData(), data
+                            .getMetaData(), new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE));
+                }, executor)
+                .thenComposeAsync(s -> s, executor)
+                .thenApplyAsync(version -> {
                     LOG.info("{} logged in and added key {} in {}", user, key, ref);
                     return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
                 }, executor)
@@ -321,33 +343,38 @@ public class KeyResource {
     @Timed(name = "delete_storage_time")
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
-    public void delete(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth Optional<User> userHolder, final @Context HttpHeaders headers) {
+    public void delete(@Suspended AsyncResponse asyncResponse,
+            final @PathParam("key") String key,
+            final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userHolder,
+            final @Context HttpHeaders headers) {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.runAsync(() -> {
-            final String userHeader = notEmpty(headers, X_JITSTATIC_NAME);
-            final String message = notEmpty(headers, X_JITSTATIC_MESSAGE);
-            final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
+        CompletableFuture.supplyAsync(() -> helper.checkIfKeyExist(key, ref, storage), executor)
+                .thenCompose(s -> s)
+                .thenApplyAsync(storeInfo -> {
+                    final String userHeader = notEmpty(headers, X_JITSTATIC_NAME);
+                    final String message = notEmpty(headers, X_JITSTATIC_MESSAGE);
+                    final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
 
-            final StoreInfo storeInfo = helper.checkIfKeyExist(key, ref, storage);
+                    final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
+                    final Set<Role> roles = storeInfo.getMetaData().getWrite();
 
-            final Set<User> allowedUsers = storeInfo.getMetaData().getUsers();
-            final Set<Role> roles = storeInfo.getMetaData().getWrite();
-
-            if (!isUserAllowed(ref, user, allowedUsers, roles)) {
-                if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
-                    throw new WebApplicationException(Status.BAD_REQUEST);
-                }
-                LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
-                throw new WebApplicationException(Status.FORBIDDEN);
-            }
-            storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), JITSTATIC_NOWHERE));
-        }, executor).thenApplyAsync(ignore -> {
-            LOG.info("{} logged in and deleted key {} in {}", user, key, ref);
-            return Response.ok().build();
-        }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+                    if (!isUserAllowed(ref, user, allowedUsers, roles)) {
+                        if (allowedUsers.isEmpty() && (roles == null || roles.isEmpty())) {
+                            throw new WebApplicationException(Status.BAD_REQUEST);
+                        }
+                        LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
+                        throw new WebApplicationException(Status.FORBIDDEN);
+                    }
+                    return storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), JITSTATIC_NOWHERE));
+                }, executor)
+                .thenCompose(c -> c)
+                .thenApplyAsync(ignore -> {
+                    LOG.info("{} logged in and deleted key {} in {}", user, key, ref);
+                    return Response.ok().build();
+                }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
     }
 
     @OPTIONS
@@ -355,7 +382,8 @@ public class KeyResource {
     @Timed(name = "options_storage_time")
     @Metered(name = "options_storage_counter")
     @ExceptionMetered(name = "options_storage_exception")
-    public void options(final @PathParam("key") String key, final @QueryParam("ref") String ref,
+    public void options(final @PathParam("key") String key,
+            final @QueryParam("ref") String ref,
             final @Context HttpServletRequest request) {
         if (!cors) {
             return;
@@ -368,7 +396,7 @@ public class KeyResource {
             declared.addAll(List.of(X_JITSTATIC_NAME, X_JITSTATIC_MESSAGE, X_JITSTATIC_MAIL));
         }
 
-        final Pair<MetaData, String> metaKey = storage.getMetaKey(key, ref);
+        final Pair<MetaData, String> metaKey = storage.getMetaKey(key, ref).join();
         if (metaKey != null && metaKey.isPresent()) {
             final List<HeaderPair> headPairList = metaKey.getLeft().getHeaders();
             if (headPairList != null && !headPairList.isEmpty()) {
@@ -381,7 +409,10 @@ public class KeyResource {
         }
     }
 
-    private Response buildResponse(final StoreInfo storeInfo, final EntityTag tag, final MetaData data, final HttpServletResponse response) {
+    private Response buildResponse(final StoreInfo storeInfo,
+            final EntityTag tag,
+            final MetaData data,
+            final HttpServletResponse response) {
         final StreamingOutput so = output -> {
             try (InputStream is = storeInfo.getStreamProvider().getInputStream()) {
                 is.transferTo(output);
@@ -395,24 +426,19 @@ public class KeyResource {
         return responseBuilder.build();
     }
 
-    private <T> void validateData(final T data) {
-        if (data == null) {
-            throw new WebApplicationException("entity is null", 422);
-        }
-        final Set<ConstraintViolation<T>> violations = validator.validate(data);
-        if (!violations.isEmpty()) {
-            throw new ConstraintViolationException(violations);
-        }
-    }
-
-    void checkIfAllowed(final String key, final User user, final Set<User> allowedUsers, final String ref, final Set<Role> keyRoles) {
+    void checkIfAllowed(final String key,
+            final User user,
+            final Set<User> allowedUsers,
+            final String ref,
+            final Set<Role> keyRoles) {
         if (!isUserAllowed(ref, user, allowedUsers, keyRoles)) {
             LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
 
-    private <T> CompletableFuture<T> loadData(final HttpServletRequest httpRequest, Class<T> clazz) {
+    private <T> CompletableFuture<T> loadData(final HttpServletRequest httpRequest,
+            final Class<T> clazz) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return mapper.readValue(httpRequest.getInputStream(), clazz);
@@ -420,7 +446,13 @@ public class KeyResource {
                 throw new UncheckedIOException(e);
             }
         }, executor).thenApplyAsync(data -> {
-            validateData(data);
+            if (data == null) {
+                throw new WebApplicationException("entity is null", 422);
+            }
+            final Set<ConstraintViolation<T>> violations = validator.validate(data);
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException(violations);
+            }
             return data;
         }, executor);
     }
@@ -438,12 +470,15 @@ public class KeyResource {
         return false;
     }
 
-    private boolean isUserAllowed(final String ref, final User user, final Set<User> allowedUsers,
+    private boolean isUserAllowed(final String ref,
+            final User user,
+            final Set<User> allowedUsers,
             final Set<Role> roles) {
         return allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, roles) || addKeyAuthenticator.authenticate(user, ref);
     }
 
-    private String notEmpty(final HttpHeaders httpHeaders, final String headerName) {
+    private String notEmpty(final HttpHeaders httpHeaders,
+            final String headerName) {
         final String headers = httpHeaders.getHeaderString(headerName);
         if (headers == null || headers.isEmpty()) {
             throw new WebApplicationException("Missing " + headerName, Status.BAD_REQUEST);
@@ -451,7 +486,8 @@ public class KeyResource {
         return headers;
     }
 
-    private void extractResponseHeaders(final MetaData data, final HttpServletResponse response,
+    private void extractResponseHeaders(final MetaData data,
+            final HttpServletResponse response,
             final ResponseBuilder responseBuilder) {
         final List<HeaderPair> headers = data.getHeaders();
         if (headers != null) {

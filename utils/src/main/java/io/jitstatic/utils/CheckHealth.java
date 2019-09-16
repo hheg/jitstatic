@@ -22,6 +22,6 @@ package io.jitstatic.utils;
 
 public interface CheckHealth {
 
-	void checkHealth() throws Exception;
+	void checkHealth() throws Throwable;
 
 }

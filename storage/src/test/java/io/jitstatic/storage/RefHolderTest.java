@@ -75,7 +75,6 @@ public class RefHolderTest {
     private static final String REF = "refs/heads/master";
     private Source source;
     private HashService hashService = new HashService();
-    private ExecutorService repoWriter = Executors.newSingleThreadExecutor();
     private RefLockService clusterService = new LocalRefLockService();
 
     @BeforeEach
