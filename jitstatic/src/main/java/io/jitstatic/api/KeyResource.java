@@ -103,6 +103,7 @@ import io.jitstatic.utils.Pair;
 //TODO Remove this SpotBugs Error
 @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class KeyResource {
+    private static final User ANONYMOUS = new User("anonymous", null);
     private static final String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
     private static final String COMMA_REGEX = ",";
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
@@ -205,7 +206,7 @@ public class KeyResource {
                             final Set<User> allowedUsers = storageData.getUsers();
                             final Set<Role> keyRoles = storageData.getRead();
                             if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
-                                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.orElse(new User("anonymous", null)), data.getLeft(), ref);
+                                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, userHolder.orElse(ANONYMOUS), data.getLeft(), ref);
                                 return true;
                             }
                             if (!userHolder.isPresent()) {
