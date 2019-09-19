@@ -683,7 +683,6 @@ public class KeyResourceTest {
 
     @Test
     public void testModifyKetWithoutIFMatchtag() {
-        WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(eq("dog"), Mockito.isNull())).thenReturn(CompletableFuture.completedFuture(storeInfo));
@@ -691,7 +690,7 @@ public class KeyResourceTest {
                 .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
-        Response response = target.request()
+        Response response = RESOURCES.target("/storage/dog").request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "")
@@ -702,6 +701,7 @@ public class KeyResourceTest {
 
     @Test
     public void testGetMasterMetaKeyShouldFail() {
+        when(storage.getListForRef(any(), anyString())).thenReturn(CompletableFuture.completedFuture(List.of()));
         Response response = RESOURCES.target("/storage/dog/")
                 .request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get();
         assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -758,8 +758,13 @@ public class KeyResourceTest {
     public void testDeleteKeyNoUserKey() {
         Optional<StoreInfo> storeInfo = DATA.get("horse");
         when(storage.getKey(eq("horse"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        Response delete = RESOURCES.target("/storage/horse").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header("X-jitstatic-name", "user")
-                .header("X-jitstatic-mail", "mail").header("X-jitstatic-message", "msg").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).delete();
+        Response delete = RESOURCES.target("/storage/horse").request()
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header("X-jitstatic-name", "user")
+                .header("X-jitstatic-mail", "mail")
+                .header("X-jitstatic-message", "msg")
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .delete();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), delete.getStatus());
         delete.close();
     }
@@ -768,8 +773,12 @@ public class KeyResourceTest {
     public void testDeleteNoHeaderInfoSet() {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        Response delete = RESOURCES.target("/storage/dog").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON).header("X-jitstatic-mail", "mail")
-                .header("X-jitstatic-message", "msg").header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).delete();
+        Response delete = RESOURCES.target("/storage/dog").request()
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header("X-jitstatic-mail", "mail")
+                .header("X-jitstatic-message", "msg")
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .delete();
         assertEquals(Status.BAD_REQUEST.getStatusCode(), delete.getStatus());
         delete.close();
     }
@@ -780,9 +789,11 @@ public class KeyResourceTest {
         StoreInfo bookInfo = DATA.get("book").get();
         Pair<String, StoreInfo> dogPair = Pair.of("dog", dogInfo);
         Pair<String, StoreInfo> bookPair = Pair.of("book", bookInfo);
-        when(storage.getListForRef(any(), any())).thenReturn(List.of(dogPair, bookPair));
-        KeyDataWrapper list = RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get(KeyDataWrapper.class);
+        when(storage.getListForRef(any(), any())).thenReturn(CompletableFuture.completedFuture(List.of(dogPair, bookPair)));
+        KeyDataWrapper list = RESOURCES.target("/storage/").request()
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .get(KeyDataWrapper.class);
         assertNotNull(list);
         assertEquals(2, list.getResult().size());
         assertEquals(new KeyData(dogPair), list.getResult().get(0));
@@ -791,16 +802,17 @@ public class KeyResourceTest {
 
     @Test
     public void testEmptyList() {
-        when(storage.getListForRef(any(), any())).thenReturn(List.of());
-        assertEquals(Status.NOT_FOUND.getStatusCode(), RESOURCES.target("/storage/").request().header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED).get().getStatus());
+        when(storage.getListForRef(any(), any())).thenReturn(CompletableFuture.completedFuture(List.of()));
+        assertEquals(Status.NOT_FOUND.getStatusCode(), RESOURCES.target("/storage/").request()
+                .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
+                .get().getStatus());
 
     }
 
     @Test
     public void testisKeyUserAllowed() throws Exception {
-        when(storage.getUser(anyString(), anyString(), anyString()))
-                .thenReturn(new UserData(Set.of(new Role("role")), "p", null, null));
+        when(storage.getUser(anyString(), anyString(), anyString())).thenReturn(new UserData(Set.of(new Role("role")), "p", null, null));
         assertTrue(APIHelper.isKeyUserAllowed(storage, hashService, new User("u", "p"), REFS_HEADS_MASTER, Set.of(new Role("role"))));
     }
 

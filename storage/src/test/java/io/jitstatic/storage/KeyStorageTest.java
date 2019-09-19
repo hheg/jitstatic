@@ -601,9 +601,9 @@ public class KeyStorageTest {
             when(source.getSourceInfo(eq(dirkey), anyString())).thenReturn(si);
             when(source.getList(eq(key), anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<String, Boolean>> keys = List.of(Pair.of(key, false));
-            List<Pair<String, StoreInfo>> list = ks.getListForRef(keys, REF_HEADS_MASTER);
+            List<Pair<String, StoreInfo>> list = ks.getListForRef(keys, REF_HEADS_MASTER).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals(1, list.size());
-            list = ks.getListForRef(keys, REF_HEADS_MASTER);
+            list = ks.getListForRef(keys, REF_HEADS_MASTER).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals(1, list.size());
         }
     }
@@ -623,12 +623,12 @@ public class KeyStorageTest {
             when(source.getSourceInfo(eq(dirkey), anyString())).thenReturn(si);
             when(source.getList(eq(key), anyString(), Mockito.anyBoolean())).thenReturn(List.of(dirkey));
             List<Pair<List<Pair<String, Boolean>>, String>> keys = List.of(Pair.of(List.of(Pair.of(key, false)), REF_HEADS_MASTER));
-            List<Pair<List<Pair<String, StoreInfo>>, String>> list = ks.getList(keys);
+            List<Pair<List<Pair<String, StoreInfo>>, String>> list = ks.getList(keys).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals(1, list.size());
             Pair<List<Pair<String, StoreInfo>>, String> masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());
             assertFalse(masterResult.getLeft().isEmpty());
-            list = ks.getList(keys);
+            list = ks.getList(keys).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals(1, list.size());
             masterResult = list.get(0);
             assertEquals(REF_HEADS_MASTER, masterResult.getRight());
@@ -657,7 +657,8 @@ public class KeyStorageTest {
     public void testGetListForNoKey() throws RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq("refs/heads/master"))).thenReturn(null);
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
-            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master");
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
+                    .join();
             assertTrue(listForRef.isEmpty());
         }
     }
@@ -666,7 +667,8 @@ public class KeyStorageTest {
     public void testGetListNoRef() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new RefNotFoundException("test"));
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
-            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
+                    .join();
             assertTrue(listForRef.isEmpty());
         }
     }
@@ -675,7 +677,8 @@ public class KeyStorageTest {
     public void testGetListIOException() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new IOException("test"));
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
-            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master");
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
+                    .join();
             assertTrue(listForRef.isEmpty());
         }
     }
@@ -694,7 +697,7 @@ public class KeyStorageTest {
             when(si.getMetaDataVersion()).thenReturn(SHA_1_MD);
             when(si.isMetaDataSource()).thenReturn(false);
             when(source.getSourceInfo(eq("key"), eq("refs/heads/master"))).thenReturn(si);
-            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key", false)), REF_HEADS_MASTER);
+            List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key", false)), REF_HEADS_MASTER).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals(1, listForRef.size());
             assertEquals("key", listForRef.get(0).getKey());
         }

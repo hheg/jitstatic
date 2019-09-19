@@ -52,9 +52,9 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public CompletableFuture<Either<String, FailedToLock>> delete(String key, String ref, CommitMetaData commitMetaData);
 
-    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
+    public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
 
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
+    public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
     public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
 

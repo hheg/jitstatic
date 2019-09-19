@@ -199,7 +199,7 @@ public class KeyResource {
             final @Auth Optional<User> userHolder) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> storage.getListForRef(List.of(Pair.of(key, recursive)), ref), executor)
+        storage.getListForRef(List.of(Pair.of(key, recursive)), ref)
                 .thenApplyAsync(list -> list.stream()
                         .filter(data -> {
                             final MetaData storageData = data.getRight().getMetaData();
@@ -273,7 +273,8 @@ public class KeyResource {
                     }
                     return currentVersion;
                 }, executor)
-                .thenCombineAsync(dataLoader, (currentVersion, data) -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
+                .thenCombineAsync(dataLoader, (currentVersion,
+                        data) -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                                 .getMessage(), user.getName(), JITSTATIC_NOWHERE)), executor)
                 .thenComposeAsync(Function.identity())
                 .thenApplyAsync(result -> {
@@ -323,7 +324,8 @@ public class KeyResource {
             }
         }, executor)
                 .thenComposeAsync(ignore -> storage.getKey(key, ref).exceptionally(helper.keyExceptionHandler(Optional::empty)), executor)
-                .thenCombineAsync(dataLoader, (storeInfo, data) -> {
+                .thenCombineAsync(dataLoader, (storeInfo,
+                        data) -> {
                     if (storeInfo.isPresent()) {
                         throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
                     }

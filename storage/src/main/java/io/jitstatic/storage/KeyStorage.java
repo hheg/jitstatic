@@ -115,7 +115,8 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                 return Optional.<StoreInfo>empty();
             }
             return storeInfo;
-        }).handleAsync((o,t) -> unwrap(o, t, ref));
+        }).handleAsync((o,
+                t) -> unwrap(o, t, ref));
     }
 
     private Optional<StoreInfo> unwrap(final Optional<StoreInfo> o,
@@ -271,43 +272,75 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public List<Pair<String, StoreInfo>> getListForRef(final List<Pair<String, Boolean>> keyPairs,
+    public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(final List<Pair<String, Boolean>> keyPairs,
             final String ref) {
-        Objects.requireNonNull(keyPairs);
         final String finalRef = checkRef(ref);
-        return Tree.of(keyPairs).accept(Tree.EXTRACTOR)
-                .parallelStream()
+        final List<CompletableFuture<List<Pair<String, StoreInfo>>>> collected = Tree.of(Objects.requireNonNull(keyPairs)).accept(Tree.EXTRACTOR).stream()
                 .map(pair -> {
                     final String key = pair.getLeft();
                     if (key.endsWith("/")) {
-                        try {
-                            return source.getList(key, finalRef, pair.getRight()).parallelStream()
-                                    .map(k -> Pair.of(k, getKey(k, finalRef).join()))
-                                    .filter(Pair::isPresent)
-                                    .filter(pa -> pa.getRight().isPresent())
-                                    .map(pa -> Pair.of(pa.getLeft(), pa.getRight().get()))
-                                    .collect(Collectors.toList());
-                        } catch (final RefNotFoundException rnfe) {
-                            return List.<Pair<String, StoreInfo>>of();
-                        } catch (final IOException e) {
-                            consumeError(e);
-                            return List.<Pair<String, StoreInfo>>of();
-                        }
+                        return extractListAndMap(finalRef, pair, key);
                     }
                     return getKey(key, finalRef).thenApply(keyContent -> {
                         if (keyContent.isPresent()) {
                             return List.of(Pair.of(key, keyContent.get()));
                         }
                         return List.<Pair<String, StoreInfo>>of();
-                    }).join();
-                }).flatMap(List::stream).collect(Collectors.toList());
+                    });
+                }).collect(Collectors.toList());
+        return CompletableFuture.allOf(collected.toArray(new CompletableFuture[collected.size()]))
+                .thenApply(ignore -> collected.stream()
+                        .map(CompletableFuture::join)
+                        .flatMap(List::stream)
+                        .collect(Collectors.toList()));
+    }
+
+    private CompletableFuture<Pair<String, Optional<StoreInfo>>> getKeyPair(final String key,
+            final String ref) {
+        final CompletableFuture<Pair<String, Optional<StoreInfo>>> cf = new CompletableFuture<>();
+        getKey(key, ref).thenComposeAsync(o -> {
+            cf.complete(Pair.of(key, o));
+            return cf;
+        });
+        return cf;
+    }
+
+    private CompletableFuture<List<Pair<String, StoreInfo>>> extractListAndMap(final String finalRef,
+            Pair<String, Boolean> pair,
+            final String key) {
+        return CompletableFuture.supplyAsync(() -> extractList(key, finalRef, pair))
+                .thenApplyAsync(l -> l.stream().map(k -> getKeyPair(k, finalRef)).collect(Collectors.toList()))
+                .thenComposeAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
+                        .thenApplyAsync(ignore -> futures))
+                .thenApplyAsync(futures -> {
+                    return futures.stream().map(CompletableFuture::join)
+                            .filter(p -> p.getRight().isPresent())
+                            .map(p -> Pair.of(p.getLeft(), p.getRight().get()))
+                            .collect(Collectors.toList());
+                });
+
+    }
+
+    private List<String> extractList(final String key,
+            final String finalRef,
+            final Pair<String, Boolean> pair) {
+        try {
+            return source.getList(key, finalRef, pair.getRight());
+        } catch (final RefNotFoundException rnfe) {
+            // Ignore
+        } catch (final IOException e) {
+            consumeError(e);
+        }
+        return List.of();
     }
 
     @Override
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input) {
-        return input.stream()
-                .map(p -> Pair.of(getListForRef(p.getLeft(), p.getRight()), p.getRight()))
-                .collect(Collectors.toList());
+    public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input) {
+        return CompletableFuture.supplyAsync(() -> input.stream()
+                .map(p -> getListForRef(p.getLeft(), p.getRight()).thenApply(l -> Pair.of(l, p.getRight()))).collect(Collectors.toList()))
+                .thenApply(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
+                        .thenApply(ignore -> futures.stream().map(CompletableFuture::join).collect(Collectors.toList())))
+                .thenCompose(cf -> cf);
     }
 
     @Override
