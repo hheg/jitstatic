@@ -31,6 +31,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.concurrent.ExecutorService;
+
 import javax.servlet.FilterRegistration.Dynamic;
 import javax.validation.Validator;
 
@@ -87,6 +89,8 @@ public class JitstaticApplicationTest {
     private Validator validator;
     @Mock
     private ObjectMapper mapper;
+    @Mock
+    private ExecutorService executor;
 
     private HashService hashService = new HashService();
     private final JitstaticApplication app = new JitstaticApplication();
@@ -114,7 +118,7 @@ public class JitstaticApplicationTest {
     @Test
     public void buildsAMapResource() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any())).thenReturn(source);
+        when(hostedFactory.build(any(), any(), executor)).thenReturn(source);
         app.run(config, environment);
         verify(jersey).register(isA(KeyResource.class));
     }
@@ -122,7 +126,7 @@ public class JitstaticApplicationTest {
     @Test
     public void buildsAstorageHealthCheck() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any())).thenReturn(source);
+        when(hostedFactory.build(any(), any(), executor)).thenReturn(source);
         app.run(config, environment);
         verify(hcr).register(eq("storagechecker"), isA(HealthCheck.class));
     }
@@ -130,7 +134,7 @@ public class JitstaticApplicationTest {
     @Test
     public void testRemoteManagerLifeCycleManagerIsRegistered() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any())).thenReturn(source);
+        when(hostedFactory.build(any(), any(), executor)).thenReturn(source);
         app.run(config, environment);
         verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
     }
@@ -138,7 +142,7 @@ public class JitstaticApplicationTest {
     @Test
     public void testStorageLifeCycleManagerIsRegisterd() throws Exception {
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any())).thenReturn(source);
+        when(hostedFactory.build(any(), any(), executor)).thenReturn(source);
         app.run(config, environment);
         verify(lifecycle, times(2)).manage(isA(AutoCloseableLifeCycleManager.class));
     }
@@ -147,7 +151,7 @@ public class JitstaticApplicationTest {
     public void testResourcesAreGettingClosed() throws Exception {
         assertThrows(RuntimeException.class, () -> {
             config.setHostedFactory(hostedFactory);
-            when(hostedFactory.build(any(), any())).thenReturn(source);
+            when(hostedFactory.build(any(), any(), executor)).thenReturn(source);
             Mockito.doThrow(new RuntimeException()).when(jersey).register(any(KeyResource.class));
             try {
                 app.run(config, environment);
@@ -165,7 +169,7 @@ public class JitstaticApplicationTest {
         assertSame(r, assertThrows(TestException.class, () -> {
             HostedFactory hf = mock(HostedFactory.class);
             config.setHostedFactory(hf);
-            doThrow(r).when(hf).build(environment, JitStaticConstants.GIT_REALM);
+            doThrow(r).when(hf).build(environment, JitStaticConstants.GIT_REALM, executor);
             app.run(config, environment);
         }));
     }
@@ -174,7 +178,7 @@ public class JitstaticApplicationTest {
     public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
+        when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM, executor)).thenReturn(source);
         when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, null, null)).thenReturn(storage);
         app.run(config, environment);
     }
@@ -187,7 +191,7 @@ public class JitstaticApplicationTest {
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
             when(config.getKeyAdminAuthenticator(storage, hashService)).thenThrow(new TestException("Test exception3"));
-            when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM)).thenReturn(source);
+            when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM, executor)).thenReturn(source);
             when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, null, null)).thenReturn(storage);
             app.run(config, environment);
         });

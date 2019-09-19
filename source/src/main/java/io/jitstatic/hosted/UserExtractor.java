@@ -160,7 +160,6 @@ public class UserExtractor {
 
     private Pair<Set<Ref>, Map<String, List<Pair<FileObjectIdStore, InputStreamHolder>>>> splitIntoRealms(
             final Pair<Set<Ref>, Pair<List<Pair<FileObjectIdStore, InputStreamHolder>>, RepositoryDataError>> iterationResult) {
-
         final Map<String, List<Pair<FileObjectIdStore, InputStreamHolder>>> realms = new HashMap<>();
         final Pair<List<Pair<FileObjectIdStore, InputStreamHolder>>, RepositoryDataError> data = iterationResult.getRight();
         final RepositoryDataError rde = data.getRight();

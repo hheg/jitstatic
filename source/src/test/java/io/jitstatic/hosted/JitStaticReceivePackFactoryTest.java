@@ -32,6 +32,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -60,24 +63,28 @@ public class JitStaticReceivePackFactoryTest {
     private final ErrorReporter reporter = new ErrorReporter();
     private static final String defaultRef = "refs/heads/master";
     private HttpServletRequest req;
+    private ExecutorService service;
 
     @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
         git = Git.init().setDirectory(getFolder().toFile()).call();
         req = mock(HttpServletRequest.class);
+        service = Executors.newSingleThreadExecutor();
     }
 
     @AfterEach
-    public void tearDown() {
+    public void tearDown() throws InterruptedException {
+        service.shutdown();
         git.close();
+        service.awaitTermination(10, TimeUnit.SECONDS);
     }
 
     @Test
     public void testJitStaticReceivePackFactory() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
         RepoInserter inserter = mock(RepoInserter.class);
-        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()), inserter);
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(), new UserExtractor(git
+                .getRepository()), inserter, service);
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);
         ReceivePack create = jsrpf.create(req, git.getRepository());
@@ -94,8 +101,8 @@ public class JitStaticReceivePackFactoryTest {
         String host = "remotehost";
         RepoInserter inserter = mock(RepoInserter.class);
         assertThat(assertThrows(ServiceNotAuthorizedException.class, () -> {
-            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                    new UserExtractor(git.getRepository()), inserter);
+            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(), new UserExtractor(git
+                    .getRepository()), inserter, service);
             when(req.getRemoteHost()).thenReturn(host);
             jsrpf.create(req, git.getRepository());
         }).getLocalizedMessage(), CoreMatchers.containsString("Unauthorized"));
@@ -106,8 +113,8 @@ public class JitStaticReceivePackFactoryTest {
         String user = "user", host = "remotehost";
         RepoInserter inserter = mock(RepoInserter.class);
         assertThat(assertThrows(ServiceNotEnabledException.class, () -> {
-            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                    new UserExtractor(git.getRepository()), inserter);
+            JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(), new UserExtractor(git
+                    .getRepository()), inserter, service);
             git.getRepository().getConfig().setString("http", null, "receivepack", "false");
             when(req.getRemoteUser()).thenReturn(user);
             when(req.getRemoteHost()).thenReturn(host);
@@ -119,8 +126,8 @@ public class JitStaticReceivePackFactoryTest {
     public void testJitStaticReceivePackFactoryReceivePackTurnedOn() throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         String user = "user", host = "remotehost";
         RepoInserter inserter = mock(RepoInserter.class);
-        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()), inserter);
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(), new UserExtractor(git
+                .getRepository()), inserter, service);
         git.getRepository().getConfig().setString("http", null, "receivepack", "true");
         when(req.getRemoteUser()).thenReturn(user);
         when(req.getRemoteHost()).thenReturn(host);
@@ -144,8 +151,8 @@ public class JitStaticReceivePackFactoryTest {
         when(head.getObjectId()).thenReturn(oid);
         when(req.getRemoteUser()).thenReturn(user);
 
-        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(),
-                new UserExtractor(git.getRepository()), inserter);
+        JitStaticReceivePackFactory jsrpf = new JitStaticReceivePackFactory(reporter, defaultRef, new RefLockHolderManager(), new UserExtractor(git
+                .getRepository()), inserter, service);
 
         ReceivePack up = jsrpf.create(req, git.getRepository());
         Map<String, Ref> map = new HashMap<>();

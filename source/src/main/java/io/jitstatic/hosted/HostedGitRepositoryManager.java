@@ -97,7 +97,7 @@ public class HostedGitRepositoryManager implements Source {
     private final ExecutorService uploadPackExecutor;
     private final RepoInserter repoInserter;
 
-    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, final ErrorReporter errorReporter)
+    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, ExecutorService repoWriter, final ErrorReporter errorReporter)
             throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
@@ -145,16 +145,16 @@ public class HostedGitRepositoryManager implements Source {
         this.updater = new SourceUpdater(repositoryUpdater);
         this.refLockHolderManager = new RefLockHolderManager();
         this.repoInserter = new RepoInserter(bareRepository);
-        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor, repoInserter);
+        this.receivePackFactory = new JitStaticReceivePackFactory(errorReporter, defaultRef, refLockHolderManager, userExtractor, repoInserter, repoWriter);
         this.uploadPackFactory = new JitStaticUploadPackFactory(uploadPackExecutor, refLockHolderManager, defaultRef);
         this.defaultRef = defaultRef;
         this.errorReporter = errorReporter;
         this.userUpdater = new UserUpdater(repositoryUpdater);
     }
 
-    public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef)
+    public HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, ExecutorService repoWriter)
             throws CorruptedSourceException, IOException {
-        this(workingDirectory, endPointName, defaultRef, ErrorReporter.INSTANCE);
+        this(workingDirectory, endPointName, defaultRef, repoWriter, ErrorReporter.INSTANCE);
     }
 
     private static List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkForUserErrors(UserExtractor userExtractor) {

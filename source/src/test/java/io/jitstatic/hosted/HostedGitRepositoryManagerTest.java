@@ -59,6 +59,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.IOUtils;
 import org.awaitility.Awaitility;
@@ -83,6 +86,7 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.hamcrest.CoreMatchers;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -121,19 +125,28 @@ public class HostedGitRepositoryManagerTest {
     private Path tempFile;
     private Path tempDir;
 
+    private ExecutorService service;
+
     @BeforeEach
     public void setup() throws IOException {
         tempDir = getFolder();
         tempFile = tmpFolder.createTemporaryFile();
+        service = Executors.newSingleThreadExecutor();
     }
 
+    @AfterEach
+    public void tearDown() throws InterruptedException {
+        service.shutdown();
+        service.awaitTermination(10, TimeUnit.SECONDS);
+    }
+    
     Path getFolder() throws IOException {
         return tmpFolder.createTemporaryDirectory().toPath();
     }
 
     @Test
     public void testCreatedBareDirectory() throws CorruptedSourceException, IOException {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             assertTrue(Files.exists(Paths.get(grm.repositoryURI()).resolve(Constants.HEAD)));
         }
     }
@@ -141,7 +154,7 @@ public class HostedGitRepositoryManagerTest {
     @Test()
     public void testForDirectory() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(IllegalArgumentException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempFile, ENDPOINT, REF_HEADS_MASTER);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempFile, ENDPOINT, REF_HEADS_MASTER, service);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString(String.format("Path %s is a file", tempFile)));
     }
@@ -151,7 +164,7 @@ public class HostedGitRepositoryManagerTest {
         assertThat(assertThrows(IllegalArgumentException.class, () -> {
             Set<PosixFilePermission> perms = PosixFilePermissions.fromString("r-xr-x---");
             Files.setPosixFilePermissions(tempDir, perms);
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString(String.format("Path %s is not writeable", tempDir)));
     }
@@ -159,7 +172,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testForNullEndPoint() throws CorruptedSourceException, IOException {
         assertThrows(NullPointerException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, null, REF_HEADS_MASTER);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, null, REF_HEADS_MASTER, service);) {
             }
         });
     }
@@ -167,7 +180,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testForEmptyEndPoint() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(IllegalArgumentException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "", REF_HEADS_MASTER);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "", REF_HEADS_MASTER, service);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Parameter endPointName cannot be empty"));
     }
@@ -175,7 +188,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testForEmptyDefaultBranch() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(IllegalArgumentException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", "");) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", "", service);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("defaultBranch cannot be empty"));
     }
@@ -183,14 +196,14 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testForNullDefaultBranch() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(NullPointerException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", null);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, "endpoint", null, service);) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("defaultBranch cannot be null"));
     }
 
     @Test
     public void testGetRepositoryResolver() throws ServiceNotAuthorizedException, ServiceNotEnabledException, CorruptedSourceException, IOException {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             Repository open = grm.getRepositoryResolver().open(null, ENDPOINT);
             assertNotNull(open);
         }
@@ -199,7 +212,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testNotFoundRepositoryResolver() throws ServiceNotAuthorizedException, ServiceNotEnabledException, CorruptedSourceException, IOException {
         assertThrows(RepositoryNotFoundException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
                 grm.getRepositoryResolver().open(null, "something");
             }
         });
@@ -207,16 +220,16 @@ public class HostedGitRepositoryManagerTest {
 
     @Test
     public void testMountingOnExistingGitRepository() throws CorruptedSourceException, IOException {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
         }
 
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
         }
     }
 
     @Test
     public void deleteDefaultRef() throws Exception {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
             assertThrows(IllegalArgumentException.class, () -> grm.deleteRef(REF_HEADS_MASTER));
         }
     }
@@ -224,7 +237,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testGetTagSourceStream() throws CorruptedSourceException, IOException, NoFilepatternException, GitAPIException {
         File workFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setDirectory(workFolder).setURI(tempDir.toUri().toString()).call();) {
             Path file = workFolder.toPath().resolve("other");
             Path mfile = workFolder.toPath().resolve("other" + METADATA);
@@ -244,7 +257,7 @@ public class HostedGitRepositoryManagerTest {
     public void testGetSourceStreamNotValid() throws CorruptedSourceException, IOException, RefNotFoundException {
         String ref = "refs/somethingelse/ref";
         assertThat(assertThrows(RefNotFoundException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
                 grm.getSourceInfo("key", ref);
             }
         }).getLocalizedMessage(), CoreMatchers.containsString(ref));
@@ -255,7 +268,7 @@ public class HostedGitRepositoryManagerTest {
         final String wrongBranch = "wrongbranch";
         final File tmpGit = getFolder().toFile();
         assertThat(assertThrows(RepositoryIsMissingIntendedBranch.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
                 // should create a bare repo with a branch other with a store file with content
             }
             try (Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(tmpGit).call();) {
@@ -265,7 +278,7 @@ public class HostedGitRepositoryManagerTest {
                 git.branchDelete().setBranchNames("master").call();
                 verifyOkPush(git.push().call(), "refs/heads/wrongbranch");
             }
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString(REF_HEADS_MASTER));
 
@@ -274,7 +287,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testInitializingValidRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException, CorruptedSourceException {
         File base = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setDirectory(base).setURI(tempDir.toUri().toString()).call()) {
         }
     }
@@ -282,7 +295,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testPushingANonJSONFormattedStorageFile() throws Exception {
         assertThat(assertThrows(CorruptedSourceException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
                 final File localGitDir = getFolder().toFile();
                 try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {
                     final Path file = localGitDir.toPath().resolve(STORE);
@@ -295,14 +308,14 @@ public class HostedGitRepositoryManagerTest {
                     verifyOkPush(git.push().call());
                 }
             }
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Error in branch " + REF_HEADS_MASTER));
     }
 
     @Test
     public void testClosedRepositoryAndInputStream() throws Exception {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             final File localGitDir = getFolder().toFile();
             try (Git git = Git.cloneRepository().setURI(grm.repositoryURI().toString()).setDirectory(localGitDir).call()) {
                 addFilesAndPush(localGitDir, git);
@@ -319,14 +332,14 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testListeners() throws CorruptedSourceException, IOException {
         ReloadRefEventListener svl = mock(ReloadRefEventListener.class);
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             grm.addListener(svl, ReloadRefEventListener.class);
         }
     }
 
     @Test
     public void testCheckHealth() throws CorruptedSourceException, IOException {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
             grm.checkHealth();
         }
     }
@@ -336,7 +349,7 @@ public class HostedGitRepositoryManagerTest {
         NullPointerException npe = new NullPointerException();
         assertSame(npe, assertThrows(RuntimeException.class, () -> {
             ErrorReporter reporter = new ErrorReporter();
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, reporter);) {
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, null, reporter);) {
                 reporter.setFault(npe);
                 grm.checkHealth();
             }
@@ -347,7 +360,7 @@ public class HostedGitRepositoryManagerTest {
     public void testModifyKey() throws Exception {
         CommitMetaData cmd = new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE);
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call();) {
 
             addFilesAndPush(gitFolder, git);
@@ -375,7 +388,7 @@ public class HostedGitRepositoryManagerTest {
         CommitMetaData cmd1 = new CommitMetaData("user", "mail", "msg1", "Test", JITSTATIC_NOWHERE);
         CommitMetaData cmd2 = new CommitMetaData("user", "mail", "msg2", "Test", JITSTATIC_NOWHERE);
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call();) {
 
             addFilesAndPush(gitFolder, git);
@@ -408,9 +421,8 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testModifyTag() throws CorruptedSourceException, IOException {
         assertThat(assertThrows(UnsupportedOperationException.class, () -> {
-            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER)) {
-                grm.modifyKey("key", "refs/tags/tag", toProvider(new byte[] { 1, 2, 3, 4 }),
-                        new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+            try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service)) {
+                grm.modifyKey("key", "refs/tags/tag", toProvider(new byte[] { 1, 2, 3, 4 }), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Tags cannot be modified"));
     }
@@ -418,12 +430,11 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testAddKey() throws Exception {
         File localGitDir = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call();) {
             addFilesAndPush(localGitDir, git);
-            var addKey = grm.addKey("key", REF_HEADS_MASTER, toProvider(new byte[] { 1 }),
-                    new MetaData(new HashSet<>(), null, false, false, List.of(), null, null),
-                    new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+            var addKey = grm.addKey("key", REF_HEADS_MASTER, toProvider(new byte[] { 1 }), new MetaData(new HashSet<>(), null, false, false, List
+                    .of(), null, null), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String version = addKey.getLeft().getRight();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -441,7 +452,7 @@ public class HostedGitRepositoryManagerTest {
     public void testModifyMetaData() throws Exception {
         CommitMetaData cmd = new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE);
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call();) {
             addFilesAndPush(gitFolder, git);
             SourceInfo firstSourceInfo = grm.getSourceInfo(STORE, null);
@@ -467,17 +478,16 @@ public class HostedGitRepositoryManagerTest {
 
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);) {
-            assertThrows(UnsupportedOperationException.class,
-                    () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List.of(), null, null), null, STORE, "refs/tags/tag",
-                            new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)));
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
+            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List
+                    .of(), null, null), null, STORE, "refs/tags/tag", new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)));
         }
     }
 
     @Test
     public void testDelete() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
             SourceInfo sourceInfo = grm.getSourceInfo(STORE, null);
@@ -491,7 +501,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testRootMasterMetaData() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             final Path file = gitFolder.toPath().resolve(STORE);
             final Path mfile = gitFolder.toPath().resolve(METADATA);
@@ -510,7 +520,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testMasterMetaData() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             final Path file = gitFolder.toPath().resolve("base/" + STORE);
             final Path mfile = gitFolder.toPath().resolve("base/" + METADATA);
@@ -531,7 +541,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testDeleteRootMasterMetaData() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             final Path file = gitFolder.toPath().resolve(STORE);
             final Path mfile = gitFolder.toPath().resolve(METADATA);
@@ -556,7 +566,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testDeleteMasterMetaData() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             final String base = "base/";
             final Path file = gitFolder.toPath().resolve(base + STORE);
@@ -583,7 +593,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testGetSourceInfoWithEmptyKey() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
             assertThrows(IllegalArgumentException.class, () -> grm.getSourceInfo("", null));
@@ -596,7 +606,7 @@ public class HostedGitRepositoryManagerTest {
     public void testCreateAndDeleteRef() throws Exception {
         File gitFolder = getFolder().toFile();
         String branch = "refs/heads/test";
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
             Collection<Ref> branches = git.lsRemote().call();
@@ -613,7 +623,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testGetList() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             Path dir = gitFolder.toPath().resolve("dir");
             dir.toFile().mkdirs();
@@ -629,7 +639,7 @@ public class HostedGitRepositoryManagerTest {
     @Test
     public void testGetListFromNotExistingBranch() throws Exception {
         File gitFolder = getFolder().toFile();
-        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER);
+        try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(gitFolder).call()) {
             addFilesAndPush(gitFolder, git);
             assertThrows(RefNotFoundException.class, () -> grm.getList("store/", "refs/heads/notexisting", false));
@@ -640,7 +650,7 @@ public class HostedGitRepositoryManagerTest {
     public void testHostedGitRepositoryWithUsers() throws Exception {
         File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
 
         }
     }
@@ -650,7 +660,7 @@ public class HostedGitRepositoryManagerTest {
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
         File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             Pair<String, UserData> userDataHolder = hgrm.getUser(".users/git/gituser", REF_HEADS_MASTER);
             assertTrue(userDataHolder.isPresent());
             assertEquals("1234", userDataHolder.getRight().getBasicPassword());
@@ -662,7 +672,7 @@ public class HostedGitRepositoryManagerTest {
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
         File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             assertFalse(hgrm.getUser(".users/git/kit", REF_HEADS_MASTER).isPresent());
         }
     }
@@ -672,7 +682,7 @@ public class HostedGitRepositoryManagerTest {
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
         File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             assertNotNull(hgrm.addUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234", null, null)));
         }
     }
@@ -682,7 +692,7 @@ public class HostedGitRepositoryManagerTest {
             throws IOException, CorruptedSourceException, InvalidRemoteException, TransportException, NoFilepatternException, GitAPIException {
         File base = createTempDirectory();
         setupGitRepoWithUsers(base);
-        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hgrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             assertNotNull(hgrm.updateUser(".users/git/kit", REF_HEADS_MASTER, "doc", new UserData(Set.of(new Role("role")), "1234", null, null)));
         }
     }
@@ -698,7 +708,8 @@ public class HostedGitRepositoryManagerTest {
             Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
             Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, CREATE_NEW);
             commit(workingGit);
-            System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
+            System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
+                    .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
         }
     }
 
@@ -715,7 +726,8 @@ public class HostedGitRepositoryManagerTest {
             write(corruptuser, new UserData(Set.of(new Role("role")), null, null, null));
             commit(workingGit);
         }
-        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
+        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
+                .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
     }
 
     @Test
@@ -731,7 +743,8 @@ public class HostedGitRepositoryManagerTest {
             write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", null));
             commit(workingGit);
         }
-        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)));
+        System.out.println(assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
+                .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
     }
 
     @Test
@@ -747,7 +760,7 @@ public class HostedGitRepositoryManagerTest {
             write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", "hash"));
             commit(workingGit);
         }
-        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
         }
     }
 
@@ -764,7 +777,7 @@ public class HostedGitRepositoryManagerTest {
             write(corruptuser, new UserData(Set.of(new Role("role")), "pass", "salt", "hash"));
             commit(workingGit);
         }
-        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
         }
     }
 
@@ -778,7 +791,7 @@ public class HostedGitRepositoryManagerTest {
             workingGit.checkout().setCreateBranch(true).setName("other").setUpstreamMode(SetupUpstreamMode.TRACK).call();
             commit(workingGit);
         }
-        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER)) {
+        try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             Repository repository = hrm.getRepositoryResolver().open(null, ENDPOINT);
             Map<String, String> refs = new ConcurrentHashMap<>();
             repository.getListenerList().addListener(AddRefEventListener.class, e -> {
@@ -837,7 +850,8 @@ public class HostedGitRepositoryManagerTest {
         }
     }
 
-    private void addFilesAndPush(final File localGitDir, Git git) throws Exception {
+    private void addFilesAndPush(final File localGitDir,
+            Git git) throws Exception {
         final Path file = localGitDir.toPath().resolve(STORE);
         final Path mfile = localGitDir.toPath().resolve(STORE + METADATA);
         Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
@@ -848,7 +862,8 @@ public class HostedGitRepositoryManagerTest {
         verifyOkPush(git.push().call());
     }
 
-    public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {
+    public void write(Path userPath,
+            UserData userData) throws IOException, JsonProcessingException {
         Files.write(userPath, MAPPER.writeValueAsBytes(userData), CREATE);
     }
 
@@ -872,13 +887,15 @@ public class HostedGitRepositoryManagerTest {
         verifyOkPush(iterable, REF_HEADS_MASTER);
     }
 
-    private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+    private void verifyOkPush(Iterable<PushResult> iterable,
+            String branch) {
         PushResult pushResult = iterable.iterator().next();
         RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
         assertEquals(Status.OK, remoteUpdate.getStatus());
     }
 
-    private RevCommit getRevCommit(Repository repository, String targetRef) throws IOException {
+    private RevCommit getRevCommit(Repository repository,
+            String targetRef) throws IOException {
         try (RevWalk revWalk = new RevWalk(repository)) {
             revWalk.sort(RevSort.COMMIT_TIME_DESC);
             Ref actualTargetRef = repository.getRefDatabase().exactRef(targetRef);
