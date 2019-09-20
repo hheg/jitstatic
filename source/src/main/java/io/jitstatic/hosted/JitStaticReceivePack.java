@@ -123,6 +123,9 @@ public class JitStaticReceivePack extends ReceivePack {
             final List<Pair<ReceiveCommand, ReceiveCommand>> indexPairs) {
         try {
             batchUpdate(updating, commandsToBeExecuted);
+            if(commandsToBeExecuted.stream().anyMatch(rc -> rc.getResult() != Result.OK)) {
+                throw new IOException("Error applying commands");
+            }
             commitCommands(checkBranches(updating, commandsToBeExecuted, indexPairs).stream().filter(p -> {
                 if (p.isPresent()) {
                     return p.getRight().getResult() == Result.OK;
@@ -131,8 +134,11 @@ public class JitStaticReceivePack extends ReceivePack {
             }).collect(Collectors.toList()), updating);
         } catch (IOException err) {
             for (Pair<ReceiveCommand, ReceiveCommand> cmd : indexPairs) {
-                ReceiveCommand rc = cmd.getLeft();
-                rc.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(JGitText.get().lockError, err.getMessage()));
+                final ReceiveCommand rc = cmd.getLeft();
+                final Result result = rc.getResult();
+                if (result == Result.NOT_ATTEMPTED || result == Result.OK) {
+                    rc.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(JGitText.get().lockError, err.getMessage()));    
+                }
             }
         }
     }
