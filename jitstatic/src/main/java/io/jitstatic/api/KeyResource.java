@@ -23,7 +23,6 @@ package io.jitstatic.api;
 import static io.jitstatic.JitStaticConstants.DECLAREDHEADERS;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MAIL;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_MESSAGE;
 import static io.jitstatic.JitStaticConstants.X_JITSTATIC_NAME;
@@ -275,7 +274,7 @@ public class KeyResource {
                 }, executor)
                 .thenCombineAsync(dataLoader, (currentVersion,
                         data) -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
-                                .getMessage(), user.getName(), JITSTATIC_NOWHERE)), executor)
+                                .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest))), executor)
                 .thenComposeAsync(Function.identity())
                 .thenApplyAsync(result -> {
                     if (result == null) {
@@ -330,7 +329,7 @@ public class KeyResource {
                         throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
                     }
                     return storage.addKey(key, ref, data.getData(), data
-                            .getMetaData(), new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), JITSTATIC_NOWHERE));
+                            .getMetaData(), new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
                 }, executor)
                 .thenComposeAsync(s -> s, executor)
                 .thenApplyAsync(version -> {
@@ -350,6 +349,7 @@ public class KeyResource {
             final @PathParam("key") String key,
             final @QueryParam("ref") String askedRef,
             final @Auth Optional<User> userHolder,
+            final @Context HttpServletRequest httpRequest,
             final @Context HttpHeaders headers) {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkValidRef(askedRef);
@@ -371,7 +371,7 @@ public class KeyResource {
                         LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
                         throw new WebApplicationException(Status.FORBIDDEN);
                     }
-                    return storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), JITSTATIC_NOWHERE));
+                    return storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
                 }, executor)
                 .thenCompose(c -> c)
                 .thenApplyAsync(ignore -> {

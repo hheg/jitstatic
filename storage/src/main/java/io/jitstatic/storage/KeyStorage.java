@@ -126,7 +126,11 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
             if (t instanceof CompletionException) {
                 return this.unwrap(o, t.getCause(), ref);
             } else if (t instanceof LoadException) {
-                LOG.warn("Trying to access non existent ref {}", ref, t);
+                if (t.getCause() instanceof RefNotFoundException) {
+                    LOG.warn("Trying to access non existent ref {}", ref);
+                } else {
+                    LOG.error("Unknown Load error {}", t);
+                }
             } else if (t instanceof WrappingAPIException) {
                 throw (WrappingAPIException) t;
             } else {
@@ -312,13 +316,11 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                 .thenApplyAsync(l -> l.stream().map(k -> getKeyPair(k, finalRef)).collect(Collectors.toList()))
                 .thenComposeAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
                         .thenApplyAsync(ignore -> futures))
-                .thenApplyAsync(futures -> {
-                    return futures.stream().map(CompletableFuture::join)
-                            .filter(p -> p.getRight().isPresent())
-                            .map(p -> Pair.of(p.getLeft(), p.getRight().get()))
-                            .collect(Collectors.toList());
-                });
-
+                .thenApplyAsync(futures -> futures.stream()
+                        .map(CompletableFuture::join)
+                        .filter(p -> p.getRight().isPresent())
+                        .map(p -> Pair.of(p.getLeft(), p.getRight().get()))
+                        .collect(Collectors.toList()));
     }
 
     private List<String> extractList(final String key,
@@ -337,9 +339,13 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     @Override
     public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(final List<Pair<List<Pair<String, Boolean>>, String>> input) {
         return CompletableFuture.supplyAsync(() -> input.stream()
-                .map(p -> getListForRef(p.getLeft(), p.getRight()).thenApply(l -> Pair.of(l, p.getRight()))).collect(Collectors.toList()))
-                .thenApply(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
-                        .thenApply(ignore -> futures.stream().map(CompletableFuture::join).collect(Collectors.toList())))
+                .map(p -> getListForRef(p.getLeft(), p.getRight())
+                        .thenApply(l -> Pair.of(l, p.getRight())))
+                .collect(Collectors.toList()))
+                .thenApplyAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
+                        .thenApplyAsync(ignore -> futures.stream()
+                                .map(CompletableFuture::join)
+                                .collect(Collectors.toList())))
                 .thenCompose(cf -> cf);
     }
 
@@ -356,7 +362,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     @Override
     public Pair<String, UserData> getUserData(final String key,
-            String ref,
+            final String ref,
             final String realm) throws RefNotFoundException {
         final RefHolder refHolder = getRefHolder(checkRef(ref));
         try {
@@ -375,13 +381,12 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     @Override
     public CompletableFuture<Either<String, FailedToLock>> updateUser(final String key,
-            String ref,
+            final String ref,
             final String realm,
             final String creatorUserName,
             final UserData data,
             final String version) {
-        ref = checkRef(ref);
-        final RefHolder refHolder = cache.peek(ref);
+        final RefHolder refHolder = cache.peek(checkRef(ref));
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
@@ -390,7 +395,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     @Override
     public CompletableFuture<String> addUser(final String key,
-            String ref,
+            final String ref,
             final String realm,
             final String creatorUserName,
             final UserData data) {

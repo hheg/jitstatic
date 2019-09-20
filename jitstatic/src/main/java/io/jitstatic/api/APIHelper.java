@@ -29,6 +29,7 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.HttpHeaders;
@@ -160,8 +161,9 @@ class APIHelper {
     <T> Function<Throwable, T> keyExceptionHandler(final Supplier<T> alternative) {
         return t -> unwrap(t, alternative);
     }
-    
-    private <T> T unwrap(final Throwable t, final Supplier<T> alternative) {
+
+    private <T> T unwrap(final Throwable t,
+            final Supplier<T> alternative) {
         if (t instanceof CompletionException) {
             return unwrap(t.getCause(), alternative);
         } else if (t instanceof WrappingAPIException) {
@@ -244,4 +246,10 @@ class APIHelper {
             return false;
         }
     }
+
+    public static String compileUserOrigin(final User user,
+            final HttpServletRequest req) {
+        return user.getName() + "@" + req.getRemoteHost();
+    }
+
 }

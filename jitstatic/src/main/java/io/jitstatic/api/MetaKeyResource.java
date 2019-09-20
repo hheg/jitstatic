@@ -1,9 +1,5 @@
 package io.jitstatic.api;
 
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
-
 /*-
  * #%L
  * jitstatic
@@ -24,6 +20,9 @@ import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
+
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -142,6 +142,7 @@ public class MetaKeyResource {
             final @Auth Optional<User> userHolder,
             final @Valid @NotNull ModifyMetaKeyData data,
             final @Context Request request,
+            final @Context HttpServletRequest httpRequest,
             final @Context HttpHeaders headers) {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
@@ -166,7 +167,7 @@ public class MetaKeyResource {
                     }
 
                     return storage.putMetaData(key, ref, data.getMetaData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
-                            .getMessage(), user.getName(), JITSTATIC_NOWHERE));
+                            .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
                 }, executor)
                 .thenComposeAsync(c -> c, executor)
                 .thenApplyAsync(result -> {
