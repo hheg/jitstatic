@@ -147,7 +147,7 @@ public class LoadTesterRunner {
                 workingFolder = dp.getFolderFile();
                 try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(dp.getGitAddress())
                         .setCredentialsProvider(getCredentials(processes.get(0).getUser(), processes.get(0).getPassword())).call()) {
-                    LOG.info("{}", dp.getGitAddress());
+                    LOG.info("Checking repository {}...", dp.getGitAddress());
                     return Stream.of(testData.branches).map(branch -> {
                         try {
                             checkoutBranch(branch, git);
