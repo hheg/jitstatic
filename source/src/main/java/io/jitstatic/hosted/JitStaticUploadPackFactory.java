@@ -94,7 +94,7 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
                                 final Throwable wnve = secondCause.getCause();
                                 if (wnve instanceof WantNotValidException) {
                                     LOG.info("{}, aborting...", wnve.getMessage());
-                                } else if (secondCause instanceof IOException) {
+                                } else {
                                     throw (IOException) secondCause;
                                 }
                             } else {
