@@ -45,6 +45,8 @@ import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.jitstatic.utils.ShouldNeverHappenException;
+
 public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServletRequest> {
 
     private static final Logger LOG = LoggerFactory.getLogger(UploadPack.class);
@@ -85,16 +87,21 @@ public class JitStaticUploadPackFactory implements UploadPackFactory<HttpServlet
                             return "upload-pack OK";
                         }).join();
                     } catch (CompletionException ce) {
-                        final Throwable cause = ce.getCause().getCause();
-                        if (cause instanceof UploadPackInternalServerErrorException) {
-                            final Throwable wnve = cause.getCause();
-                            if (wnve instanceof WantNotValidException) {
-                                LOG.info("{}, aborting...", wnve.getMessage());
+                        final Throwable cause = ce.getCause();
+                        if (cause instanceof UnwrapException) {
+                            final Throwable secondCause = cause.getCause();
+                            if (secondCause instanceof UploadPackInternalServerErrorException) {
+                                final Throwable wnve = secondCause.getCause();
+                                if (wnve instanceof WantNotValidException) {
+                                    LOG.info("{}, aborting...", wnve.getMessage());
+                                } else if (secondCause instanceof IOException) {
+                                    throw (IOException) secondCause;
+                                }
                             } else {
-                                throw (IOException) cause;
+                                throw (IOException) secondCause;
                             }
                         } else {
-                            throw (IOException) cause;
+                            throw new ShouldNeverHappenException("Unknown exception happen while reading the repository", cause);
                         }
                     }
                 }
