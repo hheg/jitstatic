@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.33.0</version>
+        <version>0.34.0</version>
     </parent>
     <artifactId>jitstatic-it</artifactId>
 
@@ -23,7 +23,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.33.0</version>
+            <version>0.34.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -80,8 +80,14 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>jitstatic</artifactId>
-            <version>0.33.0</version>
+            <version>0.34.0</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.test-framework.providers</groupId>

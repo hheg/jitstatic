@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.client.Entity;
@@ -92,7 +93,7 @@ public class BulkResourceTest {
         when(storeInfoMock.getMetaData()).thenReturn(storageData);
         when(storageData.getContentType()).thenReturn("application/something");
         when(storage.getList(Mockito.any()))
-                .thenReturn(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER)));
+                .thenReturn(CompletableFuture.completedFuture(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER))));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
                 .buildPost(Entity.entity(
                         List.of(new BulkSearch(REF_HEADS_MASTER,

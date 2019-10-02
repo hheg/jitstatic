@@ -90,8 +90,11 @@ public class MetaData {
 
     @Override
     public boolean equals(final Object other) {
-        return Optional.ofNullable(other).filter(that -> that instanceof MetaData).map(that -> (MetaData) that)
-                .filter(that -> Objects.equals(this.users, that.users)).filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
+        return Optional.ofNullable(other)
+                .filter(that -> that instanceof MetaData)
+                .map(that -> (MetaData) that)
+                .filter(that -> Objects.equals(this.users, that.users))
+                .filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
                 .isPresent();
     }
 

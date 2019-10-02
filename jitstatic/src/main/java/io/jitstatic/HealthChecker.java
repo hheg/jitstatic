@@ -38,7 +38,7 @@ public class HealthChecker extends HealthCheck {
         try {
             source.checkHealth();
             return Result.healthy();
-        } catch (final Exception e) {
+        } catch (final Throwable e) {
             return Result.unhealthy(e);
         }
     }

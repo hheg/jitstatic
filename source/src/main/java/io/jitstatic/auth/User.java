@@ -62,17 +62,16 @@ public final class User implements Principal {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((password == null) ? 0 : password.hashCode());
-        result = prime * result + ((user == null) ? 0 : user.hashCode());
-        return result;
+        return Objects.hash(user, password);
     }
 
     @Override
     public boolean equals(final Object other) {
-        return Optional.ofNullable(other).filter(that -> that instanceof User).map(that -> (User) that)
-                .filter(that -> Objects.equals(this.user, that.user)).filter(that -> Objects.equals(this.password, that.password))
+        return Optional.ofNullable(other)
+                .filter(that -> that instanceof User)
+                .map(that -> (User) that)
+                .filter(that -> Objects.equals(this.user, that.user))
+                .filter(that -> Objects.equals(this.password, that.password))
                 .isPresent();
     }
 

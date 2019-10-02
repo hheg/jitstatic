@@ -574,6 +574,17 @@ or
 java -Ddw.hosted.cors.allowOrigins=* -jar jistatic.jar server config.yaml
 ```
 
+## JSON Logging support
+
+To enable JSON logging for the main log output you add the following to the startup (assuming the it's the first appender you'd like to output JSON)
+```bash
+	-Ddw.logging.appenders[0].layout.type=json
+```
+and to make the access logs in JSON you'd use
+```bash
+	-Ddw.server.requestLog.appenders[0].layout=access-json
+```
+
 ## Java client
 You can find a Java client for JitStatic in Maven Central with coordinates 
 

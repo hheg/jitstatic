@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
@@ -296,8 +297,8 @@ public class HostedFactory {
 
     }
 
-    public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
-        final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch());
+    public Source build(final Environment env, final String gitRealm, ExecutorService repoWriter) throws CorruptedSourceException, IOException {
+        final HostedGitRepositoryManager hostedGitRepositoryManager = new HostedGitRepositoryManager(getBasePath(), getHostedEndpoint(), getBranch(), repoWriter);
         final HashService hashService = new HashService(getPrivateSalt(), getIterations());
         env.getApplicationContext().addBean(hashService);
         registerCustomDeserializer(env);

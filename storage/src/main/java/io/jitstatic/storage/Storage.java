@@ -38,7 +38,7 @@ import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
 
 public interface Storage extends AutoCloseable, CheckHealth {
-    public Optional<StoreInfo> getKey(String key, String ref);
+    public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref);
 
     public void close();
 
@@ -52,15 +52,15 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public CompletableFuture<Either<String, FailedToLock>> delete(String key, String ref, CommitMetaData commitMetaData);
 
-    public List<Pair<String, StoreInfo>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
+    public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
 
-    public List<Pair<List<Pair<String, StoreInfo>>, String>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
+    public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
     public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
 
     public Pair<String, UserData> getUserData(String username, String defaultRef, String realm) throws RefNotFoundException;
 
-    public Pair<MetaData, String> getMetaKey(String key, String ref);
+    public CompletableFuture<Pair<MetaData, String>> getMetaKey(String key, String ref);
 
     public CompletableFuture<Either<String, FailedToLock>> updateUser(String key, String ref, String path, String username, UserData data, String version);
 

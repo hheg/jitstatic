@@ -22,6 +22,7 @@ package io.jitstatic.hosted;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -44,13 +45,16 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     private final RefLockHolderManager bus;
     private final UserExtractor userExtractor;
     private final RepoInserter inserter;
+    private final ExecutorService repoWriter;
 
-    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RefLockHolderManager bus, UserExtractor userExtractor, RepoInserter inserter) {
+    public JitStaticReceivePackFactory(final ErrorReporter reporter, final String defaultRef, final RefLockHolderManager bus, final UserExtractor userExtractor,
+            final RepoInserter inserter, final ExecutorService repoWriter) {
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.errorReporter = Objects.requireNonNull(reporter);
         this.bus = Objects.requireNonNull(bus);
         this.inserter = Objects.requireNonNull(inserter);
-        this.userExtractor = userExtractor;
+        this.userExtractor = Objects.requireNonNull(userExtractor);
+        this.repoWriter = repoWriter;
     }
 
     static class ServiceConfig {
@@ -65,7 +69,8 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
     }
 
     @Override
-    public ReceivePack create(final HttpServletRequest req, final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+    public ReceivePack create(final HttpServletRequest req,
+            final Repository db) throws ServiceNotEnabledException, ServiceNotAuthorizedException {
         final ServiceConfig cfg = db.getConfig().get(ServiceConfig::new);
         String user = req.getRemoteUser();
 
@@ -83,8 +88,11 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
         throw new ServiceNotAuthorizedException();
     }
 
-    protected ReceivePack createFor(final HttpServletRequest req, final Repository db, final String user) {        
-        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req.isUserInRole(JitStaticConstants.FORCEPUSH), inserter);
+    protected ReceivePack createFor(final HttpServletRequest req,
+            final Repository db,
+            final String user) {
+        final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req
+                .isUserInRole(JitStaticConstants.FORCEPUSH), inserter, repoWriter);
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));
@@ -92,7 +100,8 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
         return rp;
     }
 
-    private static PersonIdent toPersonIdent(final HttpServletRequest req, final String user) {
+    private static PersonIdent toPersonIdent(final HttpServletRequest req,
+            final String user) {
         return new PersonIdent(user, user + "@" + req.getRemoteHost());
     }
 }

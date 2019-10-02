@@ -120,7 +120,6 @@ public class SourceCheckerTest {
         assertTrue(exceptions.size() == 1);
         Pair<FileObjectIdStore, Exception> fileExPair = exceptions.get(0);
         assertEquals(store + JitStaticConstants.METADATA, fileExPair.getLeft().getFileName());
-        System.out.println(fileExPair.getRight().getClass());
         assertTrue(fileExPair.getRight() instanceof MetaDataFileIsMissingSourceFile);
     }
 
@@ -180,7 +179,8 @@ public class SourceCheckerTest {
         verifyOkPush(iterable, "refs/heads/master");
     }
 
-    private void verifyOkPush(Iterable<PushResult> iterable, String branch) {
+    private void verifyOkPush(Iterable<PushResult> iterable,
+            String branch) {
         PushResult pushResult = iterable.iterator().next();
         RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
         assertEquals(Status.OK, remoteUpdate.getStatus());

@@ -1,6 +1,7 @@
 package io.jitstatic.auth;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /*-
  * #%L
@@ -62,13 +63,7 @@ public class UserData implements BasicAuthentication, Serializable {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((basicPassword == null) ? 0 : basicPassword.hashCode());
-        result = prime * result + ((hash == null) ? 0 : hash.hashCode());
-        result = prime * result + ((roles == null) ? 0 : roles.hashCode());
-        result = prime * result + ((salt == null) ? 0 : salt.hashCode());
-        return result;
+        return Objects.hash(basicPassword, hash, roles, salt);
     }
 
     @Override
@@ -80,27 +75,10 @@ public class UserData implements BasicAuthentication, Serializable {
         if (getClass() != obj.getClass())
             return false;
         UserData other = (UserData) obj;
-        if (basicPassword == null) {
-            if (other.basicPassword != null)
-                return false;
-        } else if (!basicPassword.equals(other.basicPassword))
-            return false;
-        if (hash == null) {
-            if (other.hash != null)
-                return false;
-        } else if (!hash.equals(other.hash))
-            return false;
-        if (roles == null) {
-            if (other.roles != null)
-                return false;
-        } else if (!roles.equals(other.roles))
-            return false;
-        if (salt == null) {
-            if (other.salt != null)
-                return false;
-        } else if (!salt.equals(other.salt))
-            return false;
-        return true;
+        return Objects.equals(basicPassword, other.basicPassword) 
+                && Objects.equals(hash, other.hash) 
+                && Objects.equals(roles, other.roles)
+                && Objects.equals(salt, other.salt);
     }
 
     public Set<Role> getRoles() {

@@ -49,6 +49,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -122,6 +125,7 @@ public class JitStaticReceivePackTest {
     private URIish uri;
     private ErrorReporter errorReporter;
     private RefLockHolderManager bus;
+    private ExecutorService executor;
 
     @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
@@ -135,13 +139,13 @@ public class JitStaticReceivePackTest {
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("Initial commit").call();
         clientGit.push().call();
-
+        executor = Executors.newSingleThreadExecutor();
         errorReporter = new ErrorReporter();
         bus = new RefLockHolderManager();
         bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
             final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db),
-                    false, new RepoInserter(db));
+                    false, new RepoInserter(db), executor);
             return receivePack;
 
         });
@@ -150,6 +154,7 @@ public class JitStaticReceivePackTest {
 
     @AfterEach
     public void tearDown() throws InterruptedException {
+        executor.shutdown();
         remoteBareGit.close();
         clientGit.close();
         Transport.unregister(protocol);
@@ -158,6 +163,7 @@ public class JitStaticReceivePackTest {
             fault.printStackTrace();
         }
         assertEquals(null, fault);
+        executor.awaitTermination(10, TimeUnit.SECONDS);
     }
 
     @Test
@@ -649,7 +655,7 @@ public class JitStaticReceivePackTest {
 
     private JitStaticReceivePack initUnit(Repository remoteRepository, SourceChecker sc, UserExtractor ue, ReceiveCommand rc, RefLockHolderManager bus) {
         JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false,
-                mock(RepoInserter.class)) {
+                mock(RepoInserter.class), executor) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);

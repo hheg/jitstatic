@@ -63,7 +63,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             SystemReader.setInstance(new OverridingSystemReader());
             final HostedFactory hostedFactory = config.getHostedFactory();
             refLockService = new LocalRefLockService();
-            source = config.build(env, GIT_REALM);
+            source = config.build(env, GIT_REALM, refLockService.getRepoWriter());
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);

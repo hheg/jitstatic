@@ -337,11 +337,9 @@ public class KeyValueStorageWithHostedStorageTest {
     @Test
     public void testAddBranchAndKey() throws URISyntaxException, ClientProtocolException, APIException, IOException {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
         String data = getData(3);
         assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();) {
+            try (JitStaticClient client = buildClient().setUser(hostedFactory.getUserName()).setPassword(hostedFactory.getSecret()).build();) {
                 client.createKey(data.getBytes(UTF_8), new CommitData("key", REFS_HEADS_NEWBRANCH, "new key", "user", "mail"),
                         new MetaData(APPLICATION_JSON));
             }
@@ -351,11 +349,9 @@ public class KeyValueStorageWithHostedStorageTest {
     @Test
     public void addKeyAndDeleteAndThenAddAgain() throws Exception {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
         String branch = REFS_HEADS_MASTER;
         String data = getData(3);
-        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();
+        try (JitStaticClient client = buildClient().setUser(hostedFactory.getUserName()).setPassword(hostedFactory.getSecret()).build();
                 JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             client.createKey(data.getBytes(UTF_8), new CommitData("key", branch, "new key", "user", "mail"),
                     new MetaData(Set.of(new User(USER, PASSWORD)), APPLICATION_JSON));
@@ -375,11 +371,9 @@ public class KeyValueStorageWithHostedStorageTest {
     @Test
     public void testListAllFiles() throws Exception {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
         String branch = REFS_HEADS_MASTER;
         String data = getData(3);
-        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();
+        try (JitStaticClient client = buildClient().setUser(hostedFactory.getUserName()).setPassword(hostedFactory.getSecret()).build();
                 JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2");
             for (String key : list) {
@@ -399,11 +393,9 @@ public class KeyValueStorageWithHostedStorageTest {
     @Test
     public void testListAllFilesTree() throws Exception {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
         String branch = REFS_HEADS_MASTER;
         String data = getData(3);
-        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();
+        try (JitStaticClient client = buildClient().setUser(hostedFactory.getUserName()).setPassword(hostedFactory.getSecret()).build();
                 JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1", "dir/k", "k", "di/k");
             for (String key : list) {
@@ -424,11 +416,9 @@ public class KeyValueStorageWithHostedStorageTest {
     @Test
     public void testListAllFilesTreeRecursive() throws Exception {
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
-        String user = hostedFactory.getUserName();
-        String pass = hostedFactory.getSecret();
         String branch = REFS_HEADS_MASTER;
         String data = getData(3);
-        try (JitStaticClient client = buildClient().setUser(user).setPassword(pass).build();
+        try (JitStaticClient client = buildClient().setUser(hostedFactory.getUserName()).setPassword(hostedFactory.getSecret()).build();
                 JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             List<String> list = List.of("key1", "key2", "dir/key1", "dir/key2", "dir/dir/key1", "dir/key/d");
             Map<String, Integer> map = new HashMap<>();

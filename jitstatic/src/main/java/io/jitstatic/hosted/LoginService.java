@@ -36,6 +36,7 @@ import io.jitstatic.storage.Storage;
 
 public class LoginService extends AbstractLoginService {
 
+    private static final String[] EMPTY_ROLES = new String[0];
     private static final String[] ROLES = JitStaticConstants.ROLES.toArray(new String[JitStaticConstants.ROLES.size()]);
     private final UserPrincipal root;
     private final String defaultRef;
@@ -58,7 +59,7 @@ public class LoginService extends AbstractLoginService {
             RoleBearingUserPrincipal rbup = (RoleBearingUserPrincipal) user;
             return rbup.getRoles();
         }
-        return new String[] {};
+        return EMPTY_ROLES;
     }
 
     @Override

@@ -36,7 +36,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -44,8 +46,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.http.impl.client.cache.CacheConfig;
@@ -67,6 +71,8 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.client.CommitData;
@@ -91,16 +97,23 @@ public class LoadWriterRunner {
     private WriteData writeData;
     private Optional<ResultData> result = Optional.empty();
 
-    private final DropwizardProcess process;
+    private final List<DropwizardProcess> processess;
 
     public LoadWriterRunner(DropwizardProcess process) {
-        this.process = process;
+        this(List.of(process));
+    }
+
+    public LoadWriterRunner(List<DropwizardProcess> processess) {
+        if (processess.isEmpty()) {
+            throw new IllegalArgumentException("The number of processes need to be more than one");
+        }
+        this.processess = processess;
     }
 
     public void testWrite(WriteData data) throws GitAPIException, InterruptedException, ExecutionException, TimeoutException, IOException {
         this.writeData = data;
 
-        initRepo(getCredentials(process.getUser(), process.getPassword()), data);
+        initRepo(getCredentials(processess.get(0).getUser(), processess.get(0).getPassword()), data);
 
         int size = data.branches.size() * data.names.size();
         ExecutorService service = Executors.newFixedThreadPool(size);
@@ -134,11 +147,16 @@ public class LoadWriterRunner {
         }
     }
 
-    private double divide(long nominator, long denominator) {
+    private double divide(long nominator,
+            long denominator) {
         return nominator / ((double) denominator / 1000);
     }
 
-    private ResultData execute(final JitStaticClient buildKeyClient, final String branch, final String key, String tag, WriteData testData) {
+    private ResultData execute(final JitStaticClient buildKeyClient,
+            final String branch,
+            final String key,
+            String tag,
+            WriteData testData) {
         int bytes = 0;
         long stop = 0;
         int i = 1;
@@ -156,7 +174,9 @@ public class LoadWriterRunner {
         return new ResultData(i - 1, (stop - start), bytes);
     }
 
-    private String setupRun(JitStaticClient buildKeyClient, String branch, final String key) {
+    private String setupRun(JitStaticClient buildKeyClient,
+            String branch,
+            final String key) {
         try {
             return buildKeyClient.getKey(key, branch, LoadWriterRunner::read).tag;
         } catch (URISyntaxException | IOException e1) {
@@ -165,40 +185,84 @@ public class LoadWriterRunner {
     }
 
     public void after() throws GitAPIException, IOException {
-        File workingFolder = process.getFolderFile();
-        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(process.getGitAddress())
-                .setCredentialsProvider(getCredentials(process.getUser(), process.getPassword())).call()) {
-            LOG.info("{}", writeData);
-            int total = 0;
-            LOG.info("Checking repository...");
-            for (String branch : writeData.branches) {
-                checkoutBranch(branch, git);
-                LOG.info("##### {} #####", branch);
-                Map<String, Integer> pairs = pairNamesWithData(workingFolder);
-                Map<String, Integer> cnt = new HashMap<>();
-                for (RevCommit rc : git.log().call()) {
-                    String msg = matchData(pairs, cnt, rc, branch);
-                    log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
-                }
-                total += pairs.values().stream().mapToInt(Integer::intValue).sum();
+        log(() -> processess.stream().forEach(p -> {
+            try {
+                LOG.info(Unirest.get(p.getMetrics()).queryString("pretty", true).asString().getBody());
+            } catch (UnirestException e) {
+                throw new RuntimeException(e);
             }
-            final int ftotal = total;
-            result.ifPresent(r -> {
-                printStats(r, ftotal);
-                assertEquals(r.iterations, ftotal, "Total iterations doesn't match");
-            });
+        }));
+
+        LOG.info("Checking repositories...");
+        LOG.info("{}", writeData);
+        AtomicInteger total = new AtomicInteger();
+        List<List<RevCommit>> branchTips = processess.stream().map(dp -> {
+            File workingFolder;
+            try {
+                workingFolder = dp.getFolderFile();
+                try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(dp.getGitAddress())
+                        .setCredentialsProvider(getCredentials(processess.get(0).getUser(), processess.get(0).getPassword())).call()) {
+                    LOG.info("Checking repository {}...", dp.getGitAddress());
+                    return writeData.branches.stream().map(branch -> {
+                        try {
+                            checkoutBranch(branch, git);
+                            LOG.info("##### {} #####", branch);
+                            Map<String, Integer> pairs = pairNamesWithData(workingFolder);
+                            Map<String, Integer> cnt = new HashMap<>();
+                            RevCommit last = null;
+                            for (RevCommit rc : git.log().call()) {
+                                String msg = matchData(pairs, cnt, rc, branch);
+                                log(() -> LOG.info("{}-{}--{}", rc.getId(), msg, rc.getAuthorIdent()));
+                                if (last == null) {
+                                    last = rc;
+                                }
+                            }
+                            total.addAndGet(pairs.values().stream().mapToInt(Integer::intValue).sum());
+                            return last;
+                        } catch (IOException | GitAPIException e) {
+                            LOG.error("Caught error when trying to read repository", e);
+                            return null;
+                        }
+                    }).filter(Objects::nonNull).collect(Collectors.toList());
+                } catch (GitAPIException e1) {
+                    LOG.error("Failed to check repo", e1);
+                    return List.<RevCommit>of();
+                }
+            } catch (IOException e2) {
+                LOG.error("Failed to check repo", e2);
+                return List.<RevCommit>of();
+            }
+        }).collect(Collectors.toList());
+        List<RevCommit> firstResult = branchTips.get(0);
+        assertEquals(firstResult.size(), writeData.branches.size(), "The first result doesn't match the number of recorded branches");
+        if (branchTips.size() > 1) {
+            List<List<RevCommit>> remaining = branchTips.subList(1, branchTips.size());
+            for (int j = 0; j < remaining.size(); j++) {
+                List<RevCommit> part = remaining.get(j);
+                assertEquals(firstResult.size(), part.size(), "Results doesn't contain the same branches");
+                for (int i = 0; i < firstResult.size(); i++) {
+                    assertEquals(firstResult.get(i), part.get(i), "Result were different in " + processess.get(i).getGitAddress());
+                }
+            }
         }
-        process.checkContainerForErrors();
+        result.ifPresent(r -> {
+            printStats(r, total.get());
+            assertEquals(r.iterations, total.get(), "Total iterations doesn't match");
+        });
+        processess.stream().forEach(DropwizardProcess::checkContainerForErrors);
+
     }
 
-    private void printStats(ResultData r, int total) {
-        LOG.info("Thread: {}  Iters: {}/{} time: {} ms length: {} B Writes: {} /s Bytes: {} B/s", Thread.currentThread().getName(), r.iterations, total,
-                r.duration, r.bytes, divide(r.iterations, r.duration), divide(r.bytes, r.duration));
+    private void printStats(ResultData r,
+            int total) {
+        LOG.info("Thread: {}  Iters: {}/{} time: {} ms length: {} B Writes: {} /s Bytes: {} B/s", Thread.currentThread()
+                .getName(), r.iterations, total, r.duration, r.bytes, divide(r.iterations, r.duration), divide(r.bytes, r.duration));
     }
 
-    private void initRepo(UsernamePasswordCredentialsProvider provider, WriteData testData) throws GitAPIException, IOException {
-        File workingFolder = process.getFolderFile();
-        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(process.getGitAddress()).setCredentialsProvider(provider).call()) {
+    private void initRepo(UsernamePasswordCredentialsProvider provider,
+            WriteData testData) throws GitAPIException, IOException {
+        File workingFolder = processess.get(0).getFolderFile();
+        try (Git git = Git.cloneRepository().setDirectory(workingFolder).setURI(processess.get(0).getGitAddress()).setCredentialsProvider(provider).call()) {
             int c = 0;
             byte[] data = testData.getData(c);
             writeFiles(testData, workingFolder, data);
@@ -210,7 +274,10 @@ public class LoadWriterRunner {
         LOG.info("Done setting up repo");
     }
 
-    private void pushBranches(UsernamePasswordCredentialsProvider provider, WriteData testData, Git git, int c)
+    private void pushBranches(UsernamePasswordCredentialsProvider provider,
+            WriteData testData,
+            Git git,
+            int c)
             throws GitAPIException {
         for (String branch : testData.branches) {
             if (!MASTER.equals(branch)) {
@@ -225,7 +292,9 @@ public class LoadWriterRunner {
         return md.getBytes(UTF_8);
     }
 
-    private boolean verifyOkPush(Iterable<PushResult> iterable, String branch, int c) {
+    private boolean verifyOkPush(Iterable<PushResult> iterable,
+            String branch,
+            int c) {
         PushResult pushResult = iterable.iterator().next();
         RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate("refs/heads/" + branch);
         if (Status.OK == remoteUpdate.getStatus()) {
@@ -236,12 +305,14 @@ public class LoadWriterRunner {
         return false;
     }
 
-    private void writeFiles(WriteData testData, File workingFolder, byte[] data) throws IOException {
+    private void writeFiles(WriteData testData,
+            File workingFolder,
+            byte[] data) throws IOException {
         Path path = Paths.get(workingFolder.toURI());
         Path user = path.resolve(USERS).resolve(JITSTATIC_KEYADMIN_REALM).resolve(USER);
         assertTrue(user.getParent().toFile().mkdirs());
-        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8), CREATE_NEW,
-                TRUNCATE_EXISTING);
+        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}")
+                .getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
 
         for (String name : testData.names) {
             Files.write(Paths.get(workingFolder.toURI()).resolve(name), data, CREATE_NEW, TRUNCATE_EXISTING);
@@ -250,7 +321,7 @@ public class LoadWriterRunner {
     }
 
     private JitStaticClient buildKeyClient(boolean cache) {
-        int localPort = process.getLocalPort();
+        int localPort = processess.get(0).getLocalPort();
         JitStaticClientBuilder builder = JitStaticClient.create().setHost("localhost").setPort(localPort)
                 .setAppContext("/application/").setUser(USER).setPassword(PASSWORD);
         if (cache) {
@@ -264,7 +335,8 @@ public class LoadWriterRunner {
         }
     }
 
-    private Ref checkoutBranch(String branch, Git git) throws IOException, GitAPIException {
+    private Ref checkoutBranch(String branch,
+            Git git) throws IOException, GitAPIException {
         git.checkout().setAllPaths(true).call();
         Ref head = git.getRepository().findRef(branch);
         if (git.getRepository().getRepositoryState() != RepositoryState.SAFE) {
@@ -282,7 +354,10 @@ public class LoadWriterRunner {
         return head;
     }
 
-    private String matchData(Map<String, Integer> data, Map<String, Integer> cnt, RevCommit rc, String ref) {
+    private String matchData(Map<String, Integer> data,
+            Map<String, Integer> cnt,
+            RevCommit rc,
+            String ref) {
         String msg = rc.getShortMessage();
         Matcher matcher = PAT.matcher(msg);
         if (matcher.matches()) {
@@ -301,7 +376,8 @@ public class LoadWriterRunner {
         return msg;
     }
 
-    private static UsernamePasswordCredentialsProvider getCredentials(String name, String pass) {
+    private static UsernamePasswordCredentialsProvider getCredentials(String name,
+            String pass) {
         return new UsernamePasswordCredentialsProvider(name, pass);
     }
 
@@ -324,7 +400,9 @@ public class LoadWriterRunner {
         }
     }
 
-    private static Entity read(InputStream is, String tag, String contentType) {
+    private static Entity read(InputStream is,
+            String tag,
+            String contentType) {
         if (is != null) {
             try {
                 return new Entity(tag, MAPPER.readValue(is, JsonNode.class));
@@ -347,7 +425,8 @@ public class LoadWriterRunner {
             this.bytes = bytes;
         }
 
-        static ResultData sum(ResultData a, ResultData b) {
+        static ResultData sum(ResultData a,
+                ResultData b) {
             return new ResultData(a.iterations + b.iterations, Math.max(a.duration, b.duration), a.bytes + b.bytes);
         }
     }

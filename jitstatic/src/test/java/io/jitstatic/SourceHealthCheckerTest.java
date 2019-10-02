@@ -44,7 +44,7 @@ public class SourceHealthCheckerTest {
 	}
 
 	@Test
-	public void testSourceHealthCheckerNotHealthy() throws Exception {
+	public void testSourceHealthCheckerNotHealthy() throws Throwable {
 		RuntimeException runtimeException = new RuntimeException("error");
 		doThrow(runtimeException).when(source).checkHealth();
 		HealthChecker shc = new HealthChecker(source);

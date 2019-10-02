@@ -1,6 +1,7 @@
 package io.jitstatic.utils;
 
 import java.util.Map;
+import java.util.function.Supplier;
 
 /*-
  * #%L
@@ -51,6 +52,13 @@ public class Pair<L, R> implements Map.Entry<L, R> {
 
     public boolean isPresent() {
         return left != null && right != null;
+    }
+    
+    public <X extends Throwable> Pair<L,R> orElseThrow(final Supplier<? extends X> s) throws X {
+        if (!isPresent()) {
+            throw s.get();
+        }
+        return this;
     }
 
     public static <T, U> Pair<T, U> of(T t, U u) {

@@ -22,6 +22,7 @@ package io.jitstatic;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -78,12 +79,11 @@ public class JitstaticConfiguration extends Configuration {
         this.hosted = hosted;
     }
 
-    public Source build(final Environment env, final String gitRealm) throws CorruptedSourceException, IOException {
-        Objects.requireNonNull(env);
-        Objects.requireNonNull(gitRealm);
+    public Source build(final Environment env, final String gitRealm, ExecutorService repoWriter) throws CorruptedSourceException, IOException {
+        Objects.requireNonNull(repoWriter);
         final HostedFactory hostedFactory = getHostedFactory();
-        getReportingFactory().build(env);
-        return hostedFactory.build(env, gitRealm);
+        getReportingFactory().build(Objects.requireNonNull(env));
+        return hostedFactory.build(env, Objects.requireNonNull(gitRealm), repoWriter);
     }
 
     public KeyAdminAuthenticator getKeyAdminAuthenticator(final Storage storage, HashService hashService) {

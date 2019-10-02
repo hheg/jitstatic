@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletRegistration.Dynamic;
@@ -67,6 +68,7 @@ public class HostedFactoryTest {
     private Environment env = mock(Environment.class);
     private ServletEnvironment senv = mock(ServletEnvironment.class);
     private Dynamic servlet = mock(Dynamic.class);
+    private ExecutorService executor = mock(ExecutorService.class);
     private MutableServletContextHandler handler = mock(MutableServletContextHandler.class);
     private TemporaryFolder tmpFolder;
     private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
@@ -85,7 +87,7 @@ public class HostedFactoryTest {
         rf.setSecret("secret");
         rf.setServletName("servletName");
         assertTrue(validator.validate(rf).isEmpty());
-        Source source = rf.build(env, JitStaticConstants.GIT_REALM);
+        Source source = rf.build(env, JitStaticConstants.GIT_REALM, executor);
         assertNotNull(source);
     }
 
@@ -102,7 +104,7 @@ public class HostedFactoryTest {
         hf.setSecret("secret");
         hf.setServletName("servletName");
         hf.setBranch("refs/heads/master");
-        Source source = hf.build(env, JitStaticConstants.GIT_REALM);
+        Source source = hf.build(env, JitStaticConstants.GIT_REALM, executor);
         assertNotNull(source);
     }
 
@@ -120,7 +122,7 @@ public class HostedFactoryTest {
         hf.setSecret("secret");
         hf.setServletName("servletName");
         hf.setBranch("refs/heads/master");
-        Source source = hf.build(env, JitStaticConstants.GIT_REALM);
+        Source source = hf.build(env, JitStaticConstants.GIT_REALM, executor);
         assertNotNull(source);
         verify(senv).setSecurityHandler(ac.capture());
         SecurityHandler sh = ac.getValue();
