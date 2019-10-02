@@ -1,0 +1,33 @@
+server:
+  type: simple
+  maxThreads: 1024
+  idleThreadTimeout: 1 h
+  connector:
+    type: http
+    port: 0
+  requestLog:
+    appenders:
+      - type: console
+        layout:
+          type: access-json
+logging:
+  level: INFO
+  loggers: 
+    "org.glassfish": ERROR
+  appenders:
+    - type: console
+      layout:
+        type: json
+hosted:
+    basePath: file:/tmp/remote
+    servletName: selfhosted
+    hostedEndpoint: git
+    userName: huser
+    secret: hseCr3t
+    adminName: admin
+    adminPass: pass
+    protectMetrics: true
+    protectTasks: true
+    cors:
+      allowedOrigins: "*"  
+    
