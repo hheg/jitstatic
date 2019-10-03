@@ -174,7 +174,7 @@ public class RepositoryUpdater {
         }
     }
 
-    public void deleteRefs(List<String> refs) throws IOException {
+    public void deleteRefs(final List<String> refs) throws IOException {
         for (String ref : refs) {
             final RefUpdate ru = repository.updateRef(ref);
             ru.setForceUpdate(true);
