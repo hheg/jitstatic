@@ -52,12 +52,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.awaitility.Awaitility;
-import org.awaitility.Duration;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -98,6 +95,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 
 import com.spencerwi.either.Either;
 
@@ -144,8 +142,7 @@ public class JitStaticReceivePackTest {
         bus = new RefLockHolderManager();
         bus.setRefHolderFactory(this::refHolderFactory);
         protocol = new TestProtocol<Object>(null, (req, db) -> {
-            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db),
-                    false, new RepoInserter(db), executor);
+            final ReceivePack receivePack = new JitStaticReceivePack(db, REF_HEADS_MASTER, errorReporter, bus, new SourceChecker(db), new UserExtractor(db), false, new RepoInserter(db), executor);
             return receivePack;
 
         });
@@ -351,35 +348,21 @@ public class JitStaticReceivePackTest {
         when(remoteRepository.getConfig()).thenReturn(remoteBareGit.getRepository().getConfig());
         SourceChecker sc = mock(SourceChecker.class);
         UserExtractor ue = mock(UserExtractor.class);
+        BatchRefUpdate batchRefUpdate = mock(BatchRefUpdate.class);
         ReceiveCommand rc = spy(new ReceiveCommand(oldRef, c.getId(), REF_HEADS_MASTER, Type.UPDATE));
 
         JitStaticReceivePack rp = initUnit(remoteRepository, sc, ue, rc, bus);
-        BatchRefUpdate batchRefUpdate = mock(BatchRefUpdate.class);
-        Ref mock = mock(Ref.class);
-        when(remoteRepository.updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC))).thenReturn(testUpdate);
+
+        Mockito.doReturn(testUpdate).doReturn(ru).when(remoteRepository).updateRef(startsWith(JitStaticConstants.REFS_JITSTATIC));
         when(testUpdate.forceUpdate()).thenReturn(RefUpdate.Result.FORCED);
+        when(ru.delete()).thenThrow(new IOException(errormsg));
         BatchRefUpdate spyBatchRefUpdate = getSpyingBatchRefUpdate(refDatabase);
         doNothing().when(spyBatchRefUpdate).execute(any(), any());
         when(remoteRepository.getRefDatabase()).thenReturn(refDatabase);
         when(refDatabase.newBatchUpdate()).thenReturn(spyBatchRefUpdate).thenReturn(batchRefUpdate);
-        doThrow(new IOException(errormsg)).when(batchRefUpdate).execute(any(), any());
-        when(refDatabase.firstExactRef(any())).thenReturn(mock);
-        when(mock.getObjectId()).thenReturn(oldRef);
-        when(remoteRepository.updateRef(eq(REF_HEADS_MASTER))).thenReturn(ru);
-        when(ru.update()).thenReturn(RefUpdate.Result.FAST_FORWARD);
-
         rp.executeCommands();
-
-        AtomicReference<Throwable> e = new AtomicReference<>();
-        Awaitility.await().atMost(Duration.TEN_SECONDS).until(() -> {
-            Throwable fault = errorReporter.getFault();
-            e.set(fault);
-            return fault != null;
-        });
-        Throwable exception = e.get();
-        assertNotNull(exception);
-        assertEquals("General error while deleting branches.", exception.getMessage());
-        assertEquals(errormsg, exception.getCause().getMessage());
+        TimeUnit.SECONDS.sleep(2);
+        Mockito.verify(ru).delete();
     }
 
     @Test
@@ -654,17 +637,14 @@ public class JitStaticReceivePackTest {
     }
 
     private JitStaticReceivePack initUnit(Repository remoteRepository, SourceChecker sc, UserExtractor ue, ReceiveCommand rc, RefLockHolderManager bus) {
-        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false,
-                mock(RepoInserter.class), executor) {
+        JitStaticReceivePack rp = new JitStaticReceivePack(remoteRepository, REF_HEADS_MASTER, errorReporter, bus, sc, ue, false, mock(RepoInserter.class), executor) {
             @Override
             protected List<ReceiveCommand> filterCommands(Result want) {
                 return Arrays.asList(rc);
             }
 
             @Override
-            public boolean isSideBand() throws RequestNotYetReadException {
-                return false;
-            }
+            public boolean isSideBand() throws RequestNotYetReadException { return false; }
         };
         return rp;
     }
@@ -678,8 +658,7 @@ public class JitStaticReceivePackTest {
             }
 
             @Override
-            public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action,
-                    Consumer<Exception> postAction) {
+            public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action, Consumer<Exception> postAction) {
                 return CompletableFuture.supplyAsync(() -> {
                     Exception exception = preRequisite.get();
                     try {
@@ -698,9 +677,7 @@ public class JitStaticReceivePackTest {
         };
     }
 
-    Path getFolder() throws IOException {
-        return tmpFolder.createTemporaryDirectory().toPath();
-    }
+    Path getFolder() throws IOException { return tmpFolder.createTemporaryDirectory().toPath(); }
 
     private static byte[] brackets() {
         return "{}".getBytes(StandardCharsets.UTF_8);
