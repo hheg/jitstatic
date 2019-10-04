@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.34.0</version>
+        <version>0.34.1</version>
     </parent>
     <artifactId>jitstatic-it</artifactId>
 
@@ -23,7 +23,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.34.0</version>
+            <version>0.34.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -80,7 +80,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>jitstatic</artifactId>
-            <version>0.34.0</version>
+            <version>0.34.1</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

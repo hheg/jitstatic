@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -77,7 +78,8 @@ public class JitStaticReceivePack extends ReceivePack {
     private final ExecutorService repoSerializer;
 
     public JitStaticReceivePack(final Repository into, final String defaultRef, final ErrorReporter errorReporter, final RefLockHolderManager bus,
-            final SourceChecker sourceChecker, final UserExtractor userExtractor, final boolean canForceUpdate, final RepoInserter inserter, final ExecutorService repoWriter) {
+            final SourceChecker sourceChecker, final UserExtractor userExtractor, final boolean canForceUpdate, final RepoInserter inserter,
+            final ExecutorService repoWriter) {
         super(into);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.reflockHolder = Objects.requireNonNull(bus);
@@ -102,10 +104,21 @@ public class JitStaticReceivePack extends ReceivePack {
         try {
             updateAndCommit(updating, commandsToBeBatched, indexPairs);
         } finally {
-            CompletableFuture.runAsync(() -> maintenanceBatchUpdate(commandsToBeBatched.stream()
+            final List<String> refs = commandsToBeBatched.stream()
                     .filter(rc -> rc.getRefName().startsWith(JitStaticConstants.REFS_JITSTATIC))
-                    .map(rc -> new ReceiveCommand(rc.getNewId(), ObjectId.zeroId(), rc.getRefName(), ReceiveCommand.Type.DELETE))
-                    .collect(Collectors.toList())), repoSerializer);
+                    .map(ReceiveCommand::getRefName)
+                    .collect(Collectors.toList());
+            CompletableFuture.runAsync(() -> {
+                refs.forEach(ref -> {
+                    try {
+                        final RefUpdate ru = getRepository().updateRef(ref);
+                        ru.setForceUpdate(true);
+                        ru.delete();
+                    } catch (IOException e) {
+                        LOG.info(e.getLocalizedMessage());
+                    }
+                });
+            }, repoSerializer);
         }
     }
 
@@ -118,12 +131,10 @@ public class JitStaticReceivePack extends ReceivePack {
         return NullProgressMonitor.INSTANCE;
     }
 
-    private void updateAndCommit(final ProgressMonitor updating,
-            final List<ReceiveCommand> commandsToBeExecuted,
-            final List<Pair<ReceiveCommand, ReceiveCommand>> indexPairs) {
+    private void updateAndCommit(final ProgressMonitor updating, final List<ReceiveCommand> commandsToBeExecuted, final List<Pair<ReceiveCommand, ReceiveCommand>> indexPairs) {
         try {
             batchUpdate(updating, commandsToBeExecuted);
-            if(commandsToBeExecuted.stream().anyMatch(rc -> rc.getResult() != Result.OK)) {
+            if (commandsToBeExecuted.stream().anyMatch(rc -> rc.getResult() != Result.OK)) {
                 throw new IOException("Error applying commands");
             }
             commitCommands(checkBranches(updating, commandsToBeExecuted, indexPairs).stream().filter(p -> {
@@ -137,14 +148,13 @@ public class JitStaticReceivePack extends ReceivePack {
                 final ReceiveCommand rc = cmd.getLeft();
                 final Result result = rc.getResult();
                 if (result == Result.NOT_ATTEMPTED || result == Result.OK) {
-                    rc.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(JGitText.get().lockError, err.getMessage()));    
+                    rc.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(JGitText.get().lockError, err.getMessage()));
                 }
             }
         }
     }
 
-    private List<Pair<ReceiveCommand, ReceiveCommand>> createTempBranchesAndIndex(final List<ReceiveCommand> originalCommands,
-            final List<ReceiveCommand> commandsToBeChecked) {
+    private List<Pair<ReceiveCommand, ReceiveCommand>> createTempBranchesAndIndex(final List<ReceiveCommand> originalCommands, final List<ReceiveCommand> commandsToBeChecked) {
         final List<Pair<ReceiveCommand, ReceiveCommand>> indexPairs = new ArrayList<>(originalCommands.size());
         for (ReceiveCommand original : originalCommands) {
             if (original.getType() != Type.DELETE) {
@@ -170,23 +180,7 @@ public class JitStaticReceivePack extends ReceivePack {
         return indexPairs;
     }
 
-    private void maintenanceBatchUpdate(final List<ReceiveCommand> tmpRefs) {
-        try {
-            final BatchRefUpdate batch = getRepository().getRefDatabase().newBatchUpdate();
-            batch.setAllowNonFastForwards(true);
-            batch.setAtomic(true);
-            batch.disableRefLog();
-            batch.addCommand(tmpRefs);
-            batch.setPushCertificate(null);
-            batch.execute(new RevWalk(getRepository()), NullProgressMonitor.INSTANCE);
-        } catch (IOException err) {
-            setFault(new RepositoryException("General error while deleting branches.", err));
-        }
-    }
-
-    private List<Pair<ReceiveCommand, ReceiveCommand>> checkBranches(final ProgressMonitor updating,
-            final List<ReceiveCommand> batchedCommands,
-            final List<Pair<ReceiveCommand, ReceiveCommand>> index) {
+    private List<Pair<ReceiveCommand, ReceiveCommand>> checkBranches(final ProgressMonitor updating, final List<ReceiveCommand> batchedCommands, final List<Pair<ReceiveCommand, ReceiveCommand>> index) {
         updating.beginTask("Checking branches", batchedCommands.size());
         for (Pair<ReceiveCommand, ReceiveCommand> pair : index) {
             final ReceiveCommand testRc = pair.getRight();
@@ -208,8 +202,7 @@ public class JitStaticReceivePack extends ReceivePack {
         return index;
     }
 
-    private void batchUpdate(final ProgressMonitor monitor,
-            final List<ReceiveCommand> cmds) throws IOException {
+    private void batchUpdate(final ProgressMonitor monitor, final List<ReceiveCommand> cmds) throws IOException {
         if (!cmds.isEmpty()) {
             final BatchRefUpdate batch = getRepository().getRefDatabase().newBatchUpdate();
             batch.setAllowNonFastForwards(isAllowNonFastForwards());
@@ -221,9 +214,7 @@ public class JitStaticReceivePack extends ReceivePack {
         }
     }
 
-    private void checkBranchData(final String branch,
-            final String testBranchName,
-            final ReceiveCommand testRc) {
+    private void checkBranchData(final String branch, final String testBranchName, final ReceiveCommand testRc) {
         try {
             sendMessage("Checking " + branch + " branch.");
             final Pair<List<String>, List<String>> interpretedErrorMessages = CorruptedSourceException
@@ -235,14 +226,10 @@ public class JitStaticReceivePack extends ReceivePack {
 
             errors.addAll(interpretedMessages.getLeft());
             warnings.addAll(interpretedMessages.getRight());
+            warnings.forEach(this::sendMessage);
 
-            for (String w : warnings) {
-                sendMessage(w);
-            }
             if (!errors.isEmpty()) {
-                for (String s : errors) {
-                    sendError(s);
-                }
+                errors.forEach(this::sendError);
                 testRc.setResult(Result.REJECTED_OTHER_REASON, errors.get(0));
             } else {
                 sendMessage(branch + " OK!");
@@ -259,11 +246,15 @@ public class JitStaticReceivePack extends ReceivePack {
         }
     }
 
-    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds,
-            final ProgressMonitor monitor) {
+    private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
         final Repository repository = getRepository();
         monitor.beginTask("Committing branches", cmds.size());
-        cmds.stream().map(cmd -> {
+        cmds.stream().map(commitCommand(monitor, repository)).filter(Either::isRight).forEach(e -> sendError(e.getRight().toString()));
+        monitor.endTask();
+    }
+
+    private Function<? super Pair<ReceiveCommand, ReceiveCommand>, ? extends Either<String, FailedToLock>> commitCommand(final ProgressMonitor monitor, final Repository repository) {
+        return cmd -> {
             final String refName = cmd.getLeft().getRefName();
             try {
                 if (cmd.getLeft().getType() == Type.CREATE) {
@@ -273,37 +264,7 @@ public class JitStaticReceivePack extends ReceivePack {
                 final RefLockHolder refHolder = reflockHolder.getRefHolder(refName);
                 final ReceiveCommand orig = cmd.getLeft();
                 final ReceiveCommand test = cmd.getRight();
-                final Either<String, FailedToLock> lock = refHolder.enqueueAndBlock(() -> tryCommit(repository, refName, orig, test), () -> {
-                    final ObjectId newId = orig.getNewId();
-                    final ObjectId oldId = orig.getOldId();
-                    return new DistributedData(os -> {
-                        if (!ObjectId.zeroId().equals(newId)) {
-                            repoInserter.packData(Set.of(), Set.of(newId), Set.of(oldId)).accept(os);
-                        }
-                    }, newId.name(), oldId.name());
-                }, e -> {
-                    switch (orig.getType()) {
-                    case CREATE:
-                        if (e != null) {
-                            getRepository().fireEvent(new DeleteRefEvent(refName));
-                        }
-                        break;
-                    case DELETE:
-                        sendMessage("Deleting " + refName);
-                        getRepository().fireEvent(new DeleteRefEvent(refName));
-                        break;
-                    case UPDATE:
-                    case UPDATE_NONFASTFORWARD:
-                        sendMessage("Reloading " + refName);
-                        getRepository().fireEvent(new ReloadRefEvent(refName));
-                        break;
-                    default:
-                        break;
-                    }
-                }).exceptionally(t -> {
-                    LOG.warn("Failed when locking branch {}", refName, t);
-                    return Either.right(FailedToLock.create(t, refName));
-                }).join();
+                final Either<String, FailedToLock> lock = enqueueOnRef(repository, refName, refHolder, orig, test);
 
                 if (lock.isRight()) {
                     final FailedToLock ftl = lock.getRight();
@@ -311,21 +272,50 @@ public class JitStaticReceivePack extends ReceivePack {
                     if (result == Result.OK || result == Result.NOT_ATTEMPTED) {
                         cmd.getLeft().setResult(Result.LOCK_FAILURE, ftl.getLocalizedMessage());
                     }
-                    return ftl;
                 }
-                return lock.getLeft();
+                return lock;
             } finally {
                 monitor.update(1);
             }
-        }).filter(Objects::nonNull).forEach(e -> sendError(e.toString()));
-        monitor.endTask();
+        };
+    }
+
+    private Either<String, FailedToLock> enqueueOnRef(final Repository repository, final String refName, final RefLockHolder refHolder, final ReceiveCommand orig, final ReceiveCommand test) {
+        return refHolder.enqueueAndBlock(() -> tryCommit(repository, refName, orig, test), () -> {
+            final ObjectId newId = orig.getNewId();
+            final ObjectId oldId = orig.getOldId();
+            return new DistributedData(os -> {
+                if (!ObjectId.zeroId().equals(newId)) {
+                    repoInserter.packData(Set.of(), Set.of(newId), Set.of(oldId)).accept(os);
+                }
+            }, newId.name(), oldId.name());
+        }, e -> {
+            switch (orig.getType()) {
+            case CREATE:
+                if (e != null) {
+                    getRepository().fireEvent(new DeleteRefEvent(refName));
+                }
+                break;
+            case DELETE:
+                sendMessage("Deleting " + refName);
+                getRepository().fireEvent(new DeleteRefEvent(refName));
+                break;
+            case UPDATE:
+            case UPDATE_NONFASTFORWARD:
+                sendMessage("Reloading " + refName);
+                getRepository().fireEvent(new ReloadRefEvent(refName));
+                break;
+            default:
+                break;
+            }
+        }).exceptionally(t -> {
+            LOG.warn("Failed when locking branch {}", refName, t);
+            return Either.right(FailedToLock.create(t, refName));
+        }).join();
     }
 
     @Nullable
-    private Exception tryCommit(final Repository repository,
-            final String refName,
-            final ReceiveCommand orig,
-            final ReceiveCommand test) {
+    private Exception tryCommit(final Repository repository, final String refName, final ReceiveCommand orig, final ReceiveCommand test) {
         try {
             final Ref ref = repository.findRef(refName);
             checkForRef(orig, refName, ref);
@@ -361,9 +351,7 @@ public class JitStaticReceivePack extends ReceivePack {
         }
     }
 
-    private void interpretResult(final ReceiveCommand rc,
-            final UpdateResultException updateResult,
-            final String refName) {
+    private void interpretResult(final ReceiveCommand rc, final UpdateResultException updateResult, final String refName) {
         switch (updateResult.getResult()) {
         case LOCK_FAILURE:
             rc.setResult(Result.LOCK_FAILURE, "Failed to lock " + refName);
@@ -379,17 +367,13 @@ public class JitStaticReceivePack extends ReceivePack {
         }
     }
 
-    private void checkForBranchStaleness(final ReceiveCommand orig,
-            final String refName,
-            final Ref ref) throws CommandIsStale {
+    private void checkForBranchStaleness(final ReceiveCommand orig, final String refName, final Ref ref) throws CommandIsStale {
         if (ref != null && !ObjectId.isEqual(ref.getObjectId(), orig.getOldId())) {
             throw new CommandIsStale(refName, orig.getOldId(), ref.getObjectId());
         }
     }
 
-    private void checkForRef(final ReceiveCommand orig,
-            final String refName,
-            final Ref ref) throws RefNotFoundException {
+    private void checkForRef(final ReceiveCommand orig, final String refName, final Ref ref) throws RefNotFoundException {
         if (!ObjectId.isEqual(orig.getOldId(), ObjectId.zeroId()) && ref == null) {
             throw new RefNotFoundException(refName);
         }
@@ -415,8 +399,7 @@ public class JitStaticReceivePack extends ReceivePack {
         return testBranchName;
     }
 
-    private void checkResult(final String refName,
-            final RefUpdate.Result result) throws IOException, UpdateResultException {
+    private void checkResult(final String refName, final RefUpdate.Result result) throws IOException, UpdateResultException {
         switch (result) {
         case FAST_FORWARD:
         case FORCED:

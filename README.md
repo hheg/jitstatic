@@ -582,7 +582,7 @@ To enable JSON logging for the main log output you add the following to the star
 ```
 and to make the access logs in JSON you'd use
 ```bash
-	-Ddw.server.requestLog.appenders[0].layout=access-json
+	-Ddw.server.requestLog.appenders[0].layout.type=access-json
 ```
 
 ## Java client
