@@ -249,7 +249,7 @@ public class JitStaticReceivePack extends ReceivePack {
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {
         final Repository repository = getRepository();
         monitor.beginTask("Committing branches", cmds.size());
-        cmds.stream().map(commitCommand(monitor, repository)).filter(Objects::nonNull).forEach(e -> sendError(e.toString()));
+        cmds.stream().map(commitCommand(monitor, repository)).filter(Either::isRight).forEach(e -> sendError(e.getRight().toString()));
         monitor.endTask();
     }
 
