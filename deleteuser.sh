@@ -35,6 +35,7 @@ esac
 
 read -p "Enter your git user name: " CREDS_USER
 read -p "Enter your git password: " CREDS_PASS
+read -p "Enter your domain: " CREDS_DOMAIN
 
 if [[ ! -z $BRANCH ]]; then
   BRANCH="--data-urlencode \"ref=${BRANCH}\""
@@ -43,7 +44,7 @@ fi
 curl -i \
 -H "X-jitstatic-name: ${CREDS_USER}" \
 -H 'X-jitstatic-message: Deleting user ${USER}' \
--H 'X-jitstatic-mail: ${CREDS_USER}@looklet.com' \
+-H 'X-jitstatic-mail: ${CREDS_USER}@${CREDS_DOMAIN}' \
 --user "${CREDS_USER}:${CREDS_PASS}" -X DELETE \
 $BASE/config/users/${REALM}/${USER}
 
