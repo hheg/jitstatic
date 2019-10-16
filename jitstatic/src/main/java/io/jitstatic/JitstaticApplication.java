@@ -77,8 +77,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
             final KeyAdminAuthenticator authenticator = config.getKeyAdminAuthenticator(storage, hashService);
-            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, env.getObjectMapper(),
-                    env.getValidator(), hashService));
+            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, hashService));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch, hashService));
             env.jersey().register(new BulkResource(storage, authenticator, defaultBranch, hashService));

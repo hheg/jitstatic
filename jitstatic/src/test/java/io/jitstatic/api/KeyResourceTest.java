@@ -127,7 +127,7 @@ public class KeyResourceTest {
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user,
                     ref) -> new User(PUSER, PSECRET)
-                            .equals(user), REFS_HEADS_MASTER, hashService), false, REFS_HEADS_MASTER, MAPPER, VALIDATOR, new HashService()))
+                            .equals(user), REFS_HEADS_MASTER, hashService), false, REFS_HEADS_MASTER, new HashService()))
             .build();
 
     @BeforeAll

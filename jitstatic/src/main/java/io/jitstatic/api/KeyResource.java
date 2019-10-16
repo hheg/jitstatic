@@ -49,7 +49,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
-import javax.validation.Validator;
+import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -83,10 +83,10 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.dropwizard.auth.Auth;
+import io.dropwizard.validation.Validated;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.HeaderPair;
 import io.jitstatic.MetaData;
@@ -115,22 +115,17 @@ public class KeyResource {
     private final KeyAdminAuthenticator addKeyAuthenticator;
     private final APIHelper helper;
     private final boolean cors;
-    private final ObjectMapper mapper;
-    private final Validator validator;
     private final HashService hashService;
     @Inject
     private ExecutorService executor;
 
-    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final boolean cors,
-            final String defaultBranch, final ObjectMapper mapper, final Validator validator,
+    public KeyResource(final Storage storage, final KeyAdminAuthenticator adminKeyAuthenticator, final boolean cors, final String defaultBranch, 
             final HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.helper = new APIHelper(LOG);
         this.cors = cors;
         this.defaultRef = Objects.requireNonNull(defaultBranch);
-        this.mapper = Objects.requireNonNull(mapper);
-        this.validator = Objects.requireNonNull(validator);
         this.hashService = Objects.requireNonNull(hashService);
     }
 
@@ -239,6 +234,7 @@ public class KeyResource {
             final @PathParam("key") String key,
             final @QueryParam("ref") String askedRef,
             final @Auth Optional<User> userholder,
+            final @Validated @Valid @NotNull ModifyKeyData data,
             final @Context HttpServletRequest httpRequest,
             final @Context Request request,
             final @Context HttpHeaders headers) {
@@ -247,7 +243,6 @@ public class KeyResource {
         final User user = userholder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        final CompletableFuture<ModifyKeyData> dataLoader = loadData(httpRequest, ModifyKeyData.class);
         CompletableFuture.supplyAsync(() -> {
             APIHelper.checkHeaders(headers);
             return helper.checkIfKeyExist(key, ref, storage);
@@ -272,8 +267,7 @@ public class KeyResource {
                     }
                     return currentVersion;
                 }, executor)
-                .thenCombineAsync(dataLoader, (currentVersion,
-                        data) -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
+                .thenApplyAsync(currentVersion -> storage.putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                                 .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest))), executor)
                 .thenComposeAsync(Function.identity())
                 .thenApplyAsync(result -> {
@@ -301,14 +295,14 @@ public class KeyResource {
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
     public void addKey(@Suspended AsyncResponse asyncResponse,
-            @NotNull final @PathParam("key") String key,
+            final @NotNull @PathParam("key") String key,
             final @QueryParam("ref") String askedRef,
+            final @Validated @Valid @NotNull AddKeyData data,
             final @Context HttpServletRequest httpRequest,
             final @Auth Optional<User> userHolder) throws JsonParseException, JsonMappingException, IOException {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        final CompletableFuture<AddKeyData> dataLoader = loadData(httpRequest, AddKeyData.class);
         CompletableFuture.runAsync(() -> {
             if (!addKeyAuthenticator.authenticate(user, ref)) {
                 try {
@@ -323,8 +317,7 @@ public class KeyResource {
             }
         }, executor)
                 .thenComposeAsync(ignore -> storage.getKey(key, ref).exceptionally(helper.keyExceptionHandler(Optional::empty)), executor)
-                .thenCombineAsync(dataLoader, (storeInfo,
-                        data) -> {
+                .thenApplyAsync(storeInfo -> {
                     if (storeInfo.isPresent()) {
                         throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
                     }
@@ -438,26 +431,6 @@ public class KeyResource {
             LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
             throw new WebApplicationException(Status.FORBIDDEN);
         }
-    }
-
-    private <T> CompletableFuture<T> loadData(final HttpServletRequest httpRequest,
-            final Class<T> clazz) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return mapper.readValue(httpRequest.getInputStream(), clazz);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }, executor).thenApplyAsync(data -> {
-            if (data == null) {
-                throw new WebApplicationException("entity is null", 422);
-            }
-            final Set<ConstraintViolation<T>> violations = validator.validate(data);
-            if (!violations.isEmpty()) {
-                throw new ConstraintViolationException(violations);
-            }
-            return data;
-        }, executor);
     }
 
     private boolean requestingDelete(final String requestMethod) {

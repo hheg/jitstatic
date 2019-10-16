@@ -127,7 +127,7 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void put(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            final @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
+            final @Validated @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
             final @Context HttpHeaders headers, final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(GIT_REALM));
         APIHelper.checkValidRef(ref);
@@ -190,7 +190,7 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void putUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
+            final @Validated @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
             final @Context HttpHeaders headers, final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkRef(askedRef);
@@ -253,7 +253,7 @@ public class UsersResource {
     @Path(GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Valid @NotNull UserData data,
+    public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Validated @Valid @NotNull UserData data,
             final @Auth Optional<User> remoteUserHolder, final @Context HttpHeaders headers,
             final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(GIT_REALM));

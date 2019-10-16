@@ -61,6 +61,7 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import io.dropwizard.validation.Validated;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
@@ -140,7 +141,7 @@ public class MetaKeyResource {
             final @PathParam("key") String key,
             final @QueryParam("ref") String askedRef,
             final @Auth Optional<User> userHolder,
-            final @Valid @NotNull ModifyMetaKeyData data,
+            final @Validated @Valid @NotNull ModifyMetaKeyData data,
             final @Context Request request,
             final @Context HttpServletRequest httpRequest,
             final @Context HttpHeaders headers) {
