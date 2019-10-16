@@ -4,7 +4,7 @@ USER=$1
 PASSWD=$2
 REALM=$3
 BRANCH=$4
-BASE=${5:-"https://config.looklet.com"}
+BASE=${5:-"http://localhost:8085"}
 
 function usage () {
   echo "Usage: $0 <user> <password> <realm> <branch> [<base>]"
