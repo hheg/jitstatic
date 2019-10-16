@@ -49,7 +49,7 @@ done
 
 
 BRANCH=${BRANCH:-"refs/heads/master"} 
-BASE=${BASE:-"http://localhost:8086"}
+BASE=${BASE:-"http://localhost:8085"}
 
 function usage () {
   echo "Usage: $0 -p <path> -d <dir> [-b <branch>] [-u <base>] [[-cu <user>] [-cp <pass>] | -cr <user:pass>]"
