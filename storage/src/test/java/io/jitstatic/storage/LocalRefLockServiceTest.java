@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.codahale.metrics.MetricRegistry;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.hosted.FailedToLock;
@@ -37,7 +38,8 @@ class LocalRefLockServiceTest {
 
     @Test
     void testFireKeyEvent() throws Exception {
-        try (LocalRefLockService service = new LocalRefLockService();) {
+        MetricRegistry registry = new MetricRegistry();
+        try (LocalRefLockService service = new LocalRefLockService(registry);) {
             RefHolder refHolder = mock(RefHolder.class);
             LockService lockService = service.getLockService("refs/heads/master");
             AtomicBoolean b = new AtomicBoolean(true);
@@ -56,7 +58,8 @@ class LocalRefLockServiceTest {
 
     @Test
     void testReturnLockService() throws Exception {
-        try (LocalRefLockService service = new LocalRefLockService();) {
+        MetricRegistry registry = new MetricRegistry();
+        try (LocalRefLockService service = new LocalRefLockService(registry);) {
             LockService lockService = service.getLockService("refs/heads/master");
             service.returnLock(lockService);
             LockService lockService2 = service.getLockService("refs/heads/master");

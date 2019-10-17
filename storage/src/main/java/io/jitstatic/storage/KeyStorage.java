@@ -42,6 +42,8 @@ import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.InstrumentedExecutorService;
+import com.codahale.metrics.MetricRegistry;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
@@ -69,13 +71,18 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     private final Source source;
     private final String defaultRef;
     private final String rootUser;
-    private final ExecutorService refCleaner = Executors.newSingleThreadExecutor(new NamingThreadFactory("RefCleaner"));
+    private final ExecutorService refCleaner;
+    private final ExecutorService executor;
 
-    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser) {
+    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser,
+            final ExecutorService executor, final ExecutorService workStealingExecutor, final MetricRegistry metrics) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
         this.rootUser = Objects.requireNonNull(rootUser);
-        this.cache = getMap(source, hashService, clusterService);
+        this.cache = getMap(source, hashService, clusterService, workStealingExecutor);
+        this.executor = Objects.requireNonNull(executor);
+        this.refCleaner = new InstrumentedExecutorService(Executors.newSingleThreadExecutor(new NamingThreadFactory("RefCleaner")), Objects
+                .requireNonNull(metrics));
         addRef(this.defaultRef);
     }
 
@@ -101,22 +108,19 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         return getKeyDirect(key, ref);
     }
 
-    private CompletableFuture<Optional<StoreInfo>> getKeyDirect(final String key,
-            final String ref) {
+    private CompletableFuture<Optional<StoreInfo>> getKeyDirect(final String key, final String ref) {
         if (checkKeyIsDotFile(key)) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
-
+        final String finalRef = checkRef(ref);
         return CompletableFuture.supplyAsync(() -> {
-            final String finalRef = checkRef(ref);
             final RefHolder refHolder = getRefHolder(finalRef);
             final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
             if (storeInfo == null) {
                 return Optional.<StoreInfo>empty();
             }
             return storeInfo;
-        }).handleAsync((o,
-                t) -> unwrap(o, t, ref));
+        }, executor).handleAsync((o, t) -> unwrap(o, t, finalRef), executor);
     }
 
     private Optional<StoreInfo> unwrap(final Optional<StoreInfo> o,
@@ -144,13 +148,13 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     @Override
     public CompletableFuture<Pair<MetaData, String>> getMetaKey(final String key,
             final String ref) {
-        return getKeyDirect(key, ref).thenApply(keyDirect -> {
+        return getKeyDirect(key, ref).thenApplyAsync(keyDirect -> {
             if (!keyDirect.isPresent()) {
                 return Pair.ofNothing();
             }
             final StoreInfo storeInfo = keyDirect.get();
             return Pair.of(storeInfo.getMetaData(), storeInfo.getMetaDataVersion());
-        });
+        }, executor);
     }
 
     private boolean checkKeyIsDotFile(final String key) {
@@ -228,7 +232,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
             return result.getLeft();
-        });
+        }, executor);
     }
 
     @Override
@@ -285,18 +289,18 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                     if (key.endsWith("/")) {
                         return extractListAndMap(finalRef, pair, key);
                     }
-                    return getKey(key, finalRef).thenApply(keyContent -> {
+                    return getKey(key, finalRef).thenApplyAsync(keyContent -> {
                         if (keyContent.isPresent()) {
                             return List.of(Pair.of(key, keyContent.get()));
                         }
                         return List.<Pair<String, StoreInfo>>of();
-                    });
+                    }, executor);
                 }).collect(Collectors.toList());
         return CompletableFuture.allOf(collected.toArray(new CompletableFuture[collected.size()]))
-                .thenApply(ignore -> collected.stream()
+                .thenApplyAsync(ignore -> collected.stream()
                         .map(CompletableFuture::join)
                         .flatMap(List::stream)
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()), executor);
     }
 
     private CompletableFuture<Pair<String, Optional<StoreInfo>>> getKeyPair(final String key,
@@ -305,22 +309,22 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         getKey(key, ref).thenComposeAsync(o -> {
             cf.complete(Pair.of(key, o));
             return cf;
-        });
+        }, executor);
         return cf;
     }
 
     private CompletableFuture<List<Pair<String, StoreInfo>>> extractListAndMap(final String finalRef,
             Pair<String, Boolean> pair,
             final String key) {
-        return CompletableFuture.supplyAsync(() -> extractList(key, finalRef, pair))
-                .thenApplyAsync(l -> l.stream().map(k -> getKeyPair(k, finalRef)).collect(Collectors.toList()))
+        return CompletableFuture.supplyAsync(() -> extractList(key, finalRef, pair), executor)
+                .thenApplyAsync(l -> l.stream().map(k -> getKeyPair(k, finalRef)).collect(Collectors.toList()), executor)
                 .thenComposeAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
-                        .thenApplyAsync(ignore -> futures))
+                        .thenApply(ignore -> futures), executor)
                 .thenApplyAsync(futures -> futures.stream()
                         .map(CompletableFuture::join)
                         .filter(p -> p.getRight().isPresent())
                         .map(p -> Pair.of(p.getLeft(), p.getRight().get()))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()), executor);
     }
 
     private List<String> extractList(final String key,
@@ -341,11 +345,11 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         return CompletableFuture.supplyAsync(() -> input.stream()
                 .map(p -> getListForRef(p.getLeft(), p.getRight())
                         .thenApply(l -> Pair.of(l, p.getRight())))
-                .collect(Collectors.toList()))
+                .collect(Collectors.toList()), executor)
                 .thenApplyAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
-                        .thenApplyAsync(ignore -> futures.stream()
+                        .thenApply(ignore -> futures.stream()
                                 .map(CompletableFuture::join)
-                                .collect(Collectors.toList())))
+                                .collect(Collectors.toList())), executor)
                 .thenCompose(cf -> cf);
     }
 
@@ -413,7 +417,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, finalRef));
             }
             return postUser.getLeft();
-        });
+        }, executor);
     }
 
     @Override
@@ -451,19 +455,18 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     }
 
-    private static Cache<String, RefHolder> getMap(final Source source,
-            final HashService hashService,
-            RefLockService refLockService) {
+    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, final RefLockService refLockService,
+            ExecutorService executor) {
         return new Cache2kBuilder<String, RefHolder>() {
         }
                 .name(KeyStorage.class)
                 .loader(new CacheLoader<String, RefHolder>() {
                     @Override
-                    public RefHolder load(final String r) throws Exception {
-                        if (r.startsWith("refs/tags/")) {
-                            return new ReadOnlyRefHolder(r, source, hashService, refLockService);
+                    public RefHolder load(final String ref) throws Exception {
+                        if (ref.startsWith("refs/tags/")) {
+                            return new ReadOnlyRefHolder(ref, source, hashService, refLockService, executor);
                         }
-                        final RefHolder refHolder = new RefHolder(r, source, hashService, refLockService);
+                        final RefHolder refHolder = new RefHolder(ref, source, hashService, refLockService, executor);
                         refHolder.start();
                         return refHolder;
                     }
@@ -472,7 +475,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public void addRef(String ref) {
+    public void addRef(final String ref) {
         RefHolder refHolder = cache.peek(ref);
         if (refHolder == null) {
             LOG.info("Adding ref {}", ref);

@@ -42,14 +42,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.codahale.metrics.MetricRegistry;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.CommitMetaData;
@@ -72,17 +75,25 @@ public class RefHolderTest {
     private static final String REF = "refs/heads/master";
     private Source source;
     private HashService hashService = new HashService();
-    private RefLockService clusterService = new LocalRefLockService();
+    private RefLockService clusterService;
+    private ExecutorService workStealer;
 
     @BeforeEach
     public void setup() {
         source = mock(Source.class);
+        workStealer = mock(ExecutorService.class);
+        clusterService = new LocalRefLockService(new MetricRegistry());
+    }
+
+    @AfterEach
+    public void tearDown() throws Exception {
+        clusterService.close();
     }
 
     // TODO Fix this with a better name and check that the logic holds
     @Test
     public void testPutGet() {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.empty());
             assertNotNull(ref.readKey("key"));
@@ -102,7 +113,7 @@ public class RefHolderTest {
 
         byte[] data = getData().getBytes(UTF_8);
         when(source.modifyKey(eq("key"), eq(REF), any(), eq(cmd))).thenReturn(Pair.of("2", ts));
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.of(storeInfo));
             ref.modifyKey("key", toProvider(data), "1", cmd).orTimeout(5, TimeUnit.SECONDS).join();
@@ -120,7 +131,7 @@ public class RefHolderTest {
         when(storeInfo.getMetaData()).thenReturn(storageData);
         when(storeInfo.getVersion()).thenReturn("1");
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.of(storeInfo));
             CompletableFuture<Either<String, FailedToLock>> modifyMetadata = ref.modifyMetadata("key", storageData, "1", commitMetaData);
@@ -140,7 +151,7 @@ public class RefHolderTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             assertTrue(ref.readKey("key").isPresent());
         }
@@ -149,7 +160,7 @@ public class RefHolderTest {
     @Test
     public void testLoadAndStoreRefNotFound() throws IOException, RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(REF));
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             assertThrows(LoadException.class, () -> ref.readKey("key"));
         }
@@ -165,7 +176,7 @@ public class RefHolderTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             Optional<StoreInfo> loadAndStore = ref.readKey("key");
             assertEquals(ref.readKey("key"), loadAndStore);
@@ -182,7 +193,7 @@ public class RefHolderTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.isMetaDataSource()).thenReturn(true);
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             Optional<StoreInfo> loadAndStore = ref.readKey("key/");
             assertEquals(ref.readKey("key/"), loadAndStore);
@@ -198,7 +209,7 @@ public class RefHolderTest {
         when(sourceInfo.readMetaData()).thenCallRealMethod();
         when(sourceInfo.getMetadataInputStream()).thenThrow(ioException);
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.readKey("key")).getCause());
         }
@@ -206,7 +217,7 @@ public class RefHolderTest {
 
     @Test
     public void testCheckIfPlainKeyDoesNotExist() {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.empty());
             ref.checkIfPlainKeyExist("key/");
@@ -215,7 +226,7 @@ public class RefHolderTest {
 
     @Test
     public void testCheckIfPlainKeyDoesNotExistNull() {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.checkIfPlainKeyExist("key/");
         }
@@ -224,7 +235,7 @@ public class RefHolderTest {
     @Test
     public void testCheckIfPlainKeyExist() {
         StoreInfo storeInfo = mock(StoreInfo.class);
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.of(storeInfo));
             assertThrows(WrappingAPIException.class, () -> ref.checkIfPlainKeyExist("key/"));
@@ -233,11 +244,11 @@ public class RefHolderTest {
 
     @Test
     public void testmodifyUserButNotLoaded() throws RefNotFoundException, IOException {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            CompletionException ex = assertThrows(CompletionException.class,
-                    () -> ref.modifyUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
-                            .join());
+            CompletionException ex = assertThrows(CompletionException.class, () -> ref
+                    .modifyUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
+                    .join());
             assertEquals(WrappingAPIException.class, ex.getCause().getClass());
             assertEquals(VersionIsNotSame.class, ex.getCause().getCause().getClass());
         }
@@ -247,11 +258,11 @@ public class RefHolderTest {
     public void testModifyUserWithNewRoles() throws RefNotFoundException, IOException {
         when(source.addUser(Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any())).thenReturn("1");
 
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            assertEquals("1",
-                    ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash")).orTimeout(5, TimeUnit.SECONDS).join()
-                            .getLeft());
+            assertEquals("1", ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash")).orTimeout(5, TimeUnit.SECONDS)
+                    .join()
+                    .getLeft());
             ref.modifyUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS).join();
             verify(source).updateUser(eq(".users/user"), eq(REF), eq("modifyinguser"), eq(new UserData(Set.of(new Role("role")), null, "salt", "hash")));
         }
@@ -259,7 +270,7 @@ public class RefHolderTest {
 
     @Test
     public void testCheckIfPlainKeyDoesExist() {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             StoreInfo si = Mockito.mock(StoreInfo.class);
             ref.putKey("key", Optional.of(si));
@@ -269,7 +280,7 @@ public class RefHolderTest {
 
     @Test
     public void testDeleteUser() throws IOException {
-        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService);) {
+        try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.deleteUser("user", "asUser").orTimeout(5, TimeUnit.SECONDS).join();
             verify(source).deleteUser(eq(".users/user"), eq(REF), eq("asUser"));
@@ -285,17 +296,13 @@ public class RefHolderTest {
         return new ByteArrayInputStream(data.getBytes(UTF_8));
     }
 
-    private String getData() {
-        return getData(0);
-    }
+    private String getData() { return getData(0); }
 
     private String getMetaData(int i) {
         return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}]}";
     }
 
-    private String getMetaData() {
-        return getMetaData(0);
-    }
+    private String getMetaData() { return getMetaData(0); }
 
     private String getData(int i) {
         return "{\"key" + i

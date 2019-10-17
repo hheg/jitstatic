@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import com.codahale.metrics.InstrumentedExecutorService;
+import com.codahale.metrics.MetricRegistry;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.hosted.DistributedData;
@@ -36,10 +38,14 @@ import io.jitstatic.hosted.FailedToLock;
 
 public class LocalRefLockService implements RefLockService {
     private final Map<String, LockService> refLockMap = new HashMap<>();
-    private final ExecutorService repoWriter = Executors.newSingleThreadExecutor(new NamingThreadFactory("RepoWriter"));
+    private final ExecutorService repoWriter;
+
+    public LocalRefLockService(final MetricRegistry metrics) {
+        this.repoWriter = new InstrumentedExecutorService( Executors.newSingleThreadExecutor(new NamingThreadFactory("RepoWriter")), metrics);
+    }
 
     @Override
-    public void close() throws Exception {
+    public synchronized void close() throws Exception {
         repoWriter.shutdown();
         repoWriter.awaitTermination(10, TimeUnit.SECONDS);
         refLockMap.forEach((k, v) -> v.close());

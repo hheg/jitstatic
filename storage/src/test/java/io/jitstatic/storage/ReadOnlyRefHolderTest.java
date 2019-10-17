@@ -21,11 +21,12 @@ package io.jitstatic.storage;
  */
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
@@ -38,13 +39,14 @@ class ReadOnlyRefHolderTest {
 
     @Test
     void testReadOnlyRefHolder() {
-        ObjectStreamProvider osp = Mockito.mock(ObjectStreamProvider.class);
-        CommitMetaData cmd = Mockito.mock(CommitMetaData.class);
-        MetaData metaData = Mockito.mock(MetaData.class);
-        UserData userData = Mockito.mock(UserData.class);
+        ObjectStreamProvider osp = mock(ObjectStreamProvider.class);
+        ExecutorService workStealer = mock(ExecutorService.class);
+        CommitMetaData cmd = mock(CommitMetaData.class);
+        MetaData metaData = mock(MetaData.class);
+        UserData userData = mock(UserData.class);
         
-        try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", Mockito.mock(Source.class), Mockito.mock(HashService.class),
-                Mockito.mock(RefLockService.class));) {
+        try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", mock(Source.class), mock(HashService.class),
+                mock(RefLockService.class), workStealer);) {
             assertThrows(WrappingAPIException.class, () -> ref.addKey("key", osp, metaData, cmd));
             assertThrows(WrappingAPIException.class, () -> ref.addUser("user", "user", userData));
             assertThrows(WrappingAPIException.class, () -> ref.modifyKey("key", osp, "ref", cmd));

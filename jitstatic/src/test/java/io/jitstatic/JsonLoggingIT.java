@@ -36,6 +36,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.StreamSupport;
 
 import org.eclipse.jgit.api.Git;
@@ -45,6 +47,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -111,9 +114,8 @@ public class JsonLoggingIT {
     @Test
     public void testJSONLogging() throws URISyntaxException, APIException, IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(bos);
         PrintStream oldOutput = System.out;
-        System.setOut(ps);
+        System.setOut(new PrintStream(bos));
         try (JitStaticClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
             Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
             assertEquals(getData(), key.data.toString());
@@ -124,6 +126,21 @@ public class JsonLoggingIT {
         } finally {
             System.setOut(oldOutput);
         }
+    }
+
+    @Test
+    public void testJavaLoggingSlf4jLink() throws IOException {
+        assertTrue(SLF4JBridgeHandler.isInstalled());
+        String msg = "it works";
+        Logger logger = Logger.getLogger(getClass().getName());
+        logger.setLevel(Level.INFO);
+        PrintStream oldOut = System.out;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(baos));
+        logger.info(msg);
+        System.setOut(oldOut);
+        JsonNode tree = MAPPER.readTree(baos.toByteArray());
+        assertEquals(msg, tree.get("message").asText());
     }
 
     private Supplier<String> getFolder() {

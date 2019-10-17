@@ -4,7 +4,7 @@ package io.jitstatic;
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.health.HealthCheck;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -91,9 +92,10 @@ public class JitstaticApplicationTest {
     private ObjectMapper mapper;
     @Mock
     private ExecutorService executor;
+    @Mock
+    private MetricRegistry registry;
 
-    private HashService hashService = new HashService();
-    private final JitstaticApplication app = new JitstaticApplication();
+    private HashService hashService = new HashService(); 
     private JitstaticConfiguration config;
 
     @BeforeEach
@@ -107,16 +109,18 @@ public class JitstaticApplicationTest {
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);
-        when(storageFactory.build(any(), isA(Environment.class), any(), any(), any(), any())).thenReturn(storage);
+        when(storageFactory.build(any(), isA(Environment.class), any(), any(), any(), any(), any(), any())).thenReturn(storage);
         when(environment.getApplicationContext()).thenReturn(handler);
         when(handler.getBean(Mockito.eq(LoginService.class))).thenReturn(service);
         when(handler.getBean(Mockito.eq(HashService.class))).thenReturn(hashService);
         when(environment.getValidator()).thenReturn(validator);
         when(environment.getObjectMapper()).thenReturn(mapper);
+        when(environment.metrics()).thenReturn(registry);
     }
 
     @Test
     public void buildsAMapResource() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
@@ -125,6 +129,7 @@ public class JitstaticApplicationTest {
 
     @Test
     public void buildsAstorageHealthCheck() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
@@ -133,6 +138,7 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testRemoteManagerLifeCycleManagerIsRegistered() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
@@ -141,6 +147,7 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testStorageLifeCycleManagerIsRegisterd() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
@@ -149,6 +156,7 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testResourcesAreGettingClosed() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         assertThrows(RuntimeException.class, () -> {
             config.setHostedFactory(hostedFactory);
             when(hostedFactory.build(any(), any(), any())).thenReturn(source);
@@ -165,6 +173,7 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testDealingWhenFailed() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         TestException r = new TestException("Test Exception");
         HostedFactory hf = mock(HostedFactory.class);
         config.setHostedFactory(hf);
@@ -176,23 +185,28 @@ public class JitstaticApplicationTest {
 
     @Test
     public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
-        when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, null, null)).thenReturn(storage);
+        when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
+                .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
         app.run(config, environment);
+        
     }
 
     @Test
     public void testClosingSourceAndThrow() throws Exception {
+        JitstaticApplication app = new JitstaticApplication();
         assertThrows(TestException.class, () -> {
             doThrow(new TestException("Test exception1")).when(source).close();
             doThrow(new TestException("Test exception2")).when(storage).close();
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
             when(config.getKeyAdminAuthenticator(storage, hashService)).thenThrow(new TestException("Test exception3"));
-            when(hostedFactory.build(environment, JitStaticConstants.GIT_REALM, executor)).thenReturn(source);
-            when(storageFactory.build(source, environment, JitStaticConstants.JITSTATIC_KEYADMIN_REALM, hashService, null, null)).thenReturn(storage);
+            when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
+            when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
+                    .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
             app.run(config, environment);
         });
     }
