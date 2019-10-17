@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -50,6 +49,7 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import io.dropwizard.validation.Validated;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.KeyAdminAuthenticator;
@@ -84,7 +84,7 @@ public class BulkResource {
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public void fetch(@Suspended AsyncResponse asyncResponse,
-            final @NotNull @NotEmpty @Valid List<BulkSearch> searches,
+            final @Validated @NotEmpty @Valid List<BulkSearch> searches,
             final @Auth Optional<User> userHolder) {
         CompletableFuture.supplyAsync(() -> searches.stream()
                 .filter(bs -> APIHelper.isRef(bs.getRef()))
@@ -118,6 +118,9 @@ public class BulkResource {
                                     return false;
                                 }).map(ps -> new SearchResult(ps, p.getRight())))
                         .flatMap(Function.identity()).collect(Collectors.toList()))
-                .thenApplyAsync(result -> Response.ok(new SearchResultWrapper(result)).build()).thenAcceptAsync(asyncResponse::resume, executor);
+                .thenApplyAsync(result -> Response.ok(new SearchResultWrapper(result)).build()).exceptionally(t -> {
+                    LOG.error("Failed to fetch", t);
+                    return Response.serverError().build();
+                }).thenAcceptAsync(asyncResponse::resume, executor);
     }
 }
