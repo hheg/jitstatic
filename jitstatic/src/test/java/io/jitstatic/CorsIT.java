@@ -28,13 +28,12 @@ import static io.jitstatic.JitStaticConstants.PULL;
 import static io.jitstatic.JitStaticConstants.PUSH;
 import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -42,7 +41,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.eclipse.jetty.http.HttpStatus;
@@ -56,7 +54,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
 import com.mashape.unirest.http.Headers;
 import com.mashape.unirest.http.HttpResponse;
@@ -71,12 +68,13 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.source.ObjectStreamProvider;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
-public class CorsIT {
+public class CorsIT extends BaseTest {
 
     private static final String ALLFILESPATTERN = ".";
     private static final String KEYUSERNOROLE = "keyusernorole";
@@ -93,8 +91,6 @@ public class CorsIT {
 
     private static final String GITUSERFULL = "gituserfull";
     private static final String GITUSERFULLPASS = "1234";
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String GITUSERPUSH = "gituserpush";
     private static final String GITUSERPUSHPASS = "3333";
     private TemporaryFolder tmpFolder;
@@ -102,7 +98,7 @@ public class CorsIT {
     private String rootPassword;
 
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolderString()));
+            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private String adress;
     private String gitAdress;
     private UserData keyAdminUserData;
@@ -114,7 +110,7 @@ public class CorsIT {
         adress = String.format("http://localhost:%d/application", DW.getLocalPort());
         rootUser = hostedFactory.getUserName();
         rootPassword = hostedFactory.getSecret();
-        Path workingFolder = getFolder();
+        Path workingFolder = getFolderFile().toPath();
         String servletName = hostedFactory.getServletName();
         String endpoint = hostedFactory.getHostedEndpoint();
         gitAdress = adress + "/" + servletName + "/" + endpoint;
@@ -468,31 +464,8 @@ public class CorsIT {
         return set;
     }
 
-    private static String getData() {
-        return getData(0);
-    }
-
-    private static String getData(int c) {
-        return "{\"key" + c
-                + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
-    }
-
     private static String getMetaData(MetaData metaData) throws JsonProcessingException {
         return MAPPER.writeValueAsString(metaData);
-    }
-
-    private Supplier<String> getFolderString() {
-        return () -> {
-            try {
-                return getFolder().toString();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
-    }
-
-    private Path getFolder() throws IOException {
-        return tmpFolder.createTemporaryDirectory().toPath();
     }
 
     private void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
@@ -513,6 +486,11 @@ public class CorsIT {
         for (Path p : paths) {
             assertTrue(p.toFile().mkdirs());
         }
+    }
+
+    @Override
+    protected File getFolderFile() throws IOException {
+        return tmpFolder.createTemporaryDirectory();
     }
 
 }

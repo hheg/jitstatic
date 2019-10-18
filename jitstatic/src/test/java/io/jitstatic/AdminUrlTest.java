@@ -1,5 +1,8 @@
 package io.jitstatic;
 
+import static org.eclipse.jetty.http.HttpStatus.OK_200;
+import static org.eclipse.jetty.http.HttpStatus.UNAUTHORIZED_401;
+
 /*-
  * #%L
  * jitstatic
@@ -24,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.junit.jupiter.api.Test;
@@ -39,12 +41,13 @@ import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
-public class AdminUrlTest {
+public class AdminUrlTest extends BaseTest {
 
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
             AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
@@ -54,52 +57,52 @@ public class AdminUrlTest {
     public void testAccessAdminMetrics() throws UnirestException {
         HttpResponse<JsonNode> response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort()))
                 .header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        assertEquals(UNAUTHORIZED_401, response.getStatus());
 
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).queryString("pretty", "true")
                 .header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        assertEquals(UNAUTHORIZED_401, response.getStatus());
 
         response = Unirest.post(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        assertEquals(UNAUTHORIZED_401, response.getStatus());
 
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.OK_200, response.getStatus());
+        assertEquals(OK_200, response.getStatus());
 
         response = Unirest.get(String.format("http://localhost:%s/admin/metrics", DW.getLocalPort())).queryString("pretty", "true")
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.OK_200, response.getStatus());
+        assertEquals(OK_200, response.getStatus());
     }
 
     @Test
     public void testAccessAdminHealthCheck() throws UnirestException {
         HttpResponse<JsonNode> response = Unirest.get(String.format("http://localhost:%s/admin/healthcheck", DW.getLocalPort()))
                 .header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.OK_200, response.getStatus());
+        assertEquals(OK_200, response.getStatus());
 
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.get(String.format("http://localhost:%s/admin/healthcheck", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).header("accept", "application/json").asJson();
-        assertEquals(HttpStatus.OK_200, response.getStatus());
+        assertEquals(OK_200, response.getStatus());
     }
 
     @Test
     public void testAccessTasksGc() throws Exception {
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/admin/tasks/gc", DW.getLocalPort())).asString();
-        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        assertEquals(UNAUTHORIZED_401, response.getStatus());
 
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.post(String.format("http://localhost:%s/admin/tasks/gc", DW.getLocalPort()))
                 .basicAuth(hostedFactory.getAdminName(), hostedFactory.getAdminPass()).asString();
-        assertEquals(HttpStatus.OK_200, response.getStatus());
+        assertEquals(OK_200, response.getStatus());
     }
 
     @Test
     public void testAccessTasks() throws Exception {
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/admin/tasks", DW.getLocalPort())).asString();
-        assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        assertEquals(UNAUTHORIZED_401, response.getStatus());
 
         HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
         response = Unirest.post(String.format("http://localhost:%s/admin/tasks", DW.getLocalPort()))
@@ -107,17 +110,7 @@ public class AdminUrlTest {
         assertEquals(HttpStatus.NOT_FOUND_404, response.getStatus());
     }
     
-    private Supplier<String> getFolder() {
-        return () -> {
-            try {
-                return getFolderFile().getAbsolutePath();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
-    private File getFolderFile() throws IOException {
+    protected File getFolderFile() throws IOException {
         return tmpfolder.createTemporaryDirectory();
     }
 

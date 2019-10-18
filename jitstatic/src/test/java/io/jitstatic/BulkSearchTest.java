@@ -30,8 +30,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -39,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
@@ -50,7 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
@@ -61,17 +57,15 @@ import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.client.BulkSearch;
 import io.jitstatic.client.JitStaticClient;
-import io.jitstatic.client.JitStaticClientBuilder;
 import io.jitstatic.client.SearchPath;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.tools.AUtils;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
-public class BulkSearchTest {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Charset UTF_8 = StandardCharsets.UTF_8;
+public class BulkSearchTest extends BaseTest {
     private static final String USER = "user1";
     private static final String SECRET = "0234";
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
@@ -101,7 +95,7 @@ public class BulkSearchTest {
 
     @Test
     public void testSearch() throws Exception {
-        try (JitStaticClient updaterClient = buildClient().setUser(USER).setPassword(SECRET).build();) {
+        try (JitStaticClient updaterClient = buildClient(DW.getLocalPort()).setUser(USER).setPassword(SECRET).build();) {
             SearchResultWrapper search = updaterClient
                     .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
             assertNotNull(search);
@@ -112,7 +106,7 @@ public class BulkSearchTest {
 
     @Test
     public void testSearchNoUser() throws Exception {
-        try (JitStaticClient updaterClient = buildClient().build()) {
+        try (JitStaticClient updaterClient = buildClient(DW.getLocalPort()).build()) {
             SearchResultWrapper search = updaterClient
                     .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false)))), parse());
             assertNotNull(search);
@@ -157,31 +151,9 @@ public class BulkSearchTest {
         local.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call();
     }
 
-    private String getData() { return getData(0); }
-
-    private String getMetaData(int i) {
-        return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}]}";
-    }
-
-    private String getMetaData() { return getMetaData(0); }
-
-    private String getData(int i) {
-        return "{\"key" + i
-                + "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
-    }
-
-    private static Supplier<String> getFolder() {
-        return () -> {
-            try {
-                return tmpFolder.createTemporaryDirectory().getAbsolutePath();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
-    private JitStaticClientBuilder buildClient() {
-        return JitStaticClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
+    @Override
+    protected File getFolderFile() throws IOException { 
+        return tmpFolder.createTemporaryDirectory();
     }
 
 }

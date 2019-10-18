@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import java.io.File;
+
 /*-
  * #%L
  * jitstatic
@@ -41,12 +43,13 @@ import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.client.APIException;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 @Tag("slow")
-public class LoadTesterIT {
+public class LoadTesterIT extends BaseTest {
 
     private TemporaryFolder tmpfolder;
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
@@ -69,13 +72,6 @@ public class LoadTesterIT {
         runner.after();
     }
 
-    private Supplier<String> getFolder() {
-        return () -> {
-            try {
-                return tmpfolder.createTemporaryDirectory().toString();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
-    }
+    @Override
+    protected File getFolderFile() throws IOException { return tmpfolder.createTemporaryDirectory(); }
 }
