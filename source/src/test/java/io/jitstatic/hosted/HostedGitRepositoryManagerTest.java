@@ -65,7 +65,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.IOUtils;
 import org.awaitility.Awaitility;
-import org.awaitility.Duration;
+import org.awaitility.Durations;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -799,7 +799,7 @@ public class HostedGitRepositoryManagerTest {
                 refs.put(e, "dummy");
             });
             hrm.readAllRefs();
-            Awaitility.await().atMost(Duration.TEN_SECONDS).until(() -> refs.keySet().size(), equalTo(2));
+            Awaitility.await().atMost(Durations.TEN_SECONDS).until(() -> refs.keySet().size(), equalTo(2));
             assertEquals(Set.of("refs/heads/master", "refs/heads/other"), refs.keySet());
         }
     }

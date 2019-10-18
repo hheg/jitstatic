@@ -23,11 +23,9 @@ import java.io.File;
  */
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Supplier;
 
 import org.apache.http.client.ClientProtocolException;
 import org.eclipse.jgit.api.errors.GitAPIException;
