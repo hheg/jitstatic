@@ -52,6 +52,8 @@ import org.glassfish.jersey.internal.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.io.Files;
@@ -76,6 +78,8 @@ import io.jitstatic.tools.AUtils;
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class CorsIT extends BaseTest {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CorsIT.class);
+
     private static final String ALLFILESPATTERN = ".";
     private static final String KEYUSERNOROLE = "keyusernorole";
     private static final String KEYUSERNOROLEPASS = "1456";
@@ -97,8 +101,8 @@ public class CorsIT extends BaseTest {
     private String rootUser;
     private String rootPassword;
 
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+            .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private String adress;
     private String gitAdress;
     private UserData keyAdminUserData;
@@ -133,12 +137,12 @@ public class CorsIT extends BaseTest {
             Files.write(MAPPER.writeValueAsBytes(keyUserUserData), keyuser.toFile());
             Files.write(MAPPER.writeValueAsBytes(keyUserUserDataNoRole), keyusernorole.toFile());
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            Files.write(getMetaData(new MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set.of(new MetaData.Role("role")),
-                    Set.of(new MetaData.Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
+            Files.write(getMetaData(new MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set.of(new MetaData.Role("role")), Set
+                    .of(new MetaData.Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file2").toFile());
-            Files.write(getMetaData(new MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false,
-                    List.of(new io.jitstatic.client.HeaderPair("X-Test", "testvalue")), Set.of(new MetaData.Role("role")),
-                    Set.of(new MetaData.Role("role")))).getBytes(UTF_8), workingFolder.resolve("file2.metadata").toFile());
+            Files.write(getMetaData(new MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List
+                    .of(new io.jitstatic.client.HeaderPair("X-Test", "testvalue")), Set.of(new MetaData.Role("role")), Set.of(new MetaData.Role("role"))))
+                            .getBytes(UTF_8), workingFolder.resolve("file2.metadata").toFile());
 
             commit(git, provider);
             Path gitRealm = users.resolve(GIT_REALM);
@@ -203,9 +207,7 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequestGet() throws UnirestException {
-        Map<String, String> headers = Map.of(
-                "Origin", "http://localhost",
-                "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -218,10 +220,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testCORSRoot() throws UnirestException {
-        Map<String, String> headers = Map.of(
-                "Origin", "http://localhost",
-                "Access-Control-Request-Method", "PUT",
-                "Access-Control-Request-Headers", "Content-Type,Accept");
+        Map<String, String> headers = Map
+                .of("Origin", "http://localhost", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers", "Content-Type,Accept");
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -232,9 +232,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testCORSWrongHeader() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Access-Control-Request-Method", "PUT",
-                "Access-Control-Request-Headers", "Content-Type,Accept,Test");
+        Map<String, String> headers = Map
+                .of("Origin", "http://localhost", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers", "Content-Type,Accept,Test");
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -246,8 +245,7 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequest() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers responseHeaders = response.getHeaders();
@@ -263,12 +261,11 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequestPost() throws UnirestException, JsonProcessingException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Content-Type", "application/json",
-                "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
+                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/application/storage/file3", DW.getLocalPort())).headers(headers)
-                .body(MAPPER.writeValueAsBytes(new AddKeyData(ObjectStreamProvider.toProvider(new byte[] { 0 }),
-                        new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))
+                .body(MAPPER.writeValueAsBytes(new AddKeyData(ObjectStreamProvider
+                        .toProvider(new byte[] { 0 }), new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))
                 .asString();
         Headers responseHeaders = response.getHeaders();
         printHeaders(responseHeaders);
@@ -281,9 +278,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequestHead() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Access-Control-Request-Headers", "Content-Type,Accept",
-                "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Access-Control-Request-Headers", "Content-Type,Accept", "Authorization", "Basic "
+                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.head(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         printHeaders(response.getHeaders());
@@ -291,9 +287,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testCORSAllMetakey() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Access-Control-Request-Method", "PUT",
-                "Access-Control-Request-Headers", "Content-Type,Accept");
+        Map<String, String> headers = Map
+                .of("Origin", "http://localhost", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers", "Content-Type,Accept");
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -305,9 +300,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testAllowedHeaders() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://www.xxx.yyy",
-                "Access-Control-Request-Method", "PUT",
-                "Access-Control-Request-Headers", "X-Requested-With,Content-Type,Accept,Origin");
+        Map<String, String> headers = Map
+                .of("Origin", "http://www.xxx.yyy", "Access-Control-Request-Method", "PUT", "Access-Control-Request-Headers", "X-Requested-With,Content-Type,Accept,Origin");
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/key", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -320,20 +314,19 @@ public class CorsIT extends BaseTest {
     public void testPreflightDelete() throws UnirestException {
         HttpResponse<String> asString = Unirest.options(String.format("http://localhost:%s/application/storage/file", DW.getLocalPort()))
                 .header("Access-Control-Request-Method", "DELETE")
-                .header("Access-Control-Request-Headers",
-                        "content-type,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + "," + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
-                                + JitStaticConstants.X_JITSTATIC_NAME)
+                .header("Access-Control-Request-Headers", "content-type,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                        + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
+                        + JitStaticConstants.X_JITSTATIC_NAME)
                 .header("Origin", "http://localhost").asString();
         Headers headers = asString.getHeaders();
         printHeaders(headers);
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(
-                toSet(Arrays.asList(("X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
-                        + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
-                        + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(Collectors.toList())),
-                toSet(headers.get("Access-Control-Allow-Headers")));
+        assertEquals(toSet(Arrays.asList(("X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
+                + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toList())), toSet(headers.get("Access-Control-Allow-Headers")));
 
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
@@ -343,9 +336,9 @@ public class CorsIT extends BaseTest {
         HttpResponse<String> asString = Unirest.options(String.format("http://localhost:%s/application/storage/file", DW.getLocalPort()))
                 .queryString("ref", "refs/tags/tag")
                 .header("Access-Control-Request-Method", "DELETE")
-                .header("Access-Control-Request-Headers",
-                        "content-type,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + "," + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
-                                + JitStaticConstants.X_JITSTATIC_NAME)
+                .header("Access-Control-Request-Headers", "content-type,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                        + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
+                        + JitStaticConstants.X_JITSTATIC_NAME)
                 .header("Origin", "http://localhost").asString();
         Headers headers = asString.getHeaders();
         printHeaders(headers);
@@ -358,9 +351,8 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testNonSimpleRequestDelete() throws UnirestException, JsonProcessingException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost",
-                "Content-Type", "application/json",
-                "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
+                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
         HttpResponse<String> response = Unirest.delete(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers responseHeaders = response.getHeaders();
@@ -396,11 +388,10 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(
-                toSet(Arrays.asList(("x-test,X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
-                        + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
-                        + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(Collectors.toList())),
-                toSet(headers.get("Access-Control-Allow-Headers")));
+        assertEquals(toSet(Arrays.asList(("x-test,X-Requested-With,Content-Type,Accept,Origin,if-match," + JitStaticConstants.X_JITSTATIC_MAIL + ","
+                + JitStaticConstants.X_JITSTATIC_MESSAGE + ","
+                + JitStaticConstants.X_JITSTATIC_NAME).split(",")).stream().map(h -> h.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toList())), toSet(headers.get("Access-Control-Allow-Headers")));
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
 
@@ -420,11 +411,10 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(
-                Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
-                        .collect(Collectors.toList())),
-                Set.of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
-                        .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toList())), Set
+                        .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
+                                .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
 
@@ -444,16 +434,15 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(
-                Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
-                        .collect(Collectors.toList())),
-                Set.of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
-                        .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toList())), Set
+                        .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
+                                .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
-    
+
     private void printHeaders(Headers result) {
-        result.entrySet().forEach(System.out::println);
+        result.entrySet().forEach(h -> LOG.info("{}", h));
     }
 
     private Set<String> toSet(List<String> list) {
@@ -489,8 +478,6 @@ public class CorsIT extends BaseTest {
     }
 
     @Override
-    protected File getFolderFile() throws IOException {
-        return tmpFolder.createTemporaryDirectory();
-    }
+    protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
 
 }

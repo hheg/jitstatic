@@ -140,11 +140,13 @@ public class JsonLoggingIT extends BaseTest {
         System.setOut(oldOut);
         listen.flush();
         byte[] content = baos.toByteArray();
-        if (content.length > 0) {
-            JsonNode tree = MAPPER.readTree(content);
-            assertEquals(msg, tree.get("message").asText(), new String(content));
+        JsonNode tree = MAPPER.readTree(content);
+        JsonNode message = tree.get("message");
+        if (message != null) {
+            assertEquals(msg, message.asText(), new String(content));
         } else {
-            System.out.println("WARN: Missed the flush " + new String(content));
+            System.out.println("Content: " + new String(content));
+            assertTrue(content.length > 0);
         }
     }
 
