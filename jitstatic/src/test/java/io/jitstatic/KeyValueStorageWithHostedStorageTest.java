@@ -142,8 +142,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
             writeFile(workingDirectory.toPath(), "accept/genkey");
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
-            Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate(REFS_HEADS_MASTER).getStatus() == Status.OK));
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
         }
     }
 
@@ -266,7 +265,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
         try (JitStaticClient client = builder.build(); JitStaticClient getter = buildClient(DW.getLocalPort()).build()) {
             APIException apiException = assertThrows(APIException.class, () -> client
                     .createKey(getData().getBytes(UTF_8), new CommitData("base/newkey", "master", "commit message", "user1", "user@mail"), new MetaData(Set
-                            .of(new User("", "")), APPLICATION_JSON)));
+                            .of(new User("", "1234")), APPLICATION_JSON)));
             assertEquals(HttpStatus.UNPROCESSABLE_ENTITY_422, apiException.getStatusCode());
             assertEquals("POST http://localhost:" + DW.getLocalPort()
                     + "/application/storage/ failed with: 422  {\"errors\":[\"metaData.users[].user may not be empty\"]}", apiException.getMessage());

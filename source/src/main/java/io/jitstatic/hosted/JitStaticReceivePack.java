@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
@@ -55,6 +56,7 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.CorruptedSourceException;
+import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.hosted.events.AddRefEvent;
 import io.jitstatic.hosted.events.DeleteRefEvent;
@@ -107,17 +109,15 @@ public class JitStaticReceivePack extends ReceivePack {
                     .filter(rc -> rc.getRefName().startsWith(JitStaticConstants.REFS_JITSTATIC))
                     .map(ReceiveCommand::getRefName)
                     .collect(Collectors.toList());
-            CompletableFuture.runAsync(() -> {
-                refs.forEach(ref -> {
-                    try {
-                        final RefUpdate ru = getRepository().updateRef(ref);
-                        ru.setForceUpdate(true);
-                        ru.delete();
-                    } catch (IOException e) {
-                        LOG.info(e.getLocalizedMessage());
-                    }
-                });
-            }, repoSerializer);
+            CompletableFuture.runAsync(() -> refs.forEach(ref -> {
+                try {
+                    final RefUpdate ru = getRepository().updateRef(ref);
+                    ru.setForceUpdate(true);
+                    ru.delete();
+                } catch (IOException e) {
+                    LOG.info(e.getLocalizedMessage());
+                }
+            }), repoSerializer);
         }
     }
 
@@ -216,15 +216,11 @@ public class JitStaticReceivePack extends ReceivePack {
     private void checkBranchData(final String branch, final String testBranchName, final ReceiveCommand testRc) {
         try {
             sendMessage("Checking " + branch + " branch.");
-            final Pair<List<String>, List<String>> interpretedErrorMessages = CorruptedSourceException
-                    .interpreteMessages(sourceChecker.checkTestBranchForErrors(testBranchName), testBranchName, branch);
-            final Pair<List<String>, List<String>> interpretedMessages = CorruptedSourceException
-                    .interpreteMessages(userExtractor.checkOnTestBranch(testBranchName, branch), testBranchName, branch);
+            final List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> mergedData = checkAndMerge(branch, testBranchName);
+            final Pair<List<String>, List<String>> interpretedErrorMessages = CorruptedSourceException.interpreteMessages(mergedData, testBranchName, branch);
             final List<String> errors = new ArrayList<>(interpretedErrorMessages.getLeft());
             final List<String> warnings = new ArrayList<>(interpretedErrorMessages.getRight());
 
-            errors.addAll(interpretedMessages.getLeft());
-            warnings.addAll(interpretedMessages.getRight());
             warnings.forEach(this::sendMessage);
 
             if (!errors.isEmpty()) {
@@ -243,6 +239,11 @@ public class JitStaticReceivePack extends ReceivePack {
             testRc.setResult(Result.REJECTED_OTHER_REASON, msg);
             setFault(new RepositoryException(msg, unexpected));
         }
+    }
+
+    private List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> checkAndMerge(final String branch, final String testBranchName)
+            throws RefNotFoundException, IOException {
+        return Stream.concat(sourceChecker.checkTestBranchForErrors(testBranchName).stream(), userExtractor.checkOnTestBranch(testBranchName, branch).stream()).collect(Collectors.toList());
     }
 
     private void commitCommands(final List<Pair<ReceiveCommand, ReceiveCommand>> cmds, final ProgressMonitor monitor) {

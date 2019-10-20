@@ -48,20 +48,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.check.FileObjectIdStore;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith(TemporaryFolderExtension.class)
-public class UserExtractorTest {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+public class UserExtractorTest extends BaseTest {
     private static final String REF_HEAD_MASTER = Constants.R_HEADS + "master";
     private static final String store = "data";
     private TemporaryFolder tmpFolder;
@@ -85,7 +83,7 @@ public class UserExtractorTest {
     private void commit() throws NoFilepatternException, GitAPIException {
         workingGit.add().addFilepattern(".").call();
         workingGit.commit().setMessage("Initial commit").call();
-        workingGit.push().call();
+        verifyOkPush(workingGit.push().call());
     }
 
     private File createTempFiles() throws IOException {
@@ -246,4 +244,7 @@ public class UserExtractorTest {
             assertTrue(realm.toFile().mkdirs());
         }
     }
+
+    @Override
+    protected File getFolderFile() throws IOException { return null; }
 }

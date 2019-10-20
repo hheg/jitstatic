@@ -478,7 +478,7 @@ public class CorsIT extends BaseTest {
         git.checkout().setName(string).setCreateBranch(true).call();
         git.add().addFilepattern(ALLFILESPATTERN).call();
         git.commit().setMessage("Test commit").call();
-        git.push().setCredentialsProvider(provider).call();
+        verifyOkPush(git.push().setCredentialsProvider(provider).call());
 
     }
 

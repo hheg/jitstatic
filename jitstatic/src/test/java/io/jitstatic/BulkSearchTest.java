@@ -148,7 +148,7 @@ public class BulkSearchTest extends BaseTest {
         Files.write(mfile, getMetaData().getBytes(UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         local.add().addFilepattern(".").call();
         local.commit().setMessage("Commit " + file.toString()).call();
-        local.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call();
+        verifyOkPush(local.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call());
     }
 
     @Override

@@ -53,12 +53,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.hosted.RemoteTestUtils;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 import io.jitstatic.utils.Pair;
 
 @ExtendWith(TemporaryFolderExtension.class)
-public class SourceCheckerTest {
+public class SourceCheckerTest extends BaseTest {
 
     private static final String REF_HEAD_MASTER = Constants.R_HEADS + "master";
     private static final String store = "data";
@@ -134,10 +135,11 @@ public class SourceCheckerTest {
         Files.write(workingPath.resolve("data.metadata"), getMetaData().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE);
         workingGit.add().addFilepattern(".").call();
         workingGit.commit().setMessage("msg").call();
-        workingGit.push().call();
+        verifyOkPush(workingGit.push().call());
         SourceChecker sc = new SourceChecker(bareGit.getRepository());
         List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> errors = sc.checkBranchForErrors(REF_HEAD_MASTER);
-        assertTrue(errors.isEmpty());
+        Pair<List<String>, List<String>> interpretedMessages = CorruptedSourceException.interpreteMessages(errors);
+        assertTrue(interpretedMessages.getLeft().isEmpty(), errors.toString());
     }
 
     @Test
@@ -175,23 +177,7 @@ public class SourceCheckerTest {
         }).getLocalizedMessage());
     }
 
-    private void verifyOkPush(Iterable<PushResult> iterable) {
-        verifyOkPush(iterable, "refs/heads/master");
-    }
-
-    private void verifyOkPush(Iterable<PushResult> iterable,
-            String branch) {
-        PushResult pushResult = iterable.iterator().next();
-        RemoteRefUpdate remoteUpdate = pushResult.getRemoteUpdate(branch);
-        assertEquals(Status.OK, remoteUpdate.getStatus());
-    }
-
-    private String getMetaData(int i) {
-        return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}]}";
-    }
-
-    private String getMetaData() {
-        return getMetaData(0);
-    }
+    @Override
+    protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
 
 }

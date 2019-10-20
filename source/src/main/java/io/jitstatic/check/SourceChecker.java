@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -91,11 +91,10 @@ public class SourceChecker {
     }
 
     public List<Pair<Set<Ref>, List<Pair<FileObjectIdStore, Exception>>>> check() {
-        final Map<Pair<AnyObjectId, Set<Ref>>, List<BranchData>> sources = extractor.extractAll();
-        return sources.entrySet().parallelStream()
+        return extractor.extractAll().entrySet().parallelStream()
                 .map(Pair::new)
                 .map(this::checkBranch)
-                .filter(l -> !l.isEmpty())
+                .filter(Predicate.not(List::isEmpty))
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
     }
@@ -134,12 +133,16 @@ public class SourceChecker {
         }
         return Stream.of(Pair.of(check.getLeft(), fileMetaDataResult.getRight()));
     }
-
+    /** 
+     * This is deprecated since JitStatic isn't going to check files if they are valid according to declared type.
+     * This should be solely something the user should validate.
+     */
+    @Deprecated
     private Pair<FileObjectIdStore, Exception> readAndCheckSourceFileData(final SourceFileData data, final String contentType) {
         final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
         if (inputStreamHolder.isPresent()) {
             try (InputStream is = inputStreamHolder.inputStream()) {
-                if (APPLICATION_JSON.equals(contentType)) {
+                if (APPLICATION_JSON.equalsIgnoreCase(contentType)) {
                     PARSER.parseJson(is);
                 }
             } catch (final IOException e) {

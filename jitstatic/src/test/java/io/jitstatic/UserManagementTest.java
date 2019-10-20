@@ -1088,7 +1088,7 @@ public class UserManagementTest extends BaseTest {
     private void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
         git.add().addFilepattern(ALLFILESPATTERN).call();
         git.commit().setMessage("Test commit").call();
-        git.push().setCredentialsProvider(provider).call();
+        verifyOkPush(git.push().setCredentialsProvider(provider).call());
     }
 
     private void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {

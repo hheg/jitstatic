@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 /*-
  * #%L
  * jitstatic
@@ -42,25 +44,25 @@ public class SourceJSONParserTest {
     @Test
     public void testReadValidParser() throws IOException {
         try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test3.md.json")) {
-            p.parseMetaData(bc);
+            assertNotNull(p.parseMetaData(bc));
         }
     }
 
     @Test
-    public void testReadJSONWithMissingUserField() throws IOException {
-        assertThat(assertThrows(IOException.class, () -> {
-            try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test5.json")) {
+    public void testReadNotValidParser() throws IOException {
+        assertThrows(StorageParseException.class, () -> {
+            try (InputStream bc = SourceJSONParserTest.class.getResourceAsStream("/test3.md2.json")) {
                 p.parseMetaData(bc);
             }
-        }).getLocalizedMessage(), CoreMatchers.containsString("metadata is missing users field"));
+        });
     }
 
     @Test
     public void testReadObjectWithUserWithNoUser() throws UnsupportedEncodingException, IOException {
-        assertThat(assertThrows(IOException.class, () -> {
+        assertThat(assertThrows(StorageParseException.class, () -> {
             try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
                 p.parseMetaData(bc);
             }
-        }).getLocalizedMessage(), CoreMatchers.containsString("Property="));
+        }).getLocalizedMessage(), CoreMatchers.containsString("Error: property=users[].user, message=may not be empty, invalidValue=null"));
     }
 }

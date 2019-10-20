@@ -24,8 +24,6 @@ import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
 
-import javax.validation.constraints.NotNull;
-
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -37,12 +35,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(justification = "Equals used here is not dodgy code", value = { "EQ_UNUSUAL" })
 public final class User implements Principal {
 
-    @NotNull
     @NotEmpty
     private final String user;
-    @NotNull
-    private final String password;
 
+    @NotEmpty
+    private final String password;
+    
     @JsonCreator
     public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
         this.user = user;

@@ -50,7 +50,7 @@ public class StoreInfoTest {
         assertEquals(s1, s1);
         assertEquals(s1, s2);
         assertNotEquals(s1, s3);
-        assertNotEquals(s1, null);
+        assertNotEquals(null, s1);
         assertNotEquals(s1, new Object());
         assertEquals(s1.hashCode(), s2.hashCode());
         assertEquals("1", s1.getVersion());

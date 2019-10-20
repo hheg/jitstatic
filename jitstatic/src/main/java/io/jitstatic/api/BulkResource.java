@@ -99,8 +99,8 @@ public class BulkResource {
                                     final String ref = APIHelper.setToDefaultRefIfNull(p.getRight(), defaultRef);
                                     final MetaData storageData = data.getRight().getMetaData();
                                     final Set<User> allowedUsers = storageData.getUsers();
-                                    final Set<Role> keyRoles = storageData.getRead();
-                                    if (allowedUsers.isEmpty() && (keyRoles == null || keyRoles.isEmpty())) {
+                                    final Set<Role> readRoles = storageData.getRead();
+                                    if (allowedUsers.isEmpty() && (readRoles == null || readRoles.isEmpty())) {
                                         LOG.info("{} logged in and accessed key {} in {}", userHolder.orElse(new User("anonymous", null)), data.getLeft(), ref);
                                         return true;
                                     }
@@ -108,7 +108,7 @@ public class BulkResource {
                                         return false;
                                     }
                                     final User user = userHolder.get();
-                                    if (allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, keyRoles)
+                                    if (allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, readRoles)
                                             || addKeyAuthenticator.authenticate(user, ref)) {
                                         LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft().stream()
                                                 .map(Pair::getLeft)

@@ -36,11 +36,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.auth.User;
+import io.jitstatic.constraints.IfNotEmpty;
+import io.jitstatic.constraints.Warning;
 
 @SuppressFBWarnings(justification = "Equals used here is not dodgy code", value = { "EQ_UNUSUAL" })
 public class MetaData {
-    @NotNull
+
     @Valid
+    @Deprecated
+    @NotNull
+    @IfNotEmpty(payload = Warning.class, groups = { Warning.class })
     private final Set<User> users;
     @NotNull
     @NotEmpty
@@ -50,21 +55,29 @@ public class MetaData {
     @Valid
     private final List<HeaderPair> headers;
     @Valid
+    @NotNull(payload = Warning.class, groups = { Warning.class })
     private final Set<Role> read;
     @Valid
+    @NotNull(payload = Warning.class, groups = { Warning.class })
     private final Set<Role> write;
 
     @JsonCreator
+    @Deprecated
     public MetaData(final @JsonProperty("users") Set<User> users, final @JsonProperty("contentType") String contentType,
             final @JsonProperty("protected") boolean isProtected, final @JsonProperty("hidden") boolean hidden,
             final @JsonProperty("headers") List<HeaderPair> headers, final @JsonProperty("read") Set<Role> read, final @JsonProperty("write") Set<Role> write) {
-        this.users = Objects.requireNonNull(users, "metadata is missing users field");
+        this.users = users;
         this.contentType = contentType == null ? "application/json" : contentType;
         this.isProtected = isProtected;
         this.hidden = hidden;
         this.headers = headers;
         this.read = read;
         this.write = write;
+    }
+
+    public MetaData(final String contentType, final boolean isProtected, final boolean hidden,
+            final List<HeaderPair> headers, final Set<Role> read, Set<Role> write) {
+        this(Set.of(), contentType, isProtected, hidden, headers, read, write);
     }
 
     public MetaData(final Set<Role> read, final Set<Role> write) {
@@ -75,17 +88,9 @@ public class MetaData {
         this(users, null, false, false, List.of(), null, null);
     }
 
-    public Set<User> getUsers() {
-        return users;
-    }
-
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + users.hashCode();
-        result = prime * result + getContentType().hashCode();
-        return result;
+        return Objects.hash(users, getContentType());
     }
 
     @Override
@@ -98,27 +103,19 @@ public class MetaData {
                 .isPresent();
     }
 
-    public String getContentType() {
-        return contentType;
-    }
+    @Deprecated
+    public Set<User> getUsers() { return users; }
 
-    public boolean isProtected() {
-        return isProtected;
-    }
+    public String getContentType() { return contentType; }
 
-    public boolean isHidden() {
-        return hidden;
-    }
+    public boolean isProtected() { return isProtected; }
 
-    public List<HeaderPair> getHeaders() {
-        return headers;
-    }
+    public boolean isHidden() { return hidden; }
 
-    public Set<Role> getRead() {
-        return read;
-    }
+    public List<HeaderPair> getHeaders() { return headers; }
 
-    public Set<Role> getWrite() {
-        return write;
-    }
+    public Set<Role> getRead() { return read; }
+
+    public Set<Role> getWrite() { return write; }
+
 }

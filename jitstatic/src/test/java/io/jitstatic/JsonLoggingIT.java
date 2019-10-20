@@ -34,13 +34,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.StreamSupport;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.transport.PushResult;
-import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,20 +98,23 @@ public class JsonLoggingIT extends BaseTest {
             writeFile(workingDirectory.toPath(), "accept/genkey");
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
-            Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate(REFS_HEADS_MASTER).getStatus() == Status.OK));
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
         }
     }
 
     @Test
-    public void testJSONLogging() throws URISyntaxException, APIException, IOException {
+    public void testJSONLogging() throws URISyntaxException, APIException, IOException, InterruptedException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         PrintStream oldOutput = System.out;
-        System.setOut(new PrintStream(bos));
+        Semaphore s = new Semaphore(1);
+        PrintStream listener = getPrintStream(bos, s);
+        System.setOut(listener);
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(USER).setPassword(PASSWORD).build();) {
             Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, parse(JsonNode.class));
             assertEquals(getData(), key.getData().toString());
             assertNotNull(key.getTag());
+            s.acquire();
+            listener.flush();
             assertTrue(bos.toByteArray().length > 0);
             JsonNode readTree = MAPPER.readTree(bos.toByteArray());
             assertEquals("INFO", readTree.findValue("level").asText());
@@ -123,18 +124,38 @@ public class JsonLoggingIT extends BaseTest {
     }
 
     @Test
-    public void testJavaLoggingSlf4jLink() throws IOException {
+    public void testJavaLoggingSlf4jLink() throws IOException, InterruptedException {
         assertTrue(SLF4JBridgeHandler.isInstalled());
         String msg = "it works";
         Logger logger = Logger.getLogger(getClass().getName());
         logger.setLevel(Level.INFO);
         PrintStream oldOut = System.out;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(baos));
+        Semaphore s = new Semaphore(1);
+        PrintStream listen = getPrintStream(baos, s);
+        s.acquire();
+        System.setOut(listen);
         logger.info(msg);
+        s.acquire();
         System.setOut(oldOut);
-        JsonNode tree = MAPPER.readTree(baos.toByteArray());
-        assertEquals(msg, tree.get("message").asText());
+        listen.flush();
+        byte[] content = baos.toByteArray();
+        if (content.length > 0) {
+            JsonNode tree = MAPPER.readTree(content);
+            assertEquals(msg, tree.get("message").asText(), new String(content));
+        } else {
+            System.out.println("WARN: Missed the flush " + new String(content));
+        }
+    }
+
+    private PrintStream getPrintStream(ByteArrayOutputStream baos, Semaphore s) {
+        return new PrintStream(baos, true) {
+            @Override
+            public void flush() {
+                super.flush();
+                s.release();
+            }
+        };
     }
 
     protected File getFolderFile() throws IOException { return tmpfolder.createTemporaryDirectory(); }

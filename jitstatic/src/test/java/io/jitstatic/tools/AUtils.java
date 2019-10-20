@@ -36,7 +36,8 @@ import com.codahale.metrics.health.HealthCheck.Result;
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.jitstatic.JitstaticConfiguration;
-
+@Deprecated
+// TODO Use ContainerUtils
 public class AUtils {
 
     public static void checkContainerForErrors(DropwizardAppExtension<JitstaticConfiguration> dw) {

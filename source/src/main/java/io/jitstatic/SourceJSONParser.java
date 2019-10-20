@@ -28,9 +28,12 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
+import javax.validation.groups.Default;
 
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.jitstatic.constraints.Warning;
 
 public class SourceJSONParser {
 
@@ -45,7 +48,7 @@ public class SourceJSONParser {
     public String parseMetaData(final InputStream bc) throws IOException {
         final MetaData metaData = parseStream(bc);
 
-        final Set<ConstraintViolation<MetaData>> violations = validator.validate(metaData);
+        final Set<ConstraintViolation<MetaData>> violations = validator.validate(metaData, Warning.class, Default.class);
         if (!violations.isEmpty()) {
             throw new StorageParseException(violations);
         }
