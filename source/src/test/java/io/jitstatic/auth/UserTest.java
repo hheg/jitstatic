@@ -58,7 +58,7 @@ public class UserTest {
 	@Test
 	public void testAgainstNull() {
 		User u1 = new User(new String("auser"), null);
-		assertNotEquals(u1, null);
+		assertNotEquals(null, u1);
 	}
 
 	@Test

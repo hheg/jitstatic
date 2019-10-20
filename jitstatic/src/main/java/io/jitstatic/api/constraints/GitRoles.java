@@ -1,4 +1,4 @@
-package io.jitstatic.auth.constraints;
+package io.jitstatic.api.constraints;
 
 /*-
  * #%L
@@ -20,8 +20,25 @@ package io.jitstatic.auth.constraints;
  * #L%
  */
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import javax.validation.Constraint;
 import javax.validation.Payload;
 
-public interface Warning extends Payload {
 
+@Constraint(validatedBy = GitRolesValidator.class)
+@Documented
+@Retention(RUNTIME)
+@Target(FIELD)
+public @interface GitRoles {
+    String message() default "Contains not valid git roles";
+
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
 }

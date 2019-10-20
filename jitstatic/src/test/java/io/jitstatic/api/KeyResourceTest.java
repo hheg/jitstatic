@@ -49,9 +49,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
@@ -74,7 +71,6 @@ import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.AuthDynamicFeature;
@@ -99,7 +95,6 @@ import io.jitstatic.utils.WrappingAPIException;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class KeyResourceTest {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String APPLICATION_JSON = "application/json";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -110,8 +105,6 @@ public class KeyResourceTest {
 
     private static final String BASIC_AUTH_CRED = createCreds(USER, SECRET);
     private static final String BASIC_AUTH_CRED_POST = createCreds(PUSER, PSECRET);
-    private static final ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
-    private static final Validator VALIDATOR = validatorFactory.getValidator();
 
     private static final Map<String, Optional<StoreInfo>> DATA = new HashMap<>();
     private static String returnedDog;
@@ -127,7 +120,7 @@ public class KeyResourceTest {
             .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new KeyResource(storage, new KeyAdminAuthenticatorImpl(storage, (user,
                     ref) -> new User(PUSER, PSECRET)
-                            .equals(user), REFS_HEADS_MASTER, hashService), false, REFS_HEADS_MASTER, MAPPER, VALIDATOR, new HashService()))
+                            .equals(user), REFS_HEADS_MASTER, hashService), false, REFS_HEADS_MASTER, new HashService()))
             .build();
 
     @BeforeAll

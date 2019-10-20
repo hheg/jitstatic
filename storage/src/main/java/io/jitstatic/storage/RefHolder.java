@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -79,8 +80,10 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     private final HashService hashService;
     private final LockService lock;
     private final RefLockService refLockService;
+    private final ExecutorService workStealingExecutor;
 
-    public RefHolder(final String ref, final Source source, final HashService hashService, final RefLockService refLockService) {
+    public RefHolder(final String ref, final Source source, final HashService hashService, final RefLockService refLockService,
+            final ExecutorService workStealingExecutor) {
         this.ref = Objects.requireNonNull(ref);
         this.refCache = new AtomicReference<>(getStorage(MAX_ENTRIES));
         this.refLockService = refLockService;
@@ -88,6 +91,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         this.threshold = THRESHOLD;
         this.hashService = Objects.requireNonNull(hashService);
         this.lock = refLockService.getLockService(ref);
+        this.workStealingExecutor = Objects.requireNonNull(workStealingExecutor);
     }
 
     public void start() {
@@ -225,8 +229,8 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         }
         final Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> version = source.addKey(key, ref, data, metaData, commitMetaData);
         final Pair<ThrowingSupplier<ObjectLoader, IOException>, String> fileInfo = version.getLeft();
-        final StoreInfo newStoreInfo = new StoreInfo(data.getObjectStreamProvider(fileInfo.getLeft(), threshold), metaData, fileInfo.getRight(),
-                version.getRight());
+        final StoreInfo newStoreInfo = new StoreInfo(data.getObjectStreamProvider(fileInfo.getLeft(), threshold), metaData, fileInfo.getRight(), version
+                .getRight());
         if (newStoreInfo.getMetaData().isHidden()) {
             putKey(key, Optional.empty());
         } else {
@@ -251,13 +255,12 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
             throw new WrappingAPIException(new VersionIsNotSame(oldVersion, storeInfo.getVersion()));
         }
 
-        Pair<StoreInfo, Pair<String, ThrowingSupplier<ObjectLoader, IOException>>> dataPair = Pair.of(storeInfo,
-                source.modifyKey(key, ref, data, commitMetaData));
+        Pair<StoreInfo, Pair<String, ThrowingSupplier<ObjectLoader, IOException>>> dataPair = Pair
+                .of(storeInfo, source.modifyKey(key, ref, data, commitMetaData));
         final StoreInfo newStoreInfo = dataPair.getLeft();
         final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = dataPair.getRight();
-        putKeyFull(key,
-                Either.left(Optional.of(new StoreInfo(data.getObjectStreamProvider(newVersion.getRight(), threshold), newStoreInfo.getMetaData(),
-                        newVersion.getLeft(), newStoreInfo.getMetaDataVersion()))));
+        putKeyFull(key, Either.left(Optional.of(new StoreInfo(data.getObjectStreamProvider(newVersion.getRight(), threshold), newStoreInfo
+                .getMetaData(), newVersion.getLeft(), newStoreInfo.getMetaDataVersion()))));
         return newVersion.getLeft();
     }
 
@@ -274,8 +277,8 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     public CompletableFuture<Either<String, FailedToLock>> modifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
-        return lock.fireEvent(key, ActionData.updateMetakey(Objects.requireNonNull(key), Objects.requireNonNull(metaData),
-                Objects.requireNonNull(oldMetaDataVersion), Objects.requireNonNull(commitMetaData)));
+        return lock.fireEvent(key, ActionData.updateMetakey(Objects.requireNonNull(key), Objects.requireNonNull(metaData), Objects
+                .requireNonNull(oldMetaDataVersion), Objects.requireNonNull(commitMetaData)));
     }
 
     String internalModifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
@@ -289,11 +292,10 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
             throw new WrappingAPIException(new VersionIsNotSame(oldMetaDataVersion, storeInfo.get().getMetaDataVersion()));
         }
 
-        Pair<Optional<StoreInfo>, String> data = Pair.of(storeInfo, source.modifyMetadata(metaData, oldMetaDataVersion, key, ref, commitMetaData));
-        final String newMetaDataVersion = data.getRight();
-        final StoreInfo si = data.getLeft().get();
+        final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, key, ref, commitMetaData);
+        final StoreInfo si = storeInfo.get();
         if (si.isMasterMetaData()) {
-            refCache.get().clear();
+            refCache.get().clear(); // Reminder
             putKey(key, Optional.of(new StoreInfo(metaData, newMetaDataVersion)));
         } else {
             putKey(key, Optional
@@ -338,8 +340,8 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         final String key = createFullUserKeyPath(userKeyPath);
-        return lock.fireEvent(key,
-                ActionData.updateUser(userKeyPath, Objects.requireNonNull(username), Objects.requireNonNull(data), Objects.requireNonNull(version)));
+        return lock.fireEvent(key, ActionData
+                .updateUser(userKeyPath, Objects.requireNonNull(username), Objects.requireNonNull(data), Objects.requireNonNull(version)));
     }
 
     String internalUpdateUser(final String userKeyPath, final String username, final UserData data,
@@ -445,8 +447,8 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     public void reload() {
         CompletableFuture.runAsync(((Supplier<Runnable>) () -> {
             LOG.info("Reloading {}", ref);
-            final Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache.compareAndExchange(refCache.get(),
-                    getStorage(MAX_ENTRIES));
+            final Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache
+                    .compareAndExchange(refCache.get(), getStorage(MAX_ENTRIES));
             return () -> {
                 StreamSupport.stream(oldRefCache.entries().spliterator(), true).filter(e -> {
                     final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
@@ -456,7 +458,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                 oldRefCache.close();
                 LOG.info("Reloaded {}", ref);
             };
-        }).get());
+        }).get(), workStealingExecutor);
     }
 
     private <T> T unwrapCacheLoaderException(final Supplier<T> supplier) {

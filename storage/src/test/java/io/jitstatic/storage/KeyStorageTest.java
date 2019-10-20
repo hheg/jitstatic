@@ -51,15 +51,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spencerwi.either.Either;
 
@@ -75,6 +80,7 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.test.TestUtils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
@@ -93,11 +99,39 @@ public class KeyStorageTest {
     private ThrowingSupplier<ObjectLoader, IOException> factory = mock(Functions.ThrowingSupplier.class);
     private Source source = mock(Source.class);
     private HashService hashService = new HashService();
-    private RefLockService clusterService = new LocalRefLockService();
+    private MetricRegistry registry  = new MetricRegistry();
+    private RefLockService clusterService;
+
+    private ExecutorService defaultExecutor;
+    private ExecutorService workStealer;
+
+    @BeforeEach
+    public void setup() {
+        defaultExecutor = Executors.newCachedThreadPool(new NamingThreadFactory("test"));
+        workStealer = Executors.newWorkStealingPool();
+        clusterService = new LocalRefLockService(registry);
+    }
+
+    @AfterEach
+    public void tearDown() throws Exception {
+        clusterService.close();
+        Exception e1 = TestUtils.shutdownExecutor(defaultExecutor);
+        Exception e2 = TestUtils.shutdownExecutor(workStealer);
+        if (e1 != null) {
+            if (e2 != null) {
+                e1.addSuppressed(e2);
+            }
+            throw e1;
+        }
+        if (e2 != null) {
+            throw e2;
+        }
+    }
 
     @Test
     public void testGetAKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest1 = getMetaData();) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest1 = getMetaData();) {
             SourceInfo si1 = mock(SourceInfo.class);
             when(si1.getStreamProvider()).thenReturn(toProvider(getByteArray(1)));
             when(si1.readMetaData()).thenCallRealMethod();
@@ -114,7 +148,7 @@ public class KeyStorageTest {
 
     @Test
     public void testGetARootKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.getKey("root/", null)).getCause().getClass());
             ks.checkHealth();
         }
@@ -122,7 +156,7 @@ public class KeyStorageTest {
 
     @Test
     public void testPutARootKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
                 InputStream mtest1 = getMetaData();
                 InputStream mtest2 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
@@ -148,7 +182,7 @@ public class KeyStorageTest {
     @Test
     public void testInitGitStorageWithNullSource() {
         assertEquals("Source cannot be null", assertThrows(NullPointerException.class, () -> {
-            try (KeyStorage ks = new KeyStorage(null, null, hashService, clusterService, "root");) {
+            try (KeyStorage ks = new KeyStorage(null, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
             }
         }).getLocalizedMessage());
     }
@@ -157,7 +191,7 @@ public class KeyStorageTest {
     public void testLoadCache() throws Throwable {
         Set<User> users = new HashSet<>();
         users.add(new User("user", "1234"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
                 InputStream mtest1 = getMetaData();
                 InputStream mtest2 = getMetaData();) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -196,7 +230,7 @@ public class KeyStorageTest {
 
     @Test
     public void testLoadNewCache() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
                 InputStream mtest3 = getMetaData();
                 InputStream mtest4 = getMetaData()) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -227,7 +261,7 @@ public class KeyStorageTest {
 
         when(source.getSourceInfo(anyString(), anyString())).thenThrow(npe);
         assertSame(npe, assertThrows(NullPointerException.class, () -> {
-            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
                 try {
                     ks.getKey("", null).get();
                 } catch (Exception ignore) {
@@ -248,7 +282,7 @@ public class KeyStorageTest {
         when(info.getMetadataInputStream()).thenReturn(getMetaData());
         doThrow(cause).doReturn(info).when(source).getSourceInfo(anyString(), anyString());
 
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
             ks.reload(REF_HEADS_MASTER);
             assertFalse(ks.getKey("test3.json", null).get().isPresent());
             assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> ks.checkHealth()).getLocalizedMessage());
@@ -263,7 +297,7 @@ public class KeyStorageTest {
         doThrow(cause).when(source).getSourceInfo(anyString(), anyString());
 
         assertSame(cause, assertThrows(RuntimeException.class, () -> {
-            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
                 ks.reload(REF_HEADS_MASTER);
                 assertFalse(ks.getKey("key", null).orTimeout(5, TimeUnit.SECONDS).join().isPresent());
                 assertEquals(cause.getLocalizedMessage(), assertThrows(RuntimeException.class, () -> ks.checkHealth()).getLocalizedMessage());
@@ -276,14 +310,14 @@ public class KeyStorageTest {
     @Test
     public void testSourceCloseFailed() {
         doThrow(new RuntimeException("Test Exception")).when(source).close();
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
         }
     }
 
     @Test
     public void testRefIsFoundButKeyIsNot() throws Throwable {
 
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
                 InputStream mtest3 = getMetaData();
                 InputStream mtest4 = getMetaData()) {
             SourceInfo si1 = mock(SourceInfo.class);
@@ -315,7 +349,8 @@ public class KeyStorageTest {
 
     @Test
     public void testPutAKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             byte[] data = readData("{\"one\" : \"two\"}");
             String key = "key3";
@@ -347,7 +382,7 @@ public class KeyStorageTest {
     @Test
     public void testPutAOnANonWritableKey() throws Exception {
         assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
-            KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");
+            KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
             try (ks; InputStream mtest3 = getMetaDataProtectedInputStream()) {
                 SourceInfo si = mock(SourceInfo.class);
                 byte[] data = readData("{\"one\" : \"two\"}");
@@ -377,7 +412,7 @@ public class KeyStorageTest {
 
     @Test
     public void testGetADotKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             String key = ".key3";
             Optional<StoreInfo> first = ks.getKey(key, null).get();
             assertFalse(first.isPresent());
@@ -387,7 +422,7 @@ public class KeyStorageTest {
 
     @Test
     public void testGetATrainDotKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             String key = "key/key/.key3";
             Optional<StoreInfo> first = ks.getKey(key, null).get();
             assertFalse(first.isPresent());
@@ -403,7 +438,7 @@ public class KeyStorageTest {
         when(si.readMetaData()).thenCallRealMethod();
         when(si.getMetadataInputStream()).thenReturn(getMetaDataHiddenInputStream());
         when(source.getSourceInfo("key", REF_HEADS_MASTER)).thenReturn(si);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             Optional<StoreInfo> key = ks.getKey("key", null).get();
             assertFalse(key.isPresent());
             ks.checkHealth();
@@ -412,7 +447,7 @@ public class KeyStorageTest {
 
     @Test
     public void testPutKeyWithEmptyMessage() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
             assertThrows(IllegalArgumentException.class, () -> {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
@@ -425,7 +460,7 @@ public class KeyStorageTest {
     @Test
     public void testPutKeyWithNoRef() {
         assertThat((RefNotFoundException) assertThrows(WrappingAPIException.class, () -> {
-            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root");) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);) {
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
                 ks.checkHealth();
@@ -437,7 +472,8 @@ public class KeyStorageTest {
     @Test
     public void testPutKeyWithNoKey() throws Throwable {
         assertThat((UnsupportedOperationException) assertThrows(WrappingAPIException.class, () -> {
-            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+            try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                    InputStream mtest3 = getMetaData()) {
                 SourceInfo si = mock(SourceInfo.class);
                 byte[] data = readData("{\"one\" : \"two\"}");
                 String key = "key3";
@@ -466,7 +502,7 @@ public class KeyStorageTest {
     @Test
     public void testAddKey() throws Throwable {
         when(source.addKey(any(), any(), any(), any(), any())).thenReturn(Pair.of(Pair.of(factory, "1"), "1"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             String si = ks
@@ -480,7 +516,8 @@ public class KeyStorageTest {
 
     @Test
     public void testPutMetaDataKey() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             String key = "key3";
 
@@ -510,7 +547,8 @@ public class KeyStorageTest {
 
     @Test
     public void testDelete() throws Throwable {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             String key = "key3";
 
@@ -531,7 +569,7 @@ public class KeyStorageTest {
 
     @Test
     public void testDeleteMetaKey() throws IOException {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertSame(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks
                     .delete("key/", null, new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE))).getCause().getClass());
         }
@@ -544,7 +582,7 @@ public class KeyStorageTest {
 
         when(source.getSourceInfo(eq(key), eq(branch))).thenThrow(RefNotFoundException.class);
         when(source.addKey(eq(key), eq(branch), any(), any(), any())).thenReturn(Pair.of(Pair.of(factory, "1"), "1"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             byte[] data = getByteArray(1);
             byte[] pretty = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(MAPPER.readTree(data));
             assertThrows(WrappingAPIException.class, () -> {
@@ -573,7 +611,7 @@ public class KeyStorageTest {
         when(sourceInfo.getSourceVersion()).thenReturn("1");
         when(sourceInfo.getStreamProvider()).thenReturn(toProvider(pretty));
         when(source.getSourceInfo(eq(key), eq(branch))).thenReturn(sourceInfo);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addRef(branch);
             assertSame(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> {
                 try {
@@ -588,7 +626,8 @@ public class KeyStorageTest {
 
     @Test
     public void testGetListForRef() throws RefNotFoundException, IOException {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             String key = "dir/";
             String dirkey = "dir/key";
@@ -610,7 +649,8 @@ public class KeyStorageTest {
 
     @Test
     public void testGetList() throws Exception {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             String key = "dir/";
             String dirkey = "dir/key";
@@ -638,7 +678,7 @@ public class KeyStorageTest {
 
     @Test
     public void testAclusterServiceotFile() {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertThrows(WrappingAPIException.class, () -> ks.addKey("dot/.dot", null, toProvider(new byte[] { 1 }), new MetaData(Set
                     .of()), new CommitMetaData("d", "d", "d", "Test", JITSTATIC_NOWHERE)));
         }
@@ -647,7 +687,7 @@ public class KeyStorageTest {
     @Test
     public void testGetUser() throws RefNotFoundException, IOException {
         when(source.getUser(anyString(), anyString())).thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "1234", null, null)));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addRef("refs/heads/secret");
             assertNotNull(ks.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
         }
@@ -656,7 +696,7 @@ public class KeyStorageTest {
     @Test
     public void testGetListForNoKey() throws RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq("refs/heads/master"))).thenReturn(null);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
                     .join();
             assertTrue(listForRef.isEmpty());
@@ -666,7 +706,7 @@ public class KeyStorageTest {
     @Test
     public void testGetListNoRef() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new RefNotFoundException("test"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
                     .join();
             assertTrue(listForRef.isEmpty());
@@ -676,7 +716,7 @@ public class KeyStorageTest {
     @Test
     public void testGetListIOException() throws RefNotFoundException, IOException {
         when(source.getList(eq("key/"), eq("refs/heads/master"), Mockito.anyBoolean())).thenThrow(new IOException("test"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             List<Pair<String, StoreInfo>> listForRef = ks.getListForRef(List.of(Pair.of("key/", false)), "refs/heads/master").orTimeout(5, TimeUnit.SECONDS)
                     .join();
             assertTrue(listForRef.isEmpty());
@@ -685,7 +725,8 @@ public class KeyStorageTest {
 
     @Test
     public void testGetListForAKey() throws RefNotFoundException, IOException {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root"); InputStream mtest3 = getMetaData()) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry);
+                InputStream mtest3 = getMetaData()) {
             SourceInfo si = mock(SourceInfo.class);
             MetaData metaData = mock(MetaData.class);
             ObjectStreamProvider osp = mock(ObjectStreamProvider.class);
@@ -706,7 +747,7 @@ public class KeyStorageTest {
     @Test
     public void testGetUserDataNoBranch() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new RefNotFoundException("Test"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertThrows(RefNotFoundException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
@@ -715,7 +756,7 @@ public class KeyStorageTest {
     @Test
     public void testGetUserDataIOError() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new IOException("Test"));
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertThrows(UncheckedIOException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
@@ -723,7 +764,7 @@ public class KeyStorageTest {
 
     @Test
     public void testUpdateUserNoRef() {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertThrows(UnsupportedOperationException.class, () -> ks
                     .updateUser("kit", "refs/heads/noref", JitStaticConstants.GIT_REALM, "updater", new UserData(Set
                             .of(new Role("role")), "p", null, null), "1"));
@@ -734,7 +775,7 @@ public class KeyStorageTest {
     public void testUpdateUser() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
@@ -746,7 +787,7 @@ public class KeyStorageTest {
     public void testUpdateUserNoKey() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
@@ -757,7 +798,7 @@ public class KeyStorageTest {
     @Test
     public void testDeleteUser() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).join();
             ks.deleteUser("kit", null, JitStaticConstants.GIT_REALM, "creator");
@@ -767,7 +808,7 @@ public class KeyStorageTest {
     @Test
     public void testAddUserRefNotFound() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenThrow(RefNotFoundException.class);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> {
                 try {
                     ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
@@ -782,7 +823,7 @@ public class KeyStorageTest {
     @Test
     public void testAddUserReadError() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenThrow(IOException.class);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(IOException.class, assertThrows(UncheckedIOException.class, () -> {
                 try {
                     ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
@@ -796,7 +837,7 @@ public class KeyStorageTest {
 
     @Test
     public void testAddUserMatchingRoot() {
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals("io.jitstatic.storage.KeyAlreadyExist: Key 'root' already exist in branch refs/heads/master", assertThrows(WrappingAPIException.class, () -> ks
                     .addUser("root", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))).getMessage());
         }
@@ -806,7 +847,7 @@ public class KeyStorageTest {
     public void testPutMetaDataDotKey() {
         MetaData md = mock(MetaData.class);
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.putMetaData(".key", null, md, "1", cmd)
                     .orTimeout(5, TimeUnit.SECONDS).join()).getCause().getClass());
         }
@@ -816,7 +857,7 @@ public class KeyStorageTest {
     public void testPutMetaDataWithNoRef() {
         MetaData md = mock(MetaData.class);
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(RefNotFoundException.class, assertThrows(WrappingAPIException.class, () -> ks.putMetaData("key", "refs/heads/blah", md, "1", cmd)
                     .orTimeout(5, TimeUnit.SECONDS).join()).getCause().getClass());
         }
@@ -825,7 +866,7 @@ public class KeyStorageTest {
     @Test
     public void testDeleteFromTag() {
         CommitMetaData cmd = mock(CommitMetaData.class);
-        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root")) {
+        try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             String tag = "refs/tags/blah";
             ks.addRef(tag);
             assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.delete("key", tag, cmd)).getCause().getClass());
@@ -836,9 +877,7 @@ public class KeyStorageTest {
         return ("{\"data\":\"value" + c + "\"}").getBytes(UTF_8);
     }
 
-    private InputStream getMetaData() {
-        return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}]}".getBytes(UTF_8));
-    }
+    private InputStream getMetaData() { return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}]}".getBytes(UTF_8)); }
 
     private InputStream getMetaDataHiddenInputStream() {
         return new ByteArrayInputStream("{\"users\": [{\"user\": \"user\",\"password\": \"1234\"}],\"hidden\":true}".getBytes(UTF_8));

@@ -34,7 +34,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.jitstatic.Role;
 import io.jitstatic.auth.constraints.DuplicatedAuthenticationMethods;
 import io.jitstatic.auth.constraints.HasPassword;
-import io.jitstatic.auth.constraints.Warning;
+import io.jitstatic.constraints.Warning;
 
 @HasPassword
 @DuplicatedAuthenticationMethods(payload = Warning.class)

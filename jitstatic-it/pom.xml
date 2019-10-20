@@ -4,11 +4,30 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.34.1</version>
+        <version>0.35.0</version>
     </parent>
     <artifactId>jitstatic-it</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>annotations</artifactId>
+            <version>3.0.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.code.findbugs</groupId>
+                    <artifactId>jsr305</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
@@ -23,7 +42,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -42,7 +61,6 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient-cache</artifactId>
-            <version>${http.client.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>
@@ -80,7 +98,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>jitstatic</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

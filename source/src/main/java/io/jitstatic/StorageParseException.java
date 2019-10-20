@@ -27,8 +27,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.validation.ConstraintViolation;
+import javax.validation.Payload;
 
-import io.jitstatic.auth.constraints.Warning;
+import io.jitstatic.constraints.Warning;
 
 public class StorageParseException extends IOException {
 
@@ -51,17 +52,21 @@ public class StorageParseException extends IOException {
 
     private static <T> List<String> compile(final Set<ConstraintViolation<T>> violations) {
         return violations.stream()
-                .map(v -> String.format("Property=%s, message=%s, invalidValue=%s", v.getPropertyPath(), v.getMessage(), v.getInvalidValue()))
+                .map(v -> String.format("%s: property=%s, message=%s, invalidValue=%s", getPayLoad(v.getConstraintDescriptor().getPayload()), v.getPropertyPath(), v
+                        .getMessage(), v.getInvalidValue()))
                 .collect(Collectors.toList());
     }
 
-    public List<String> getWarnings() {
-        return warnings;
+    private static String getPayLoad(Set<Class<? extends Payload>> payload) {
+        if (payload.contains(Warning.class)) {
+            return Warning.class.getSimpleName();
+        }
+        return "Error";
     }
 
-    public List<String> getErrors() {
-        return errors;
-    }
+    public List<String> getWarnings() { return warnings; }
+
+    public List<String> getErrors() { return errors; }
 
     @Override
     public Throwable fillInStackTrace() {
@@ -69,7 +74,5 @@ public class StorageParseException extends IOException {
     }
 
     @Override
-    public String getMessage() {
-        return Stream.concat(errors.stream(), warnings.stream()).collect(Collectors.joining(System.lineSeparator()));
-    }
+    public String getMessage() { return Stream.concat(errors.stream(), warnings.stream()).collect(Collectors.joining(System.lineSeparator())); }
 }

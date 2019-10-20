@@ -24,11 +24,21 @@ import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.version.ProjectVersion.INSTANCE;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+
 import org.eclipse.jgit.util.SystemReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
+
+import com.codahale.metrics.InstrumentedExecutorService;
+import com.codahale.metrics.MetricRegistry;
 
 import io.dropwizard.Application;
+import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.api.BulkResource;
 import io.jitstatic.api.JitstaticInfoResource;
@@ -42,12 +52,17 @@ import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.LocalRefLockService;
+import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.storage.RefLockService;
 import io.jitstatic.storage.Storage;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JitstaticApplication.class);
+    static {
+        SLF4JBridgeHandler.install();
+        java.util.logging.Logger.getGlobal().setLevel(Level.INFO);
+    }
 
     public static void main(final String[] args) throws Exception {
         LOG.info("Starting {} build {}", INSTANCE.getBuildVersion(), INSTANCE.getCommitIdAbbrev());
@@ -60,29 +75,36 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         Storage storage = null;
         RefLockService refLockService = null;
         try {
+            ExecutorService defaultExecutor = setUpExecutor(env.metrics());
+            ExecutorService workStealingExecutor = setUpWorkStealingExecutor(env.metrics());
             SystemReader.setInstance(new OverridingSystemReader());
             final HostedFactory hostedFactory = config.getHostedFactory();
-            refLockService = new LocalRefLockService();
+            refLockService = new LocalRefLockService(env.metrics());
             source = config.build(env, GIT_REALM, refLockService.getRepoWriter());
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory.getUserName(), refLockService);
+            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory
+                    .getUserName(), refLockService, defaultExecutor, workStealingExecutor);
             loginService.setUserStorage(storage);
-            source.readAllRefs();
+            final KeyAdminAuthenticator authenticator = config.getKeyAdminAuthenticator(storage, hashService);
+
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(refLockService));
+            env.lifecycle().manage(new ManagedExecutor(defaultExecutor));
+            env.lifecycle().manage(new ManagedExecutor(workStealingExecutor));
 
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
-            final KeyAdminAuthenticator authenticator = config.getKeyAdminAuthenticator(storage, hashService);
-            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, env.getObjectMapper(),
-                    env.getValidator(), hashService));
+
+            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, hashService));
             env.jersey().register(new JitstaticInfoResource());
             env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch, hashService));
             env.jersey().register(new BulkResource(storage, authenticator, defaultBranch, hashService));
             env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch, hashService));
+
+            source.readAllRefs();
         } catch (final RuntimeException e) {
             closeSilently(refLockService);
             closeSilently(source);
@@ -92,6 +114,14 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         }
     }
 
+    private ExecutorService setUpExecutor(final MetricRegistry metricRegistry) {
+        return new InstrumentedExecutorService(Executors.newCachedThreadPool(new NamingThreadFactory("default")), metricRegistry);
+    }
+
+    private ExecutorService setUpWorkStealingExecutor(final MetricRegistry metricRegistry) {
+        return new InstrumentedExecutorService(Executors.newWorkStealingPool(Runtime.getRuntime().availableProcessors() * 4), metricRegistry);
+    }
+
     private void closeSilently(final AutoCloseable closeable) {
         if (closeable != null) {
             try {
@@ -99,6 +129,25 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             } catch (final Exception ignore) {
                 // NOOP
             }
+        }
+    }
+
+    private static class ManagedExecutor implements Managed {
+        private final ExecutorService service;
+
+        public ManagedExecutor(final ExecutorService service) {
+            this.service = service;
+        }
+
+        @Override
+        public void start() throws Exception {
+            // NOOP
+        }
+
+        @Override
+        public void stop() throws Exception {
+            service.shutdown();
+            service.awaitTermination(10, TimeUnit.SECONDS);
         }
     }
 }

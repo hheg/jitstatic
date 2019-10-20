@@ -48,27 +48,18 @@ public class ModifyKeyData {
     @JsonCreator
     public ModifyKeyData(
             @JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
-            @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
-            @JsonProperty("userMail") final String userMail) {
+            @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo, @JsonProperty("userMail") final String userMail) {
         this.data = data;
         this.message = message;
         this.userMail = userMail;
         this.userInfo = userInfo;
     }
 
-    public ObjectStreamProvider getData() {
-        return data;
-    }
+    public ObjectStreamProvider getData() { return data; }
 
-    public String getMessage() {
-        return message;
-    }
+    public String getMessage() { return message; }
 
-    public String getUserMail() {
-        return userMail;
-    }
+    public String getUserMail() { return userMail; }
 
-    public String getUserInfo() {
-        return userInfo;
-    }
+    public String getUserInfo() { return userInfo; }
 }

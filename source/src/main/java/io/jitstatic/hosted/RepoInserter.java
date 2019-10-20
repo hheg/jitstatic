@@ -69,8 +69,7 @@ public class RepoInserter {
         }
     }
 
-    public CheckedConsumer<OutputStream,IOException> packData(final Set<ObjectId> tags, final Set<ObjectId> tips, final Set<ObjectId> uninterestingObjects)
-            throws IOException {
+    public CheckedConsumer<OutputStream,IOException> packData(final Set<ObjectId> tags, final Set<ObjectId> tips, final Set<ObjectId> uninterestingObjects) {
         return os -> {
             final Accumulator accumulator = new Accumulator(); // TODO Use the statistics
             try (ObjectWalk walk = new DepthWalk.ObjectWalk(repository, Integer.MAX_VALUE);

@@ -1,8 +1,10 @@
+package io.jitstatic.api.constraints;
+
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +19,12 @@
  * limitations under the License.
  * #L%
  */
-{
- "users": [],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]
+
+/**
+ * Marker interface to activate validation on valid Git Roles
+ * @author hheg
+ *
+ */
+public interface GitRolesGroup {
+
 }

@@ -66,7 +66,6 @@ public class LogoPoster implements PreReceiveHook, PreUploadHook {
     @Override
     public void onSendPack(final UploadPack up, final Collection<? extends ObjectId> wants,final  Collection<? extends ObjectId> haves)
             throws ServiceMayNotContinueException {
-        // NOOP
         up.sendMessage(line1);
         up.sendMessage(line2);
         up.sendMessage(line3);

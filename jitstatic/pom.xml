@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.34.1</version>
+        <version>0.35.0</version>
     </parent>
     <artifactId>jitstatic</artifactId>
 
@@ -99,22 +99,22 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>storage</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>version</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>javax.activation</groupId>
@@ -140,6 +140,11 @@
         <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
             <artifactId>jersey-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jul-to-slf4j</artifactId>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -257,20 +262,8 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.34.1</version>
+            <version>0.35.0</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.jitstatic</groupId>
-            <artifactId>jitstatic-client</artifactId>
-            <version>0.11.0</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>commons-logging</groupId>
-                    <artifactId>commons-logging</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.mashape.unirest</groupId>
@@ -302,7 +295,6 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient-cache</artifactId>
-            <version>${http.client.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

@@ -73,6 +73,7 @@ import com.codahale.metrics.annotation.Timed;
 import io.dropwizard.auth.Auth;
 import io.dropwizard.validation.Validated;
 import io.jitstatic.api.constraints.Adding;
+import io.jitstatic.api.constraints.GitRolesGroup;
 import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.LoginService;
@@ -127,7 +128,7 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void put(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
-            final @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
+            final @Validated @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
             final @Context HttpHeaders headers, final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(GIT_REALM));
         APIHelper.checkValidRef(ref);
@@ -190,7 +191,7 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void putUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
+            final @Validated @Valid @NotNull UserData data, final @Auth Optional<User> remoteUserHolder,
             final @Context HttpHeaders headers, final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkRef(askedRef);
@@ -253,7 +254,8 @@ public class UsersResource {
     @Path(GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Valid @NotNull UserData data,
+    public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
+            final @Validated({ GitRolesGroup.class, Default.class }) @Valid @NotNull UserData data,
             final @Auth Optional<User> remoteUserHolder, final @Context HttpHeaders headers,
             final @Context Request request) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(GIT_REALM));
@@ -269,7 +271,7 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void postGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
-            final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
+            final @Valid @NotNull @Validated({ GitRolesGroup.class, Adding.class, Default.class }) UserData data,
             final @Auth Optional<User> remoteUserHolder) {
         final User user = remoteUserHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(GIT_REALM));
         authorize(user, CREATE);
@@ -307,8 +309,8 @@ public class UsersResource {
             if (evaluatePreconditions != null) {
                 throw new WebApplicationException(evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
             }
-            return storage.updateUser(key, ref, realm, user.getName(), new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null),
-                    version);
+            return storage
+                    .updateUser(key, ref, realm, user.getName(), new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null), version);
         }, executor).thenComposeAsync(Function.identity()).thenApplyAsync(result -> {
             if (result.isRight()) {
                 return Response.status(Status.PRECONDITION_FAILED).build();
@@ -334,8 +336,7 @@ public class UsersResource {
             if (userData != null && userData.isPresent()) {
                 throw new WebApplicationException(key + " already exist", Status.CONFLICT);
             }
-            return storage.addUser(key, ref, realm, user.getName(),
-                    hashService.constructUserData(data.getRoles(), data.getBasicPassword()));
+            return storage.addUser(key, ref, realm, user.getName(), hashService.constructUserData(data.getRoles(), data.getBasicPassword()));
         }, executor).thenCompose(Function.identity()).thenApplyAsync(newVersion -> {
             if (newVersion == null) {
                 throw new WebApplicationException(Status.NOT_FOUND);

@@ -33,6 +33,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.jitstatic.Role;
 import io.jitstatic.api.constraints.Adding;
+import io.jitstatic.api.constraints.GitRoles;
+import io.jitstatic.api.constraints.GitRolesGroup;
 
 public class UserData {
     @Size(min = 1, max = 100)
@@ -41,6 +43,7 @@ public class UserData {
 
     @NotNull
     @Valid
+    @GitRoles(groups = GitRolesGroup.class)
     private final Set<Role> roles;
 
     @JsonCreator
@@ -53,12 +56,8 @@ public class UserData {
         this(userData.getRoles(), userData.getHash() != null ? null : userData.getBasicPassword());
     }
 
-    public Set<Role> getRoles() {
-        return roles;
-    }
+    public Set<Role> getRoles() { return roles; }
 
-    public String getBasicPassword() {
-        return basicPassword;
-    }
+    public String getBasicPassword() { return basicPassword; }
 
 }

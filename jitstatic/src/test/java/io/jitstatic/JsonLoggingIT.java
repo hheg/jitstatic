@@ -29,25 +29,23 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
-import java.util.function.Supplier;
-import java.util.stream.StreamSupport;
+import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.transport.PushResult;
-import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
@@ -55,20 +53,17 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.client.APIException;
 import io.jitstatic.client.JitStaticClient;
-import io.jitstatic.client.JitStaticClientBuilder;
-import io.jitstatic.client.TriFunction;
 import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
-public class JsonLoggingIT {
+public class JsonLoggingIT extends BaseTest {
     private static final String METADATA = ".metadata";
-    private static final String REFS_HEADS_MASTER = "refs/heads/master";
     private static final String ACCEPT_STORAGE = "accept/storage";
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ResourceHelpers
             .resourceFilePath("simpleserver_json.yaml"), ConfigOverride.config("hosted.basePath", getFolder()));
     private TemporaryFolder tmpfolder;
@@ -103,21 +98,23 @@ public class JsonLoggingIT {
             writeFile(workingDirectory.toPath(), "accept/genkey");
             git.add().addFilepattern(".").call();
             git.commit().setMessage("Initial commit").call();
-            Iterable<PushResult> call = git.push().setCredentialsProvider(provider).call();
-            assertTrue(StreamSupport.stream(call.spliterator(), false).allMatch(p -> p.getRemoteUpdate(REFS_HEADS_MASTER).getStatus() == Status.OK));
+            verifyOkPush(git.push().setCredentialsProvider(provider).call());
         }
     }
 
     @Test
-    public void testJSONLogging() throws URISyntaxException, APIException, IOException {
+    public void testJSONLogging() throws URISyntaxException, APIException, IOException, InterruptedException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(bos);
         PrintStream oldOutput = System.out;
-        System.setOut(ps);
-        try (JitStaticClient client = buildClient().setUser(USER).setPassword(PASSWORD).build();) {
-            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, tf);
-            assertEquals(getData(), key.data.toString());
+        Semaphore s = new Semaphore(1);
+        PrintStream listener = getPrintStream(bos, s);
+        System.setOut(listener);
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(USER).setPassword(PASSWORD).build();) {
+            Entity<JsonNode> key = client.getKey(ACCEPT_STORAGE, null, parse(JsonNode.class));
+            assertEquals(getData(), key.getData().toString());
             assertNotNull(key.getTag());
+            s.acquire();
+            listener.flush();
             assertTrue(bos.toByteArray().length > 0);
             JsonNode readTree = MAPPER.readTree(bos.toByteArray());
             assertEquals("INFO", readTree.findValue("level").asText());
@@ -126,21 +123,44 @@ public class JsonLoggingIT {
         }
     }
 
-    private Supplier<String> getFolder() {
-        return () -> {
-            try {
-                return getFolderFile().getAbsolutePath();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+    @Test
+    public void testJavaLoggingSlf4jLink() throws IOException, InterruptedException {
+        assertTrue(SLF4JBridgeHandler.isInstalled());
+        String msg = "it works";
+        Logger logger = Logger.getLogger(getClass().getName());
+        logger.setLevel(Level.INFO);
+        PrintStream oldOut = System.out;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Semaphore s = new Semaphore(1);
+        PrintStream listen = getPrintStream(baos, s);
+        s.acquire();
+        System.setOut(listen);
+        logger.info(msg);
+        s.acquire();
+        System.setOut(oldOut);
+        listen.flush();
+        byte[] content = baos.toByteArray();
+        JsonNode tree = MAPPER.readTree(content);
+        JsonNode message = tree.get("message");
+        if (message != null) {
+            assertEquals(msg, message.asText(), new String(content));
+        } else {
+            System.out.println("Content: " + new String(content));
+            assertTrue(content.length > 0);
+        }
+    }
+
+    private PrintStream getPrintStream(ByteArrayOutputStream baos, Semaphore s) {
+        return new PrintStream(baos, true) {
+            @Override
+            public void flush() {
+                super.flush();
+                s.release();
             }
         };
     }
 
-    private File getFolderFile() throws IOException { return tmpfolder.createTemporaryDirectory(); }
-
-    private JitStaticClientBuilder buildClient() {
-        return JitStaticClient.create().setHost("localhost").setPort(DW.getLocalPort()).setAppContext("/application/");
-    }
+    protected File getFolderFile() throws IOException { return tmpfolder.createTemporaryDirectory(); }
 
     private void writeFile(Path workBase, String file) throws IOException {
         final Path filePath = workBase.resolve(file);
@@ -148,40 +168,5 @@ public class JsonLoggingIT {
         try (InputStream is = getClass().getResourceAsStream("/" + file)) {
             Files.copy(is, filePath, StandardCopyOption.REPLACE_EXISTING);
         }
-    }
-
-    static class Entity<T> {
-
-        final T data;
-        private final String tag;
-        private final String contentType;
-
-        public Entity(String tag, String contentType, T data) {
-            this.tag = tag;
-            this.contentType = contentType;
-            this.data = data;
-        }
-
-        public String getTag() { return tag; }
-
-        public String getContentType() { return contentType; }
-    }
-
-    private TriFunction<InputStream, String, String, Entity<JsonNode>> tf = (is, v, t) -> {
-        if (is != null) {
-            try {
-                return new Entity<>(v, t, MAPPER.readValue(is, JsonNode.class));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-        return new Entity<>(v, t, null);
-    };
-
-    private static String getData() { return getData(0); }
-
-    private static String getData(int c) {
-        return "{\"key" + c
-                + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
 }

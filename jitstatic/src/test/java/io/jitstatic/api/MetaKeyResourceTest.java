@@ -134,7 +134,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithoutuser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -147,7 +147,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        MetaData storageData = new MetaData(Set.of(), null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -162,7 +162,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongVersion() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        MetaData storageData = new MetaData(Set.of(), null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -177,7 +177,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKey() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        MetaData storageData = new MetaData(Set.of(), null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
@@ -221,7 +221,7 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAMasterMetaData() {
-        MetaData storageData = new MetaData(new HashSet<>(), null, false, false, List.of(), null, null);
+        MetaData storageData = new MetaData(Set.of(), null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");

@@ -162,8 +162,7 @@ class APIHelper {
         return t -> unwrap(t, alternative);
     }
 
-    private <T> T unwrap(final Throwable t,
-            final Supplier<T> alternative) {
+    private <T> T unwrap(final Throwable t, final Supplier<T> alternative) {
         if (t instanceof CompletionException) {
             return unwrap(t.getCause(), alternative);
         } else if (t instanceof WrappingAPIException) {
@@ -194,8 +193,7 @@ class APIHelper {
         return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
     }
 
-    static Response checkETag(final HttpHeaders headers,
-            final EntityTag tag) {
+    static Response checkETag(final HttpHeaders headers, final EntityTag tag) {
         final List<String> requestHeaders = headers.getRequestHeader(HttpHeaders.IF_MATCH);
         if (requestHeaders == null) {
             return null;
@@ -216,24 +214,17 @@ class APIHelper {
                 .header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build());
     }
 
-    CompletableFuture<StoreInfo> checkIfKeyExist(final String key,
-            final String ref,
-            final Storage storage) {
+    CompletableFuture<StoreInfo> checkIfKeyExist(final String key, final String ref, final Storage storage) {
         return storage.getKey(key, ref)
                 .exceptionally(this.keyExceptionHandler(Optional::empty))
                 .thenApply(storeInfo -> storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND)));
     }
 
-    static String setToDefaultRefIfNull(final String ref,
-            final String defaultRef) {
+    static String setToDefaultRefIfNull(final String ref, final String defaultRef) {
         return ref == null ? defaultRef : ref;
     }
 
-    static boolean isKeyUserAllowed(final Storage storage,
-            final HashService hashService,
-            final User user,
-            final String ref,
-            Set<Role> keyRoles) {
+    static boolean isKeyUserAllowed(final Storage storage, final HashService hashService, final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
         try {
             final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
@@ -247,8 +238,7 @@ class APIHelper {
         }
     }
 
-    public static String compileUserOrigin(final User user,
-            final HttpServletRequest req) {
+    public static String compileUserOrigin(final User user, final HttpServletRequest req) {
         return user.getName() + "@" + req.getRemoteHost();
     }
 

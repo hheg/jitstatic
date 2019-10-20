@@ -22,6 +22,7 @@ package io.jitstatic.storage;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 import com.spencerwi.either.Either;
 
@@ -38,8 +39,9 @@ public class ReadOnlyRefHolder extends RefHolder {
 
     private static final String TAGS_CANNOT_BE_MODIFIED = "Tags cannot be modified";
 
-    public ReadOnlyRefHolder(final String ref, final Source source, final HashService hashService, final RefLockService clusterService) {
-        super(ref, source, hashService, clusterService);
+    public ReadOnlyRefHolder(final String ref, final Source source, final HashService hashService, final RefLockService clusterService,
+            ExecutorService workStealer) {
+        super(ref, source, hashService, clusterService, workStealer);
     }
 
     @Override

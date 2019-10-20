@@ -53,7 +53,7 @@ The container is reachable on port 8085. Remember to run the container in an emp
 ### Manually: 
 To setup an instance you download a jitstatic.jar and store the above example configuration in a file, lets say `config.yaml`
  
-To lauch jitstatic you'll type:
+To launch jitstatic you'll type:
 ```bash
 java -jar jistatic.jar server config.yaml
 
@@ -132,12 +132,12 @@ Packing up objects: 100% (4/4), done.
 
 Warning: You seem to have cloned an empty repository
 ```
-Remember to use the values for the master user and password you chose when you started the container (in the example above it's `huser` and password is `hseCr3t`). This way of handling passwords is deprecated and exists to start fast. A more secure way with hashed values are available, see the Users section.
+Remember to use the values for the master user and password you chose when you started the container (in the example above it's `huser` and password is `hseCr3t`). How user management work, see the Users section.
 
 In your target directory create a key store file:
 ```bash
 echo '{"hello" : "world"}' > hello_world
-echo '{"users" : [{"password": "1234", "user" : "user1"}]}' > hello_world.metadata
+echo '{"read":[],"write":[]}' > hello_world.metadata
 ```
 Then you add the files with git
 ```bash
@@ -184,18 +184,17 @@ The repository contains files which contains the data. Each of these files are a
 ```
 Each file on the repo will be the access point for getting the object. This example is the content of a file called `hello_world`.
 
-There must be a file which contains metadata about the `hello_world` file and it's name is `hello_world.metadata`. It must be a JSON file and contains information for each key. There can be a master .metadata that specifies for all keys in the folder, except those with their own metadata file. A metadata file could contain a direct user or a set of read and write roles for corresponding users. How users and roles work is specified in the [Users](#users) section.
+There must be a file which contains metadata about the `hello_world` file and it's name is `hello_world.metadata`. It must be a JSON file and contain information for each key. There can be a master .metadata that specifies for all keys in the folder, except those with their own metadata file. A metadata file contains set of read and write roles for corresponding users. How users and roles work is specified in the [Users](#users) section.
 ```json
-{"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[],"read":[{"role":"read"}],"write":[{"role":"write"}]}
+{"contentType":"application/json","protected":false,"hidden":false,"headers":[],"read":[{"role":"somerole"}],"write":[{"role":"somerole"}]}
 ```
+To specify a key which can be read by all specify an empty `"read":[]` section and if you want to make it write protected you can specify an empty `"write":[]`.
 
-To reach the `hello_world` data the address could look like the command below. The user and password for the endpoint will be what you have specified in the `key.metadata` file. Each key can be protected so only one or several users can access that particular key
+To reach the `hello_world` data the address could look like the command below. To access the `hello_world` key you need a user which has the role you have specified in the `hello_world.metadata`file, in this example it's `somerole`. Each key can be protected so only one or several users can access that particular key
  
 ```bash
 curl --user user1:1234 http://localhost:8085/app/storage/hello_world
 ```
-
-If you leave an metadata file with an empty 'users' entry anyone can access the key. If you there's no user restriction you can't modify the key through the modify API.
 
 At the moment the application only allows basic authentication so be sure you secure it with HTTPS by using standard Dropwizard HTTPS configuration or some external SSL terminator.
 
@@ -205,7 +204,7 @@ To clone the repo you just type (the user name and password defined in the Dropw
 ```bash
 git clone http://huser:hsecr3t@localhost:8085/app/jitstatic/git
 ```
-It's also possible to reach keys (files) through refs so if you make a call like:
+It's also possible to reach keys (files) through refs, so if you make a call like:
 
 ```bash
 curl --user user1:1234 http://localhost:8085/app/storage/hello_world?ref=refs/heads/somebranch
@@ -282,7 +281,7 @@ You can create a key by just POSTing the content to the server. Since there are 
 ```
 curl -i -H 'Content-Type: application/json' \
 --user huser:hseCr3t -X POST \
--d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"users":[{"password":"1234","user":"user1"}],"contentType":"application/json"},"userInfo":"user"}' \
+-d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"read":[],"write":[],"contentType":"application/json"},"userInfo":"user"}' \
 http://localhost:8085/app/storage/test?ref=refs%2Fheads%2Fmaster
 
 HTTP/1.1 200 OK
@@ -322,9 +321,6 @@ git log --graph --pretty=format:'%h %d %s %cr <%an>' --abbrev-commit --date=rela
 * 3af867a - Initial commit (4 minutes ago) <hheg>
 ```
 
-If you add a key to a branch which does not currently exist, JitStatic will make a branch from the default branch (which usually is master) and add the key to that branch. However if the key already exist in the base branch you'll get an error that the key already exist.
-
-
 ### API for modifying a key's metadata
 
 There's also an API for remotely change a key's metadata file using the master password.
@@ -345,7 +341,7 @@ Then you'd take that tag information and use that in the PUT operation.
 curl -i -H 'Content-Type: application/json' \
 -H 'If-Match: "9eaea0b295e8daa399924a2961cd25958381aa59"' \
 --user huser:hseCr3t -X PUT \
--d '{"message":"msg","userInfo":"ui","userMail":"mail","metaData":{"users":[{"user":"user1","password":"1234"}],"contentType":"plain/text"}}' \
+-d '{"message":"msg","userInfo":"ui","userMail":"mail","metaData":{"read":[{"role":"somerole"}],"write":[{"role":"somerole"}],"contentType":"plain/text"}}' \
 http://localhost:8085/app/metakey/hello_world
 
 HTTP/1.1 200 OK
@@ -362,7 +358,7 @@ The API for deleting a key looks like the following:
 ```
 curl -i -H 'Content-Type: application/json' \
 -H 'X-jitstatic-name: user' \
--H 'X-jitstatic-message: why I am deleting' \
+-H 'X-jitstatic-message: reason why the key is deleted' \
 -H 'X-jitstatic-mail: user@somewhere.org' \
 --user user1:1234 -X DELETE \
 http://localhost:8085/app/storage/hello_world
@@ -448,11 +444,11 @@ All keys are still protected by authorization. The keys are still protected by t
 
 ### MetaKeys
 
-Each key have a <key_name>.metadata which stores information about the key. It defines things like what users can access a key and what headers that should be used. It also defines the key's type. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` property.
-You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder. The users field is deprecated and the preferred way of ACL is to use the role based ACL described in the Users section. 
+Each key have a <key_name>.metadata which stores information about the key. It defines contentType, headers that should be used and who can read and write to the files. You could if you want hide files from being accessed from the API by using the `hidden` property. It can also be read only by using the `protected` property.
+You could if you want create a master .metadata in the directory root and all keys in that directory (not sub folders) will have that key. If you need you can override that by specifying a specific metadata file for a particular file in that folder. The users field is deprecated and the preferred way of RBAC is to use the role based RBAC described in the Users section. 
 Example:
 ```json
-{"users":[{"password": "1234", "user" : "user1"}],"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]}
+{"contentType":"application/json","protected":false,"hidden":false,"headers":[{"header":"tag","value":"1234"},{"header":"header","value":"value"}],"read":[{"role":"read"}],"write":[{"role":"write"}]}
 ```
 
 ## <a name="users"></a> Users
@@ -467,9 +463,9 @@ The format of the file <username> is in the format
 ```
 The `.user` folder not a valid key so this can't be reached from the normal endpoints.
 
-#### ACL
+#### RBAC
 
-There are two ways of declaring ACL for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password. If you use the API for creating users, the passwords will be automatically hashed when stored. If more security is needed an additional salt can be configured. If this is done, all clones must define that in it's settings to have same password work across all of them.
+There are two ways of declaring RBAC for a specific key. The old `users` field in the metadata file and the preferred way of defining `read` and write `roles`in the metadata file and then specify a user with a corresponding role and a password. If you use the API for creating users, the passwords will be automatically hashed when stored. If more security is needed an additional salt can be configured. If this is done, all clones must define that in it's settings to have same password work across all of them.
 
 #### Public keys
 
@@ -485,7 +481,7 @@ There are four security realms in JitStatic which covers parts of the functional
 
 #### The Git realm .users/git/
 
-This realm covers the user management for accessing the Git repository with ACL for who can `pull`, `push`, force push a branch (`forcepush`) or read the `secrets`. This information is stored in a special branch called `refs/heads/secrets` which is clonable only if you have the role `secrets`. This branch shouldn't be merged into any other branch and if the folder `.users/git/`is in an another branch it will be ignored.
+This realm covers the user management for accessing the Git repository with RBAC for who can `pull`, `push`, force push a branch (`forcepush`) or read the `secrets`. This information is stored in a special branch called `refs/heads/secrets` which is clonable only if you have the role `secrets`. This branch shouldn't be merged into any other branch and if the folder `.users/git/`is in an another branch it will be ignored.
 
 By having this separation each repository can create their own secrets branch, so the information can be protected and sites can have more protection.
 

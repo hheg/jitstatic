@@ -59,25 +59,15 @@ public class SearchResult {
         this.content = provider;
     }
 
-    public String getTag() {
-        return tag;
-    }
+    public String getTag() { return tag; }
 
-    public String getContentType() {
-        return contentType;
-    }
+    public String getContentType() { return contentType; }
 
-    public ObjectStreamProvider getContent() {
-        return content;
-    }
+    public ObjectStreamProvider getContent() { return content; }
 
-    public String getKey() {
-        return key;
-    }
+    public String getKey() { return key; }
 
-    public String getRef() {
-        return ref;
-    }
+    public String getRef() { return ref; }
 
     @Override
     public int hashCode() {

@@ -101,11 +101,12 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.SourceChecker;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
 
 @ExtendWith(TemporaryFolderExtension.class)
-public class JitStaticReceivePackTest {
+public class JitStaticReceivePackTest extends BaseTest {
 
     private static final String METADATA = ".metadata";
     private static final String REF_HEADS_MASTER = "refs/heads/master";
@@ -127,8 +128,8 @@ public class JitStaticReceivePackTest {
 
     @BeforeEach
     public void setup() throws IllegalStateException, GitAPIException, IOException {
-        remoteBareGit = Git.init().setDirectory(getFolder().toFile()).setBare(true).call();
-        File workingFolder = getFolder().toFile();
+        remoteBareGit = Git.init().setDirectory(getFolderFile()).setBare(true).call();
+        File workingFolder = getFolderFile();
         clientGit = Git.cloneRepository().setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).setDirectory(workingFolder).call();
         storePath = workingFolder.toPath().resolve(STORE);
         storeMetaPath = workingFolder.toPath().resolve(STORE + METADATA);
@@ -136,7 +137,7 @@ public class JitStaticReceivePackTest {
         Files.write(storeMetaPath, data, StandardOpenOption.CREATE);
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("Initial commit").call();
-        clientGit.push().call();
+        verifyOkPush(clientGit.push().call());
         executor = Executors.newSingleThreadExecutor();
         errorReporter = new ErrorReporter();
         bus = new RefLockHolderManager();
@@ -170,7 +171,7 @@ public class JitStaticReceivePackTest {
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("New commit").call();
-        clientGit.push().call();
+        verifyOkPush(clientGit.push().call());
 
         clientGit.branchCreate().setName("newbranch").call();
 
@@ -200,7 +201,7 @@ public class JitStaticReceivePackTest {
         RemoteTestUtils.copy("/test3.json", storePath);
         clientGit.add().addFilepattern(STORE).call();
         clientGit.commit().setMessage("New commit").call();
-        clientGit.push().call();
+        verifyOkPush(clientGit.push().call());
 
         clientGit.branchCreate().setName("newbranch").call();
 
@@ -238,7 +239,7 @@ public class JitStaticReceivePackTest {
             String messages = connection.getMessages();
             System.out.println(messages);
         }
-        assertEquals(Status.OK, rru.getStatus());
+        assertEquals(Status.OK, rru.getStatus(), rru.getMessage());
         assertEquals(null, errorReporter.getFault());
     }
 
@@ -264,7 +265,7 @@ public class JitStaticReceivePackTest {
         assertEquals(Status.REJECTED_OTHER_REASON, rru.getStatus());
         assertTrue(rru.getMessage().startsWith("Error in branch " + REF_HEADS_MASTER));
         assertEquals(null, errorReporter.getFault());
-        final File newFolder = getFolder().toFile();
+        final File newFolder = getFolderFile();
         try (Git git = Git.cloneRepository().setDirectory(newFolder).setURI(remoteBareGit.getRepository().getDirectory().getAbsolutePath()).call()) {
             byte[] readAllBytes = Files.readAllBytes(newFolder.toPath().resolve(STORE));
             assertArrayEquals(data, readAllBytes);
@@ -658,7 +659,8 @@ public class JitStaticReceivePackTest {
             }
 
             @Override
-            public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action, Consumer<Exception> postAction) {
+            public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(Supplier<Exception> preRequisite, Supplier<DistributedData> action,
+                    Consumer<Exception> postAction) {
                 return CompletableFuture.supplyAsync(() -> {
                     Exception exception = preRequisite.get();
                     try {
@@ -677,10 +679,12 @@ public class JitStaticReceivePackTest {
         };
     }
 
-    Path getFolder() throws IOException { return tmpFolder.createTemporaryDirectory().toPath(); }
-
     private static byte[] brackets() {
         return "{}".getBytes(StandardCharsets.UTF_8);
+    }
 
+    @Override
+    protected File getFolderFile() throws IOException {
+        return tmpFolder.createTemporaryDirectory();
     }
 }

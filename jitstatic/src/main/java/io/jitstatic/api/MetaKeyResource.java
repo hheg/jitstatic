@@ -61,6 +61,7 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
+import io.dropwizard.validation.Validated;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
@@ -99,12 +100,8 @@ public class MetaKeyResource {
     @ExceptionMetered(name = "get_metakey_exception")
     @Path("/{key : .+}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void get(@Suspended AsyncResponse asyncResponse,
-            final @PathParam("key") String key,
-            final @QueryParam("ref") String askedRef,
-            final @Auth Optional<User> userHolder,
-            final @Context Request request,
-            final @Context HttpHeaders headers) {
+    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+            final @Auth Optional<User> userHolder, final @Context Request request, final @Context HttpHeaders headers) {
         final User user = userHolder.orElseThrow(() -> APIHelper.createAuthenticationChallenge(JITSTATIC_KEYADMIN_REALM));
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
@@ -140,7 +137,7 @@ public class MetaKeyResource {
             final @PathParam("key") String key,
             final @QueryParam("ref") String askedRef,
             final @Auth Optional<User> userHolder,
-            final @Valid @NotNull ModifyMetaKeyData data,
+            final @Validated @Valid @NotNull ModifyMetaKeyData data,
             final @Context Request request,
             final @Context HttpServletRequest httpRequest,
             final @Context HttpHeaders headers) {
@@ -183,17 +180,13 @@ public class MetaKeyResource {
                 }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
     }
 
-    private void authorize(final User user,
-            final String ref,
-            final Set<Role> roles) {
+    private void authorize(final User user, final String ref, final Set<Role> roles) {
         if (!keyAdminAuthenticator.authenticate(user, ref) && !isKeyUserAllowed(user, ref, roles)) {
             throw new WebApplicationException(Status.FORBIDDEN);
         }
     }
 
-    private boolean isKeyUserAllowed(final User user,
-            final String ref,
-            Set<Role> keyRoles) {
+    private boolean isKeyUserAllowed(final User user, final String ref, Set<Role> keyRoles) {
         keyRoles = keyRoles == null ? Set.of() : keyRoles;
         try {
             UserData userData = storage.getUser(user.getName(), ref, JITSTATIC_KEYUSER_REALM);

@@ -127,6 +127,7 @@ public class JitStaticUploadPackFactoryTest {
         assertTrue(filtered.isEmpty());
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testUploadThrowingException() throws ServiceNotEnabledException, ServiceNotAuthorizedException, IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
@@ -154,7 +155,6 @@ public class JitStaticUploadPackFactoryTest {
         when(head.getObjectId()).thenReturn(oid);
         when(db.getConfig()).thenReturn(scfg);
         // This is sneaky
-        @SuppressWarnings("unchecked")
         ArgumentCaptor<SectionParser<ServiceConfig>> argcaptor = ArgumentCaptor.forClass(SectionParser.class);
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(true);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));
@@ -169,6 +169,7 @@ public class JitStaticUploadPackFactoryTest {
         assertThrows(UploadPackInternalServerErrorException.class, () -> up.upload(input, output, messages));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testUploadThrowingWantNotValidException() throws ServiceNotEnabledException, ServiceNotAuthorizedException, IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
@@ -195,7 +196,6 @@ public class JitStaticUploadPackFactoryTest {
         when(head.getObjectId()).thenReturn(oid);
         when(db.getConfig()).thenReturn(scfg);
         // This is sneaky
-        @SuppressWarnings("unchecked")
         ArgumentCaptor<SectionParser<ServiceConfig>> argcaptor = ArgumentCaptor.forClass(SectionParser.class);
         when(cfg.getBoolean(Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean())).thenReturn(true);
         when(scfg.get(argcaptor.capture())).thenAnswer((i) -> argcaptor.getValue().parse(cfg));

@@ -24,6 +24,7 @@ import static io.jitstatic.JitStaticConstants.METADATA;
 import static io.jitstatic.JitStaticConstants.REFS_JITSTATIC;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.function.Predicate.not;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
@@ -35,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -230,7 +230,7 @@ public class SourceExtractor {
         final Map<AnyObjectId, Set<Ref>> allRefs = repository.getAllRefsByPeeledObjectId();
         return allRefs.entrySet().stream().map(e -> {
             final Set<Ref> refs = e.getValue().stream()
-                    .filter(Predicate.not(Ref::isSymbolic))
+                    .filter(not(Ref::isSymbolic))
                     .filter(ref -> ref.getName().startsWith(R_HEADS))
                     .collect(Collectors.toSet());
             return Pair.of(e.getKey(), refs);
