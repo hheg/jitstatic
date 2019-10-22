@@ -36,6 +36,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.eclipse.jetty.http.HttpStatus;
@@ -86,6 +87,7 @@ public class BulkSearchTest extends BaseTest {
 
         try (Git local = Git.cloneRepository().setURI(adress + "/" + servletName + "/" + endpoint).setDirectory(temporaryGitFolder)
                 .setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call()) {
+            setupUser(local, "keyuser", USER, SECRET, Set.of("read", "write"));
             for (String k : List
                     .of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2", "data/data/key3", "decoy/key1", "decoy/decoy/key1")) {
                 addFilesAndPush(k, temporaryGitFolder, local, user, pass);
@@ -152,8 +154,6 @@ public class BulkSearchTest extends BaseTest {
     }
 
     @Override
-    protected File getFolderFile() throws IOException { 
-        return tmpFolder.createTemporaryDirectory();
-    }
+    protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
 
 }

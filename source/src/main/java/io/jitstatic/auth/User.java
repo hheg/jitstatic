@@ -28,6 +28,7 @@ import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -40,27 +41,41 @@ public final class User implements Principal {
 
     @NotEmpty
     private final String password;
+
+    private final String domain;
+
+    private volatile boolean isAdmin;
     
     @JsonCreator
     public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
+        this(user, password, null);
+    }
+
+    public User(final String user, final String password, final String domain) {
         this.user = user;
         this.password = password;
+        this.domain = domain;
     }
 
     @Override
     @JsonGetter("user")
-    public String getName() {
-        return this.user;
-    }
+    public String getName() { return this.user; }
 
     @JsonGetter("password")
-    public String getPassword() {
-        return password;
-    }
+    public String getPassword() { return password; }
 
     @Override
     public int hashCode() {
         return Objects.hash(user, password);
+    }
+    
+    @JsonIgnore
+    public boolean isAdmin() {
+        return isAdmin;
+    }
+    @JsonIgnore
+    public void setAdmin(boolean isAdmin) {
+        this.isAdmin = isAdmin;
     }
 
     @Override
@@ -75,6 +90,6 @@ public final class User implements Principal {
 
     @Override
     public String toString() {
-        return "User [user=" + user + "]";
+        return "User [user=" + (domain != null ? domain + "/" : "") + user + "]";
     }
 }

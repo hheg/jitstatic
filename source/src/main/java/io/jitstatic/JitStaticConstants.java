@@ -25,7 +25,9 @@ import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import java.util.Set;
 import org.eclipse.jgit.lib.Constants;
 
-public class JitStaticConstants {
+import io.jitstatic.auth.User;
+
+public interface JitStaticConstants {
 
     public static final String REFS_JITSTATIC = Constants.R_REFS + "jitstatic/";
     public static final String APPLICATION_JSON = "application/json";
@@ -48,5 +50,10 @@ public class JitStaticConstants {
     public static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     public static final String JITSTATIC_NOWHERE = "jitstatic@nowhere";
     public static final String REFS_HEADS_SECRETS = R_HEADS + SECRETS;
+    
+    public static final User ANONYMOUS = new User("anonymous", null);
+    public static boolean isRef(final String ref) {
+        return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
+    }
 
 }

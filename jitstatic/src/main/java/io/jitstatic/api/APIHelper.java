@@ -35,18 +35,18 @@ import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.SecurityContext;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.slf4j.Logger;
 
 import io.jitstatic.JitStaticConstants;
+import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.UpdateFailedException;
 import io.jitstatic.auth.User;
-import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.StoreInfo;
-import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -75,7 +75,7 @@ class APIHelper {
                 return new WebApplicationException(apiException.getMessage(), Status.CONFLICT).getResponse();
             } else if (apiException instanceof RefNotFoundException) {
                 RefNotFoundException rnfe = (RefNotFoundException) apiException;
-                return new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.NOT_FOUND).getResponse();
+                return new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.BAD_REQUEST).getResponse();
             } else if (apiException instanceof UnsupportedOperationException) {
                 return new WebApplicationException(Status.FORBIDDEN).getResponse();
             } else if (apiException instanceof IOException) {
@@ -85,20 +85,19 @@ class APIHelper {
         }
         log.error(UNHANDLED_ERROR, e);
         return new WebApplicationException(Status.INTERNAL_SERVER_ERROR).getResponse();
-
     }
 
     static void checkHeaders(final HttpHeaders headers) {
         final List<String> header = headers.getRequestHeader(HttpHeaders.IF_MATCH);
         if (header == null || header.isEmpty()) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
+            throw new WebApplicationException("Required headers are missing", Status.BAD_REQUEST);
         }
         boolean isValid = false;
         for (String headerValue : header) {
             isValid |= !headerValue.isEmpty();
         }
         if (!isValid) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
+            throw new WebApplicationException("Header value is empty", Status.BAD_REQUEST);
         }
     }
 
@@ -139,8 +138,11 @@ class APIHelper {
         }
         if (e instanceof WrappingAPIException) {
             final Throwable apiException = e.getCause();
-            if (apiException instanceof UnsupportedOperationException || apiException instanceof RefNotFoundException) {
+            if (apiException instanceof UnsupportedOperationException) {
                 return new WebApplicationException(Status.NOT_FOUND).getResponse();
+            }
+            if (apiException instanceof RefNotFoundException) {
+                return new WebApplicationException(apiException.getMessage(), Status.BAD_REQUEST).getResponse();
             }
             if (apiException instanceof VersionIsNotSame) {
                 return new WebApplicationException(apiException.getMessage(), Status.PRECONDITION_FAILED).getResponse();
@@ -171,7 +173,7 @@ class APIHelper {
                 throw new WebApplicationException(Status.METHOD_NOT_ALLOWED);
             }
             if (cause instanceof RefNotFoundException) {
-                throw new WebApplicationException(Status.NOT_FOUND);
+                throw new WebApplicationException(cause.getMessage(),Status.BAD_REQUEST);
             }
             log.error("Unknown api error", t);
             return alternative.get();
@@ -184,13 +186,9 @@ class APIHelper {
         if (ref == null) {
             return;
         }
-        if (!isRef(ref)) {
-            throw new WebApplicationException(Status.NOT_FOUND);
+        if (!JitStaticConstants.isRef(ref)) {
+            throw new WebApplicationException(String.format("Ref %s doesn't exit", ref), Status.BAD_REQUEST);
         }
-    }
-
-    static boolean isRef(final String ref) {
-        return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
     }
 
     static Response checkETag(final HttpHeaders headers, final EntityTag tag) {
@@ -199,7 +197,7 @@ class APIHelper {
             return null;
         }
         if (requestHeaders.size() > 1) {
-            throw new WebApplicationException(Status.BAD_REQUEST);
+            throw new WebApplicationException("If-Match header is missing", Status.BAD_REQUEST);
         }
         for (final String header : requestHeaders) {
             if (header.equals("\"" + tag.getValue() + "\"")) {
@@ -215,31 +213,46 @@ class APIHelper {
     }
 
     CompletableFuture<StoreInfo> checkIfKeyExist(final String key, final String ref, final Storage storage) {
-        return storage.getKey(key, ref)
+        return getKeyMuted(key, ref, storage)
                 .exceptionally(this.keyExceptionHandler(Optional::empty))
                 .thenApply(storeInfo -> storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND)));
+    }
+
+    CompletableFuture<Optional<StoreInfo>> getKeyMuted(String key, String ref, Storage storage) {
+        try {
+            return storage.getKey(key, ref);
+        } catch (RefNotFoundException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    boolean canAdministrate(final User user, final Set<Role> writeRoles) {
+        return writeRoles.isEmpty() && user.isAdmin();
+    }
+
+    void checkWritePermission(final String key, final User user, SecurityContext context, final String ref, final MetaData metaData) {
+        final Set<Role> writeRoles = metaData.getWrite();
+        if (!(APIHelper.isUserInRole(context, writeRoles) || (canAdministrate(user, writeRoles)))) {
+            log.info(KeyResource.RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
     }
 
     static String setToDefaultRefIfNull(final String ref, final String defaultRef) {
         return ref == null ? defaultRef : ref;
     }
 
-    static boolean isKeyUserAllowed(final Storage storage, final HashService hashService, final User user, final String ref, Set<Role> keyRoles) {
-        keyRoles = keyRoles == null ? Set.of() : keyRoles;
-        try {
-            final UserData userData = storage.getUser(user.getName(), ref, JitStaticConstants.JITSTATIC_KEYUSER_REALM);
-            if (userData == null) {
-                return false;
-            }
-            final Set<Role> userRoles = userData.getRoles();
-            return (!keyRoles.stream().noneMatch(userRoles::contains) && hashService.hasSamePassword(userData, user.getPassword()));
-        } catch (RefNotFoundException e) {
-            return false;
-        }
-    }
-
     public static String compileUserOrigin(final User user, final HttpServletRequest req) {
         return user.getName() + "@" + req.getRemoteHost();
+    }
+
+    public static boolean isUserInRole(final SecurityContext context, final Set<Role> roles) {
+        for (Role role : roles) {
+            if (context.isUserInRole(role.getRole())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

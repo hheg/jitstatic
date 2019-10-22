@@ -28,14 +28,24 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
 import com.fasterxml.jackson.core.JsonParser.Feature;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jitstatic.client.JitStaticClient;
@@ -66,17 +76,22 @@ public abstract class BaseTest {
     protected static final ObjectMapper MAPPER = new ObjectMapper().enable(Feature.ALLOW_COMMENTS);
     protected static final String REFS_HEADS_MASTER = "refs/heads/master";
     protected static final Charset UTF_8 = StandardCharsets.UTF_8;
+    protected static final String ALLFILESPATTERN = ".";
 
     protected String getData() { return getData(0); }
 
-    protected String getMetaData() { return "{\"users\":[{\"user\":\"user1\",\"password\":\"0234\"}],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}"; }
+    protected String getMetaData() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}"; }
+    protected String getMetaDataHidden() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}],\"hidden\":true}"; }
+    protected String getMetaDataProtected() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}],\"protected\":true}"; }
 
     protected String getData(int i) {
         return "{\"key" + i
                 + "\":{\"data\":\"value1\",\"users\":[{\"captain\":\"america\",\"black\":\"widow\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"tony\":\"stark\",\"spider\":\"man\"}]}}";
     }
 
-    protected abstract File getFolderFile() throws IOException;
+    protected File getFolderFile() throws IOException {
+        throw new UnsupportedOperationException("implement this");
+    }
 
     protected Supplier<String> getFolder() {
         return () -> {
@@ -105,6 +120,41 @@ public abstract class BaseTest {
         };
     }
 
+    protected void setupUser(Git repo, String realm, String userName, String password, Set<String> roles)
+            throws JsonProcessingException, IOException, NoFilepatternException, GitAPIException {
+        File gitBase = repo.getRepository().getDirectory().getParentFile();
+        Path user = gitBase.toPath().resolve(".users/" + realm + "/" + userName);
+        mkdirs(user.getParent());
+        Set<Role> newroles = roles.stream().map(Role::new).collect(Collectors.toSet());
+        Files.write(user, MAPPER.writeValueAsBytes(new User(newroles, password)), StandardOpenOption.CREATE);
+        repo.add().addFilepattern(".").call();
+        repo.commit().setMessage("Added user " + userName);
+    }
+
+    static class User {
+        String basicPassword;
+        Set<Role> roles;
+
+        public User(Set<Role> roles, String password) {
+            this.basicPassword = password;
+            this.roles = roles;
+        }
+
+        public String getBasicPassword() { return basicPassword; }
+
+        public Set<Role> getRoles() { return roles; }
+    }
+
+    static class Role {
+        String role;
+
+        public Role(String role) {
+            this.role = role;
+        }
+
+        public String getRole() { return role; }
+    }
+
     protected void verifyOkPush(Iterable<PushResult> call) {
         assertTrue(StreamSupport.stream(call.spliterator(), false)
                 .allMatch(p -> p.getRemoteUpdates().stream()
@@ -113,5 +163,21 @@ public abstract class BaseTest {
                                         .map(ru -> String.format("%s %s %s", ru.getStatus(), ru.getRemoteName(), ru.getMessage()))
                                         .collect(Collectors.joining(",")))
                                 .collect(Collectors.joining(",")));
+    }
+
+    protected void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
+        git.add().addFilepattern(ALLFILESPATTERN).call();
+        git.commit().setMessage("Test commit").call();
+        verifyOkPush(git.push().setCredentialsProvider(provider).call());
+    }
+
+    protected void mkdirs(Path... paths) {
+        for (Path p : paths) {
+            assertTrue(p.toFile().mkdirs());
+        }
+    }
+
+    protected Set<io.jitstatic.client.MetaData.Role> roleOf(String... roles) {
+        return Arrays.stream(roles).map(io.jitstatic.client.MetaData.Role::new).collect(Collectors.toSet());
     }
 }

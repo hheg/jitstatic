@@ -21,12 +21,12 @@ package io.jitstatic;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.version.ProjectVersion.INSTANCE;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiPredicate;
 import java.util.logging.Level;
 
 import org.eclipse.jgit.util.SystemReader;
@@ -45,7 +45,6 @@ import io.jitstatic.api.JitstaticInfoResource;
 import io.jitstatic.api.KeyResource;
 import io.jitstatic.api.MetaKeyResource;
 import io.jitstatic.api.UsersResource;
-import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.git.OverridingSystemReader;
 import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
@@ -84,10 +83,10 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
-            storage = config.getStorageFactory().build(source, env, JITSTATIC_KEYADMIN_REALM, hashService, hostedFactory
-                    .getUserName(), refLockService, defaultExecutor, workStealingExecutor);
+            BiPredicate<String,String> rootAuthenticator = config.getRootAuthenticator();
+            storage = config.getStorageFactory().build(source, env, defaultBranch, hashService, hostedFactory
+                    .getUserName(), refLockService, defaultExecutor, workStealingExecutor, rootAuthenticator);
             loginService.setUserStorage(storage);
-            final KeyAdminAuthenticator authenticator = config.getKeyAdminAuthenticator(storage, hashService);
 
             env.lifecycle().manage(new ManagedObject<>(source));
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(storage));
@@ -98,11 +97,11 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
 
-            env.jersey().register(new KeyResource(storage, authenticator, config.getHostedFactory().getCors() != null, defaultBranch, hashService));
+            env.jersey().register(new KeyResource(storage, config.getHostedFactory().getCors() != null, defaultBranch));
             env.jersey().register(new JitstaticInfoResource());
-            env.jersey().register(new MetaKeyResource(storage, authenticator, defaultBranch, hashService));
-            env.jersey().register(new BulkResource(storage, authenticator, defaultBranch, hashService));
-            env.jersey().register(new UsersResource(storage, authenticator, loginService, defaultBranch, hashService));
+            env.jersey().register(new MetaKeyResource(storage, defaultBranch));
+            env.jersey().register(new BulkResource(storage, defaultBranch));
+            env.jersey().register(new UsersResource(storage, defaultBranch, hashService));
 
             source.readAllRefs();
         } catch (final RuntimeException e) {

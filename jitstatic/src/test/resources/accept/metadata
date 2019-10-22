@@ -1,1 +1,1 @@
-{"users":[{"password":"ssecret","user":"suser"}]}
+{"users":[],"read":[{"role":"read"}],"write":[{"role":"write"}]}

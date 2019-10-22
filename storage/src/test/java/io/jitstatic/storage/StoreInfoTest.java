@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,16 +44,16 @@ public class StoreInfoTest {
 
     @Test
     public void testStorageInfo() throws JsonParseException, JsonMappingException, IOException {
-        StoreInfo si1 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
-        StoreInfo si2 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "1", "1");
-        StoreInfo si3 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(null, null), "2", "2");
+        StoreInfo si1 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(Set.of(), Set.of()), "1", "1");
+        StoreInfo si2 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(Set.of(), Set.of()), "1", "1");
+        StoreInfo si3 = new StoreInfo(toProvider("{\"one\":\"two\"}".getBytes(UTF_8)), new MetaData(Set.of(), Set.of()), "2", "2");
 
         assertEquals(si1, si1);
         assertEquals(si1.hashCode(), si2.hashCode());
         assertEquals(si1, si2);
         assertNotEquals(si1, si3);
 
-        assertNotEquals(si1, null);
+        assertNotEquals(null, si1);
         assertNotEquals(si1, new Object());
     }
 }

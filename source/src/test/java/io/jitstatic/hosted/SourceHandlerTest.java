@@ -30,17 +30,13 @@ import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
+import io.jitstatic.test.BaseTest;
 
-public class SourceHandlerTest {
+public class SourceHandlerTest extends BaseTest {
 
     @Test
     public void testSourceHandlerMetaData() throws IOException {
         MetaData metaData = SourceHandler.readMetaData(new ByteArrayInputStream(getMetaData().getBytes(StandardCharsets.UTF_8)));
-        User user = new User("user1", "1234");
-        assertTrue(metaData.getUsers().contains(user));
-    }
-    @Deprecated
-    private String getMetaData() {
-        return "{\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}";
+        assertTrue(metaData.getUsers().isEmpty());
     }
 }

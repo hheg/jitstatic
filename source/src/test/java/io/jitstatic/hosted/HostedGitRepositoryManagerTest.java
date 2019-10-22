@@ -51,7 +51,6 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -430,8 +429,8 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);
                 Git git = Git.cloneRepository().setURI(tempDir.toUri().toString()).setDirectory(localGitDir).call();) {
             addFilesAndPush(localGitDir, git);
-            var addKey = grm.addKey("key", REF_HEADS_MASTER, toProvider(new byte[] { 1 }), new MetaData(new HashSet<>(), null, false, false, List
-                    .of(), null, null), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
+            var addKey = grm.addKey("key", REF_HEADS_MASTER, toProvider(new byte[] { 1 }), new MetaData(null, false, false, List
+                    .of(), Set.of(), Set.of()), new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE));
             String version = addKey.getLeft().getRight();
             assertNotNull(version);
             SourceInfo sourceInfo = grm.getSourceInfo("key", REF_HEADS_MASTER);
@@ -456,7 +455,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
             assertNotNull(firstSourceInfo);
             MetaData firstValue = readMetaData(firstSourceInfo);
             String firstVersion = firstSourceInfo.getMetaDataVersion();
-            MetaData newData = new MetaData(new HashSet<>(), "newcontent", false, false, List.of(), null, null);
+            MetaData newData = new MetaData("newcontent", false, false, List.of(), Set.of(), Set.of());
             String newVersion = grm.modifyMetadata(newData, firstVersion, STORE, REF_HEADS_MASTER, cmd);
             assertNotNull(newVersion);
             assertNotEquals(firstVersion, newVersion);
@@ -476,8 +475,8 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
     @Test
     public void testModifyMetadataWithTag() throws CorruptedSourceException, IOException {
         try (HostedGitRepositoryManager grm = new HostedGitRepositoryManager(tempDir, ENDPOINT, REF_HEADS_MASTER, service);) {
-            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData(Set.of(), "", false, false, List
-                    .of(), null, null), null, STORE, "refs/tags/tag", new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)));
+            assertThrows(UnsupportedOperationException.class, () -> grm.modifyMetadata(new MetaData("", false, false, List
+                    .of(), Set.of(), Set.of()), null, STORE, "refs/tags/tag", new CommitMetaData("user", "mail", "msg", "Test", JITSTATIC_NOWHERE)));
         }
     }
 
@@ -705,7 +704,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
             Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
             Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, CREATE_NEW);
             commit(workingGit);
-            LOG.info("",assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
+            LOG.info("", assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
                     .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
         }
     }
@@ -893,12 +892,6 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
     private JsonNode readJsonData(SourceInfo sourceInfo) throws IOException, JsonParseException, JsonMappingException {
         try (InputStream is = sourceInfo.getStreamProvider().getInputStream()) {
             return MAPPER.readValue(is, JsonNode.class);
-        }
-    }
-
-    private void mkdirs(Path... realms) {
-        for (Path realm : realms) {
-            assertTrue(realm.toFile().mkdirs());
         }
     }
 }

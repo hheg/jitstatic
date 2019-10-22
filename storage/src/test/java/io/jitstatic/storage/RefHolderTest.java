@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
@@ -64,13 +66,14 @@ import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.test.BaseTest;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
-public class RefHolderTest {
+public class RefHolderTest extends BaseTest {
 
     private static final String REF = "refs/heads/master";
     private Source source;
@@ -287,26 +290,11 @@ public class RefHolderTest {
         }
     }
 
-    private String getMetaDataHidden() {
-        int i = 0;
-        return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}],\"hidden\": true}";
-    }
-
     private ByteArrayInputStream asStream(String data) {
         return new ByteArrayInputStream(data.getBytes(UTF_8));
     }
 
-    private String getData() { return getData(0); }
-
-    private String getMetaData(int i) {
-        return "{\"users\":[{\"password\":\"" + i + "234\",\"user\":\"user1\"}]}";
-    }
-
-    private String getMetaData() { return getMetaData(0); }
-
-    private String getData(int i) {
-        return "{\"key" + i
-                + "\":{\"data\":\"value1\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]},\"mkey3\":{\"data\":\"value3\",\"users\":[{\"password\":\"1234\",\"user\":\"user1\"}]}}";
-    }
+    @Override
+    protected File getFolderFile() throws IOException { return null; }
 
 }

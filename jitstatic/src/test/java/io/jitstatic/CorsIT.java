@@ -30,7 +30,6 @@ import static io.jitstatic.JitStaticConstants.SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,7 +79,6 @@ public class CorsIT extends BaseTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsIT.class);
 
-    private static final String ALLFILESPATTERN = ".";
     private static final String KEYUSERNOROLE = "keyusernorole";
     private static final String KEYUSERNOROLEPASS = "1456";
 
@@ -262,7 +260,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testSimpleRequestPost() throws UnirestException, JsonProcessingException {
         Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
-                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+                + Base64.encodeAsString(KEYADMINUSER + ":" + KEYADMINUSERPASS));
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/application/storage/file3", DW.getLocalPort())).headers(headers)
                 .body(MAPPER.writeValueAsBytes(new AddKeyData(ObjectStreamProvider
                         .toProvider(new byte[] { 0 }), new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))
@@ -457,24 +455,9 @@ public class CorsIT extends BaseTest {
         return MAPPER.writeValueAsString(metaData);
     }
 
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        git.push().setCredentialsProvider(provider).call();
-    }
-
     private void commit(Git git, UsernamePasswordCredentialsProvider provider, String string) throws NoFilepatternException, GitAPIException {
         git.checkout().setName(string).setCreateBranch(true).call();
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        verifyOkPush(git.push().setCredentialsProvider(provider).call());
-
-    }
-
-    private void mkdirs(Path... paths) {
-        for (Path p : paths) {
-            assertTrue(p.toFile().mkdirs());
-        }
+        commit(git,provider);
     }
 
     @Override

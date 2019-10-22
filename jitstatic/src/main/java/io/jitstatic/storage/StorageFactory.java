@@ -1,13 +1,10 @@
 package io.jitstatic.storage;
 
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +20,14 @@ import java.util.concurrent.ExecutorService;
  * #L%
  */
 
-import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.function.BiPredicate;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
-import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.auth.ConfiguratedAuthenticator;
+import io.jitstatic.auth.UrlAwareBasicCredentialAuthFilter;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.events.AddRefEventListener;
 import io.jitstatic.hosted.events.DeleteRefEventListener;
@@ -39,24 +37,21 @@ import io.jitstatic.source.Source;
 
 public class StorageFactory {
 
-    public Storage build(final Source source, final Environment env, final String storageRealm, final HashService hashService, final String rootUser,
-            final RefLockService clusterService, final ExecutorService executor, final ExecutorService workStealingExecutor) {
+    public Storage build(final Source source, final Environment env, final String defaultBranch, final HashService hashService, final String rootUser,
+            final RefLockService clusterService, final ExecutorService executor, final ExecutorService workStealingExecutor, BiPredicate<String,String> rootAuthenticator) {
         Objects.requireNonNull(source, "Source cannot be null");
         Objects.requireNonNull(rootUser);
-        env.jersey().register(new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>()
-                .setAuthenticator(new ConfiguratedAuthenticator())
-                .setAuthorizer((user, role) -> true)
-                .setRealm(Objects.requireNonNull(storageRealm, "realm cannot be null"))
-                .buildAuthFilter()));
 
-        env.jersey().register(RolesAllowedDynamicFeature.class);
-        env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
-
-        final KeyStorage keyStorage = new KeyStorage(source, source.getDefaultRef(), hashService, clusterService, rootUser, executor, workStealingExecutor, env.metrics());
+        final KeyStorage keyStorage = new KeyStorage(source, defaultBranch, hashService, clusterService, rootUser, executor, workStealingExecutor, env
+                .metrics());
         source.addListener(new ReloadRefEventListener(keyStorage), ReloadRefEventListener.class);
         source.addListener(new DeleteRefEventListener(keyStorage), DeleteRefEventListener.class);
         source.addListener(new StorageAddRefEventListener(keyStorage), AddRefEventListener.class);
         source.addRefHolderFactory(keyStorage::getRefHolderLock);
+
+        env.jersey().register(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(keyStorage, hashService, rootAuthenticator)));
+        env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
+
         return keyStorage;
     }
 }

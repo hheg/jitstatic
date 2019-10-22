@@ -239,12 +239,6 @@ public class UserExtractorTest extends BaseTest {
         Files.write(userPath, MAPPER.writeValueAsBytes(userData), StandardOpenOption.CREATE);
     }
 
-    private void mkdirs(Path... realms) {
-        for (Path realm : realms) {
-            assertTrue(realm.toFile().mkdirs());
-        }
-    }
-
     @Override
     protected File getFolderFile() throws IOException { return null; }
 }

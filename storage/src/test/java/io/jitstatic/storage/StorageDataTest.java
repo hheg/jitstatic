@@ -38,83 +38,83 @@ import io.jitstatic.auth.User;
 
 public class StorageDataTest {
 
-	@Test
-	public void testEquals() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-
-		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		MetaData sd2 = new MetaData(users2);
-		assertEquals(sd1, sd2);
-	}
-
-	@Test
-	public void testNotEquals() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user2", "p"));
-		MetaData sd1 = new MetaData(users1);
-		MetaData sd2 = new MetaData(users2);
-		assertNotEquals(sd1, sd2);
-	}
-
-	@Test
-	public void testEqualsHashCode() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		MetaData sd2 = new MetaData(users2);
-		assertEquals(sd1.hashCode(), sd2.hashCode());
-	}
-
-	@Test
-	public void testNotEqualsHashCode() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		Set<User> users2 = new HashSet<>();
-		users2.add(new User("user2", "p"));
-		MetaData sd1 = new MetaData(users1);
-		MetaData sd2 = new MetaData(users2);
-		assertNotEquals(sd1.hashCode(), sd2.hashCode());
-	}
-
-	@Test
-	public void testEqualsInstance() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		assertTrue(sd1.equals(sd1));
-	}
-
-	@Test
-	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		assertFalse(sd1.equals(null));
-	}
-
-	@Test
-	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		assertFalse(sd1.equals(new Object()));
-	}
-
-	@Test
-	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
-		Set<User> users1 = new HashSet<>();
-		users1.add(new User("user1", "p"));
-		MetaData sd1 = new MetaData(users1);
-		Set<User> users2 = new HashSet<>();
-		users1.add(new User("user2", "p"));
-		MetaData sd2 = new MetaData(users2);
-		assertFalse(sd1.equals(sd2));
-	}
+//	@Test
+//	public void testEquals() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//
+//		Set<User> users2 = new HashSet<>();
+//		users2.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		MetaData sd2 = new MetaData(users2);
+//		assertEquals(sd1, sd2);
+//	}
+//
+//	@Test
+//	public void testNotEquals() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		Set<User> users2 = new HashSet<>();
+//		users2.add(new User("user2", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		MetaData sd2 = new MetaData(users2);
+//		assertNotEquals(sd1, sd2);
+//	}
+//
+//	@Test
+//	public void testEqualsHashCode() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		Set<User> users2 = new HashSet<>();
+//		users2.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		MetaData sd2 = new MetaData(users2);
+//		assertEquals(sd1.hashCode(), sd2.hashCode());
+//	}
+//
+//	@Test
+//	public void testNotEqualsHashCode() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		Set<User> users2 = new HashSet<>();
+//		users2.add(new User("user2", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		MetaData sd2 = new MetaData(users2);
+//		assertNotEquals(sd1.hashCode(), sd2.hashCode());
+//	}
+//
+//	@Test
+//	public void testEqualsInstance() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		assertTrue(sd1.equals(sd1));
+//	}
+//
+//	@Test
+//	public void testNotEqualsToNull() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		assertFalse(sd1.equals(null));
+//	}
+//
+//	@Test
+//	public void testNotEqualsToOther() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		assertFalse(sd1.equals(new Object()));
+//	}
+//
+//	@Test
+//	public void testNotEqualsUsers() throws JsonProcessingException, IOException {
+//		Set<User> users1 = new HashSet<>();
+//		users1.add(new User("user1", "p"));
+//		MetaData sd1 = new MetaData(users1);
+//		Set<User> users2 = new HashSet<>();
+//		users1.add(new User("user2", "p"));
+//		MetaData sd2 = new MetaData(users2);
+//		assertFalse(sd1.equals(sd2));
+//	}
 }

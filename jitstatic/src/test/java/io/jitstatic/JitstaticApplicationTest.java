@@ -109,7 +109,7 @@ public class JitstaticApplicationTest {
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);
-        when(storageFactory.build(any(), isA(Environment.class), any(), any(), any(), any(), any(), any())).thenReturn(storage);
+        when(storageFactory.build(any(), isA(Environment.class), any(), any(), any(), any(), any(), any(), any())).thenReturn(storage);
         when(environment.getApplicationContext()).thenReturn(handler);
         when(handler.getBean(Mockito.eq(LoginService.class))).thenReturn(service);
         when(handler.getBean(Mockito.eq(HashService.class))).thenReturn(hashService);
@@ -190,7 +190,7 @@ public class JitstaticApplicationTest {
         config.setHostedFactory(hostedFactory);
         when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
         when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
-                .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
+                .eq(hashService), any(), any(), any(), any(), any())).thenReturn(storage);
         app.run(config, environment);
         
     }
@@ -203,10 +203,10 @@ public class JitstaticApplicationTest {
             doThrow(new TestException("Test exception2")).when(storage).close();
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
-            when(config.getKeyAdminAuthenticator(storage, hashService)).thenThrow(new TestException("Test exception3"));
+            when(config.getRootAuthenticator()).thenThrow(new TestException("Test exception3"));
             when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
             when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
-                    .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
+                    .eq(hashService), any(), any(), any(), any(), any())).thenReturn(storage);
             app.run(config, environment);
         });
     }

@@ -43,7 +43,7 @@ public class StoreInfoTest {
 
     @Test
     public void testStoreInfo() throws IOException {
-        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of(), null, null);
+        MetaData sd = new MetaData("t", false, false, List.of(), Set.of(),Set.of());
         StoreInfo s1 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "1", "1");
         StoreInfo s2 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "1", "1");
         StoreInfo s3 = new StoreInfo(toProvider(new byte[] { 0 }), sd, "2", "1");
@@ -61,7 +61,7 @@ public class StoreInfoTest {
 
     @Test
     public void testStoreInfoMasterMetaData() {
-        MetaData sd = new MetaData(Set.of(new User("u", "p")), "t", false, false, List.of(), null, null);
+        MetaData sd = new MetaData("t", false, false, List.of(), Set.of(), Set.of());
         StoreInfo s1 = new StoreInfo(sd, "1");
         StoreInfo s2 = new StoreInfo(sd, "1");
 

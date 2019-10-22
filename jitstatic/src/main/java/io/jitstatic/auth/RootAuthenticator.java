@@ -19,7 +19,7 @@ package io.jitstatic.auth;
  * limitations under the License.
  * #L%
  */
-
-public interface KeyAdminAuthenticator {
-    boolean authenticate(User user, String ref);
+@Deprecated
+public interface RootAuthenticator {
+    boolean test(User user);
 }

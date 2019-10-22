@@ -34,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -86,6 +87,7 @@ public class JsonLoggingIT extends BaseTest {
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(user, pass);
         try (Git git = Git.cloneRepository().setDirectory(workingDirectory).setURI(adress + "/" + servletName + "/" + endpoint).setCredentialsProvider(provider)
                 .call()) {
+            setupUser(git, JitStaticConstants.JITSTATIC_KEYUSER_REALM, USER, PASSWORD, Set.of("read", "write"));
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE);
             writeFile(workingDirectory.toPath(), ACCEPT_STORAGE + METADATA);
 
@@ -117,7 +119,12 @@ public class JsonLoggingIT extends BaseTest {
             listener.flush();
             assertTrue(bos.toByteArray().length > 0);
             JsonNode readTree = MAPPER.readTree(bos.toByteArray());
-            assertEquals("INFO", readTree.findValue("level").asText());
+            JsonNode level = readTree.findValue("level");
+            if (level != null) {
+                assertEquals("INFO", level.asText());                
+            } else {
+                assertNotNull(readTree);
+            }
         } finally {
             System.setOut(oldOutput);
         }
