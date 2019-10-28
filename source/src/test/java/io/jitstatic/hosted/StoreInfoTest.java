@@ -36,7 +36,6 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.User;
 import io.jitstatic.source.ObjectStreamProvider;
 
 public class StoreInfoTest {

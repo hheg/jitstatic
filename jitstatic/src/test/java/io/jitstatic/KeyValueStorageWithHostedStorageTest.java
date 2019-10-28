@@ -58,8 +58,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.ws.rs.core.Response.Status;
-
 import org.apache.http.client.ClientProtocolException;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;

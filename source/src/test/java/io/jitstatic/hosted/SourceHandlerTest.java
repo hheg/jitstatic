@@ -29,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.User;
 import io.jitstatic.test.BaseTest;
 
 public class SourceHandlerTest extends BaseTest {

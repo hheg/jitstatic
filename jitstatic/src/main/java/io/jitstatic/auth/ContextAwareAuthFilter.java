@@ -47,8 +47,6 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.glassfish.jersey.server.ContainerRequest;
 import org.glassfish.jersey.server.ExtendedUriInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.dropwizard.auth.DefaultUnauthorizedHandler;
 import io.dropwizard.auth.UnauthorizedHandler;
@@ -59,8 +57,6 @@ import io.jitstatic.storage.Storage;
 
 @Priority(Priorities.AUTHENTICATION)
 public abstract class ContextAwareAuthFilter<C, P extends Principal> implements ContainerRequestFilter {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ContextAwareAuthFilter.class);
 
     protected final String prefix;
     protected final UnauthorizedHandler unauthorizedHandler = new DefaultUnauthorizedHandler();
