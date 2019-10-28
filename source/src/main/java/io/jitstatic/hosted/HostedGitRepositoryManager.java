@@ -230,11 +230,6 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String getDefaultRef() {
-        return defaultRef;
-    }
-
-    @Override
     public <T extends RepositoryListener> void addListener(final T listener, Class<T> type) {
         this.bareRepository.getListenerList().addListener(type, listener);
     }

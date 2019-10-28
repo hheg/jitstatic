@@ -44,8 +44,6 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 
-    public String getDefaultRef();
-
     public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, ObjectStreamProvider data, CommitMetaData commitMetaData);
 
     public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String ref, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
