@@ -20,13 +20,13 @@ package io.jitstatic.auth;
  * #L%
  */
 
+import static io.jitstatic.JitStaticConstants.ANONYMOUS;
 import static io.jitstatic.JitStaticConstants.GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.REFS_HEADS_SECRETS;
 
 import java.security.Principal;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -50,7 +50,6 @@ import org.glassfish.jersey.server.ExtendedUriInfo;
 
 import io.dropwizard.auth.DefaultUnauthorizedHandler;
 import io.dropwizard.auth.UnauthorizedHandler;
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
@@ -82,8 +81,8 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
             throw new WebApplicationException(HttpStatus.FORBIDDEN_403);
         }
         if (realm == Realm.NONE) {
-            setPrincipal(requestContext, scheme, JitStaticConstants.ANONYMOUS, Objects::isNull);
-            return new Verdict(true, realm);
+            setPrincipal(requestContext, scheme, ANONYMOUS, Objects::isNull);
+            return realm.accept;
         }
         if (credentials == null) {
             return testForAnonymousAccess(requestContext, scheme, realm);
@@ -93,94 +92,110 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
             final String password = getPassword(credentials);
             final String userName = getUserName(credentials);
             if (rootAuthenticator.test(userName, password)) {
-                final User root = new User(userName, password, "root");
-                root.setAdmin(true);
+                final User root = new User(userName, password, "root", true);
                 setPrincipal(requestContext, scheme, root, role -> true);
-                return new Verdict(true, realm);
+                return realm.accept;
             }
-            for (Realm.Domain domain : realm.getDomains()) {
-                final UserData userData = findUserInDomain(ref, userName, domain);
-                if (userData != null) {
-                    if (hashService.hasSamePassword(userData, password)) {
-                        User user = new User(userName, password, domain.getDomainName());
-                        switch (realm) {
-                        case GIT:
-                        case ADMIN_GIT:
-                        case USER_ADMIN_GIT:
-                        case NONE_USER_ADMIN_GIT: {
-                            switch (domain) {
-                            case GIT:
-                            case KEYADMIN:
-                                user.setAdmin(true);
-                                // Git users and KeyAdmins can read and write to all keys
-                                setPrincipal(requestContext, scheme, user, role -> true);
-                                return new Verdict(true, realm);
-                            case KEYUSER:
-                                // Keyusers can only read or write to the roles they are part of.
-                                Set<Role> roles = userData.getRoles();
-                                setPrincipal(requestContext, scheme, user, role -> roles.contains(new Role(role)));
-                                return new Verdict(true, realm);
-                            case NONE:
-                            default:
-                                throw new IllegalStateException(String.format("Domain %s for user %s is illegal", domain.domainName, user));
-                            }
-                        }
-                        case USERS_GIT:
-                        case USERS_ADMIN_GIT:
-                        case USERS_USER_ADMIN_GIT:
-                            switch (domain) {
-                            case GIT: {
-                                // Git admin with the appropriate roles can change their own password, keyadmins and keyusers
-                                final Set<Role> roles = new HashSet<>(userData.getRoles());
-                                roles.add(new Role(createUserKey(user, Realm.Domain.GIT)));
-                                roles.add(new Role(Realm.Domain.KEYADMIN.getDomainName()));
-                                roles.add(new Role(Realm.Domain.KEYUSER.getDomainName()));
-                                setPrincipal(requestContext, scheme, user, role -> roles.contains(new Role(role)));
-                                return new Verdict(true, realm);
-                            }
-                            case KEYADMIN: {
-                                // Keyadmins kan change keyuser's data
-                                final Set<Role> roles = Set
-                                        .of(new Role(createUserKey(user, Realm.Domain.KEYADMIN)), new Role(Realm.Domain.KEYUSER.getDomainName()));
-                                setPrincipal(requestContext, scheme, user, role -> roles.contains(new Role(role)));
-                                return new Verdict(true, realm);
-                            }
-                            case KEYUSER: {
-                                // TODO Keyusers can only change their password not their roles
-                                final Set<Role> roles = Set.of(new Role(createUserKey(user, Realm.Domain.KEYUSER)));
-                                setPrincipal(requestContext, scheme, user, role -> roles.contains(new Role(role)));
-                                return new Verdict(true, realm);
-                            }
-                            case NONE:
-                                break;
-                            default:
-                                break;
-                            }
-                            break;
-                        case UNKNOWN:
-                            break;
-                        default:
-                            break;
-                        }
-                    }
-                }
-            }
+            return setupInRealm(requestContext, scheme, ref, realm, password, userName);
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
-        return new Verdict(false, realm);
+    }
+
+    Verdict setupInRealm(final ContainerRequestContext requestContext, final String scheme, final String ref, final Realm realm, final String password,
+            final String userName) throws RefNotFoundException {
+        for (Realm.Domain domain : realm.getDomains()) {
+            final UserData userData = findUserInDomain(ref, userName, domain);
+            if (userData != null && hashService.hasSamePassword(userData, password)) {
+                switch (realm) {
+                case GIT:
+                case ADMIN_GIT:
+                case USER_ADMIN_GIT:
+                case NONE_USER_ADMIN_GIT:
+                    return setupKeysDomain(requestContext, scheme, realm, domain, userData, userName, password);
+                case USERS_GIT:
+                case USERS_ADMIN_GIT:
+                case USERS_USER_ADMIN_GIT:
+                    return setupUsersDomain(requestContext, scheme, realm, domain, userData, userName, password);
+                case UNKNOWN:
+                    break;
+                case NONE:
+                default:
+                    break;
+                }
+            }
+        }
+        return realm.denied;
+    }
+
+    Verdict setupUsersDomain(final ContainerRequestContext requestContext, final String scheme, final Realm realm, Realm.Domain domain, final UserData userData,
+            String userName, String password) {
+        final User user = new User(userName, password, domain.domainName, false);
+        switch (domain) {
+        case GIT:
+            return setGitPrincipal(requestContext, scheme, realm, userData, user);
+        case KEYADMIN:
+            return setKeyAdminPrincipal(requestContext, scheme, realm, user);
+        case KEYUSER:
+            return setKeyUserPrincipal(requestContext, scheme, realm, user);
+        case NONE:
+        default:
+            throw new IllegalStateException("Unreachable");
+        }
+    }
+
+    Verdict setKeyUserPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
+        // TODO Keyusers can only change their password not their roles
+        final String userName = user.getName();
+        setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYUSER.createUserKey(userName).equals(role));
+        return realm.accept;
+    }
+
+    Verdict setKeyAdminPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
+        // Keyadmins kan change keyuser's data
+        final String userName = user.getName();
+        setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYUSER.getDomainName().equals(role)
+                || Realm.Domain.KEYADMIN.createUserKey(userName).equals(role));
+        return realm.accept;
+    }
+
+    Verdict setGitPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, final UserData userData, User user) {
+        final Set<Role> roles = userData.getRoles();
+        // Git admin with the appropriate roles can change their own password, keyadmins
+        // and keyusers
+        final String userName = user.getName();
+        setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYADMIN.getDomainName().equals(role)
+                || Realm.Domain.KEYUSER.getDomainName().equals(role)
+                || roles.contains(new Role(role))
+                || Realm.Domain.GIT.createUserKey(userName).equals(role));
+        return realm.accept;
+    }
+
+    private Verdict setupKeysDomain(final ContainerRequestContext requestContext, final String scheme, final Realm realm, Realm.Domain domain,
+            final UserData userData, String userName, String password) {
+        switch (domain) {
+        case GIT:
+        case KEYADMIN:
+            // Git users and KeyAdmins can read and write to all keys
+            setPrincipal(requestContext, scheme, new User(userName, password, domain.domainName, true), role -> true);
+            return realm.accept;
+        case KEYUSER:
+            // Keyusers can only read or write to the roles they are part of.
+            Set<Role> roles = userData.getRoles();
+            setPrincipal(requestContext, scheme, new User(userName, password, domain.domainName, false), role -> roles.contains(new Role(role)));
+            return realm.accept;
+        case NONE:
+        default:
+            throw new IllegalStateException(String.format("Domain %s for user %s is illegal", domain.domainName, userName));
+        }
     }
 
     private Verdict testForAnonymousAccess(final ContainerRequestContext requestContext, final String scheme, final Realm realm) {
         if (realm == Realm.NONE_USER_ADMIN_GIT) {
-            setPrincipal(requestContext, scheme, JitStaticConstants.ANONYMOUS, Objects::isNull);
-            return new Verdict(true, realm);
+            setPrincipal(requestContext, scheme, ANONYMOUS, Objects::isNull);
+            return realm.accept;
         }
-        return new Verdict(false, realm);
-    }
-
-    private String createUserKey(User user, Realm.Domain domain) {
-        return String.format("%s/%s", domain.getDomainName(), user.getName());
+        return realm.denied;
     }
 
     private UserData findUserInDomain(final String ref, final String userName, Realm.Domain domain) throws RefNotFoundException {
@@ -205,10 +220,9 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
             return Realm.GIT;
         }
         final List<String> matchedURIs = request.getUriInfo().getMatchedURIs(true);
-        final String method = request.getMethod();
-        switch (matchedURIs.get(matchedURIs.size() - 1).toLowerCase()) {
+        switch (matchedURIs.get(matchedURIs.size() - 1)) {
         case "storage":
-            return storage(method);
+            return storage(request.getMethod());
         case "bulk":
             return Realm.NONE_USER_ADMIN_GIT;
         case "metakey":
@@ -216,25 +230,28 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         case "info":
             return Realm.NONE;
         case "users":
-            String base = matchedURIs.get(0);
-            if (base.startsWith("users/keyuser/")) {
-                return Realm.USERS_USER_ADMIN_GIT;
-            }
-            if (base.startsWith("users/keyadmin/")) {
-                return Realm.USERS_ADMIN_GIT;
-            }
-            if (base.startsWith("users/git/")) {
-                return Realm.USERS_GIT;
-            }
-            break;
+            return matchBaseUrl(matchedURIs);
         default:
             return Realm.UNKNOWN;
+        }
+    }
+
+    Realm matchBaseUrl(final List<String> matchedURIs) {
+        final String base = matchedURIs.get(0);
+        if (base.startsWith("users/keyuser/")) {
+            return Realm.USERS_USER_ADMIN_GIT;
+        }
+        if (base.startsWith("users/keyadmin/")) {
+            return Realm.USERS_ADMIN_GIT;
+        }
+        if (base.startsWith("users/git/")) {
+            return Realm.USERS_GIT;
         }
         return Realm.UNKNOWN;
     }
 
     private Realm storage(String method) {
-        switch (method.toUpperCase()) {
+        switch (method) {
         case "GET":
             return Realm.NONE_USER_ADMIN_GIT;
         case "POST":
@@ -282,15 +299,27 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
 
         private final String realmName;
         private final List<Domain> domains;
+        private Verdict denied;
+        private Verdict accept;
 
         private Realm(List<Domain> domains) {
             this.realmName = domains.stream().map(Domain::getDomainName).collect(Collectors.joining("|"));
             this.domains = domains;
+            this.denied = new Verdict(false, this);
+            this.accept = new Verdict(true, this);
         }
 
         public String getRealmName() { return realmName; }
 
         public List<Domain> getDomains() { return domains; }
+
+        public Verdict accept() {
+            return accept;
+        }
+
+        public Verdict denied() {
+            return denied;
+        }
 
         protected enum Domain {
             NONE(""),
@@ -305,6 +334,10 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
             }
 
             public String getDomainName() { return domainName; }
+
+            public String createUserKey(String userName) {
+                return domainName + "/" + userName;
+            }
         }
     }
 

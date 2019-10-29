@@ -24,6 +24,7 @@ import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.hibernate.validator.constraints.NotBlank;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -36,25 +37,26 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(justification = "Equals used here is not dodgy code", value = { "EQ_UNUSUAL" })
 public final class User implements Principal {
 
-    @NotEmpty
+    @NotBlank
     private final String user;
 
-    @NotEmpty
+    @NotBlank
     private final String password;
 
     private final String domain;
 
-    private volatile boolean isAdmin;
-    
+    private final boolean isAdmin;
+
     @JsonCreator
     public User(@JsonProperty("user") final String user, @JsonProperty("password") final String password) {
-        this(user, password, null);
+        this(user, password, null, false);
     }
 
-    public User(final String user, final String password, final String domain) {
-        this.user = user;
+    public User(String userName, String password, String domainName, boolean b) {
+        this.user = userName;
         this.password = password;
-        this.domain = domain;
+        this.domain = domainName;
+        this.isAdmin = b;
     }
 
     @Override
@@ -68,15 +70,9 @@ public final class User implements Principal {
     public int hashCode() {
         return Objects.hash(user, password);
     }
-    
+
     @JsonIgnore
-    public boolean isAdmin() {
-        return isAdmin;
-    }
-    @JsonIgnore
-    public void setAdmin(boolean isAdmin) {
-        this.isAdmin = isAdmin;
-    }
+    public boolean isAdmin() { return isAdmin; }
 
     @Override
     public boolean equals(final Object other) {
