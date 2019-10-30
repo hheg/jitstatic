@@ -285,7 +285,7 @@ public class UsersResource {
             try {
                 return storage.getUserData(key, ref, realm);
             } catch (RefNotFoundException e) {
-                throw new WebApplicationException(HttpStatus.NOT_FOUND_404);
+                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
             }
         }, executor).thenApplyAsync(userData -> {
             if (userData == null || !userData.isPresent()) {
@@ -327,7 +327,7 @@ public class UsersResource {
             try {
                 return storage.getUserData(key, ref, realm);
             } catch (RefNotFoundException e) {
-                throw new WebApplicationException(Status.NOT_FOUND);
+                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
             }
         }, executor).thenApplyAsync(userData -> {
             if (userData != null && userData.isPresent()) {
@@ -357,7 +357,7 @@ public class UsersResource {
             try {
                 return storage.getUserData(key, ref, realm);
             } catch (RefNotFoundException e) {
-                throw new WebApplicationException(Status.NOT_FOUND);
+                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
             }
         }, executor).thenApplyAsync(userData -> {
             if (userData != null && userData.isPresent()) {
@@ -365,7 +365,7 @@ public class UsersResource {
                     storage.deleteUser(key, ref, realm, user.getName());
                     LOG.info("{} logged in and deleted key {}/{} in {}", user, realm, key, ref);
                 } catch (RefNotFoundException e) {
-                    return Response.status(Status.NOT_FOUND).build();
+                    return new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
                 }
                 return Response.ok().build();
             }
@@ -395,7 +395,7 @@ public class UsersResource {
             LOG.info("{} logged in and accessed {}/{} in {}", user, realm, key, ref);
             return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
         } catch (RefNotFoundException e) {
-            throw new WebApplicationException(Status.NOT_FOUND);
+            throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
         }
     }
 }
