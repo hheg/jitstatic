@@ -799,6 +799,24 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
         }
     }
 
+    @Test
+    public void testMountMetaDataWithUsers() throws Exception {
+        File base = createTempDirectory();
+        setupGitRepoWithUsers(base);
+        File wBase = createTempDirectory();
+        try (Git git = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
+            final Path file = wBase.toPath().resolve(STORE);
+            final Path mfile = wBase.toPath().resolve(STORE + METADATA);
+            file.getParent().toFile().mkdirs();
+            RemoteTestUtils.copy("/test3.json", file);
+            RemoteTestUtils.copy("/test3.md2.json", mfile);
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("Test commit").call();
+            verifyOkPush(git.push().call());
+        }
+        assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service));
+    }
+
     private void setupGitRepoWithUsers(File base)
             throws IOException, GitAPIException, InvalidRemoteException, TransportException, JsonProcessingException, NoFilepatternException {
         File wBase = createTempDirectory();

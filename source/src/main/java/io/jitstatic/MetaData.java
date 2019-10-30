@@ -69,17 +69,17 @@ public class MetaData {
         this.isProtected = isProtected;
         this.hidden = hidden;
         this.headers = headers;
-        this.read = Objects.requireNonNull(read);
-        this.write = Objects.requireNonNull(write);
+        this.read = read;
+        this.write = write;
     }
 
     public MetaData(final String contentType, final boolean isProtected, final boolean hidden, final List<HeaderPair> headers, final Set<Role> read,
             Set<Role> write) {
-        this(Set.of(), contentType, isProtected, hidden, headers, read, write);
+        this(Set.of(), contentType, isProtected, hidden, headers, Objects.requireNonNull(read), Objects.requireNonNull(write));
     }
 
     public MetaData(final Set<Role> read, final Set<Role> write) {
-        this(Set.of(), null, false, false, List.of(), read, write);
+        this(null, false, false, List.of(), read, write);
     }
 
     @Override
