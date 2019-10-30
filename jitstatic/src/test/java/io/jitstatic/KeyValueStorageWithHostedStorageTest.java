@@ -90,7 +90,7 @@ import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class KeyValueStorageWithHostedStorageTest extends BaseTest {
@@ -104,7 +104,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
     private static final String USER = "suser";
     private static final String PASSWORD = "ssecret";
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ContainerUtils
             .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private TemporaryFolder tmpfolder;
     private String adress;

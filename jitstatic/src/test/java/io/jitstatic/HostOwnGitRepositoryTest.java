@@ -76,7 +76,7 @@ import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class HostOwnGitRepositoryTest extends BaseTest {
@@ -87,7 +87,7 @@ public class HostOwnGitRepositoryTest extends BaseTest {
     private static final String REFS_HEADS_NEWBRANCH = "refs/heads/newbranch";
 
     private TemporaryFolder tmpFolder;
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ContainerUtils
             .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
 
     private UsernamePasswordCredentialsProvider provider;
@@ -103,7 +103,7 @@ public class HostOwnGitRepositoryTest extends BaseTest {
 
     @AfterEach
     public void after() {
-        AUtils.checkContainerForErrors(DW);
+        ContainerUtils.checkContainerForErrors(DW);
     }
 
     @Test
