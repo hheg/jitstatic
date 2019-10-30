@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -92,7 +93,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         try {
             return getRefHolder(ref);
         } catch (RefNotFoundException e) {
-            throw new ShouldNeverHappenException("Ref is missing",e);
+            throw new ShouldNeverHappenException("Ref is missing", e);
         }
     }
 
@@ -327,10 +328,26 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         return cf;
     }
 
-    private CompletableFuture<List<Pair<String, StoreInfo>>> extractListAndMap(final String finalRef,
-            Pair<String, Boolean> pair,
-            final String key) {
-        return CompletableFuture.supplyAsync(() -> extractList(key, finalRef, pair), executor)
+    private CompletableFuture<List<Pair<String, StoreInfo>>> extractListAndMap(final String finalRef, Pair<String, Boolean> pair, final String key) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                final RefHolder refHolder = getRefHolder(finalRef);
+                return refHolder.getList(key, pair.getRight()).handle((l1, t) -> {
+                    if (t != null) {
+                        if (t instanceof CompletionException) {
+                            handle(t.getCause());
+                        } else {
+                            consumeError(t);
+                        }
+                        return List.<String>of();
+                    }
+                    return l1;
+                });
+            } catch (final RefNotFoundException rnfe) {
+                // Ignore
+            }
+            return CompletableFuture.completedFuture(List.<String>of());
+        }, executor).thenCompose(s -> s)
                 .thenApplyAsync(l -> l.stream().map(k -> getKeyPair(k, finalRef)).collect(Collectors.toList()), executor)
                 .thenComposeAsync(futures -> CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
                         .thenApply(ignore -> futures), executor)
@@ -341,15 +358,15 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                         .collect(Collectors.toList()), executor);
     }
 
-    private List<String> extractList(final String key, final String finalRef, final Pair<String, Boolean> pair) {
-        try {
-            return source.getList(key, finalRef, pair.getRight());
-        } catch (final RefNotFoundException rnfe) {
-            // Ignore
-        } catch (final IOException e) {
-            consumeError(e);
+    private void handle(Throwable t) {
+        if (t instanceof WrappingAPIException) {
+            Throwable cause = t.getCause();
+            if (!(cause instanceof RefNotFoundException)) {
+                consumeError(cause);
+            }
+        } else {
+            consumeError(t);
         }
-        return List.of();
     }
 
     @Override

@@ -22,6 +22,7 @@ package io.jitstatic.storage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -453,8 +454,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                 StreamSupport.stream(oldRefCache.entries().spliterator(), true).filter(e -> {
                     final Either<Optional<StoreInfo>, Pair<String, UserData>> value = e.getValue();
                     return (value.isLeft() && value.getLeft().isPresent());
-                }).map(CacheEntry::getKey)
-                        .forEach(key -> refCache.get().get(key));
+                }).map(CacheEntry::getKey).forEach(key -> refCache.get().get(key));
                 oldRefCache.close();
                 LOG.info("Reloaded {}", ref);
             };
@@ -498,5 +498,17 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     public CompletableFuture<Either<String, FailedToLock>> enqueueAndBlock(final Supplier<Exception> preRequisite, final Supplier<DistributedData> action,
             final Consumer<Exception> postAction) {
         return lock.fireEvent(ref, preRequisite, action, postAction);
+    }
+
+    public CompletableFuture<List<String>> getList(String key, boolean recursive) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return source.getList(key, ref, recursive);
+            } catch (RefNotFoundException e) {
+                throw new WrappingAPIException(e);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, refLockService.getRepoWriter());
     }
 }
