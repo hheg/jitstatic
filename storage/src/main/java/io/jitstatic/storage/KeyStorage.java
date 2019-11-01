@@ -139,9 +139,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         }, executor).handleAsync((o, t) -> unwrap(o, t, finalRef), executor);
     }
 
-    private Optional<StoreInfo> unwrap(final Optional<StoreInfo> o,
-            final Throwable t,
-            final String ref) {
+    private Optional<StoreInfo> unwrap(final Optional<StoreInfo> o, final Throwable t, final String ref) {
         if (t != null) {
             if (t instanceof CompletionException) {
                 return this.unwrap(o, t.getCause(), ref);
@@ -319,12 +317,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     private CompletableFuture<Pair<String, Optional<StoreInfo>>> getKeyPair(final String key,
             final String ref) {
-        final CompletableFuture<Pair<String, Optional<StoreInfo>>> cf = new CompletableFuture<>();
-        getKeyMuted(key, ref).thenComposeAsync(o -> {
-            cf.complete(Pair.of(key, o));
-            return cf;
-        }, executor);
-        return cf;
+        return getKeyMuted(key, ref).thenApplyAsync(o -> Pair.of(key, o), executor);
     }
 
     private CompletableFuture<List<Pair<String, StoreInfo>>> extractListAndMap(final String finalRef, Pair<String, Boolean> pair, final String key) {
@@ -359,7 +352,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     private void handle(Throwable t) {
         if (t instanceof WrappingAPIException) {
-            Throwable cause = t.getCause();
+            final Throwable cause = t.getCause();
             if (!(cause instanceof RefNotFoundException)) {
                 consumeError(cause);
             }
