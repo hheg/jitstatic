@@ -44,8 +44,8 @@ public class JitStaticRefFilter implements RefFilter {
     @Nullable
     public Map<String, Ref> filter(final Map<String, Ref> refs) {
         if (refs != null) {
-            if (!req.isUserInRole(JitStaticConstants.SECRETS)) {
-                final Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.SECRETS);
+            if (!req.isUserInRole(JitStaticConstants.GIT_SECRETS)) {
+                final Ref secrets = refs.remove("refs/heads/" + JitStaticConstants.GIT_SECRETS);
                 final Ref head = refs.get("HEAD");
                 if (secrets != null && head != null && secrets.getObjectId().equals(head.getObjectId())) {
                     refs.remove("HEAD");

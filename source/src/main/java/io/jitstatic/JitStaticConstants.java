@@ -32,16 +32,16 @@ public interface JitStaticConstants {
     public static final String REFS_JITSTATIC = Constants.R_REFS + "jitstatic/";
     public static final String APPLICATION_JSON = "application/json";
     public static final String METADATA = ".metadata";
-    public static final String GIT_REALM = "git";
+    public static final String JITSTATIC_GIT_REALM = "git";
     public static final String JITSTATIC_KEYADMIN_REALM = "keyadmin";
     public static final String JITSTATIC_KEYUSER_REALM = "keyuser";
     public static final String USERS = ".users/";
-    public static final String PULL = "pull";
-    public static final String PUSH = "push";
-    public static final String FORCEPUSH = "forcepush";
-    public static final String CREATE = "create";
-    public static final String SECRETS = "secrets";
-    public static final Set<String> ROLES = Set.of(PULL, PUSH, FORCEPUSH, SECRETS, CREATE);
+    public static final String GIT_PULL = "pull";
+    public static final String GIT_PUSH = "push";
+    public static final String GIT_FORCEPUSH = "forcepush";
+    public static final String GIT_CREATE = "create";
+    public static final String GIT_SECRETS = "secrets";
+    public static final Set<String> GIT_ROLES = Set.of(GIT_PULL, GIT_PUSH, GIT_FORCEPUSH, GIT_SECRETS, GIT_CREATE);
     public static final String DECLAREDHEADERS = "declaredheaders";
     public static final String DEFERREDHEADERS = "deferredheaders";
     public static final String X_JITSTATIC = "X-jitstatic";
@@ -49,11 +49,12 @@ public interface JitStaticConstants {
     public static final String X_JITSTATIC_MESSAGE = X_JITSTATIC + "-message";
     public static final String X_JITSTATIC_NAME = X_JITSTATIC + "-name";
     public static final String JITSTATIC_NOWHERE = "jitstatic@nowhere";
-    public static final String REFS_HEADS_SECRETS = R_HEADS + SECRETS;
+    public static final String REFS_HEADS_SECRETS = R_HEADS + GIT_SECRETS;
     
     public static final User ANONYMOUS = new User("anonymous", null);
     public static boolean isRef(final String ref) {
         return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
     }
+    public String ROLERROLES = "roles";
 
 }

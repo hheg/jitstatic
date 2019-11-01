@@ -1,10 +1,10 @@
 package io.jitstatic.hosted;
 
-import static io.jitstatic.JitStaticConstants.CREATE;
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_CREATE;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 
 /*-
  * #%L
@@ -116,7 +116,7 @@ public class LoginServiceTest {
         LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
         String[] loadRoleInfo = sls.loadRoleInfo(new AbstractLoginService.UserPrincipal(new String(user), new Password(new String(secret))));
         assertTrue(loadRoleInfo.length == 5);
-        Arrays.asList(loadRoleInfo).containsAll(List.of(PUSH, PULL, FORCEPUSH, CREATE,SECRETS));
+        Arrays.asList(loadRoleInfo).containsAll(List.of(GIT_PUSH, GIT_PULL, GIT_FORCEPUSH, GIT_CREATE,GIT_SECRETS));
     }
 
     @Test

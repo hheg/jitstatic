@@ -20,13 +20,13 @@ package io.jitstatic;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -143,18 +143,18 @@ public class CorsIT extends BaseTest {
                             .getBytes(UTF_8), workingFolder.resolve("file2.metadata").toFile());
 
             commit(git, provider);
-            Path gitRealm = users.resolve(GIT_REALM);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
             Path gitUserPush = gitRealm.resolve(GITUSERPUSH);
             Path gitUserNoPush = gitRealm.resolve(GITUSER);
-            UserData gitUserData = new UserData(Set.of(new Role(PULL), new Role(PUSH), new Role(FORCEPUSH), new Role(SECRETS)), GITUSERFULLPASS, null, null);
-            UserData gitUserDataNoPush = new UserData(Set.of(new Role(PULL)), GITUSERPASS, null, null);
-            UserData gitUserDataPush = new UserData(Set.of(new Role(PULL), new Role(PUSH)), GITUSERPUSHPASS, null, null);
+            UserData gitUserData = new UserData(Set.of(new Role(GIT_PULL), new Role(GIT_PUSH), new Role(GIT_FORCEPUSH), new Role(GIT_SECRETS)), GITUSERFULLPASS, null, null);
+            UserData gitUserDataNoPush = new UserData(Set.of(new Role(GIT_PULL)), GITUSERPASS, null, null);
+            UserData gitUserDataPush = new UserData(Set.of(new Role(GIT_PULL), new Role(GIT_PUSH)), GITUSERPUSHPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserData), gitUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(gitUserDataPush), gitUserPush.toFile());
             Files.write(MAPPER.writeValueAsBytes(gitUserDataNoPush), gitUserNoPush.toFile());
-            commit(git, provider, SECRETS);
+            commit(git, provider, GIT_SECRETS);
         }
     }
 

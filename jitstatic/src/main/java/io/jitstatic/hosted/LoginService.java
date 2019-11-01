@@ -37,7 +37,7 @@ import io.jitstatic.storage.Storage;
 public class LoginService extends AbstractLoginService {
 
     private static final String[] EMPTY_ROLES = new String[0];
-    private static final String[] ROLES = JitStaticConstants.ROLES.toArray(new String[JitStaticConstants.ROLES.size()]);
+    private static final String[] ROLES = JitStaticConstants.GIT_ROLES.toArray(new String[JitStaticConstants.GIT_ROLES.size()]);
     private final UserPrincipal root;
     private final String defaultRef;
     private Storage storage;

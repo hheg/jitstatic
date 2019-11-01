@@ -437,9 +437,9 @@ public class HostOwnGitRepositoryTest extends BaseTest {
             git.commit().setMessage("initial commit").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call());
             Path users = working.resolve(JitStaticConstants.USERS);
-            Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+            Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_GIT_REALM);
             Path user = gitRealm.resolve(TEST_USER);
-            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
+            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.GIT_SECRETS).call());
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234", null, null)), StandardOpenOption.CREATE);
 
@@ -475,11 +475,11 @@ public class HostOwnGitRepositoryTest extends BaseTest {
             git.commit().setMessage("initial commit").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call());
             Path users = working.resolve(JitStaticConstants.USERS);
-            Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+            Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_GIT_REALM);
             Path user = gitRealm.resolve(TEST_USER);
             assertTrue(gitRealm.toFile().mkdirs());
             Files.write(user, MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("pull")), "1234", null, null)), StandardOpenOption.CREATE);
-            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.SECRETS).call());
+            assertNotNull(git.checkout().setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(JitStaticConstants.GIT_SECRETS).call());
             git.add().addFilepattern(".").call();
             git.commit().setMessage("msg").call();
             verifyOkPush(git.push().setCredentialsProvider(provider).call());
@@ -489,7 +489,7 @@ public class HostOwnGitRepositoryTest extends BaseTest {
         }
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(userarg.getUserName()).setPassword(userarg.getPassword()).build()) {
-                client.getKey(JitStaticConstants.USERS + JitStaticConstants.GIT_REALM + "/blipp", parse(JsonNode.class));
+                client.getKey(JitStaticConstants.USERS + JitStaticConstants.JITSTATIC_GIT_REALM + "/blipp", parse(JsonNode.class));
             }
         }).getStatusCode());
         try (Git git2 = Git.cloneRepository().setDirectory(getFolderFile()).setURI(gitAdress)

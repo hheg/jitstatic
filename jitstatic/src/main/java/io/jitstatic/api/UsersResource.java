@@ -1,7 +1,7 @@
 package io.jitstatic.api;
 
-import static io.jitstatic.JitStaticConstants.CREATE;
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.GIT_CREATE;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
 
 /*-
  * #%L
@@ -23,11 +23,11 @@ import static io.jitstatic.JitStaticConstants.FORCEPUSH;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
 import static io.jitstatic.JitStaticConstants.REFS_HEADS_SECRETS;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static javax.ws.rs.core.MediaType.APPLICATION_XML;
@@ -76,6 +76,7 @@ import com.spencerwi.either.Either;
 
 import io.dropwizard.auth.Auth;
 import io.dropwizard.validation.Validated;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.api.constraints.Adding;
 import io.jitstatic.api.constraints.GitRolesGroup;
@@ -131,7 +132,7 @@ public class UsersResource {
             @Context SecurityContext context) {
         APIHelper.checkValidRef(ref);
         authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYADMIN_REALM, key), JITSTATIC_KEYADMIN_REALM), context);
-        modifyUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse);
+        modifyUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, context);
     }
 
     @POST
@@ -174,7 +175,7 @@ public class UsersResource {
             final @Auth User user, final @Context HttpHeaders headers, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, GIT_REALM), context);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         return getUser(key, ref, headers, JITSTATIC_KEYUSER_REALM, user);
     }
 
@@ -190,8 +191,8 @@ public class UsersResource {
             final @Context HttpHeaders headers, final @Context Request request, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, GIT_REALM), context);
-        modifyUser(key, ref, data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
+        modifyUser(key, ref, data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse, context);
     }
 
     @POST
@@ -206,7 +207,7 @@ public class UsersResource {
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, GIT_REALM), context);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         addUser(key, ref, data, user, JITSTATIC_KEYUSER_REALM, asyncResponse);
     }
 
@@ -221,7 +222,7 @@ public class UsersResource {
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, GIT_REALM), context);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         deleteUser(key, ref, user, JITSTATIC_KEYUSER_REALM, asyncResponse);
     }
 
@@ -229,58 +230,58 @@ public class UsersResource {
     @Timed(name = "get_gituser_time")
     @Metered(name = "get_gituser_counter")
     @ExceptionMetered(name = "get_gituser_exception")
-    @Path(GIT_REALM + "/{key : .+}")
+    @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public Response getGitUser(final @PathParam("key") String key, final @Auth User user,
             final @Context HttpHeaders headers, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", GIT_REALM, key), CREATE, PUSH, FORCEPUSH, PULL), context);
-        return getUser(key, REFS_HEADS_SECRETS, headers, GIT_REALM, user);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH, GIT_PULL), context);
+        return getUser(key, REFS_HEADS_SECRETS, headers, JITSTATIC_GIT_REALM, user);
     }
 
     @PUT
     @Timed(name = "put_gituser_time")
     @Metered(name = "put_gituser_counter")
     @ExceptionMetered(name = "put_gituser_exception")
-    @Path(GIT_REALM + "/{key : .+}")
+    @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Validated({ GitRolesGroup.class, Default.class }) @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers,
             final @Context Request request, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", GIT_REALM, key), CREATE, PUSH, FORCEPUSH), context);
-        modifyUser(key, REFS_HEADS_SECRETS, data, request, user, GIT_REALM, asyncResponse);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        modifyUser(key, REFS_HEADS_SECRETS, data, request, user, JITSTATIC_GIT_REALM, asyncResponse, context);
     }
 
     @POST
     @Timed(name = "post_gituser_time")
     @Metered(name = "post_gituser_counter")
     @ExceptionMetered(name = "post_gituser_exception")
-    @Path(GIT_REALM + "/{key : .+}")
+    @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void postGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Valid @NotNull @Validated({ GitRolesGroup.class, Adding.class, Default.class }) UserData data,
             final @Auth User user, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", GIT_REALM, key), CREATE, PUSH, FORCEPUSH), context);
-        addUser(key, REFS_HEADS_SECRETS, data, user, GIT_REALM, asyncResponse);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        addUser(key, REFS_HEADS_SECRETS, data, user, JITSTATIC_GIT_REALM, asyncResponse);
     }
 
     @DELETE
     @Timed(name = "delete_gituser_time")
     @Metered(name = "delete_gituser_counter")
     @ExceptionMetered(name = "delete_gituser_exception")
-    @Path(GIT_REALM + "/{key : .+}")
+    @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void deleteGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Auth User user,
             @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", GIT_REALM, key), CREATE, PUSH, FORCEPUSH), context);
-        deleteUser(key, REFS_HEADS_SECRETS, user, GIT_REALM, asyncResponse);
+        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        deleteUser(key, REFS_HEADS_SECRETS, user, JITSTATIC_GIT_REALM, asyncResponse);
     }
 
     private void modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm,
-            final AsyncResponse asyncResponse) {
+            final AsyncResponse asyncResponse, SecurityContext context) {
         CompletableFuture.supplyAsync(() -> {
             try {
                 return storage.getUserData(key, ref, realm);
@@ -297,7 +298,12 @@ public class UsersResource {
             if (evaluatePreconditions != null) {
                 throw new WebApplicationException(evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
             }
-            return updateUser(key, ref, data, user, realm, version);
+            try {
+                return storage
+                        .updateUser(key, ref, realm, user.getName(), getRoles(data, context, userData), version);
+            } catch (RefNotFoundException e) {
+                return CompletableFuture.<Either<String, FailedToLock>>failedFuture(new WrappingAPIException(e));
+            }
         }, executor).thenComposeAsync(Function.identity()).thenApplyAsync(result -> {
             if (result.isRight()) {
                 return Response.status(Status.PRECONDITION_FAILED).build();
@@ -312,14 +318,14 @@ public class UsersResource {
         }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
     }
 
-    private CompletableFuture<Either<String, FailedToLock>> updateUser(final String key, final String ref, final UserData data, final User user,
-            final String realm, final String version) {
-        try {
-            return storage
-                    .updateUser(key, ref, realm, user.getName(), new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null), version);
-        } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+    io.jitstatic.auth.UserData getRoles(final UserData data, SecurityContext context, Pair<String, io.jitstatic.auth.UserData> userData) {
+        io.jitstatic.auth.UserData newUserData;
+        if (context.isUserInRole(JitStaticConstants.ROLERROLES)) {
+            newUserData = new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null);
+        } else {
+            newUserData = new io.jitstatic.auth.UserData(userData.getRight().getRoles(), data.getBasicPassword(), null, null);
         }
+        return newUserData;
     }
 
     private void addUser(final String key, final String ref, final UserData data, final User user, final String realm, final AsyncResponse asyncResponse) {

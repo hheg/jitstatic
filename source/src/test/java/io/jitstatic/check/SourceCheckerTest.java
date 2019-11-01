@@ -125,7 +125,7 @@ public class SourceCheckerTest extends BaseTest {
     public void testCheckSourceRepoWithUsers() throws IOException, NoFilepatternException, GitAPIException {
         Path workingPath = workingGit.getRepository().getWorkTree().toPath();
         Path users = workingPath.resolve(JitStaticConstants.USERS);
-        Path gitRealm = users.resolve(JitStaticConstants.GIT_REALM);
+        Path gitRealm = users.resolve(JitStaticConstants.JITSTATIC_GIT_REALM);
         Path user = gitRealm.resolve("auser");
         assertTrue(gitRealm.toFile().mkdirs());
         Files.write(user, new byte[] { 0, 1, 2, 3 }, StandardOpenOption.CREATE);

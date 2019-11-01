@@ -20,10 +20,10 @@ package io.jitstatic.api;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static javax.ws.rs.core.HttpHeaders.AUTHORIZATION;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static org.eclipse.jetty.http.HttpStatus.CONFLICT_409;
@@ -83,7 +83,7 @@ import io.jitstatic.utils.Pair;
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class UsersResourceTest {
 
-    private static final Set<Role> ROOTROLES = JitStaticConstants.ROLES.stream().map(Role::new).collect(Collectors.toSet());
+    private static final Set<Role> ROOTROLES = JitStaticConstants.GIT_ROLES.stream().map(Role::new).collect(Collectors.toSet());
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
     private Storage storage = mock(Storage.class);
 
@@ -116,7 +116,7 @@ public class UsersResourceTest {
 
     @Test
     public void testGetKeyAdminUser() throws RefNotFoundException {
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + GIT_SECRETS), eq(JITSTATIC_GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYADMIN_REALM)))
                 .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
@@ -152,7 +152,7 @@ public class UsersResourceTest {
 
     @Test
     public void testGetUserNotChanged() throws RefNotFoundException {
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + GIT_SECRETS), eq(JITSTATIC_GIT_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYADMIN_REALM)))
                 .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 
@@ -383,7 +383,7 @@ public class UsersResourceTest {
 
     @Test
     public void testGetKeyUserNotChanged() throws RefNotFoundException {
-        when(storage.getUser(eq(PUSER), eq("refs/heads/" + SECRETS), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
+        when(storage.getUser(eq(PUSER), eq("refs/heads/" + GIT_SECRETS), eq(JITSTATIC_KEYADMIN_REALM))).thenReturn(new UserData(ROOTROLES, PSECRET, null, null));
         when(storage.getUserData(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYUSER_REALM)))
                 .thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null)));
 

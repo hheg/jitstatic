@@ -40,7 +40,7 @@ public class GitRolesValidator implements ConstraintValidator<GitRoles, Set<Role
         if (value == null) {
             return true;
         }
-        return value.stream().map(Role::getRole).allMatch(JitStaticConstants.ROLES::contains);
+        return value.stream().map(Role::getRole).allMatch(JitStaticConstants.GIT_ROLES::contains);
     }
 
 }

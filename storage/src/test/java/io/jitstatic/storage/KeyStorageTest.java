@@ -691,7 +691,7 @@ public class KeyStorageTest extends BaseTest {
         when(source.getUser(anyString(), anyString())).thenReturn(Pair.of("1", new UserData(Set.of(new Role("role")), "1234", null, null)));
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             ks.addRef("refs/heads/secret");
-            assertNotNull(ks.getUser("name", "refs/heads/secret", JitStaticConstants.GIT_REALM));
+            assertNotNull(ks.getUser("name", "refs/heads/secret", JitStaticConstants.JITSTATIC_GIT_REALM));
         }
     }
 
@@ -750,7 +750,7 @@ public class KeyStorageTest extends BaseTest {
     public void testGetUserDataNoBranch() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new RefNotFoundException("Test"));
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            assertThrows(RefNotFoundException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+            assertThrows(RefNotFoundException.class, () -> ks.getUserData("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
     }
@@ -759,7 +759,7 @@ public class KeyStorageTest extends BaseTest {
     public void testGetUserDataIOError() throws RefNotFoundException, IOException {
         when(source.getUser(eq(".users/git/kit"), eq(REF_HEADS_MASTER))).thenThrow(new IOException("Test"));
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            assertThrows(UncheckedIOException.class, () -> ks.getUserData("kit", null, JitStaticConstants.GIT_REALM));
+            assertThrows(UncheckedIOException.class, () -> ks.getUserData("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM));
             Mockito.verify(source).getUser(".users/git/kit", REF_HEADS_MASTER);
         }
     }
@@ -768,7 +768,7 @@ public class KeyStorageTest extends BaseTest {
     public void testUpdateUserNoRef() {
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertThrows(UnsupportedOperationException.class, () -> ks
-                    .updateUser("kit", "refs/heads/noref", JitStaticConstants.GIT_REALM, "updater", new UserData(Set
+                    .updateUser("kit", "refs/heads/noref", JitStaticConstants.JITSTATIC_GIT_REALM, "updater", new UserData(Set
                             .of(new Role("role")), "p", null, null), "1"));
         }
     }
@@ -778,9 +778,9 @@ public class KeyStorageTest extends BaseTest {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
+            ks.addUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).orTimeout(5, TimeUnit.SECONDS).join();
-            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
+            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
                     .orTimeout(5, TimeUnit.SECONDS).join().getLeft());
         }
     }
@@ -790,9 +790,9 @@ public class KeyStorageTest extends BaseTest {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         when(source.updateUser(anyString(), anyString(), anyString(), any())).thenReturn("2");
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
+            ks.addUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).join();
-            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
+            assertEquals("2", ks.updateUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "updater", new UserData(Set.of(new Role("role")), "pb", null, null), "1")
                     .orTimeout(5, TimeUnit.SECONDS).join().getLeft());
         }
     }
@@ -801,9 +801,9 @@ public class KeyStorageTest extends BaseTest {
     public void testDeleteUser() throws RefNotFoundException, IOException {
         when(source.addUser(anyString(), anyString(), anyString(), any())).thenReturn("1");
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
+            ks.addUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                     .orTimeout(5, TimeUnit.SECONDS).join();
-            ks.deleteUser("kit", null, JitStaticConstants.GIT_REALM, "creator");
+            ks.deleteUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator");
         }
     }
 
@@ -813,7 +813,7 @@ public class KeyStorageTest extends BaseTest {
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> {
                 try {
-                    ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
+                    ks.addUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                             .orTimeout(5, TimeUnit.SECONDS).join();
                 } catch (CompletionException ce) {
                     throw ce.getCause();
@@ -828,7 +828,7 @@ public class KeyStorageTest extends BaseTest {
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals(IOException.class, assertThrows(UncheckedIOException.class, () -> {
                 try {
-                    ks.addUser("kit", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
+                    ks.addUser("kit", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))
                             .orTimeout(5, TimeUnit.SECONDS).join();
                 } catch (CompletionException ce) {
                     throw ce.getCause();
@@ -841,7 +841,7 @@ public class KeyStorageTest extends BaseTest {
     public void testAddUserMatchingRoot() {
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
             assertEquals("io.jitstatic.storage.KeyAlreadyExist: Key 'root' already exist in branch refs/heads/master", assertThrows(WrappingAPIException.class, () -> ks
-                    .addUser("root", null, JitStaticConstants.GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))).getMessage());
+                    .addUser("root", null, JitStaticConstants.JITSTATIC_GIT_REALM, "creator", new UserData(Set.of(new Role("role")), "pa", null, null))).getMessage());
         }
     }
 

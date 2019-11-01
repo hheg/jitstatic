@@ -20,7 +20,7 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_NOWHERE;
@@ -825,7 +825,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
 
             Path users = wBase.toPath().resolve(USERS);
             assertTrue(users.toFile().mkdirs());
-            Path gitRealm = users.resolve(GIT_REALM);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
 
             Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
             Path updaterRealm = users.resolve(JITSTATIC_KEYUSER_REALM);

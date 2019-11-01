@@ -21,7 +21,7 @@ package io.jitstatic.auth;
  */
 
 import static io.jitstatic.JitStaticConstants.ANONYMOUS;
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.REFS_HEADS_SECRETS;
@@ -50,6 +50,7 @@ import org.glassfish.jersey.server.ExtendedUriInfo;
 
 import io.dropwizard.auth.DefaultUnauthorizedHandler;
 import io.dropwizard.auth.UnauthorizedHandler;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
@@ -155,6 +156,7 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         // Keyadmins kan change keyuser's data
         final String userName = user.getName();
         setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYUSER.getDomainName().equals(role)
+                || role.equals(JitStaticConstants.ROLERROLES)
                 || Realm.Domain.KEYADMIN.createUserKey(userName).equals(role));
         return realm.accept;
     }
@@ -167,7 +169,8 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYADMIN.getDomainName().equals(role)
                 || Realm.Domain.KEYUSER.getDomainName().equals(role)
                 || roles.contains(new Role(role))
-                || Realm.Domain.GIT.createUserKey(userName).equals(role));
+                || Realm.Domain.GIT.createUserKey(userName).equals(role)
+                || (roles.contains(new Role(JitStaticConstants.GIT_CREATE)) && role.equals(JitStaticConstants.ROLERROLES)));
         return realm.accept;
     }
 
@@ -323,7 +326,7 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
 
         protected enum Domain {
             NONE(""),
-            GIT(GIT_REALM),
+            GIT(JITSTATIC_GIT_REALM),
             KEYADMIN(JITSTATIC_KEYADMIN_REALM),
             KEYUSER(JITSTATIC_KEYUSER_REALM);
 

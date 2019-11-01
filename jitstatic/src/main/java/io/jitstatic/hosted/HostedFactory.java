@@ -332,28 +332,28 @@ public class HostedFactory {
         infoPath.setConstraint(new Constraint());
         infoPath.getConstraint().setAuthenticate(true);
         infoPath.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        infoPath.getConstraint().setRoles(new String[] { JitStaticConstants.PULL });
+        infoPath.getConstraint().setRoles(new String[] { JitStaticConstants.GIT_PULL });
         infoPath.setPathSpec(base + getHostedEndpoint() + "/info/*");
 
         final ConstraintMapping receivePath = new ConstraintMapping();
         receivePath.setConstraint(new Constraint());
         receivePath.getConstraint().setAuthenticate(true);
         receivePath.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        receivePath.getConstraint().setRoles(new String[] { JitStaticConstants.PUSH });
+        receivePath.getConstraint().setRoles(new String[] { JitStaticConstants.GIT_PUSH });
         receivePath.setPathSpec(base + getHostedEndpoint() + "/git-receive-pack");
 
         final ConstraintMapping uploadPath = new ConstraintMapping();
         uploadPath.setConstraint(new Constraint());
         uploadPath.getConstraint().setAuthenticate(true);
         uploadPath.getConstraint().setDataConstraint(Constraint.DC_NONE);
-        uploadPath.getConstraint().setRoles(new String[] { JitStaticConstants.PULL });
+        uploadPath.getConstraint().setRoles(new String[] { JitStaticConstants.GIT_PULL });
         uploadPath.setPathSpec(base + getHostedEndpoint() + "/git-upload-pack");
 
         final ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 
         sec.setRealmName(gitRealm);
         sec.setAuthenticator(new BasicAuthenticator());
-        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.SECRETS,
+        final LoginService gitLoginService = new LoginService(getUserName(), getSecret(), sec.getRealmName(), "refs/heads/" + JitStaticConstants.GIT_SECRETS,
                 hashService);
         sec.setLoginService(gitLoginService);
         sec.setConstraintMappings(new ConstraintMapping[] { baseMapping, infoPath, receivePath, uploadPath });

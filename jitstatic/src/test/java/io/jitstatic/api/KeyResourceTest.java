@@ -295,7 +295,7 @@ public class KeyResourceTest {
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.GIT_REALM
+        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.JITSTATIC_GIT_REALM
                 + "\"", response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }
@@ -629,7 +629,7 @@ public class KeyResourceTest {
                 .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
                         .of(new Role("write"))), "testmessage", "user", "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.GIT_REALM
+        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.JITSTATIC_GIT_REALM
                 + "\"", response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }

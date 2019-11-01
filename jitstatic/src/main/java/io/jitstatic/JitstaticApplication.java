@@ -20,7 +20,7 @@ package io.jitstatic;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.version.ProjectVersion.INSTANCE;
 
 import java.util.concurrent.ExecutorService;
@@ -79,7 +79,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             SystemReader.setInstance(new OverridingSystemReader());
             final HostedFactory hostedFactory = config.getHostedFactory();
             refLockService = new LocalRefLockService(env.metrics());
-            source = config.build(env, GIT_REALM, refLockService.getRepoWriter());
+            source = config.build(env, JITSTATIC_GIT_REALM, refLockService.getRepoWriter());
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);

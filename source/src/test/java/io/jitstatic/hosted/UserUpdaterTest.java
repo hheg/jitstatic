@@ -20,7 +20,7 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
@@ -103,7 +103,7 @@ public class UserUpdaterTest {
     @Test
     public void testUpdateUsers()
             throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, UnmergedPathException, IOException, RefNotFoundException {
-        String gitAdmin = USERS + GIT_REALM + "/gitadmin";
+        String gitAdmin = USERS + JITSTATIC_GIT_REALM + "/gitadmin";
         String keyAdmin = USERS + JITSTATIC_KEYADMIN_REALM + "/keyadmin";
         String keyUser = USERS + JITSTATIC_KEYUSER_REALM + "/keyuser";
 
@@ -150,7 +150,7 @@ public class UserUpdaterTest {
 
     @Test
     public void testUpdateSingleUser() throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, RefNotFoundException, IOException {
-        String gitAdmin = USERS + GIT_REALM + "/gitadmin";
+        String gitAdmin = USERS + JITSTATIC_GIT_REALM + "/gitadmin";
         UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
 
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
@@ -164,7 +164,7 @@ public class UserUpdaterTest {
 
     @Test
     public void testDeleteUser() throws Exception {
-        String gitAdmin = USERS + GIT_REALM + "/gitadmin";
+        String gitAdmin = USERS + JITSTATIC_GIT_REALM + "/gitadmin";
         UserData gitAdminData = new UserData(Set.of(new Role("pull"), new Role("push"), new Role("forcepush")), "1234", null, null); // Full admin rights
         UserUpdater uu = new UserUpdater(new RepositoryUpdater(bareGit.getRepository()));
         uu.addUser(gitAdmin, gitAdminData, new CommitMetaData("user", "test", "msg", "Test", JitStaticConstants.JITSTATIC_NOWHERE), REF_HEAD_MASTER);

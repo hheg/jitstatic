@@ -87,7 +87,7 @@ public class HostedFactoryTest {
         rf.setSecret("secret");
         rf.setServletName("servletName");
         assertTrue(validator.validate(rf).isEmpty());
-        Source source = rf.build(env, JitStaticConstants.GIT_REALM, executor);
+        Source source = rf.build(env, JitStaticConstants.JITSTATIC_GIT_REALM, executor);
         assertNotNull(source);
     }
 
@@ -104,7 +104,7 @@ public class HostedFactoryTest {
         hf.setSecret("secret");
         hf.setServletName("servletName");
         hf.setBranch("refs/heads/master");
-        Source source = hf.build(env, JitStaticConstants.GIT_REALM, executor);
+        Source source = hf.build(env, JitStaticConstants.JITSTATIC_GIT_REALM, executor);
         assertNotNull(source);
     }
 
@@ -122,7 +122,7 @@ public class HostedFactoryTest {
         hf.setSecret("secret");
         hf.setServletName("servletName");
         hf.setBranch("refs/heads/master");
-        Source source = hf.build(env, JitStaticConstants.GIT_REALM, executor);
+        Source source = hf.build(env, JitStaticConstants.JITSTATIC_GIT_REALM, executor);
         assertNotNull(source);
         verify(senv).setSecurityHandler(ac.capture());
         SecurityHandler sh = ac.getValue();

@@ -20,8 +20,8 @@ package io.jitstatic;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static io.jitstatic.source.ObjectStreamProvider.toByte;
 import static org.eclipse.jetty.http.HttpStatus.BAD_REQUEST_400;
@@ -578,17 +578,17 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
         String user = hostedFactory.getUserName();
         String pass = hostedFactory.getSecret();
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(user).setPassword(pass).build()) {
-            final String key = USERS + "/" + GIT_REALM + "/user";
+            final String key = USERS + "/" + JITSTATIC_GIT_REALM + "/user";
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class))).getStatusCode());
             assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> client
                     .createKey(getData()
                             .getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), new MetaData(APPLICATION_JSON, false, false, roleOf("read"), roleOf("write"))))
                                     .getStatusCode());
             assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class)));
-            assertThrows(APIException.class, () -> client.getKey(key, SECRETS, parse(JsonNode.class)));
+            assertThrows(APIException.class, () -> client.getKey(key, GIT_SECRETS, parse(JsonNode.class)));
             assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
                 client.createKey(getData()
-                        .getBytes(UTF_8), new CommitData(key, SECRETS, "msg", "info", "mail"), new MetaData(APPLICATION_JSON, false, false, roleOf("read"), roleOf("write")));
+                        .getBytes(UTF_8), new CommitData(key, GIT_SECRETS, "msg", "info", "mail"), new MetaData(APPLICATION_JSON, false, false, roleOf("read"), roleOf("write")));
             }).getStatusCode());
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class))).getStatusCode());
         }

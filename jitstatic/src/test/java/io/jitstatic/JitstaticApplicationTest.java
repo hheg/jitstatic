@@ -177,7 +177,7 @@ public class JitstaticApplicationTest {
         TestException r = new TestException("Test Exception");
         HostedFactory hf = mock(HostedFactory.class);
         config.setHostedFactory(hf);
-        doThrow(r).when(hf).build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any());
+        doThrow(r).when(hf).build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_GIT_REALM), any());
         assertSame(r, assertThrows(TestException.class, () -> {
             app.run(config, environment);
         }));
@@ -188,7 +188,7 @@ public class JitstaticApplicationTest {
         JitstaticApplication app = new JitstaticApplication();
         config.setStorageFactory(storageFactory);
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
+        when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_GIT_REALM), any())).thenReturn(source);
         when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
                 .eq(hashService), any(), any(), any(), any(), any())).thenReturn(storage);
         app.run(config, environment);
@@ -204,7 +204,7 @@ public class JitstaticApplicationTest {
             config.setStorageFactory(storageFactory);
             config.setHostedFactory(hostedFactory);
             when(config.getRootAuthenticator()).thenThrow(new TestException("Test exception3"));
-            when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
+            when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_GIT_REALM), any())).thenReturn(source);
             when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
                     .eq(hashService), any(), any(), any(), any(), any())).thenReturn(storage);
             app.run(config, environment);
