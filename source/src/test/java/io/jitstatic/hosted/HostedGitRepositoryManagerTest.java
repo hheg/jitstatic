@@ -703,7 +703,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
             Path users = wBase.toPath().resolve(USERS);
             Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
             Files.write(creatorRealm.resolve("error"), new byte[] { 1, 2, 4 }, CREATE_NEW);
-            commit(workingGit);
+            commitAndPush(workingGit, null);
             LOG.info("", assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
                     .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
         }
@@ -720,7 +720,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
                     .resolve(JITSTATIC_KEYADMIN_REALM)
                     .resolve("corruptuser");
             write(corruptuser, new UserData(Set.of(new Role("role")), null, null, null));
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
         LOG.info("", assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
                 .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
@@ -737,7 +737,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
                     .resolve(JITSTATIC_KEYADMIN_REALM)
                     .resolve("corruptuser");
             write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", null));
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
         LOG.info("", assertThrows(CorruptedSourceException.class, () -> new HostedGitRepositoryManager(base
                 .toPath(), ENDPOINT, REF_HEADS_MASTER, service)));
@@ -754,7 +754,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
                     .resolve(JITSTATIC_KEYADMIN_REALM)
                     .resolve("corruptuser");
             write(corruptuser, new UserData(Set.of(new Role("role")), null, "salt", "hash"));
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
         try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
         }
@@ -771,7 +771,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
                     .resolve(JITSTATIC_KEYADMIN_REALM)
                     .resolve("corruptuser");
             write(corruptuser, new UserData(Set.of(new Role("role")), "pass", "salt", "hash"));
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
         try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
         }
@@ -785,7 +785,7 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
         File wBase = createTempDirectory();
         try (Git workingGit = Git.cloneRepository().setURI(base.getAbsolutePath()).setDirectory(wBase).call();) {
             workingGit.checkout().setCreateBranch(true).setName("other").setUpstreamMode(SetupUpstreamMode.TRACK).call();
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
         try (HostedGitRepositoryManager hrm = new HostedGitRepositoryManager(base.toPath(), ENDPOINT, REF_HEADS_MASTER, service)) {
             Repository repository = hrm.getRepositoryResolver().open(null, ENDPOINT);
@@ -859,12 +859,11 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
             write(screatorUser, screatorUserData);
             write(supdaterUser, supdaterUserData);
 
-            commit(workingGit);
+            commitAndPush(workingGit, null);
         }
     }
 
-    private void addFilesAndPush(final File localGitDir,
-            Git git) throws Exception {
+    private void addFilesAndPush(final File localGitDir, final Git git) throws Exception {
         final Path file = localGitDir.toPath().resolve(STORE);
         final Path mfile = localGitDir.toPath().resolve(STORE + METADATA);
         Files.write(file, getData().getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
@@ -884,12 +883,6 @@ public class HostedGitRepositoryManagerTest extends BaseTest {
         try (InputStream is = secondSourceInfo.getMetadataInputStream()) {
             return MAPPER.readValue(is, MetaData.class);
         }
-    }
-
-    private void commit(Git workingGit) throws NoFilepatternException, GitAPIException {
-        workingGit.add().addFilepattern(".").call();
-        workingGit.commit().setMessage("Initial commit").call();
-        verifyOkPush(workingGit.push().call());
     }
 
     private File createTempDirectory() throws IOException {
