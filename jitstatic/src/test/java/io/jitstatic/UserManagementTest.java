@@ -164,7 +164,7 @@ public class UserManagementTest extends BaseTest {
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file").toFile());
             Files.write(getMetaData(new io.jitstatic.MetaData(JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set
                     .of(new Role("role")), Set.of(new Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
-            commit(git, provider);
+            commitAndPush(git, provider);
             Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
@@ -197,7 +197,7 @@ public class UserManagementTest extends BaseTest {
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             Files.write(getData(1).getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            commit(git, provider);
+            commitAndPush(git, provider);
         }
     }
 
@@ -207,7 +207,7 @@ public class UserManagementTest extends BaseTest {
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPULL, GITUSERPULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             Files.write(getData(1).getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            assertTrue(assertThrows(TransportException.class, () -> commit(git, provider)).getMessage().contains("authentication not supported"));
+            assertTrue(assertThrows(TransportException.class, () -> commitAndPush(git, provider)).getMessage().contains("authentication not supported"));
         }
     }
 
@@ -1079,7 +1079,7 @@ public class UserManagementTest extends BaseTest {
             UserData userData = MAPPER.readValue(keyUserNoPush.toFile(), UserData.class);
             UserData modified = new UserData(userData.getRoles(), "222", userData.getSalt(), userData.getHash());
             Files.write(MAPPER.writeValueAsBytes(modified), keyUserNoPush.toFile());
-            commit(git, provider);
+            commitAndPush(git, provider);
         }
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword("111").build();) {
             Entity<JsonNode> user = client.getKey("file", "refs/heads/master", null, parse(JsonNode.class));
@@ -1184,7 +1184,7 @@ public class UserManagementTest extends BaseTest {
 
     private void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
         git.checkout().setName(ref).setCreateBranch(true).call();
-        commit(git, provider);
+        commitAndPush(git, provider);
     }
 
     private static io.jitstatic.client.UserData from(Set<Role> roles, String pass) {

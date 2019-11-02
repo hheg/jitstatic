@@ -32,14 +32,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
@@ -81,7 +90,9 @@ public abstract class BaseTest {
     protected String getData() { return getData(0); }
 
     protected String getMetaData() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}"; }
+
     protected String getMetaDataHidden() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}],\"hidden\":true}"; }
+
     protected String getMetaDataProtected() { return "{\"users\":[],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}],\"protected\":true}"; }
 
     protected String getData(int i) {
@@ -127,32 +138,65 @@ public abstract class BaseTest {
         mkdirs(user.getParent());
         Set<Role> newroles = roles.stream().map(Role::new).collect(Collectors.toSet());
         Files.write(user, MAPPER.writeValueAsBytes(new User(newroles, password)), StandardOpenOption.CREATE);
-        repo.add().addFilepattern(".").call();
-        repo.commit().setMessage("Added user " + userName);
+        repo.add().addFilepattern(ALLFILESPATTERN).call();
+        repo.commit().setMessage("Added user " + userName).call();
     }
 
     static class User {
-        String basicPassword;
-        Set<Role> roles;
+        private String basicPassword;
+        private Set<Role> roles;
+
+        public User() {
+            this(null, null);
+        }
 
         public User(Set<Role> roles, String password) {
-            this.basicPassword = password;
-            this.roles = roles;
+            this.setBasicPassword(password);
+            this.setRoles(roles);
         }
 
         public String getBasicPassword() { return basicPassword; }
 
         public Set<Role> getRoles() { return roles; }
+
+        public void setRoles(Set<Role> roles) { this.roles = roles; }
+
+        public void setBasicPassword(String basicPassword) { this.basicPassword = basicPassword; }
     }
 
     static class Role {
-        String role;
+        private String role;
+
+        public Role() {
+            this(null);
+        }
 
         public Role(String role) {
-            this.role = role;
+            this.setRole(role);
         }
 
         public String getRole() { return role; }
+
+        public void setRole(String role) { this.role = role; }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            Role other = (Role) obj;
+            return Objects.equals(role, other.role);
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((role == null) ? 0 : role.hashCode());
+            return result;
+        }
     }
 
     protected void verifyOkPush(Iterable<PushResult> call) {
@@ -164,10 +208,14 @@ public abstract class BaseTest {
                                         .collect(Collectors.joining(",")))
                                 .collect(Collectors.joining(",")));
     }
-
-    protected void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
+    
+    protected void commit(Git git) throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, GitAPIException {
         git.add().addFilepattern(ALLFILESPATTERN).call();
         git.commit().setMessage("Test commit").call();
+    }
+
+    protected void commitAndPush(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
+        commit(git);
         verifyOkPush(git.push().setCredentialsProvider(provider).call());
     }
 
@@ -179,5 +227,15 @@ public abstract class BaseTest {
 
     protected Set<io.jitstatic.client.MetaData.Role> roleOf(String... roles) {
         return Arrays.stream(roles).map(io.jitstatic.client.MetaData.Role::new).collect(Collectors.toSet());
+    }
+
+    public static Exception shutdownExecutor(final ExecutorService service) {
+        try {
+            service.shutdown();
+            service.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return e;
+        }
+        return null;
     }
 }

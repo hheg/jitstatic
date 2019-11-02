@@ -142,7 +142,7 @@ public class CorsIT extends BaseTest {
                     .of(new io.jitstatic.client.HeaderPair("X-Test", "testvalue")), Set.of(new MetaData.Role("role")), Set.of(new MetaData.Role("role"))))
                             .getBytes(UTF_8), workingFolder.resolve("file2.metadata").toFile());
 
-            commit(git, provider);
+            commitAndPush(git, provider);
             Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
@@ -457,7 +457,7 @@ public class CorsIT extends BaseTest {
 
     private void commit(Git git, UsernamePasswordCredentialsProvider provider, String string) throws NoFilepatternException, GitAPIException {
         git.checkout().setName(string).setCreateBranch(true).call();
-        commit(git,provider);
+        commitAndPush(git,provider);
     }
 
     @Override

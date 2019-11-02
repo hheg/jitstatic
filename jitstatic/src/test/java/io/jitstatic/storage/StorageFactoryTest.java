@@ -50,9 +50,9 @@ import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.source.Source;
-import io.jitstatic.test.TestUtils;
+import io.jitstatic.test.BaseTest;
 
-public class StorageFactoryTest {
+public class StorageFactoryTest extends BaseTest {
 
     private static final String ROOT = "root";
     private static final String REFS_HEADS_MASTER = "refs/heads/master";
@@ -81,8 +81,8 @@ public class StorageFactoryTest {
     @AfterEach
     public void tearDown() throws Exception {
         clusterService.close();
-        Exception e1 = TestUtils.shutdownExecutor(defaultExecutor);
-        Exception e2 = TestUtils.shutdownExecutor(workStealer);
+        Exception e1 = BaseTest.shutdownExecutor(defaultExecutor);
+        Exception e2 = BaseTest.shutdownExecutor(workStealer);
         if (e1 != null) {
             if (e2 != null) {
                 e1.addSuppressed(e2);

@@ -81,7 +81,6 @@ import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.test.BaseTest;
-import io.jitstatic.test.TestUtils;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
@@ -116,8 +115,8 @@ public class KeyStorageTest extends BaseTest {
     @AfterEach
     public void tearDown() throws Exception {
         clusterService.close();
-        Exception e1 = TestUtils.shutdownExecutor(defaultExecutor);
-        Exception e2 = TestUtils.shutdownExecutor(workStealer);
+        Exception e1 = BaseTest.shutdownExecutor(defaultExecutor);
+        Exception e2 = BaseTest.shutdownExecutor(workStealer);
         if (e1 != null) {
             if (e2 != null) {
                 e1.addSuppressed(e2);
