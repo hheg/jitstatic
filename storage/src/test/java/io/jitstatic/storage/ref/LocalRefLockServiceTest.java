@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.storage.ref;
 
 /*-
  * #%L
@@ -33,6 +33,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.spencerwi.either.Either;
 
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.storage.ref.ActionData;
+import io.jitstatic.storage.ref.LocalRefLockService;
+import io.jitstatic.storage.ref.LockService;
+import io.jitstatic.storage.ref.RefHolder;
 
 class LocalRefLockServiceTest {
 

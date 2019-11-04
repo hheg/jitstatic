@@ -34,6 +34,7 @@ import io.jitstatic.hosted.events.DeleteRefEventListener;
 import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.hosted.events.StorageAddRefEventListener;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.ref.RefLockService;
 
 public class StorageFactory {
 

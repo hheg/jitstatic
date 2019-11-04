@@ -68,7 +68,7 @@ public class LoginService extends AbstractLoginService {
             return root;
         }
         try {
-            final UserData userData = storage.getUser(username, defaultRef, _name);
+            final UserData userData = storage.getUser(username, defaultRef, _name).join();
             if (userData == null) {
                 return null;
             }

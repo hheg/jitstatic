@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.storage.ref;
 
 /*-
  * #%L
@@ -64,6 +64,11 @@ import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.HashService;
+import io.jitstatic.storage.KeyAlreadyExist;
+import io.jitstatic.storage.ref.LocalRefLockService;
+import io.jitstatic.storage.ref.RefHolder;
+import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
@@ -97,7 +102,7 @@ public class RefHolderTest extends BaseTest {
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             ref.putKey("key", Optional.empty());
-            assertNotNull(ref.readKey("key"));
+            assertNotNull(ref.internalReadKey("key"));
             assertTrue(ref.isEmpty());
         }
     }
@@ -118,7 +123,7 @@ public class RefHolderTest extends BaseTest {
             ref.start();
             ref.putKey("key", Optional.of(storeInfo));
             ref.modifyKey("key", toProvider(data), "1", cmd).orTimeout(5, TimeUnit.SECONDS).join();
-            assertEquals("2", ref.readKey("key").get().getVersion());
+            assertEquals("2", ref.internalReadKey("key").get().getVersion());
         }
     }
 
@@ -137,7 +142,7 @@ public class RefHolderTest extends BaseTest {
             ref.putKey("key", Optional.of(storeInfo));
             CompletableFuture<Either<String, FailedToLock>> modifyMetadata = ref.modifyMetadata("key", storageData, "1", commitMetaData);
             assertEquals("2", modifyMetadata.orTimeout(5, TimeUnit.SECONDS).join().getLeft());
-            Optional<StoreInfo> key = ref.readKey("key");
+            Optional<StoreInfo> key = ref.internalReadKey("key");
             assertEquals("2", key.get().getMetaDataVersion());
         }
     }
@@ -154,7 +159,7 @@ public class RefHolderTest extends BaseTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            assertTrue(ref.readKey("key").isPresent());
+            assertTrue(ref.internalReadKey("key").isPresent());
         }
     }
 
@@ -163,7 +168,7 @@ public class RefHolderTest extends BaseTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(REF));
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            assertThrows(LoadException.class, () -> ref.readKey("key"));
+            assertThrows(LoadException.class, () -> ref.internalReadKey("key"));
         }
     }
 
@@ -179,8 +184,8 @@ public class RefHolderTest extends BaseTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            Optional<StoreInfo> loadAndStore = ref.readKey("key");
-            assertEquals(ref.readKey("key"), loadAndStore);
+            Optional<StoreInfo> loadAndStore = ref.internalReadKey("key");
+            assertEquals(ref.internalReadKey("key"), loadAndStore);
             assertFalse(loadAndStore.isPresent());
         }
     }
@@ -196,8 +201,8 @@ public class RefHolderTest extends BaseTest {
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            Optional<StoreInfo> loadAndStore = ref.readKey("key/");
-            assertEquals(ref.readKey("key/"), loadAndStore);
+            Optional<StoreInfo> loadAndStore = ref.internalReadKey("key/");
+            assertEquals(ref.internalReadKey("key/"), loadAndStore);
             assertTrue(loadAndStore.isPresent());
         }
     }
@@ -212,7 +217,7 @@ public class RefHolderTest extends BaseTest {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.readKey("key")).getCause());
+            assertSame(ioException, assertThrows(UncheckedIOException.class, () -> ref.internalReadKey("key")).getCause());
         }
     }
 

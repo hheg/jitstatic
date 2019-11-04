@@ -30,6 +30,7 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -54,6 +55,7 @@ import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.WrappingAPIException;
 
 @Priority(Priorities.AUTHENTICATION)
 public abstract class ContextAwareAuthFilter<C, P extends Principal> implements ContainerRequestFilter {
@@ -61,14 +63,14 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
     protected final String prefix;
     protected final UnauthorizedHandler unauthorizedHandler = new DefaultUnauthorizedHandler();
 
-    private final Storage source;
+    private final Storage storage;
 
     private final HashService hashService;
 
     private final BiPredicate<String, String> rootAuthenticator;
 
     public ContextAwareAuthFilter(final Storage storage, final HashService hashService, final String prefix, BiPredicate<String, String> rootAuthenticator) {
-        this.source = Objects.requireNonNull(storage);
+        this.storage = Objects.requireNonNull(storage);
         this.hashService = Objects.requireNonNull(hashService);
         this.prefix = Objects.requireNonNull(prefix);
         this.rootAuthenticator = Objects.requireNonNull(rootAuthenticator);
@@ -103,7 +105,7 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         }
     }
 
-    Verdict setupInRealm(final ContainerRequestContext requestContext, final String scheme, final String ref, final Realm realm, final String password,
+    private Verdict setupInRealm(final ContainerRequestContext requestContext, final String scheme, final String ref, final Realm realm, final String password,
             final String userName) throws RefNotFoundException {
         for (Realm.Domain domain : realm.getDomains()) {
             final UserData userData = findUserInDomain(ref, userName, domain);
@@ -129,8 +131,9 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         return realm.denied;
     }
 
-    Verdict setupUsersDomain(final ContainerRequestContext requestContext, final String scheme, final Realm realm, Realm.Domain domain, final UserData userData,
-            String userName, String password) {
+    private Verdict setupUsersDomain(final ContainerRequestContext requestContext, final String scheme, final Realm realm, Realm.Domain domain,
+            final UserData userData,
+            final String userName, final String password) {
         final User user = new User(userName, password, domain.domainName, false);
         switch (domain) {
         case GIT:
@@ -145,14 +148,13 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         }
     }
 
-    Verdict setKeyUserPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
-        // TODO Keyusers can only change their password not their roles
+    private Verdict setKeyUserPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
         final String userName = user.getName();
         setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYUSER.createUserKey(userName).equals(role));
         return realm.accept;
     }
 
-    Verdict setKeyAdminPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
+    private Verdict setKeyAdminPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, User user) {
         // Keyadmins kan change keyuser's data
         final String userName = user.getName();
         setPrincipal(requestContext, scheme, user, role -> Realm.Domain.KEYUSER.getDomainName().equals(role)
@@ -161,7 +163,7 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         return realm.accept;
     }
 
-    Verdict setGitPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, final UserData userData, User user) {
+    private Verdict setGitPrincipal(final ContainerRequestContext requestContext, final String scheme, final Realm realm, final UserData userData, User user) {
         final Set<Role> roles = userData.getRoles();
         // Git admin with the appropriate roles can change their own password, keyadmins
         // and keyusers
@@ -201,16 +203,31 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         return realm.denied;
     }
 
-    private UserData findUserInDomain(final String ref, final String userName, Realm.Domain domain) throws RefNotFoundException {
+    private UserData findUserInDomain(String ref, final String userName, Realm.Domain domain) throws RefNotFoundException {
         if (domain == Realm.Domain.GIT) {
-            try {
-                return source.getUser(userName, REFS_HEADS_SECRETS, domain.getDomainName());
-            } catch (RefNotFoundException e) {
+            ref = REFS_HEADS_SECRETS;
+        }
+        try {
+            return storage.getUser(userName, ref, domain.getDomainName()).join();
+        } catch (CompletionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof WrappingAPIException) {
+                Throwable rootCause = cause.getCause();
+                if (rootCause instanceof RefNotFoundException) {
+                    if (domain == Realm.Domain.GIT) {
+                        // It is ok for refs/heads/secrets branch to not exist
+                        return null;
+                    }
+                    throw (RefNotFoundException) rootCause;
+                }
+            }
+            throw e;
+        } catch (RefNotFoundException e) {
+            if (domain == Realm.Domain.GIT) {
                 // It is ok for refs/heads/secrets branch to not exist
                 return null;
             }
-        } else {
-            return source.getUser(userName, ref, domain.getDomainName());
+            throw (RefNotFoundException) e;
         }
     }
 
@@ -239,7 +256,7 @@ public abstract class ContextAwareAuthFilter<C, P extends Principal> implements 
         }
     }
 
-    Realm matchBaseUrl(final List<String> matchedURIs) {
+    private Realm matchBaseUrl(final List<String> matchedURIs) {
         final String base = matchedURIs.get(0);
         if (base.startsWith("users/keyuser/")) {
             return Realm.USERS_USER_ADMIN_GIT;

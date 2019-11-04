@@ -50,6 +50,8 @@ import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.setup.Environment;
 import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.ref.LocalRefLockService;
+import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.test.BaseTest;
 
 public class StorageFactoryTest extends BaseTest {

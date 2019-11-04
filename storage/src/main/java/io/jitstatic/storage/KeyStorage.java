@@ -20,7 +20,6 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +58,9 @@ import io.jitstatic.hosted.events.DeleteRef;
 import io.jitstatic.hosted.events.ReloadRef;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.ref.ReadOnlyRefHolder;
+import io.jitstatic.storage.ref.RefHolder;
+import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
@@ -131,11 +133,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
             } catch (RefNotFoundException e) {
                 throw new WrappingAPIException(e);
             }
-            final Optional<StoreInfo> storeInfo = refHolder.readKey(key);
-            if (storeInfo == null) {
-                return Optional.<StoreInfo>empty();
-            }
-            return storeInfo;
+            return refHolder.readKey(key);
         }, executor).handleAsync((o, t) -> unwrap(o, t, finalRef), executor);
     }
 
@@ -257,9 +255,8 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> delete(final String key,
-            final String ref,
-            final CommitMetaData commitMetaData) throws RefNotFoundException {
+    public CompletableFuture<Either<String, FailedToLock>> delete(final String key, final String ref, final CommitMetaData commitMetaData)
+            throws RefNotFoundException {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
 
@@ -381,31 +378,19 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public UserData getUser(final String key,
-            String ref,
-            final String realm) throws RefNotFoundException {
-        final Pair<String, UserData> userData = getUserData(key, ref, realm);
-        if (userData != null && userData.isPresent()) {
-            return userData.getRight();
-        }
-        return null;
+    public CompletableFuture<UserData> getUser(final String key, String ref, final String realm) throws RefNotFoundException {
+        return getUserData(key, ref, realm).thenApply(userData -> {
+            if (userData != null && userData.isPresent()) {
+                return userData.getRight();
+            }
+            return null;
+        });
     }
 
     @Override
-    public Pair<String, UserData> getUserData(final String key, final String ref, final String realm) throws RefNotFoundException {
+    public CompletableFuture<Pair<String, UserData>> getUserData(final String key, final String ref, final String realm) throws RefNotFoundException {
         final RefHolder refHolder = getRefHolder(checkRef(ref));
-        try {
-            return refHolder.getUser(realm + "/" + key);
-        } catch (WrappingAPIException e) {
-            final Throwable cause = e.getCause();
-            if (cause instanceof RefNotFoundException) {
-                throw (RefNotFoundException) cause;
-            }
-            if (cause instanceof IOException) {
-                throw new UncheckedIOException((IOException) cause);
-            }
-            throw e;
-        }
+        return refHolder.getUser(realm + "/" + key);
     }
 
     @Override
@@ -439,10 +424,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public void deleteUser(final String key,
-            final String ref,
-            final String realm,
-            final String creatorUserName) throws RefNotFoundException {
+    public void deleteUser(final String key, final String ref, final String realm, final String creatorUserName) throws RefNotFoundException {
         Objects.requireNonNull(key);
         Objects.requireNonNull(realm);
         Objects.requireNonNull(creatorUserName);

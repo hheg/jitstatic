@@ -64,8 +64,6 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.WrappingAPIException;
 
 @Path("metakey")
 public class MetaKeyResource {
@@ -94,31 +92,26 @@ public class MetaKeyResource {
             final @Auth User user, final @Context Request request, final @Context HttpHeaders headers, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> getMetaKey(key, ref).exceptionally(helper.keyExceptionHandler(Pair::ofNothing)), executor)
-                .thenCompose(c -> c)
-                .thenApplyAsync(metaDataInfo -> metaDataInfo.orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND)), executor)
-                .thenApplyAsync(metaDataInfo -> {
-                    final MetaData metaData = metaDataInfo.getLeft();
-                    helper.checkWritePermission(key, user, context, ref, metaData);
-                    final EntityTag tag = new EntityTag(metaDataInfo.getRight());
-                    final Response noChange = APIHelper.checkETag(headers, tag);
-                    if (noChange != null) {
-                        return noChange;
-                    }
-                    LOG.info("{} logged in and accessed key {} in {}", user, key, ref);
-                    return Response.ok(metaData)
-                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-                            .header(HttpHeaders.CONTENT_ENCODING, UTF_8)
-                            .tag(tag)
-                            .build();
-                }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
-    }
-
-    private CompletableFuture<Pair<MetaData, String>> getMetaKey(final String key, final String ref) {
         try {
-            return storage.getMetaKey(key, ref);
+            storage.getMetaKey(key, ref)
+                    .thenApplyAsync(metaDataInfo -> metaDataInfo.orElseThrow(() -> new WebApplicationException(Status.NOT_FOUND)), executor)
+                    .thenApplyAsync(metaDataInfo -> {
+                        final MetaData metaData = metaDataInfo.getLeft();
+                        helper.checkWritePermission(key, user, context, ref, metaData);
+                        final EntityTag tag = new EntityTag(metaDataInfo.getRight());
+                        final Response noChange = APIHelper.checkETag(headers, tag);
+                        if (noChange != null) {
+                            return noChange;
+                        }
+                        LOG.info("{} logged in and accessed key {} in {}", user, key, ref);
+                        return Response.ok(metaData)
+                                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+                                .header(HttpHeaders.CONTENT_ENCODING, UTF_8)
+                                .tag(tag)
+                                .build();
+                    }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
         } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
 
@@ -133,40 +126,41 @@ public class MetaKeyResource {
             final @Auth User user, final @Validated @Valid @NotNull ModifyMetaKeyData data, final @Context Request request,
             final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, final @Context SecurityContext context) {
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> {
-            APIHelper.checkHeaders(headers);
-            APIHelper.checkRef(ref);
-            return getMetaKey(key, ref);
-        }, executor)
-                .thenCompose(c -> c)
-                .thenApplyAsync(metaKeyData -> {
-                    if (!metaKeyData.isPresent()) {
-                        throw new WebApplicationException(key, Status.NOT_FOUND);
-                    }
-                    helper.checkWritePermission(key, user, context, ref, metaKeyData.getLeft());
-                    final String currentVersion = metaKeyData.getRight();
+        APIHelper.checkHeaders(headers);
+        APIHelper.checkRef(ref);
+        try {
+            storage.getMetaKey(key, ref)
+                    .thenApplyAsync(metaKeyData -> {
+                        if (!metaKeyData.isPresent()) {
+                            throw new WebApplicationException(key, Status.NOT_FOUND);
+                        }
+                        helper.checkWritePermission(key, user, context, ref, metaKeyData.getLeft());
+                        final String currentVersion = metaKeyData.getRight();
 
-                    final EntityTag tag = new EntityTag(currentVersion);
-                    final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
+                        final EntityTag tag = new EntityTag(currentVersion);
+                        final ResponseBuilder noChangeBuilder = request.evaluatePreconditions(tag);
 
-                    if (noChangeBuilder != null) {
-                        throw new WebApplicationException(noChangeBuilder.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build());
-                    }
+                        if (noChangeBuilder != null) {
+                            throw new WebApplicationException(noChangeBuilder.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build());
+                        }
 
-                    return putMetaData(key, data, httpRequest, user, ref, currentVersion);
-                }, executor)
-                .thenComposeAsync(c -> c, executor)
-                .thenApplyAsync(result -> {
-                    if (result.isRight()) {
-                        throw new WebApplicationException(Status.PRECONDITION_FAILED);
-                    }
-                    final String newVersion = result.getLeft();
-                    if (newVersion == null) {
-                        throw new WebApplicationException(Status.NOT_FOUND);
-                    }
-                    LOG.info("{} logged in and modified key {} in {}", user, key, ref);
-                    return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-                }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+                        return putMetaData(key, data, httpRequest, user, ref, currentVersion);
+                    }, executor)
+                    .thenComposeAsync(c -> c, executor)
+                    .thenApplyAsync(result -> {
+                        if (result.isRight()) {
+                            throw new WebApplicationException(Status.PRECONDITION_FAILED);
+                        }
+                        final String newVersion = result.getLeft();
+                        if (newVersion == null) {
+                            throw new WebApplicationException(Status.NOT_FOUND);
+                        }
+                        LOG.info("{} logged in and modified key {} in {}", user, key, ref);
+                        return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+                    }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     private CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key, final ModifyMetaKeyData data, final HttpServletRequest httpRequest,
@@ -175,7 +169,7 @@ public class MetaKeyResource {
             return storage.putMetaData(key, ref, data.getMetaData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                     .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
 

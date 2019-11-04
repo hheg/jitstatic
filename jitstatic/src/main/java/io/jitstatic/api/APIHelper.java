@@ -74,8 +74,7 @@ class APIHelper {
             if (apiException instanceof KeyAlreadyExist) {
                 return new WebApplicationException(apiException.getMessage(), Status.CONFLICT).getResponse();
             } else if (apiException instanceof RefNotFoundException) {
-                RefNotFoundException rnfe = (RefNotFoundException) apiException;
-                return new WebApplicationException(String.format("Branch %s is not found ", rnfe.getMessage()), Status.BAD_REQUEST).getResponse();
+                return new WebApplicationException(apiException.getMessage(), Status.BAD_REQUEST).getResponse();
             } else if (apiException instanceof UnsupportedOperationException) {
                 return new WebApplicationException(Status.FORBIDDEN).getResponse();
             } else if (apiException instanceof IOException) {
@@ -173,7 +172,7 @@ class APIHelper {
                 throw new WebApplicationException(Status.METHOD_NOT_ALLOWED);
             }
             if (cause instanceof RefNotFoundException) {
-                throw new WebApplicationException(cause.getMessage(),Status.BAD_REQUEST);
+                throw new WebApplicationException(cause.getMessage(), Status.BAD_REQUEST);
             }
             log.error("Unknown api error", t);
             return alternative.get();
@@ -212,18 +211,10 @@ class APIHelper {
                 .header(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"" + realm + "\", charset=\"UTF-8\"").build());
     }
 
-    CompletableFuture<StoreInfo> checkIfKeyExist(final String key, final String ref, final Storage storage) {
-        return getKeyMuted(key, ref, storage)
+    CompletableFuture<StoreInfo> checkIfKeyExist(final String key, final String ref, final Storage storage) throws RefNotFoundException {
+        return storage.getKey(key, ref)
                 .exceptionally(this.keyExceptionHandler(Optional::empty))
                 .thenApply(storeInfo -> storeInfo.orElseThrow(() -> new WebApplicationException(key, Status.NOT_FOUND)));
-    }
-
-    CompletableFuture<Optional<StoreInfo>> getKeyMuted(String key, String ref, Storage storage) {
-        try {
-            return storage.getKey(key, ref);
-        } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(e);
-        }
     }
 
     boolean canAdministrate(final User user, final Set<Role> writeRoles) {

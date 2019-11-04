@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.storage.ref;
 
 /*-
  * #%L
@@ -33,6 +33,7 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 import io.jitstatic.utils.WrappingAPIException;
 
 public class ReadOnlyRefHolder extends RefHolder {

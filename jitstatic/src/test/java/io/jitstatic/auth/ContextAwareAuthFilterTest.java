@@ -1,5 +1,7 @@
 package io.jitstatic.auth;
 
+import static io.jitstatic.JitStaticConstants.REFS_HEADS_SECRETS;
+
 /*-
  * #%L
  * jitstatic
@@ -35,6 +37,7 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 import javax.ws.rs.WebApplicationException;
@@ -58,6 +61,7 @@ import io.jitstatic.auth.ContextAwareAuthFilter.Realm.Domain;
 import io.jitstatic.auth.ContextAwareAuthFilter.Verdict;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.WrappingAPIException;
 
 class ContextAwareAuthFilterTest {
 
@@ -82,10 +86,11 @@ class ContextAwareAuthFilterTest {
         when(mvm.get(eq("ref"))).thenReturn(branch == null ? null : List.of(branch));
         when(info.getMatchedURIs(anyBoolean())).thenReturn(List.of(key, api));
         when(crc.getMethod()).thenReturn(method);
+        when(storage.getUser(Mockito.anyString(), Mockito.any(), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
         if (in == Domain.GIT) {
-            when(storage.getUser(eq(user), eq("refs/heads/secrets"), eq(in.getDomainName()))).thenReturn(data);
+            when(storage.getUser(eq(user), eq(REFS_HEADS_SECRETS), eq(in.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
         } else {
-            when(storage.getUser(eq(user), eq(branch), eq(in.getDomainName()))).thenReturn(data);
+            when(storage.getUser(eq(user), eq(branch), eq(in.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
         }
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
@@ -238,9 +243,9 @@ class ContextAwareAuthFilterTest {
         when(mvm.get(eq("ref"))).thenReturn(List.of("refs/notref/other"));
         when(info.getMatchedURIs(anyBoolean())).thenReturn(List.of("storage/key", "storage"));
         when(crc.getMethod()).thenReturn("GET");
-
+        when(storage.getUser(Mockito.anyString(), Mockito.any(), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
         when(storage.getUser(eq(user), eq("refs/notref/other"), eq(Domain.KEYADMIN.getDomainName())))
-                .thenThrow(new RefNotFoundException("refs/notref/other"));
+                .thenReturn(CompletableFuture.failedFuture(new WrappingAPIException(new RefNotFoundException("refs/notref/other"))));
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
         ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);
@@ -266,11 +271,10 @@ class ContextAwareAuthFilterTest {
         when(mvm.get(eq("ref"))).thenReturn(List.of("refs/heads/master", "refs/heads/other", "refs/tags/blah"));
         when(info.getMatchedURIs(anyBoolean())).thenReturn(List.of("storage/key", "storage"));
         when(crc.getMethod()).thenReturn("GET");
+        when(storage.getUser(Mockito.anyString(), Mockito.any(), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
         URI uri = new URI("http://localhost:8080/application/storage/key?ref=refs%2Fheads%2Fother&?ref=refs%2Fheads%2Fmaster&?ref=refs%2Ftags%2Fblah");
-
         when(info.getRequestUri()).thenReturn(uri);
-        when(storage.getUser(eq(user), eq("refs/heads/other"), eq(Domain.KEYADMIN.getDomainName())))
-                .thenReturn(data);
+        when(storage.getUser(eq(user), eq("refs/heads/other"), eq(Domain.KEYADMIN.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
         ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);

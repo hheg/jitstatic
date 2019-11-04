@@ -56,9 +56,9 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
-    public UserData getUser(String username, String ref, String realm) throws RefNotFoundException;
+    public CompletableFuture<UserData> getUser(String username, String ref, String realm) throws RefNotFoundException;
 
-    public Pair<String, UserData> getUserData(String username, String ref, String realm) throws RefNotFoundException;
+    public CompletableFuture<Pair<String, UserData>> getUserData(String username, String ref, String realm) throws RefNotFoundException;
 
     public CompletableFuture<Pair<MetaData, String>> getMetaKey(String key, String ref) throws RefNotFoundException;
 

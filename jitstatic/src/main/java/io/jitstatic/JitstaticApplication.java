@@ -50,10 +50,10 @@ import io.jitstatic.hosted.HostedFactory;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
-import io.jitstatic.storage.LocalRefLockService;
 import io.jitstatic.storage.NamingThreadFactory;
-import io.jitstatic.storage.RefLockService;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.storage.ref.LocalRefLockService;
+import io.jitstatic.storage.ref.RefLockService;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 

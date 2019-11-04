@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.storage.ref;
 
 /*-
  * #%L
@@ -27,9 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -63,9 +61,10 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.storage.HashService;
+import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
@@ -106,20 +105,15 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                     @Override
                     public Either<Optional<StoreInfo>, Pair<String, UserData>> load(final String key) throws Exception {
                         // TODO Cache2k doesn't have an asynchronous API, yet.
-                        return unwrap(loadFully(key));
+                        return key.startsWith(JitStaticConstants.USERS) ? loadUserKey(key) : loadKey(key);
                     }
                 }).entryCapacity(size).build();
     }
 
-    private CompletableFuture<Either<Optional<StoreInfo>, Pair<String, UserData>>> loadFully(final String key) {
-        // TODO Don't complete on this
-        return CompletableFuture.completedFuture(key.startsWith(JitStaticConstants.USERS) ? loadUserKey(key) : loadKey(key));
-    }
-
     @Nullable
-    public Optional<StoreInfo> readKey(final String key) {
+    Optional<StoreInfo> internalReadKey(final String key) {
         return unwrapCacheLoaderException(() -> {
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> data = readKeyFull(key);
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> data = refCache.get().get(key);
             if (data != null && data.isLeft()) {
                 return data.getLeft();
             }
@@ -129,10 +123,6 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     private Either<Optional<StoreInfo>, Pair<String, UserData>> pollForKey(final String key) {
         return refCache.get().peek(key);
-    }
-
-    private Either<Optional<StoreInfo>, Pair<String, UserData>> readKeyFull(final String key) {
-        return refCache.get().get(key);
     }
 
     void putKey(final String key, final Optional<StoreInfo> store) {
@@ -199,11 +189,11 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     void checkIfPlainKeyExist(final String key) {
         if (key.endsWith("/")) {
             final String plainKey = key.substring(0, key.length() - 1);
-            Either<Optional<StoreInfo>, Pair<String, UserData>> compute = pollForKey(plainKey);
-            if (compute == null) {
-                compute = loadKey(plainKey);
+            Either<Optional<StoreInfo>, Pair<String, UserData>> keyData = pollForKey(plainKey);
+            if (keyData == null) {
+                keyData = loadKey(plainKey);
             }
-            if (compute != null && compute.getLeft().isPresent()) {
+            if (keyData != null && keyData.getLeft().isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
         }
@@ -216,7 +206,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     String internalAddKey(final String key, ObjectStreamProvider data, final MetaData metaData, final CommitMetaData commitMetaData) {
         try {
-            final Optional<StoreInfo> storeInfo = readKey(key);
+            final Optional<StoreInfo> storeInfo = internalReadKey(key);
             if (storeInfo != null && storeInfo.isPresent()) {
                 throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
             }
@@ -247,7 +237,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     String internalModifyKey(final String key, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
-        final Optional<StoreInfo> keyHolder = readKey(key);
+        final Optional<StoreInfo> keyHolder = internalReadKey(key);
         if (storageIsForbidden(keyHolder)) {
             throw new WrappingAPIException(new UnsupportedOperationException("modifyKey " + key));
         }
@@ -269,7 +259,6 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         return lock.fireEvent(key, ActionData.deleteKey(key, commitMetaData));
     }
 
-    // TODO Should return something more useful?
     String internalDeleteKey(final String key, final CommitMetaData commitMetaData) {
         source.deleteKey(key, ref, commitMetaData);
         putKey(key, Optional.empty());
@@ -285,7 +274,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     String internalModifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         checkIfPlainKeyExist(key);
-        final Optional<StoreInfo> storeInfo = readKey(key);
+        final Optional<StoreInfo> storeInfo = internalReadKey(key);
         if (storageIsForbidden(storeInfo)) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
@@ -311,10 +300,14 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     }
 
     @Nullable
-    public Pair<String, UserData> getUser(final String userKeyPath) {
+    public CompletableFuture<Pair<String, UserData>> getUser(final String userKeyPath) {
+        return CompletableFuture.supplyAsync(() -> internalGetUser(userKeyPath), refLockService.getRepoWriter());
+    }
+
+    Pair<String, UserData> internalGetUser(final String userKeyPath) {
         final String key = createFullUserKeyPath(userKeyPath);
         return unwrapCacheLoaderException(() -> {
-            final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = readKeyFull(key);
+            final Either<Optional<StoreInfo>, Pair<String, UserData>> computed = refCache.get().get(key);
             if (computed != null) {
                 return computed.getRight();
             }
@@ -333,7 +326,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                 return Either.right(user);
             }
             return Either.right(Pair.ofNothing());
-        } catch (Exception e) {
+        } catch (RefNotFoundException | IOException e) {
             throw new WrappingAPIException(e);
         }
     }
@@ -348,31 +341,35 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     String internalUpdateUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         final String key = createFullUserKeyPath(userKeyPath);
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = pollForKey(key);
-        final Pair<String, UserData> userKeyData;
-        if (keyDataHolder == null || keyDataHolder.isLeft()) {
-            userKeyData = getUser(userKeyPath);
-            if (userKeyData == null) {
-                throw new WrappingAPIException(new UnsupportedOperationException(key));
-            }
-        } else {
-            userKeyData = keyDataHolder.getRight();
-        }
+        final Pair<String, UserData> userKeyData = extractUserKeyData(userKeyPath, key);
         if (!version.equals(userKeyData.getLeft())) {
             throw new WrappingAPIException(new VersionIsNotSame(version, userKeyData.getLeft()));
         }
         try {
             final UserData input = generateUser(data, userKeyData);
             final String newVersion = source.updateUser(key, ref, username, input);
-            Pair<String, UserData> p = Pair.of(newVersion, input);
-            putKeyFull(key, Either.right(p));
-            return p.getLeft();
+            putKeyFull(key, Either.right(Pair.of(newVersion, input)));
+            return newVersion;
         } catch (RefNotFoundException e) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to update " + key, e);
         }
 
+    }
+
+    Pair<String, UserData> extractUserKeyData(final String userKeyPath, final String key) {
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = pollForKey(key);
+        final Pair<String, UserData> userKeyData;
+        if (keyDataHolder == null || keyDataHolder.isLeft()) {
+            userKeyData = internalGetUser(userKeyPath);
+            if (userKeyData == null) {
+                throw new WrappingAPIException(new UnsupportedOperationException(key));
+            }
+        } else {
+            userKeyData = keyDataHolder.getRight();
+        }
+        return userKeyData;
     }
 
     private UserData generateUser(final UserData data, final Pair<String, UserData> userKeyData) {
@@ -391,15 +388,14 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     String internalAddUser(final String userKeyPath, final String username, final UserData data) {
         final String key = createFullUserKeyPath(userKeyPath);
-        final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = readKeyFull(key);
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> keyDataHolder = refCache.get().get(key);
         if (keyDataHolder != null && keyDataHolder.isRight() && keyDataHolder.getRight().isPresent()) {
             throw new WrappingAPIException(new KeyAlreadyExist(key, ref));
         }
         try {
             final String newVersion = source.addUser(key, ref, username, data);
-            Pair<String, UserData> p = Pair.of(newVersion, data);
-            putKeyFull(key, Either.right(p));
-            return p.getLeft();
+            putKeyFull(key, Either.right(Pair.of(newVersion, data)));
+            return newVersion;
         } catch (RefNotFoundException e) {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         } catch (IOException e) {
@@ -420,28 +416,6 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
             return ObjectId.zeroId().name();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to delete " + key, e);
-        }
-    }
-
-    @Deprecated
-    static <T> T unwrap(final CompletableFuture<T> future) {
-        try {
-            return future.orTimeout(5, TimeUnit.SECONDS).join();
-        } catch (CompletionException ce) {
-            final Throwable cause = ce.getCause();
-            if (cause instanceof WrappingAPIException) {
-                throw (WrappingAPIException) cause;
-            }
-            if (cause instanceof LoadException) {
-                throw (LoadException) cause;
-            }
-            if (cause instanceof UncheckedIOException) {
-                throw (UncheckedIOException) cause;
-            }
-            if (cause instanceof RuntimeException) {
-                throw (RuntimeException) cause;
-            }
-            throw new ShouldNeverHappenException("Error unwrapping future ", ce);
         }
     }
 
@@ -486,7 +460,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     @Override
     public void close() {
-        // NOOP
+        refCache.get().close();
     }
 
     @Override
@@ -510,5 +484,13 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                 throw new UncheckedIOException(e);
             }
         }, refLockService.getRepoWriter());
+    }
+
+    public Optional<StoreInfo> readKey(String key) {
+        final Optional<StoreInfo> storeInfo = internalReadKey(key);
+        if (storeInfo == null) {
+            return Optional.<StoreInfo>empty();
+        }
+        return storeInfo;
     }
 }

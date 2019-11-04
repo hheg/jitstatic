@@ -36,7 +36,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -113,11 +112,12 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response get(final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user, final @Context HttpHeaders headers,
+    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user,
+            final @Context HttpHeaders headers,
             @Context SecurityContext context) {
         APIHelper.checkRef(ref);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYADMIN_REALM, key), JITSTATIC_KEYADMIN_REALM), context);
-        return getUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), headers, JITSTATIC_KEYADMIN_REALM, user);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
+        getUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), headers, JITSTATIC_KEYADMIN_REALM, user, asyncResponse);
     }
 
     @PUT
@@ -131,7 +131,7 @@ public class UsersResource {
             final @Validated @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers, final @Context Request request,
             @Context SecurityContext context) {
         APIHelper.checkValidRef(ref);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYADMIN_REALM, key), JITSTATIC_KEYADMIN_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
         modifyUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, context);
     }
 
@@ -146,7 +146,7 @@ public class UsersResource {
             final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(ref);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYADMIN_REALM, key), JITSTATIC_KEYADMIN_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
         addUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, user, JITSTATIC_KEYADMIN_REALM, asyncResponse);
     }
 
@@ -160,7 +160,7 @@ public class UsersResource {
     public void delete(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(ref);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYADMIN_REALM, key), JITSTATIC_KEYADMIN_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
         deleteUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), user, JITSTATIC_KEYADMIN_REALM, asyncResponse);
     }
 
@@ -171,12 +171,12 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response getUser(final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void getUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpHeaders headers, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
-        return getUser(key, ref, headers, JITSTATIC_KEYUSER_REALM, user);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
+        getUser(key, ref, headers, JITSTATIC_KEYUSER_REALM, user, asyncResponse);
     }
 
     @PUT
@@ -191,7 +191,7 @@ public class UsersResource {
             final @Context HttpHeaders headers, final @Context Request request, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         modifyUser(key, ref, data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse, context);
     }
 
@@ -207,7 +207,7 @@ public class UsersResource {
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         addUser(key, ref, data, user, JITSTATIC_KEYUSER_REALM, asyncResponse);
     }
 
@@ -222,7 +222,7 @@ public class UsersResource {
             final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_KEYUSER_REALM, key), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         deleteUser(key, ref, user, JITSTATIC_KEYUSER_REALM, asyncResponse);
     }
 
@@ -233,10 +233,10 @@ public class UsersResource {
     @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public Response getGitUser(final @PathParam("key") String key, final @Auth User user,
+    public void getGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Auth User user,
             final @Context HttpHeaders headers, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH, GIT_PULL), context);
-        return getUser(key, REFS_HEADS_SECRETS, headers, JITSTATIC_GIT_REALM, user);
+        authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH, GIT_PULL), context);
+        getUser(key, REFS_HEADS_SECRETS, headers, JITSTATIC_GIT_REALM, user, asyncResponse);
     }
 
     @PUT
@@ -249,7 +249,7 @@ public class UsersResource {
     public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Validated({ GitRolesGroup.class, Default.class }) @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers,
             final @Context Request request, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
         modifyUser(key, REFS_HEADS_SECRETS, data, request, user, JITSTATIC_GIT_REALM, asyncResponse, context);
     }
 
@@ -263,7 +263,7 @@ public class UsersResource {
     public void postGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Valid @NotNull @Validated({ GitRolesGroup.class, Adding.class, Default.class }) UserData data,
             final @Auth User user, @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
         addUser(key, REFS_HEADS_SECRETS, data, user, JITSTATIC_GIT_REALM, asyncResponse);
     }
 
@@ -276,78 +276,77 @@ public class UsersResource {
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void deleteGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Auth User user,
             @Context SecurityContext context) {
-        authorize(Set.of(String.format("%s/%s", JITSTATIC_GIT_REALM, key), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
+        authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
         deleteUser(key, REFS_HEADS_SECRETS, user, JITSTATIC_GIT_REALM, asyncResponse);
     }
 
     private void modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm,
             final AsyncResponse asyncResponse, SecurityContext context) {
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                return storage.getUserData(key, ref, realm);
-            } catch (RefNotFoundException e) {
-                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
-            }
-        }, executor).thenApplyAsync(userData -> {
-            if (userData == null || !userData.isPresent()) {
-                throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
-            }
-            final String version = userData.getLeft();
-            final EntityTag entityTag = new EntityTag(version);
-            final ResponseBuilder evaluatePreconditions = request.evaluatePreconditions(entityTag);
-            if (evaluatePreconditions != null) {
-                throw new WebApplicationException(evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
-            }
-            try {
-                return storage
-                        .updateUser(key, ref, realm, user.getName(), getRoles(data, context, userData), version);
-            } catch (RefNotFoundException e) {
-                return CompletableFuture.<Either<String, FailedToLock>>failedFuture(new WrappingAPIException(e));
-            }
-        }, executor).thenComposeAsync(Function.identity()).thenApplyAsync(result -> {
-            if (result.isRight()) {
-                return Response.status(Status.PRECONDITION_FAILED).build();
-            }
-            final String newVersion = result.getLeft();
+        try {
+            storage.getUserData(key, ref, realm)
+                    .thenApplyAsync(userData -> {
+                        if (userData == null || !userData.isPresent()) {
+                            throw new WebApplicationException(key, HttpStatus.NOT_FOUND_404);
+                        }
+                        final String version = userData.getLeft();
+                        final EntityTag entityTag = new EntityTag(version);
+                        final ResponseBuilder evaluatePreconditions = request.evaluatePreconditions(entityTag);
+                        if (evaluatePreconditions != null) {
+                            throw new WebApplicationException(evaluatePreconditions.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
+                        }
+                        try {
+                            return storage.updateUser(key, ref, realm, user.getName(), getRoles(data, context, userData), version);
+                        } catch (RefNotFoundException e) {
+                            return CompletableFuture.<Either<String, FailedToLock>>failedFuture(new WrappingAPIException(e));
+                        }
+                    }, executor)
+                    .thenComposeAsync(s -> s)
+                    .thenApplyAsync(result -> {
+                        if (result.isRight()) {
+                            return Response.status(Status.PRECONDITION_FAILED).build();
+                        }
+                        final String newVersion = result.getLeft();
 
-            if (newVersion == null) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
-            LOG.info("{} logged in and modified key {}/{} in {}", user, realm, key, ref);
-            return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-        }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+                        if (newVersion == null) {
+                            throw new WebApplicationException(Status.NOT_FOUND);
+                        }
+                        LOG.info("{} logged in and modified key {}/{} in {}", user, realm, key, ref);
+                        return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+                    }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
+        }
+
     }
 
     io.jitstatic.auth.UserData getRoles(final UserData data, SecurityContext context, Pair<String, io.jitstatic.auth.UserData> userData) {
-        io.jitstatic.auth.UserData newUserData;
         if (context.isUserInRole(JitStaticConstants.ROLERROLES)) {
-            newUserData = new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null);
+            return new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null);
         } else {
-            newUserData = new io.jitstatic.auth.UserData(userData.getRight().getRoles(), data.getBasicPassword(), null, null);
+            return new io.jitstatic.auth.UserData(userData.getRight().getRoles(), data.getBasicPassword(), null, null);
         }
-        return newUserData;
     }
 
     private void addUser(final String key, final String ref, final UserData data, final User user, final String realm, final AsyncResponse asyncResponse) {
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                return storage.getUserData(key, ref, realm);
-            } catch (RefNotFoundException e) {
-                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
-            }
-        }, executor).thenApplyAsync(userData -> {
-            if (userData != null && userData.isPresent()) {
-                throw new WebApplicationException(key + " already exist", Status.CONFLICT);
-            }
-            return addUser(key, ref, data, user, realm);
-        }, executor).thenCompose(Function.identity()).thenApplyAsync(newVersion -> {
-            if (newVersion == null) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
-            LOG.info("{} logged in and added key {}/{} in {}", user, realm, key, ref);
-            return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-        }, executor).exceptionally(helper::exceptionHandlerPOSTAPI).thenAcceptAsync(asyncResponse::resume, executor);
-
+        try {
+            storage.getUserData(key, ref, realm)
+                    .thenApplyAsync(userData -> {
+                        if (userData != null && userData.isPresent()) {
+                            throw new WebApplicationException(key + " already exist", Status.CONFLICT);
+                        }
+                        return addUser(key, ref, data, user, realm);
+                    }, executor)
+                    .thenCompose(s -> s)
+                    .thenApplyAsync(newVersion -> {
+                        if (newVersion == null) {
+                            throw new WebApplicationException(Status.NOT_FOUND);
+                        }
+                        LOG.info("{} logged in and added key {}/{} in {}", user, realm, key, ref);
+                        return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+                    }, executor).exceptionally(helper::exceptionHandlerPOSTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     private CompletableFuture<String> addUser(final String key, final String ref, final UserData data, final User user, final String realm) {
@@ -359,24 +358,23 @@ public class UsersResource {
     }
 
     private void deleteUser(final String key, final String ref, final User user, final String realm, final AsyncResponse asyncResponse) {
-        CompletableFuture.supplyAsync(() -> {
-            try {
-                return storage.getUserData(key, ref, realm);
-            } catch (RefNotFoundException e) {
-                throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
-            }
-        }, executor).thenApplyAsync(userData -> {
-            if (userData != null && userData.isPresent()) {
-                try {
-                    storage.deleteUser(key, ref, realm, user.getName());
-                    LOG.info("{} logged in and deleted key {}/{} in {}", user, realm, key, ref);
-                } catch (RefNotFoundException e) {
-                    return new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
-                }
-                return Response.ok().build();
-            }
-            throw new WebApplicationException(key, Status.NOT_FOUND);
-        }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        try {
+            storage.getUserData(key, ref, realm)
+                    .thenApplyAsync(userData -> {
+                        if (userData != null && userData.isPresent()) {
+                            try {
+                                storage.deleteUser(key, ref, realm, user.getName());
+                                LOG.info("{} logged in and deleted key {}/{} in {}", user, realm, key, ref);
+                            } catch (RefNotFoundException e) {
+                                return new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
+                            }
+                            return Response.ok().build();
+                        }
+                        throw new WebApplicationException(key, Status.NOT_FOUND);
+                    }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
+        }
 
     }
 
@@ -386,22 +384,28 @@ public class UsersResource {
         }
     }
 
-    private Response getUser(final String key, final String ref, final HttpHeaders headers, final String realm, final User user) {
+    private void getUser(final String key, final String ref, final HttpHeaders headers, final String realm, final User user, AsyncResponse asyncResponse) {
         try {
-            final Pair<String, io.jitstatic.auth.UserData> value = storage.getUserData(key, ref, realm);
-            if (value == null || !value.isPresent()) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
+            storage.getUserData(key, ref, realm).thenApplyAsync(value -> {
+                if (value == null || !value.isPresent()) {
+                    throw new WebApplicationException(Status.NOT_FOUND);
+                }
 
-            final EntityTag tag = new EntityTag(value.getKey());
-            final Response noChange = APIHelper.checkETag(headers, tag);
-            if (noChange != null) {
-                return noChange;
-            }
-            LOG.info("{} logged in and accessed {}/{} in {}", user, realm, key, ref);
-            return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
+                final EntityTag tag = new EntityTag(value.getKey());
+                final Response noChange = APIHelper.checkETag(headers, tag);
+                if (noChange != null) {
+                    return noChange;
+                }
+                LOG.info("{} logged in and accessed {}/{} in {}", user, realm, key, ref);
+                return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();
+            }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
         } catch (RefNotFoundException e) {
-            throw new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
+
+    private String createUserRole(final String key, final String realm) {
+        return realm + "/" + key;
+    }
+
 }

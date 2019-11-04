@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.storage.ref;
 
 /*-
  * #%L
@@ -35,6 +35,7 @@ import com.spencerwi.either.Either;
 
 import io.jitstatic.hosted.DistributedData;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.storage.NamingThreadFactory;
 
 public class LocalRefLockService implements RefLockService {
     private final Map<String, LockService> refLockMap = new HashMap<>();

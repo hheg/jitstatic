@@ -23,7 +23,11 @@ package io.jitstatic.api;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -100,8 +104,8 @@ public class MetaKeyResourceTest {
     @Test
     public void testUserKeyWithUser() throws RefNotFoundException {
         io.jitstatic.auth.UserData userData = Mockito.mock(io.jitstatic.auth.UserData.class);
-        Mockito.when(storage.getUser(Mockito.eq("not"),Mockito.any(),Mockito.eq(JitStaticConstants.JITSTATIC_KEYUSER_REALM))).thenReturn(userData);
-        Mockito.when(storage.getMetaKey(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER)))
+        Mockito.when(storage.getUser(eq("not"), any(), eq(JitStaticConstants.JITSTATIC_KEYUSER_REALM))).thenReturn(CompletableFuture.completedFuture(userData));
+        Mockito.when(storage.getMetaKey(eq("dog"), eq(REFS_HEADS_MASTER)))
                 .thenReturn(CompletableFuture
                         .completedFuture(Pair.of(new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set.of(new Role("write"))), "1")));
         Mockito.when(userData.getBasicPassword()).thenReturn("right");
@@ -154,18 +158,23 @@ public class MetaKeyResourceTest {
 
     @Test
     public void testModifyAKeyWithWrongUser() throws RefNotFoundException {
+        io.jitstatic.auth.UserData userData = mock(io.jitstatic.auth.UserData.class);
         MetaData storageData = new MetaData(null, false, false, List.of(), Set.of(), Set.of());
         ModifyMetaKeyData mukd = new ModifyMetaKeyData();
         mukd.setMessage("message");
         mukd.setUserInfo("userinfo");
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
-        Mockito.when(storage.getMetaKey("dog", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "metadataversion")));
+        when(userData.getBasicPassword()).thenReturn("right");
+        when(userData.getRoles()).thenReturn(Set.of());
+        when(storage.getMetaKey(eq("dog"), any())).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "version")));
+        when(storage.getUser(anyString(), any(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
+        when(storage.getUser(eq("not"), any(), eq("keyuser"))).thenReturn(CompletableFuture.completedFuture(userData));
         Response put = RESOURCES.target("/metakey/dog").request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_2)
                 .header(HttpHeaders.IF_MATCH, "\"version\"")
                 .put(Entity.json(mukd));
-        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_UNAUTHORIZED));
+        assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_FORBIDDEN));
         put.close();
     }
 
@@ -196,7 +205,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         Mockito.when(storage.getMetaKey("dog", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "2")));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog"), Mockito.eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), Mockito.eq("2"), Mockito.any()))
+        Mockito.when(storage.putMetaData(eq("dog"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
                 .thenReturn(CompletableFuture.completedFuture(Either.left("3")));
         Response put = RESOURCES.target("/metakey/dog")
                 .request()
@@ -249,7 +258,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         Mockito.when(storage.getMetaKey("dog/", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "2")));
-        Mockito.when(storage.putMetaData(Mockito.eq("dog/"), Mockito.eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), Mockito.eq("2"), Mockito.any()))
+        Mockito.when(storage.putMetaData(eq("dog/"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
                 .thenReturn(CompletableFuture.completedFuture(Either.left("3")));
         Response put = RESOURCES.target("/metakey/dog/")
                 .request()
@@ -259,16 +268,6 @@ public class MetaKeyResourceTest {
         assertThat(put.getStatus(), Matchers.is(HttpStatus.SC_OK));
         assertThat(put.getEntityTag().getValue(), Matchers.equalTo("3"));
         put.close();
-    }
-
-    @Test
-    public void testGetMetaKeyUnsupported() throws RefNotFoundException {
-        Mockito.when(storage.getMetaKey("dog", REFS_HEADS_MASTER)).thenThrow(new WrappingAPIException(new UnsupportedOperationException("Test")));
-        Response response = RESOURCES.target("/metakey/dog")
-                .request()
-                .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .get();
-        assertEquals(HttpStatus.SC_METHOD_NOT_ALLOWED, response.getStatus());
     }
 
     @Test

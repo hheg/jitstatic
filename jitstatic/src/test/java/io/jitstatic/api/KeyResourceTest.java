@@ -141,7 +141,7 @@ public class KeyResourceTest {
 
     @BeforeEach
     public void beforeEach() throws RefNotFoundException {
-        when(storage.getUser(eq(USER), any(), eq(JitStaticConstants.JITSTATIC_KEYUSER_REALM))).thenReturn(userData);
+        when(storage.getUser(eq(USER), any(), eq(JitStaticConstants.JITSTATIC_KEYUSER_REALM))).thenReturn(CompletableFuture.completedFuture(userData));
         when(userData.getRoles()).thenReturn(Set.of(new Role("read"), new Role("write")));
         when(userData.getBasicPassword()).thenReturn(SECRET);
     }
@@ -180,14 +180,18 @@ public class KeyResourceTest {
     @Test
     public void testKeyIsFoundButWrongUser() throws RefNotFoundException {
         Optional<StoreInfo> expected = DATA.get("dog");
+        io.jitstatic.auth.UserData userData = mock(io.jitstatic.auth.UserData.class);
+        when(userData.getBasicPassword()).thenReturn(SECRET);
+        when(userData.getRoles()).thenReturn(Set.of());
+        when(storage.getUser(eq("anotheruser"), Mockito.any(), Mockito.eq("keyuser"))).thenReturn(CompletableFuture.completedFuture(userData));
         when(storage.getKey("dog", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(expected));
         final String bac = createCreds("anotheruser", SECRET);
-        assertEquals("HTTP 401 Unauthorized", assertThrows(WebApplicationException.class, () -> {
+        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(WebApplicationException.class, () -> {
             RESOURCES.target("/storage/dog")
                     .request()
                     .header(HttpHeaders.AUTHORIZATION, bac)
                     .get(JsonNode.class);
-        }).getLocalizedMessage());
+        }).getResponse().getStatus());
     }
 
     @Test
@@ -195,7 +199,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> expected = DATA.get("horse");
         final String bac = createCreds("anotheruser", SECRET);
         io.jitstatic.auth.UserData anotherUser = Mockito.mock(io.jitstatic.auth.UserData.class);
-        when(storage.getUser("anotheruser", "refs/heads/branch", "keyuser")).thenReturn(anotherUser);
+        when(storage.getUser("anotheruser", "refs/heads/branch", "keyuser")).thenReturn(CompletableFuture.completedFuture(anotherUser));
         when(anotherUser.getRoles()).thenReturn(Set.of(new Role("read2"), new Role("write2")));
         when(anotherUser.getBasicPassword()).thenReturn(SECRET);
         when(storage.getKey(Mockito.matches("horse"), Mockito.matches("refs/heads/branch"))).thenReturn(CompletableFuture.completedFuture(expected));
@@ -295,7 +299,8 @@ public class KeyResourceTest {
                 .buildPut(Entity.entity(data, MediaType.APPLICATION_JSON))
                 .invoke();
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.JITSTATIC_GIT_REALM
+        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|"
+                + JitStaticConstants.JITSTATIC_GIT_REALM
                 + "\"", response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }
@@ -629,7 +634,8 @@ public class KeyResourceTest {
                 .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
                         .of(new Role("write"))), "testmessage", "user", "test@test.com")));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|" + JitStaticConstants.JITSTATIC_GIT_REALM
+        assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|"
+                + JitStaticConstants.JITSTATIC_GIT_REALM
                 + "\"", response.getHeaderString(HttpHeaders.WWW_AUTHENTICATE));
         response.close();
     }

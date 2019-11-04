@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -129,23 +128,26 @@ public class KeyResource {
             final @Auth User user, final @Context HttpHeaders headers, final @Context HttpServletResponse response, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> helper.checkIfKeyExist(key, ref, storage), executor)
-                .thenCompose(s -> s)
-                .thenApplyAsync(storeInfo -> {
-                    final MetaData data = storeInfo.getMetaData();
-                    final Set<Role> readRoles = data.getRead();
-                    if (!(readRoles.isEmpty() || APIHelper.isUserInRole(context, readRoles))) {
-                        LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
-                        throw new WebApplicationException(Status.FORBIDDEN);
-                    }
-                    final EntityTag tag = new EntityTag(storeInfo.getVersion());
-                    final Response noChange = APIHelper.checkETag(headers, tag);
-                    if (noChange != null) {
-                        return noChange;
-                    }
-                    LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, key, ref);
-                    return buildResponse(storeInfo, tag, data, response);
-                }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        try {
+            helper.checkIfKeyExist(key, ref, storage)
+                    .thenApplyAsync(storeInfo -> {
+                        final MetaData data = storeInfo.getMetaData();
+                        final Set<Role> readRoles = data.getRead();
+                        if (!(readRoles.isEmpty() || APIHelper.isUserInRole(context, readRoles))) {
+                            LOG.info(RESOURCE_IS_DENIED_FOR_USER, key, ref, user);
+                            throw new WebApplicationException(Status.FORBIDDEN);
+                        }
+                        final EntityTag tag = new EntityTag(storeInfo.getVersion());
+                        final Response noChange = APIHelper.checkETag(headers, tag);
+                        if (noChange != null) {
+                            return noChange;
+                        }
+                        LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, key, ref);
+                        return buildResponse(storeInfo, tag, data, response);
+                    }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     @GET
@@ -165,33 +167,29 @@ public class KeyResource {
             @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth User user, @Context SecurityContext context) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        getListForRef(key, recursive, ref)
-                .thenApplyAsync(list -> list.stream()
-                        .filter(data -> {
-                            final MetaData storageData = data.getRight().getMetaData();
-                            final Set<Role> readRoles = storageData.getRead();
-                            if (readRoles.isEmpty() || APIHelper.isUserInRole(context, readRoles)) {
-                                LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), ref);
-                                return true;
-                            }
-                            return false;
-                        }).collect(Collectors.toList()), executor)
-                .thenApplyAsync(list -> {
-                    if (list.isEmpty()) {
-                        return Response.status(Status.NOT_FOUND).build();
-                    }
-                    return Response.ok(new KeyDataWrapper(list.stream()
-                            .map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p))
-                            .collect(Collectors.toList())))
-                            .build();
-                }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
-    }
-
-    private CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(final String key, boolean recursive, final String ref) {
         try {
-            return storage.getListForRef(List.of(Pair.of(key, recursive)), ref);
+            storage.getListForRef(List.of(Pair.of(key, recursive)), ref)
+                    .thenApplyAsync(list -> list.stream()
+                            .filter(data -> {
+                                final MetaData storageData = data.getRight().getMetaData();
+                                final Set<Role> readRoles = storageData.getRead();
+                                if (readRoles.isEmpty() || APIHelper.isUserInRole(context, readRoles)) {
+                                    LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, data.getLeft(), ref);
+                                    return true;
+                                }
+                                return false;
+                            }).collect(Collectors.toList()), executor)
+                    .thenApplyAsync(list -> {
+                        if (list.isEmpty()) {
+                            return Response.status(Status.NOT_FOUND).build();
+                        }
+                        return Response.ok(new KeyDataWrapper(list.stream()
+                                .map(p -> light ? new KeyData(p.getLeft(), p.getRight()) : new KeyData(p))
+                                .collect(Collectors.toList())))
+                                .build();
+                    }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
         } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
 
@@ -208,38 +206,39 @@ public class KeyResource {
         // be done through directly changing the file in the Git repository.
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> {
-            APIHelper.checkHeaders(headers);
-            return helper.checkIfKeyExist(key, ref, storage);
-        }, executor)
-                .thenComposeAsync(s -> s)
-                .thenApplyAsync(storeInfo -> {
-                    helper.checkWritePermission(key, user, context, ref, storeInfo.getMetaData());
-                    final String currentVersion = storeInfo.getVersion();
-                    final EntityTag entityTag = new EntityTag(currentVersion);
-                    final ResponseBuilder response = request.evaluatePreconditions(entityTag);
-                    if (response != null) {
-                        throw new WebApplicationException(response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
-                    }
-                    return currentVersion;
-                }, executor)
-                .thenApplyAsync(currentVersion -> putKey(key, httpRequest, data, user, ref, currentVersion), executor)
-                .thenComposeAsync(Function.identity())
-                .thenApplyAsync(result -> {
-                    if (result == null) {
-                        throw new WebApplicationException(Status.NOT_FOUND);
-                    }
-                    if (result.isRight()) {
-                        throw new WebApplicationException(Status.PRECONDITION_FAILED);
-                    }
-                    final String newVersion = result.getLeft();
+        APIHelper.checkHeaders(headers);
+        try {
+            helper.checkIfKeyExist(key, ref, storage)
+                    .thenApplyAsync(storeInfo -> {
+                        helper.checkWritePermission(key, user, context, ref, storeInfo.getMetaData());
+                        final String currentVersion = storeInfo.getVersion();
+                        final EntityTag entityTag = new EntityTag(currentVersion);
+                        final ResponseBuilder response = request.evaluatePreconditions(entityTag);
+                        if (response != null) {
+                            throw new WebApplicationException(response.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(entityTag).build());
+                        }
+                        return currentVersion;
+                    }, executor)
+                    .thenApplyAsync(currentVersion -> putKey(key, httpRequest, data, user, ref, currentVersion), executor)
+                    .thenComposeAsync(Function.identity())
+                    .thenApplyAsync(result -> {
+                        if (result == null) {
+                            throw new WebApplicationException(Status.NOT_FOUND);
+                        }
+                        if (result.isRight()) {
+                            throw new WebApplicationException(Status.PRECONDITION_FAILED);
+                        }
+                        final String newVersion = result.getLeft();
 
-                    if (newVersion == null) {
-                        throw new WebApplicationException(Status.NOT_FOUND);
-                    }
-                    LOG.info("{} logged in and modified key {} in {}", user, key, ref);
-                    return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-                }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+                        if (newVersion == null) {
+                            throw new WebApplicationException(Status.NOT_FOUND);
+                        }
+                        LOG.info("{} logged in and modified key {} in {}", user, key, ref);
+                        return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+                    }, executor).exceptionally(helper::exceptionHandlerPUTAPI).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     private CompletableFuture<Either<String, FailedToLock>> putKey(final String key, final HttpServletRequest httpRequest, final ModifyKeyData data,
@@ -249,7 +248,7 @@ public class KeyResource {
                     .putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                             .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
 
@@ -265,21 +264,24 @@ public class KeyResource {
             @Context SecurityContext context) throws JsonParseException, JsonMappingException, IOException {
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> helper.getKeyMuted(key, ref, storage).exceptionally(helper.keyExceptionHandler(Optional::empty)), executor)
-                .thenComposeAsync(s -> s, executor)
-                .thenApplyAsync(storeInfo -> {
-                    if (storeInfo.isPresent()) {
-                        throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
-                    }
-                    return addKey(key, data, httpRequest, user, ref);
-                }, executor)
-                .thenComposeAsync(s -> s, executor)
-                .thenApplyAsync(version -> {
-                    LOG.info("{} logged in and added key {} in {}", user, key, ref);
-                    return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
-                }, executor)
-                .exceptionally(helper::exceptionHandlerPOSTAPI)
-                .thenAcceptAsync(asyncResponse::resume, executor);
+        try {
+            storage.getKey(key, ref)
+                    .thenApplyAsync(storeInfo -> {
+                        if (storeInfo.isPresent()) {
+                            throw new WebApplicationException(key + " already exist in " + ref, Status.CONFLICT);
+                        }
+                        return addKey(key, data, httpRequest, user, ref);
+                    }, executor)
+                    .thenComposeAsync(s -> s, executor)
+                    .thenApplyAsync(version -> {
+                        LOG.info("{} logged in and added key {} in {}", user, key, ref);
+                        return Response.ok().tag(new EntityTag(version)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
+                    }, executor)
+                    .exceptionally(helper::exceptionHandlerPOSTAPI)
+                    .thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     private CompletableFuture<String> addKey(final String key, final AddKeyData data, final HttpServletRequest httpRequest, final User user, final String ref) {
@@ -288,7 +290,7 @@ public class KeyResource {
                     .getMetaData(), new CommitMetaData(data.getUserInfo(), data.getUserMail(), data.getMessage(), user.getName(), APIHelper
                             .compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
-            return CompletableFuture.failedFuture(new WrappingAPIException(e));
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
     }
 
@@ -301,21 +303,24 @@ public class KeyResource {
             final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, @Context SecurityContext context) {
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
-        CompletableFuture.supplyAsync(() -> helper.checkIfKeyExist(key, ref, storage), executor)
-                .thenCompose(s -> s)
-                .thenApplyAsync(storeInfo -> {
-                    final String userHeader = notEmpty(headers, X_JITSTATIC_NAME);
-                    final String message = notEmpty(headers, X_JITSTATIC_MESSAGE);
-                    final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
-                    
-                    helper.checkWritePermission(key, user, context, ref, storeInfo.getMetaData());
-                    return delete(key, httpRequest, user, ref, userHeader, message, userMail);
-                }, executor)
-                .thenCompose(c -> c)
-                .thenApplyAsync(ignore -> {
-                    LOG.info("{} logged in and deleted key {} in {}", user, key, ref);
-                    return Response.ok().build();
-                }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        try {
+            helper.checkIfKeyExist(key, ref, storage)
+                    .thenApplyAsync(storeInfo -> {
+                        final String userHeader = notEmpty(headers, X_JITSTATIC_NAME);
+                        final String message = notEmpty(headers, X_JITSTATIC_MESSAGE);
+                        final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
+
+                        helper.checkWritePermission(key, user, context, ref, storeInfo.getMetaData());
+                        return delete(key, httpRequest, user, ref, userHeader, message, userMail);
+                    }, executor)
+                    .thenCompose(c -> c)
+                    .thenApplyAsync(ignore -> {
+                        LOG.info("{} logged in and deleted key {} in {}", user, key, ref);
+                        return Response.ok().build();
+                    }, executor).exceptionally(helper::execptionHandler).thenAcceptAsync(asyncResponse::resume, executor);
+        } catch (RefNotFoundException e) {
+            throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
+        }
     }
 
     private CompletableFuture<Either<String, FailedToLock>> delete(final String key, final HttpServletRequest httpRequest, final User user, final String ref,
