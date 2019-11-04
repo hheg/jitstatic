@@ -51,11 +51,11 @@ public final class User implements Principal {
         this(user, password, null, false);
     }
 
-    public User(String userName, String password, String domainName, boolean b) {
+    public User(String userName, String password, String domainName, boolean isAdmin) {
         this.user = userName;
         this.password = password;
         this.domain = domainName;
-        this.isAdmin = b;
+        this.isAdmin = isAdmin;
     }
 
     @Override

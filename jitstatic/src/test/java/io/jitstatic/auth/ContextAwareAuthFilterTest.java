@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -94,7 +93,7 @@ class ContextAwareAuthFilterTest {
         }
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
-        ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);
+        ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         Verdict authenticate = caaf.authenticate(crc, creds, "scheme");
         assertEquals(allowed, authenticate.isAllowed);
         assertEquals(of, authenticate.realm);
@@ -222,7 +221,7 @@ class ContextAwareAuthFilterTest {
         when(info.getMatchedURIs(anyBoolean())).thenReturn(List.of("unknown/unknown", "unknown"));
         when(crc.getMethod()).thenReturn("UNKNOWN");
 
-        ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);
+        ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         assertEquals(403, assertThrows(WebApplicationException.class, () -> caaf.authenticate(crc, new Object(), "scheme")).getResponse().getStatus());
     }
 
@@ -248,7 +247,7 @@ class ContextAwareAuthFilterTest {
                 .thenReturn(CompletableFuture.failedFuture(new WrappingAPIException(new RefNotFoundException("refs/notref/other"))));
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
-        ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);
+        ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         assertEquals(Status.BAD_REQUEST.getStatusCode(), assertThrows(WebApplicationException.class, () -> caaf.authenticate(crc, new Object(), "scheme"))
                 .getResponse()
                 .getStatus());
@@ -277,14 +276,14 @@ class ContextAwareAuthFilterTest {
         when(storage.getUser(eq(user), eq("refs/heads/other"), eq(Domain.KEYADMIN.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
         when(hashService.hasSamePassword(data, pass)).thenReturn(true);
 
-        ContextAwareAuthFilter<Object, Principal> caaf = getUnit(storage, hashService, user, pass);
+        ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         Verdict authenticate = caaf.authenticate(crc, new Object(), "scheme");
         assertEquals(true, authenticate.isAllowed);
         assertEquals(Realm.NONE_USER_ADMIN_GIT, authenticate.realm);
     }
 
-    private ContextAwareAuthFilter<Object, Principal> getUnit(Storage storage, HashService hashService, String user, String pass) {
-        return new ContextAwareAuthFilter<>(storage, hashService, "none", (u, p) -> u.equals("root") && p.equals("pass")) {
+    private ContextAwareAuthFilter<Object> getUnit(Storage storage, HashService hashService, String user, String pass) {
+        return new ContextAwareAuthFilter<>(storage, "none") {
 
             @Override
             public void filter(ContainerRequestContext requestContext) throws IOException {
@@ -296,10 +295,13 @@ class ContextAwareAuthFilterTest {
                 return user;
             }
 
-            @Override
-            protected String getPassword(Object credentials) {
-                return pass;
-            }
+            protected boolean validate(UserData userData, Object credentials) {
+                return userData != null && hashService.hasSamePassword(userData, pass);
+            };
+
+            protected boolean isRoot(Object credentials) {
+                return false;
+            };
 
         };
     }

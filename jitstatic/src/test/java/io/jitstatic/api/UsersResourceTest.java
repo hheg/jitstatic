@@ -99,14 +99,15 @@ public class UsersResourceTest {
     private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(storage, hashService, authen)))
+            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(storage, hashService, authen)))
             .addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new UsersResource(storage, REFS_HEADS_MASTER, hashService))
             .build();
 
     @BeforeEach
-    public void before() {
+    public void before() throws RefNotFoundException {
         when(authen.test(PUSER, PSECRET)).thenReturn(true);
+        when(storage.getUser(anyString(), any(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @AfterEach

@@ -107,7 +107,7 @@ public class KeyResourceTest {
     private io.jitstatic.auth.UserData userData = mock(io.jitstatic.auth.UserData.class);
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(storage, hashService, (u, p) -> u.equals(PUSER) && p.equals(PSECRET))))
+            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(storage, hashService, (u, p) -> u.equals(PUSER) && p.equals(PSECRET))))
             .addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new KeyResource(storage, false, REFS_HEADS_MASTER))
             .build();
@@ -137,10 +137,12 @@ public class KeyResourceTest {
     @AfterEach
     public void tearDown() {
         Mockito.reset(storage);
+        Mockito.reset(userData);
     }
 
     @BeforeEach
     public void beforeEach() throws RefNotFoundException {
+        when(storage.getUser(anyString(), any(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
         when(storage.getUser(eq(USER), any(), eq(JitStaticConstants.JITSTATIC_KEYUSER_REALM))).thenReturn(CompletableFuture.completedFuture(userData));
         when(userData.getRoles()).thenReturn(Set.of(new Role("read"), new Role("write")));
         when(userData.getBasicPassword()).thenReturn(SECRET);

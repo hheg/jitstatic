@@ -49,6 +49,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.glassfish.jersey.test.grizzly.GrizzlyWebTestContainerFactory;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
@@ -85,7 +86,7 @@ public class MetaKeyResourceTest {
     private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(storage, hashService, (u, p) -> u.equals(PUSER) && p.equals(PSECRET))))
+            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(storage, hashService, (u, p) -> u.equals(PUSER) && p.equals(PSECRET))))
             .addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new MetaKeyResource(storage, REFS_HEADS_MASTER))
             .build();
@@ -93,6 +94,11 @@ public class MetaKeyResourceTest {
     @AfterEach
     public void tearDown() {
         Mockito.reset(storage);
+    }
+
+    @BeforeEach
+    public void setup() throws RefNotFoundException {
+        when(storage.getUser(anyString(), any(), anyString())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @Test

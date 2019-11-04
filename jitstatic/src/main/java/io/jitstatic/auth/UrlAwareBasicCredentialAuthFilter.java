@@ -22,7 +22,6 @@ package io.jitstatic.auth;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
 import java.util.Base64;
 import java.util.function.BiPredicate;
 
@@ -39,12 +38,16 @@ import io.dropwizard.auth.basic.BasicCredentials;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 
-public class UrlAwareBasicCredentialAuthFilter<P extends Principal> extends ContextAwareAuthFilter<BasicCredentials, P> {
+public class UrlAwareBasicCredentialAuthFilter extends ContextAwareAuthFilter<BasicCredentials> {
 
     private static final Logger LOG = LoggerFactory.getLogger(UrlAwareBasicCredentialAuthFilter.class);
+    private final HashService hashService;
+    private final BiPredicate<String, String> rootAuthenticator;
 
     public UrlAwareBasicCredentialAuthFilter(final Storage storage, final HashService hashService, final BiPredicate<String, String> rootAuthenticator) {
-        super(storage, hashService, "Basic", rootAuthenticator);
+        super(storage, "Basic");
+        this.hashService = hashService;
+        this.rootAuthenticator = rootAuthenticator;
     }
 
     @Override
@@ -60,10 +63,15 @@ public class UrlAwareBasicCredentialAuthFilter<P extends Principal> extends Cont
     protected String getUserName(BasicCredentials credentials) {
         return credentials.getUsername();
     }
+    
+    @Override
+    protected boolean validate(UserData userData, BasicCredentials credentials) {
+        return userData != null && hashService.hasSamePassword(userData, credentials.getPassword());
+    }
 
     @Override
-    protected String getPassword(BasicCredentials credentials) {
-        return credentials.getPassword();
+    protected boolean isRoot(BasicCredentials credentials) {
+        return rootAuthenticator.test(credentials.getUsername(), credentials.getPassword());
     }
 
     @Nullable

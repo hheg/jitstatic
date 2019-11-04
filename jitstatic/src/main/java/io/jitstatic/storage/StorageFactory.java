@@ -50,7 +50,7 @@ public class StorageFactory {
         source.addListener(new StorageAddRefEventListener(keyStorage), AddRefEventListener.class);
         source.addRefHolderFactory(keyStorage::getRefHolderLock);
 
-        env.jersey().register(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(keyStorage, hashService, rootAuthenticator)));
+        env.jersey().register(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(keyStorage, hashService, rootAuthenticator)));
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
 
         return keyStorage;

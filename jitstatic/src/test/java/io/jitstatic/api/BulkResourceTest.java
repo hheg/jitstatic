@@ -70,7 +70,7 @@ public class BulkResourceTest {
     private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter<>(storage, hashService, (u, p) -> u.equals(USER) && p.equals(SECRET))))
+            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(storage, hashService, (u, p) -> u.equals(USER) && p.equals(SECRET))))
             .addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
             .addResource(new BulkResource(storage, REF_HEADS_MASTER))
             .build();
