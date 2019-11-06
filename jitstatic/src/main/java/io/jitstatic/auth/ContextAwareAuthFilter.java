@@ -32,7 +32,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -106,8 +105,11 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
         final CompletableFuture<Verdict> resultEmitter = resultReceiver.thenApply(result -> {
             realm.invokeInRealm(requestContext, scheme, result.userData, userName, result.domain);
             return result.verdict;
-        }).completeOnTimeout(realm.denied, 1, TimeUnit.SECONDS);
-        realm.getDomains().stream().forEach(d -> invokeInDomain(d, ref, realm, userName, credentials, resultReceiver));
+        });
+        CompletableFuture.allOf(realm.getDomains().stream()
+                .map(d -> invokeInDomain(d, ref, realm, userName, credentials, resultReceiver))
+                .toArray(CompletableFuture[]::new))
+        .thenAccept(ignore -> resultEmitter.complete(realm.denied));
         try {
             return resultEmitter.join();
         } catch (CompletionException e) {
@@ -136,10 +138,10 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
         }
     }
 
-    private void invokeInDomain(final Domain domain, final String ref, final Realm realm, final String userName, final C credentials,
+    private CompletableFuture<Data> invokeInDomain(final Domain domain, final String ref, final Realm realm, final String userName, final C credentials,
             final CompletableFuture<Data> cf) {
         try {
-            domain.findUser(storage, ref, userName).thenApplyAsync(userData -> {
+            return domain.findUser(storage, ref, userName).thenApplyAsync(userData -> {
                 if (validate(userData, credentials)) {
                     return new Data(userData, domain, realm.accept);
                 }
@@ -154,6 +156,7 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
             });
         } catch (RefNotFoundException e) {
             cf.completeExceptionally(e);
+            return CompletableFuture.completedFuture(new Data(null, domain, realm.denied));
         }
     }
 
