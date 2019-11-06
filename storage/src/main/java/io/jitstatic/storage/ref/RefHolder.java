@@ -292,7 +292,6 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
                     .of(new StoreInfo(si.getStreamProvider(), metaData, si.getVersion(), newMetaDataVersion)));
         }
         return newMetaDataVersion;
-
     }
 
     private boolean storageIsForbidden(final Optional<StoreInfo> storeInfo) {
@@ -301,6 +300,10 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     @Nullable
     public CompletableFuture<Pair<String, UserData>> getUser(final String userKeyPath) {
+        final Either<Optional<StoreInfo>, Pair<String, UserData>> peek = refCache.get().peek(createFullUserKeyPath(userKeyPath));
+        if (peek != null && peek.isRight()) {
+            return CompletableFuture.completedFuture(peek.getRight());
+        }
         return CompletableFuture.supplyAsync(() -> internalGetUser(userKeyPath), refLockService.getRepoWriter());
     }
 

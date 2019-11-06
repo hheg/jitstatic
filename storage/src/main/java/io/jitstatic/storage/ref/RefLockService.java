@@ -27,7 +27,10 @@ public interface RefLockService extends AutoCloseable {
     public LockService getLockService(String ref);
 
     public void returnLock(LockService keys);
-
+    /*
+     * This is deprecated becuase it should be moved into LockService and only accessed from there
+     */
+    @Deprecated
     public ExecutorService getRepoWriter();
 
 }

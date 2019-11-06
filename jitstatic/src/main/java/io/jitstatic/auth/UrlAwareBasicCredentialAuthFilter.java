@@ -58,12 +58,12 @@ public class UrlAwareBasicCredentialAuthFilter extends ContextAwareAuthFilter<Ba
             throw new WebApplicationException(unauthorizedHandler.buildResponse(prefix, verdict.realm.getRealmName()));
         }
     }
-    
+
     @Override
     protected String getUserName(BasicCredentials credentials) {
         return credentials.getUsername();
     }
-    
+
     @Override
     protected boolean validate(UserData userData, BasicCredentials credentials) {
         return userData != null && hashService.hasSamePassword(userData, credentials.getPassword());

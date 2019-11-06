@@ -56,6 +56,7 @@ import io.jitstatic.JitStaticConstants;
 import io.jitstatic.Role;
 import io.jitstatic.auth.ContextAwareAuthFilter.Realm.Domain;
 import io.jitstatic.storage.Storage;
+import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
 
 @Priority(Priorities.AUTHENTICATION)
@@ -101,13 +102,14 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
 
     private Verdict setupInRealm(final ContainerRequestContext requestContext, final String scheme, final String ref, final Realm realm, final String userName,
             C credentials) throws RefNotFoundException {
-        CompletableFuture<Data> resultReceiver = new CompletableFuture<>();
+        final CompletableFuture<Data> resultReceiver = new CompletableFuture<>();
+        final CompletableFuture<Verdict> resultEmitter = resultReceiver.thenApply(result -> {
+            realm.invokeInRealm(requestContext, scheme, result.userData, userName, result.domain);
+            return result.verdict;
+        }).completeOnTimeout(realm.denied, 1, TimeUnit.SECONDS);
         realm.getDomains().stream().forEach(d -> invokeInDomain(d, ref, realm, userName, credentials, resultReceiver));
         try {
-            return resultReceiver.thenApply(result -> {
-                realm.invokeInRealm(requestContext, scheme, result.userData, userName, result.domain);
-                return result.verdict;
-            }).completeOnTimeout(realm.denied, 1, TimeUnit.SECONDS).join();
+            return resultEmitter.join();
         } catch (CompletionException e) {
             final Throwable cause = e.getCause();
             if (cause instanceof WrappingAPIException) {
@@ -123,9 +125,9 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
     }
 
     private static class Data {
-        UserData userData;
-        Realm.Domain domain;
-        Verdict verdict;
+        final UserData userData;
+        final Realm.Domain domain;
+        final Verdict verdict;
 
         Data(final UserData userData, final Realm.Domain domain, final Verdict verdict) {
             this.userData = userData;
@@ -298,8 +300,8 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
 
         private final String realmName;
         private final List<Domain> domains;
-        private Verdict denied;
-        private Verdict accept;
+        private final Verdict denied;
+        private final Verdict accept;
 
         private Realm(final List<Domain> domains) {
             this.realmName = domains.stream().map(Domain::getDomainName).collect(Collectors.joining("|"));
@@ -368,7 +370,7 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
                                 if (t instanceof RefNotFoundException) {
                                     return null;
                                 }
-                                throw new RuntimeException(t);
+                                throw new ShouldNeverHappenException(String.format("Failed to load user %s in ref %s", userName, ref), t);
                             }
                             return ud;
                         });
