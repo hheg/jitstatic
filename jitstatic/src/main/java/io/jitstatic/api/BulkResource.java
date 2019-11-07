@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.inject.Inject;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -65,9 +64,6 @@ public class BulkResource {
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
 
-    @Inject
-    private ExecutorService executor;
-
     public BulkResource(final Storage storage, String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
@@ -81,7 +77,7 @@ public class BulkResource {
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     public void fetch(@Suspended AsyncResponse asyncResponse, final @Validated @NotEmpty @Valid List<BulkSearch> searches, final @Auth User user,
-            @Context SecurityContext context) {
+            @Context SecurityContext context, @Context ExecutorService executor) {
         CompletableFuture.supplyAsync(() -> searches.stream()
                 .filter(bs -> JitStaticConstants.isRef(bs.getRef()))
                 .map(bs -> Pair.of(bs.getPaths().stream()

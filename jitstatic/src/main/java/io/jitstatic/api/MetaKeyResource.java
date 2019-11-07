@@ -24,7 +24,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
-import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -73,8 +72,6 @@ public class MetaKeyResource {
     private static final Logger LOG = LoggerFactory.getLogger(MetaKeyResource.class);
     private final Storage storage;
     private final APIHelper helper;
-    @Inject
-    private ExecutorService executor;
 
     public MetaKeyResource(final Storage storage, final String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);
@@ -89,7 +86,8 @@ public class MetaKeyResource {
     @Path("/{key : .+}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth User user, final @Context Request request, final @Context HttpHeaders headers, @Context SecurityContext context) {
+            final @Auth User user, final @Context Request request, final @Context HttpHeaders headers, @Context SecurityContext context,
+            @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
@@ -124,7 +122,8 @@ public class MetaKeyResource {
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public void modifyMetaKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Validated @Valid @NotNull ModifyMetaKeyData data, final @Context Request request,
-            final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, final @Context SecurityContext context) {
+            final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, final @Context SecurityContext context,
+            @Context ExecutorService executor) {
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         APIHelper.checkHeaders(headers);
         APIHelper.checkRef(ref);

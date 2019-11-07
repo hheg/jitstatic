@@ -40,7 +40,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
@@ -109,8 +108,6 @@ public class KeyResource {
     private final Storage storage;
     private final APIHelper helper;
     private final boolean cors;
-    @Inject
-    private ExecutorService executor;
 
     public KeyResource(final Storage storage, final boolean cors, final String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);
@@ -125,7 +122,8 @@ public class KeyResource {
     @ExceptionMetered(name = "get_storage_exception")
     @Path("{key : .+}")
     public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth User user, final @Context HttpHeaders headers, final @Context HttpServletResponse response, @Context SecurityContext context) {
+            final @Auth User user, final @Context HttpHeaders headers, final @Context HttpServletResponse response, @Context SecurityContext context,
+            @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
@@ -153,8 +151,8 @@ public class KeyResource {
     @GET
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public void getRootList(@Suspended AsyncResponse asyncResponse, final @QueryParam("ref") String ref, @QueryParam("recursive") boolean recursive,
-            @QueryParam("light") final boolean light, final @Auth User user, @Context SecurityContext context) {
-        getList(asyncResponse, "/", ref, recursive, light, user, context);
+            @QueryParam("light") final boolean light, final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor) {
+        getList(asyncResponse, "/", ref, recursive, light, user, context, executor);
     }
 
     @GET
@@ -164,7 +162,8 @@ public class KeyResource {
     @Path("{key : .+/}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public void getList(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth User user, @Context SecurityContext context) {
+            @QueryParam("recursive") boolean recursive, @QueryParam("light") final boolean light, final @Auth User user, @Context SecurityContext context,
+            @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
@@ -201,7 +200,8 @@ public class KeyResource {
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     public void modifyKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context Request request,
-            final @Validated @Valid @NotNull ModifyKeyData data, final @Context HttpHeaders headers, @Context SecurityContext context) {
+            final @Validated @Valid @NotNull ModifyKeyData data, final @Context HttpHeaders headers, @Context SecurityContext context,
+            @Context ExecutorService executor) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
         APIHelper.checkValidRef(askedRef);
@@ -261,7 +261,7 @@ public class KeyResource {
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
     public void addKey(@Suspended AsyncResponse asyncResponse, @NotNull final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Validated @Valid @NotNull AddKeyData data, final @Context HttpServletRequest httpRequest, final @Auth User user,
-            @Context SecurityContext context) throws JsonParseException, JsonMappingException, IOException {
+            @Context SecurityContext context, @Context ExecutorService executor) throws JsonParseException, JsonMappingException, IOException {
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
@@ -300,7 +300,8 @@ public class KeyResource {
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
     public void delete(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, @Context SecurityContext context) {
+            final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, @Context SecurityContext context,
+            @Context ExecutorService executor) {
         APIHelper.checkValidRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
