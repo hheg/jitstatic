@@ -6,7 +6,6 @@ server:
     type: http
     port: 8085
   requestLog:
-    type: classic
     appenders:
        - type: console
        - type: file
