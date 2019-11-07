@@ -26,7 +26,6 @@ import static io.jitstatic.version.ProjectVersion.INSTANCE;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiPredicate;
 import java.util.logging.Level;
 
 import org.eclipse.jgit.util.SystemReader;
@@ -83,9 +82,8 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
-            BiPredicate<String,String> rootAuthenticator = config.getRootAuthenticator();
             storage = config.getStorageFactory().build(source, env, defaultBranch, hashService, hostedFactory
-                    .getUserName(), refLockService, defaultExecutor, workStealingExecutor, rootAuthenticator);
+                    .getUserName(), refLockService, defaultExecutor, workStealingExecutor, config.getRootAuthenticator());
             loginService.setUserStorage(storage);
 
             env.lifecycle().manage(new ManagedObject<>(source));
@@ -114,11 +112,11 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
     }
 
     private ExecutorService setUpExecutor(final MetricRegistry metricRegistry) {
-        return new InstrumentedExecutorService(Executors.newCachedThreadPool(new NamingThreadFactory("default")), metricRegistry);
+        return new InstrumentedExecutorService(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, new NamingThreadFactory("default")), metricRegistry);
     }
 
     private ExecutorService setUpWorkStealingExecutor(final MetricRegistry metricRegistry) {
-        return new InstrumentedExecutorService(Executors.newWorkStealingPool(Runtime.getRuntime().availableProcessors() * 4), metricRegistry);
+        return new InstrumentedExecutorService(Executors.newWorkStealingPool(Runtime.getRuntime().availableProcessors()), metricRegistry);
     }
 
     private void closeSilently(final AutoCloseable closeable) {
