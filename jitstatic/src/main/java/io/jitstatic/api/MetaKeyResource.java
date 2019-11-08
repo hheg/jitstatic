@@ -97,9 +97,9 @@ public class MetaKeyResource {
                         final MetaData metaData = metaDataInfo.getLeft();
                         helper.checkWritePermission(key, user, context, ref, metaData);
                         final EntityTag tag = new EntityTag(metaDataInfo.getRight());
-                        final Response noChange = APIHelper.checkETag(headers, tag);
+                        final ResponseBuilder noChange = request.evaluatePreconditions(tag);
                         if (noChange != null) {
-                            return noChange;
+                            return noChange.build();
                         }
                         LOG.info("{} logged in and accessed key {} in {}", user, key, ref);
                         return Response.ok(metaData)

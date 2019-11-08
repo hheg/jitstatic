@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -227,6 +228,10 @@ public abstract class BaseTest {
 
     protected Set<io.jitstatic.client.MetaData.Role> roleOf(String... roles) {
         return Arrays.stream(roles).map(io.jitstatic.client.MetaData.Role::new).collect(Collectors.toSet());
+    }
+
+    protected String baseEncode(String user, String password) {
+        return Base64.getEncoder().encodeToString((user + ":" + password).getBytes(UTF_8));
     }
 
     public static Exception shutdownExecutor(final ExecutorService service) {

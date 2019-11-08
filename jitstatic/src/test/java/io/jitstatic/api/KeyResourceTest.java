@@ -264,7 +264,7 @@ public class KeyResourceTest {
                 .queryParam("ref", "refs/tags/branch")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + optional.get().getVersion() + "\"")
+                .header(HttpHeaders.IF_NONE_MATCH, "\"" + optional.get().getVersion() + "\"")
                 .get();
         assertEquals(HttpStatus.NOT_MODIFIED_304, response.getStatus());
         response.close();
@@ -553,7 +553,7 @@ public class KeyResourceTest {
                 .request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .header(HttpHeaders.IF_MATCH, "\"" + DATA.get("dog").get().getVersion() + "\"")
+                .header(HttpHeaders.IF_NONE_MATCH, "\"" + DATA.get("dog").get().getVersion() + "\"")
                 .get();
         assertEquals(Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
     }

@@ -109,10 +109,10 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user,
-            final @Context HttpHeaders headers, @Context SecurityContext context, @Context ExecutorService executor) {
+            @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         APIHelper.checkRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
-        getUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), headers, JITSTATIC_KEYADMIN_REALM, user, asyncResponse, executor);
+        getUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), JITSTATIC_KEYADMIN_REALM, user, asyncResponse, executor, request);
     }
 
     @PUT
@@ -167,11 +167,11 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void getUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
-            final @Auth User user, final @Context HttpHeaders headers, @Context SecurityContext context, @Context ExecutorService executor) {
+            final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
-        getUser(key, ref, headers, JITSTATIC_KEYUSER_REALM, user, asyncResponse, executor);
+        getUser(key, ref, JITSTATIC_KEYUSER_REALM, user, asyncResponse, executor, request);
     }
 
     @PUT
@@ -229,9 +229,9 @@ public class UsersResource {
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
     public void getGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @Auth User user,
-            final @Context HttpHeaders headers, @Context SecurityContext context, @Context ExecutorService executor) {
+            @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH, GIT_PULL), context);
-        getUser(key, REFS_HEADS_SECRETS, headers, JITSTATIC_GIT_REALM, user, asyncResponse, executor);
+        getUser(key, REFS_HEADS_SECRETS, JITSTATIC_GIT_REALM, user, asyncResponse, executor, request);
     }
 
     @PUT
@@ -381,8 +381,8 @@ public class UsersResource {
         }
     }
 
-    private void getUser(final String key, final String ref, final HttpHeaders headers, final String realm, final User user, AsyncResponse asyncResponse,
-            final ExecutorService executor) {
+    private void getUser(final String key, final String ref, final String realm, final User user, AsyncResponse asyncResponse, final ExecutorService executor,
+            Request request) {
         try {
             storage.getUserData(key, ref, realm).thenApplyAsync(value -> {
                 if (value == null || !value.isPresent()) {
@@ -390,9 +390,9 @@ public class UsersResource {
                 }
 
                 final EntityTag tag = new EntityTag(value.getKey());
-                final Response noChange = APIHelper.checkETag(headers, tag);
+                final ResponseBuilder noChange = request.evaluatePreconditions(tag);
                 if (noChange != null) {
-                    return noChange;
+                    return noChange.build();
                 }
                 LOG.info("{} logged in and accessed {}/{} in {}", user, realm, key, ref);
                 return Response.ok(new UserData(value.getRight())).tag(new EntityTag(value.getLeft())).encoding(UTF_8).build();

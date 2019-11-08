@@ -31,7 +31,6 @@ import java.util.function.Supplier;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -188,22 +187,6 @@ class APIHelper {
         if (!JitStaticConstants.isRef(ref)) {
             throw new WebApplicationException(String.format("Ref %s doesn't exit", ref), Status.BAD_REQUEST);
         }
-    }
-
-    static Response checkETag(final HttpHeaders headers, final EntityTag tag) {
-        final List<String> requestHeaders = headers.getRequestHeader(HttpHeaders.IF_MATCH);
-        if (requestHeaders == null) {
-            return null;
-        }
-        if (requestHeaders.size() > 1) {
-            throw new WebApplicationException("If-Match header is missing", Status.BAD_REQUEST);
-        }
-        for (final String header : requestHeaders) {
-            if (header.equals("\"" + tag.getValue() + "\"")) {
-                return Response.notModified().tag(tag).build();
-            }
-        }
-        return null;
     }
 
     static WebApplicationException createAuthenticationChallenge(final String realm) {

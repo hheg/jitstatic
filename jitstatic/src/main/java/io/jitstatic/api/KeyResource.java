@@ -123,7 +123,7 @@ public class KeyResource {
     @Path("{key : .+}")
     public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpHeaders headers, final @Context HttpServletResponse response, @Context SecurityContext context,
-            @Context ExecutorService executor) {
+            final @Context ExecutorService executor, final @Context Request request) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
@@ -136,9 +136,9 @@ public class KeyResource {
                             throw new WebApplicationException(Status.FORBIDDEN);
                         }
                         final EntityTag tag = new EntityTag(storeInfo.getVersion());
-                        final Response noChange = APIHelper.checkETag(headers, tag);
+                        final ResponseBuilder noChange = request.evaluatePreconditions(tag);
                         if (noChange != null) {
-                            return noChange;
+                            return noChange.build();
                         }
                         LOG.info(LOGGED_IN_AND_ACCESSED_KEY, user, key, ref);
                         return buildResponse(storeInfo, tag, data, response);
