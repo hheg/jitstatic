@@ -22,15 +22,12 @@ package io.jitstatic.storage.ref;
 
 import java.util.concurrent.ExecutorService;
 
+import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
+
 public interface RefLockService extends AutoCloseable {
 
-    public LockService getLockService(String ref);
+    public LockService getLockService(String ref, ExecutorService workstealingExecutor, Source source, HashService hashService);
 
     public void returnLock(LockService keys);
-    /*
-     * This is deprecated becuase it should be moved into LockService and only accessed from there
-     */
-    @Deprecated
-    public ExecutorService getRepoWriter();
-
 }

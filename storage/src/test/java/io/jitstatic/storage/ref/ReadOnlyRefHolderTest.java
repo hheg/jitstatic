@@ -19,11 +19,9 @@ package io.jitstatic.storage.ref;
  * limitations under the License.
  * #L%
  */
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Test;
@@ -34,8 +32,6 @@ import io.jitstatic.auth.UserData;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
-import io.jitstatic.storage.ref.ReadOnlyRefHolder;
-import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.utils.WrappingAPIException;
 
 class ReadOnlyRefHolderTest {
@@ -49,14 +45,13 @@ class ReadOnlyRefHolderTest {
         UserData userData = mock(UserData.class);
         
         try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", mock(Source.class), mock(HashService.class),
-                mock(RefLockService.class), workStealer);) {
+                mock(LocalRefLockService.class), workStealer);) {
             assertThrows(WrappingAPIException.class, () -> ref.addKey("key", osp, metaData, cmd));
             assertThrows(WrappingAPIException.class, () -> ref.addUser("user", "user", userData));
             assertThrows(WrappingAPIException.class, () -> ref.modifyKey("key", osp, "ref", cmd));
             assertThrows(WrappingAPIException.class, () -> ref.modifyMetadata("key", metaData, "ref", cmd));
             assertThrows(WrappingAPIException.class, () -> ref.deleteKey("key",cmd));
             assertThrows(WrappingAPIException.class, () -> ref.deleteUser("user", "user"));
-            assertThrows(WrappingAPIException.class, () -> ref.putKey("key", Optional.empty()));
             assertThrows(WrappingAPIException.class, () -> ref.modifyUser("user", "ref", userData, "version"));
         }
     }

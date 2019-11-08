@@ -19,54 +19,31 @@ package io.jitstatic.storage.ref;
  * limitations under the License.
  * #L%
  */
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import com.codahale.metrics.MetricRegistry;
-import com.spencerwi.either.Either;
 
-import io.jitstatic.hosted.FailedToLock;
-import io.jitstatic.storage.ref.ActionData;
-import io.jitstatic.storage.ref.LocalRefLockService;
-import io.jitstatic.storage.ref.LockService;
-import io.jitstatic.storage.ref.RefHolder;
+import io.jitstatic.source.Source;
+import io.jitstatic.storage.HashService;
 
 class LocalRefLockServiceTest {
 
     @Test
-    void testFireKeyEvent() throws Exception {
-        MetricRegistry registry = new MetricRegistry();
-        try (LocalRefLockService service = new LocalRefLockService(registry);) {
-            RefHolder refHolder = mock(RefHolder.class);
-            LockService lockService = service.getLockService("refs/heads/master");
-            AtomicBoolean b = new AtomicBoolean(true);
-            Mockito.when(refHolder.internalAddKey(Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any())).thenAnswer((a) -> {
-                while (b.get())
-                    ;
-                return "result";
-            });
-            lockService.register(refHolder);
-            CompletableFuture<Either<String, FailedToLock>> event = lockService.fireEvent("key", ActionData.addKey("key", null, null, null));
-            b.set(false);
-            Either<String, FailedToLock> result = event.join();
-            assertEquals("result", result.getLeft());
-        }
-    }
-
-    @Test
     void testReturnLockService() throws Exception {
         MetricRegistry registry = new MetricRegistry();
+        Source source = mock(Source.class);
+        HashService hashService = mock(HashService.class);
+        ExecutorService workstealingExecutor = ForkJoinPool.commonPool();
         try (LocalRefLockService service = new LocalRefLockService(registry);) {
-            LockService lockService = service.getLockService("refs/heads/master");
+            LockService lockService = service.getLockService("refs/heads/master", workstealingExecutor, source, hashService);
             service.returnLock(lockService);
-            LockService lockService2 = service.getLockService("refs/heads/master");
+            LockService lockService2 = service.getLockService("refs/heads/master", workstealingExecutor, source, hashService);
             assertSame(lockService, lockService2);
         }
     }

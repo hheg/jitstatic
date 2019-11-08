@@ -1,5 +1,8 @@
 package io.jitstatic.storage.ref;
 
+import java.util.List;
+import java.util.Optional;
+
 /*-
  * #%L
  * jitstatic
@@ -26,18 +29,32 @@ import java.util.function.Supplier;
 
 import com.spencerwi.either.Either;
 
+import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.DistributedData;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.utils.Pair;
 
 public interface LockService extends AutoCloseable {
 
     void close();
 
-    void register(RefHolder refHolder);
-
     CompletableFuture<Either<String, FailedToLock>> fireEvent(String key, ActionData data);
 
     CompletableFuture<Either<String, FailedToLock>> fireEvent(String ref, Supplier<Exception> preRequisite, Supplier<DistributedData> action, Consumer<Exception> postAction);
-    
     String getRef();
+    CompletableFuture<Pair<String, UserData>> getUser(final String userKeyPath);
+    <T> CompletableFuture<Either<T, FailedToLock>> enqueueAndReadBlock(Supplier<T> supplier);
+    Optional<StoreInfo> readKey(String key);
+    CompletableFuture<List<String>> getList(String key, boolean recursive);
+    void reload();
+    boolean isEmpty();
+    Either<Optional<StoreInfo>, Pair<String, UserData>> peek(String key);
+
+    /** 
+     * This is for testing purposes only
+     * @param key
+     * @param data
+     */
+    void putKeyFull(String key, Either<Optional<StoreInfo>, Pair<String, UserData>> data);
 }

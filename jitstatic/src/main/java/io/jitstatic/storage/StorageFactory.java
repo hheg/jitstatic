@@ -34,12 +34,13 @@ import io.jitstatic.hosted.events.DeleteRefEventListener;
 import io.jitstatic.hosted.events.ReloadRefEventListener;
 import io.jitstatic.hosted.events.StorageAddRefEventListener;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.ref.LocalRefLockService;
 import io.jitstatic.storage.ref.RefLockService;
 
 public class StorageFactory {
 
     public Storage build(final Source source, final Environment env, final String defaultBranch, final HashService hashService, final String rootUser,
-            final RefLockService clusterService, final ExecutorService executor, final ExecutorService workStealingExecutor, BiPredicate<String,String> rootAuthenticator) {
+            final LocalRefLockService clusterService, final ExecutorService executor, final ExecutorService workStealingExecutor, BiPredicate<String,String> rootAuthenticator) {
         Objects.requireNonNull(source, "Source cannot be null");
         Objects.requireNonNull(rootUser);
 

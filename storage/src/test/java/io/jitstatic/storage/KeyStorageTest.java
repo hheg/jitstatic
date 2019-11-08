@@ -81,7 +81,6 @@ import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.storage.ref.LocalRefLockService;
-import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
@@ -102,7 +101,7 @@ public class KeyStorageTest extends BaseTest {
     private Source source = mock(Source.class);
     private HashService hashService = new HashService();
     private MetricRegistry registry = new MetricRegistry();
-    private RefLockService clusterService;
+    private LocalRefLockService clusterService;
 
     private ExecutorService defaultExecutor;
     private ExecutorService workStealer;

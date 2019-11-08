@@ -52,7 +52,6 @@ import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.ref.LocalRefLockService;
-import io.jitstatic.storage.ref.RefLockService;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
@@ -71,14 +70,15 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
         Source source = null;
         Storage storage = null;
-        RefLockService refLockService = null;
+        LocalRefLockService refLockService = null;
         try {
             ExecutorService defaultExecutor = setUpExecutor(env.metrics());
             ExecutorService workStealingExecutor = setUpWorkStealingExecutor(env.metrics());
+            ExecutorService repoWriter = setUpRepoWriter(env.metrics());
             SystemReader.setInstance(new OverridingSystemReader());
             final HostedFactory hostedFactory = config.getHostedFactory();
             refLockService = new LocalRefLockService(env.metrics());
-            source = config.build(env, JITSTATIC_GIT_REALM, refLockService.getRepoWriter());
+            source = config.build(env, JITSTATIC_GIT_REALM, repoWriter);
             final String defaultBranch = hostedFactory.getBranch();
             final LoginService loginService = env.getApplicationContext().getBean(LoginService.class);
             final HashService hashService = env.getApplicationContext().getBean(HashService.class);
@@ -91,6 +91,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
             env.lifecycle().manage(new AutoCloseableLifeCycleManager<>(refLockService));
             env.lifecycle().manage(new ManagedExecutor(defaultExecutor));
             env.lifecycle().manage(new ManagedExecutor(workStealingExecutor));
+            env.lifecycle().manage(new ManagedExecutor(repoWriter));
 
             env.healthChecks().register("storagechecker", new HealthChecker(storage));
             env.healthChecks().register("sourcechecker", new HealthChecker(source));
@@ -109,6 +110,10 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
             throw e;
         }
+    }
+
+    private ExecutorService setUpRepoWriter(MetricRegistry metricRegistry) {
+        return new InstrumentedExecutorService(Executors.newSingleThreadExecutor(new NamingThreadFactory("RepoWriter")), metricRegistry);
     }
 
     private ExecutorService setUpExecutor(final MetricRegistry metricRegistry) {

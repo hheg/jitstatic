@@ -58,9 +58,9 @@ import io.jitstatic.hosted.events.DeleteRef;
 import io.jitstatic.hosted.events.ReloadRef;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
+import io.jitstatic.storage.ref.LocalRefLockService;
 import io.jitstatic.storage.ref.ReadOnlyRefHolder;
 import io.jitstatic.storage.ref.RefHolder;
-import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
@@ -78,7 +78,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     private final ExecutorService refCleaner;
     private final ExecutorService executor;
 
-    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser,
+    public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final LocalRefLockService clusterService, final String rootUser,
             final ExecutorService executor, final ExecutorService workStealingExecutor, final MetricRegistry metrics) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
         this.defaultRef = defaultRef == null ? Constants.R_HEADS + Constants.MASTER : defaultRef;
@@ -455,7 +455,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     }
 
-    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, final RefLockService refLockService,
+    private static Cache<String, RefHolder> getMap(final Source source, final HashService hashService, final LocalRefLockService refLockService,
             ExecutorService executor) {
         return new Cache2kBuilder<String, RefHolder>() {
         }

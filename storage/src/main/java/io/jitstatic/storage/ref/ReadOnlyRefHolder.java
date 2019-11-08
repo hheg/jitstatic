@@ -20,7 +20,6 @@ package io.jitstatic.storage.ref;
  * #L%
  */
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -30,7 +29,6 @@ import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
-import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
@@ -40,7 +38,7 @@ public class ReadOnlyRefHolder extends RefHolder {
 
     private static final String TAGS_CANNOT_BE_MODIFIED = "Tags cannot be modified";
 
-    public ReadOnlyRefHolder(final String ref, final Source source, final HashService hashService, final RefLockService clusterService,
+    public ReadOnlyRefHolder(final String ref, final Source source, final HashService hashService, final LocalRefLockService clusterService,
             ExecutorService workStealer) {
         super(ref, source, hashService, clusterService, workStealer);
     }
@@ -76,11 +74,6 @@ public class ReadOnlyRefHolder extends RefHolder {
     public CompletableFuture<Either<String, FailedToLock>> modifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         throw new WrappingAPIException(new UnsupportedOperationException("modify metadata " + TAGS_CANNOT_BE_MODIFIED));
-    }
-
-    @Override
-    void putKey(final String key, final Optional<StoreInfo> store) {
-        throw new WrappingAPIException(new UnsupportedOperationException("put key" + TAGS_CANNOT_BE_MODIFIED));
     }
 
     @Override
