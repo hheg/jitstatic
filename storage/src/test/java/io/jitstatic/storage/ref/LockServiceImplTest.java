@@ -23,38 +23,26 @@ package io.jitstatic.storage.ref;
 import static io.jitstatic.source.ObjectStreamProvider.toProvider;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import io.jitstatic.CommitMetaData;
-import io.jitstatic.MetaData;
-import io.jitstatic.Role;
-import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
@@ -63,10 +51,6 @@ import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.test.BaseTest;
-import io.jitstatic.utils.Functions;
-import io.jitstatic.utils.Functions.ThrowingSupplier;
-import io.jitstatic.utils.Pair;
-import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
 class LockServiceImplTest extends BaseTest {

@@ -63,7 +63,7 @@ public class StorageFactoryTest extends BaseTest {
     private Source source = mock(Source.class);
     private HashService hashService = new HashService();
 
-    private LocalRefLockService clusterService;
+    private RefLockService clusterService;
 
     private StorageFactory sf = new StorageFactory();
 

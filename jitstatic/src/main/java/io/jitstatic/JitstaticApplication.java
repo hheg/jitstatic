@@ -52,6 +52,7 @@ import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.storage.ref.LocalRefLockService;
+import io.jitstatic.storage.ref.RefLockService;
 
 public class JitstaticApplication extends Application<JitstaticConfiguration> {
 
@@ -70,7 +71,7 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
     public void run(final JitstaticConfiguration config, final Environment env) throws Exception {
         Source source = null;
         Storage storage = null;
-        LocalRefLockService refLockService = null;
+        RefLockService refLockService = null;
         try {
             ExecutorService defaultExecutor = setUpExecutor(env.metrics());
             ExecutorService workStealingExecutor = setUpWorkStealingExecutor(env.metrics());

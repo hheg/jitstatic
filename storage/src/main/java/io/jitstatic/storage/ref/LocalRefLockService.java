@@ -32,7 +32,7 @@ import com.codahale.metrics.MetricRegistry;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.NamingThreadFactory;
-// TODO Implementation not for public use
+
 public class LocalRefLockService implements RefLockService {
     private final Map<String, LockService> refLockMap = new HashMap<>();
     private final ExecutorService repoWriter;

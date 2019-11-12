@@ -56,9 +56,9 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     final Source source;
     private final HashService hashService;
     final LockService lock;
-    public final LocalRefLockService refLockService;
+    public final RefLockService refLockService;
 
-    public RefHolder(final String ref, final Source source, final HashService hashService, final LocalRefLockService refLockService,
+    public RefHolder(final String ref, final Source source, final HashService hashService, final RefLockService refLockService,
             final ExecutorService workStealingExecutor) {
         this.ref = Objects.requireNonNull(ref);
         this.refLockService = refLockService;
