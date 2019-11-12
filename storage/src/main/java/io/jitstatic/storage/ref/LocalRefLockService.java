@@ -52,7 +52,7 @@ public class LocalRefLockService implements RefLockService {
     public synchronized LockService getLockService(final String ref, final ExecutorService workstealingExecutor, final Source source,
             final HashService hashService) {
         final LockService map = refLockMap.get(ref);
-        return map == null ? new LockServiceImpl(this, ref, workstealingExecutor, source, hashService, repoWriter) : map;
+        return map == null ? new LockServiceImpl(this, ref, workstealingExecutor, source, repoWriter) : map;
     }
 
     @Override

@@ -106,7 +106,7 @@ class LockServiceImplTest extends BaseTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             assertTrue(lock.readKey("key").isPresent());
         }
     }
@@ -114,7 +114,7 @@ class LockServiceImplTest extends BaseTest {
     @Test
     public void testLoadAndStoreRefNotFound() throws IOException, RefNotFoundException {
         when(source.getSourceInfo(eq("key"), eq(REF))).thenThrow(new RefNotFoundException(REF));
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             assertThrows(LoadException.class, () -> lock.readKey("key"));
         }
     }
@@ -129,7 +129,7 @@ class LockServiceImplTest extends BaseTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.getSourceVersion()).thenReturn("2");
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             Optional<StoreInfo> loadAndStore = lock.readKey("key");
             assertEquals(lock.readKey("key"), loadAndStore);
             assertFalse(loadAndStore.isPresent());
@@ -145,7 +145,7 @@ class LockServiceImplTest extends BaseTest {
         when(sourceInfo.getMetaDataVersion()).thenReturn("2");
         when(sourceInfo.isMetaDataSource()).thenReturn(true);
         when(source.getSourceInfo(eq("key/"), eq(REF))).thenReturn(sourceInfo);
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             Optional<StoreInfo> loadAndStore = lock.readKey("key/");
             assertEquals(lock.readKey("key/"), loadAndStore);
             assertTrue(loadAndStore.isPresent());
@@ -160,7 +160,7 @@ class LockServiceImplTest extends BaseTest {
         when(sourceInfo.readMetaData()).thenCallRealMethod();
         when(sourceInfo.getMetadataInputStream()).thenThrow(ioException);
         when(source.getSourceInfo(eq("key"), eq(REF))).thenReturn(sourceInfo);
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             assertSame(ioException, assertThrows(UncheckedIOException.class, () -> lock.readKey("key")).getCause());
         }
     }
@@ -168,7 +168,7 @@ class LockServiceImplTest extends BaseTest {
 
     @Test
     public void testCheckIfPlainKeyDoesNotExist() {
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             lock.putKey("key", Optional.empty());
             lock.checkIfPlainKeyExist("key/");
         }
@@ -176,7 +176,7 @@ class LockServiceImplTest extends BaseTest {
 
     @Test
     public void testCheckIfPlainKeyDoesNotExistNull() {
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             lock.checkIfPlainKeyExist("key/");
         }
     }
@@ -184,7 +184,7 @@ class LockServiceImplTest extends BaseTest {
     @Test
     public void testCheckIfPlainKeyExist() {
         StoreInfo storeInfo = mock(StoreInfo.class);
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             lock.putKey("key", Optional.of(storeInfo));
             assertThrows(WrappingAPIException.class, () -> lock.checkIfPlainKeyExist("key/"));
         }
@@ -192,7 +192,7 @@ class LockServiceImplTest extends BaseTest {
     
     @Test
     public void testCheckIfPlainKeyDoesExist() {
-        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter)) {
+        try (LockServiceImpl lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter)) {
             StoreInfo si = Mockito.mock(StoreInfo.class);
             lock.putKey("key", Optional.of(si));
             assertEquals(KeyAlreadyExist.class, assertThrows(WrappingAPIException.class, () -> lock.checkIfPlainKeyExist("key/")).getCause().getClass());

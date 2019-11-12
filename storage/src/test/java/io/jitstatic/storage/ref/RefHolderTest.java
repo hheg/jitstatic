@@ -98,7 +98,7 @@ public class RefHolderTest extends BaseTest {
         workStealer = Executors.newWorkStealingPool();
         repoWriter = Executors.newSingleThreadExecutor(new NamingThreadFactory("test-repowriter"));
         clusterService = mock(LocalRefLockService.class);
-        lock = new LockServiceImpl(clusterService, REF, workStealer, source, hashService, repoWriter);
+        lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter);
         when(clusterService.getLockService(REF, workStealer, source, hashService)).thenReturn(lock);
     }
 
@@ -237,11 +237,9 @@ public class RefHolderTest extends BaseTest {
     public void testmodifyUserButNotLoaded() throws RefNotFoundException, IOException {
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
-            CompletionException ex = assertThrows(CompletionException.class, () -> ref
+            assertEquals(VersionIsNotSame.class, assertThrows(WrappingAPIException.class, () -> ref
                     .modifyUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
-                    .join());
-            assertEquals(WrappingAPIException.class, ex.getCause().getClass());
-            assertEquals(VersionIsNotSame.class, ex.getCause().getCause().getClass());
+                    .join()).getCause().getClass());
         }
     }
 

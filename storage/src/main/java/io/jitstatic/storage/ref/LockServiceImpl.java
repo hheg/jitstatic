@@ -61,7 +61,6 @@ import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.KeyAlreadyExist;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
@@ -79,11 +78,10 @@ class LockServiceImpl implements LockService {
     private final Logger LOG;
     private final ExecutorService workStealingExecutor;
     private final Source source;
-    private final HashService hashService;
     private final ExecutorService repoWriter;
 
     public LockServiceImpl(final LocalRefLockService refLockService, final String ref, ExecutorService workStealingExecutor, final Source source,
-            final HashService hashService, final ExecutorService repoWriter) {
+            final ExecutorService repoWriter) {
         this.keyMap = new HashMap<>();
         this.refLockService = Objects.requireNonNull(refLockService);
         this.ref = Objects.requireNonNull(ref);
@@ -91,7 +89,6 @@ class LockServiceImpl implements LockService {
         this.LOG = LoggerFactory.getLogger(ref);
         this.workStealingExecutor = Objects.requireNonNull(workStealingExecutor);
         this.source = Objects.requireNonNull(source);
-        this.hashService = Objects.requireNonNull(hashService);
         this.repoWriter = Objects.requireNonNull(repoWriter);
     }
 
@@ -390,16 +387,6 @@ class LockServiceImpl implements LockService {
         return userKeyData;
     }
 
-    // TODO Move this to RefHolder
-    UserData generateUser(final UserData data, final Pair<String, UserData> userKeyData) {
-        if (data.getBasicPassword() != null) {
-            return hashService.constructUserData(data.getRoles(), data.getBasicPassword());
-        } else {
-            final UserData current = userKeyData.getRight();
-            return new UserData(data.getRoles(), current.getBasicPassword(), current.getSalt(), current.getHash());
-        }
-    }
-
     private String internalUpdateUser(final String userKeyPath, final String username, final UserData data, final String version) {
         final String key = RefHolder.createFullUserKeyPath(userKeyPath);
         final Pair<String, UserData> userKeyData = extractUserKeyData(userKeyPath, key);
@@ -407,9 +394,8 @@ class LockServiceImpl implements LockService {
             throw new WrappingAPIException(new VersionIsNotSame(version, userKeyData.getLeft()));
         }
         try {
-            final UserData input = generateUser(data, userKeyData);
-            final String newVersion = source.updateUser(key, ref, username, input);
-            putKeyFull(key, Either.right(Pair.of(newVersion, input)));
+            final String newVersion = source.updateUser(key, ref, username, data);
+            putKeyFull(key, Either.right(Pair.of(newVersion, data)));
             return newVersion;
         } catch (RefNotFoundException e) {
             throw new WrappingAPIException(e);

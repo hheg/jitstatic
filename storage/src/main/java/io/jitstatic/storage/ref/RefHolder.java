@@ -45,6 +45,8 @@ import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.utils.Pair;
+import io.jitstatic.utils.VersionIsNotSame;
+import io.jitstatic.utils.WrappingAPIException;
 
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefLockHolder, AutoCloseable {
@@ -66,12 +68,10 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     }
 
     public void start() {
-        
+
     }
-    
-    public boolean isEmpty() {
-        return lock.isEmpty();
-    }
+
+    public boolean isEmpty() { return lock.isEmpty(); }
 
     public CompletableFuture<Either<String, FailedToLock>> addKey(final String key, final ObjectStreamProvider data, final MetaData metaData,
             final CommitMetaData commitMetaData) {
@@ -92,7 +92,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         return lock.fireEvent(key, ActionData.updateMetakey(Objects.requireNonNull(key), Objects.requireNonNull(metaData), Objects
                 .requireNonNull(oldMetaDataVersion), Objects.requireNonNull(commitMetaData)));
     }
-    
+
     @Nullable
     public CompletableFuture<Pair<String, UserData>> getUser(final String userKeyPath) {
         final Either<Optional<StoreInfo>, Pair<String, UserData>> peek = lock.peek(createFullUserKeyPath(userKeyPath));
@@ -109,8 +109,21 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         final String key = createFullUserKeyPath(userKeyPath);
+        final UserData generatedUser = generateUser(Objects.requireNonNull(data), getUser(userKeyPath).join(), version);
         return lock.fireEvent(key, ActionData
-                .updateUser(userKeyPath, Objects.requireNonNull(username), Objects.requireNonNull(data), Objects.requireNonNull(version)));
+                .updateUser(userKeyPath, Objects.requireNonNull(username), generatedUser, Objects.requireNonNull(version)));
+    }
+
+    UserData generateUser(final UserData data, final Pair<String, UserData> userKeyData, final String oldVersion) {
+        if (!oldVersion.equals(userKeyData.getLeft())) {
+            throw new WrappingAPIException(new VersionIsNotSame(oldVersion, userKeyData.getLeft()));
+        }
+        if (data.getBasicPassword() != null) {
+            return hashService.constructUserData(data.getRoles(), data.getBasicPassword());
+        } else {
+            final UserData current = userKeyData.getRight();
+            return new UserData(data.getRoles(), current.getBasicPassword(), current.getSalt(), current.getHash());
+        }
     }
 
     public CompletableFuture<Either<String, FailedToLock>> addUser(final String userKeyPath, final String username, final UserData data) {
@@ -144,7 +157,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     }
 
     public CompletableFuture<List<String>> getList(String key, boolean recursive) {
-        return lock.getList(key,recursive);
+        return lock.getList(key, recursive);
     }
 
     public Optional<StoreInfo> readKey(String key) {
