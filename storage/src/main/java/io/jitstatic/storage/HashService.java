@@ -55,7 +55,7 @@ public class HashService implements Serializable {
     public boolean validatePassword(String user, final UserData data, final String password) {
         boolean isValid = checkPassword(data, password);
         if (!isValid) {
-            LOG.info("User {} has incorrect password", user);
+            LOG.info("User {} has an incorrect password", user);
         }
         return isValid;
     }
