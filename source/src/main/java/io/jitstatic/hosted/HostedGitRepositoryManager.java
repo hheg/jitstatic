@@ -283,7 +283,7 @@ public class HostedGitRepositoryManager implements Source {
         Objects.requireNonNull(key);
         checkIfTag(checkRef(ref));
         try {
-            return updater.modifyKey(key, data, commitMetaData, ref);
+            return updater.updateKey(key, data, commitMetaData, ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }

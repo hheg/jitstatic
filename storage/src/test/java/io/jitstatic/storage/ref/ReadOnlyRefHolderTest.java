@@ -20,11 +20,13 @@ package io.jitstatic.storage.ref;
  * #L%
  */
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 
 import java.util.concurrent.ExecutorService;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
@@ -43,16 +45,16 @@ class ReadOnlyRefHolderTest {
         CommitMetaData cmd = mock(CommitMetaData.class);
         MetaData metaData = mock(MetaData.class);
         UserData userData = mock(UserData.class);
-        
-        try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", mock(Source.class), mock(HashService.class),
-                mock(LocalRefLockService.class), workStealer);) {
+        LocalRefLockService lrls = mock(LocalRefLockService.class);
+        Mockito.when(lrls.getLockService(any(), any(), any(), any())).thenReturn(mock(LockService.class));
+        try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", mock(Source.class), mock(HashService.class), lrls, workStealer);) {
             assertThrows(WrappingAPIException.class, () -> ref.addKey("key", osp, metaData, cmd));
             assertThrows(WrappingAPIException.class, () -> ref.addUser("user", "user", userData));
-            assertThrows(WrappingAPIException.class, () -> ref.modifyKey("key", osp, "ref", cmd));
-            assertThrows(WrappingAPIException.class, () -> ref.modifyMetadata("key", metaData, "ref", cmd));
-            assertThrows(WrappingAPIException.class, () -> ref.deleteKey("key",cmd));
+            assertThrows(WrappingAPIException.class, () -> ref.updateKey("key", osp, "ref", cmd));
+            assertThrows(WrappingAPIException.class, () -> ref.updateMetadata("key", metaData, "ref", cmd));
+            assertThrows(WrappingAPIException.class, () -> ref.deleteKey("key", cmd));
             assertThrows(WrappingAPIException.class, () -> ref.deleteUser("user", "user"));
-            assertThrows(WrappingAPIException.class, () -> ref.modifyUser("user", "ref", userData, "version"));
+            assertThrows(WrappingAPIException.class, () -> ref.updateUser("user", "ref", userData, "version"));
         }
     }
 

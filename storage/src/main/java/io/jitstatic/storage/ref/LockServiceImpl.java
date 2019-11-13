@@ -233,9 +233,9 @@ class LockServiceImpl implements LockService {
         case DELETE_USER:
             return internalDeleteUser(data.getKey(), data.getUserName());
         case UPDATE_KEY:
-            return internalModifyKey(data.getKey(), data.getData(), data.getOldVersion(), data.getCommitMetaData());
+            return internalUpdateKey(data.getKey(), data.getData(), data.getOldVersion(), data.getCommitMetaData());
         case UPDATE_METAKEY:
-            return internalModifyMetadata(data.getKey(), data.getMetaData(), data.getOldVersion(), data.getCommitMetaData());
+            return internalUpdateMetadata(data.getKey(), data.getMetaData(), data.getOldVersion(), data.getCommitMetaData());
         case UPDATE_USER:
             return internalUpdateUser(data.getKey(), data.getUserName(), data.getUserData(), data.getOldVersion());
         case WRITE_REPO:
@@ -302,7 +302,7 @@ class LockServiceImpl implements LockService {
         return fileInfo.getRight();
     }
 
-    private String internalModifyKey(final String key, final ObjectStreamProvider data, final String oldVersion, final CommitMetaData commitMetaData) {
+    private String internalUpdateKey(final String key, final ObjectStreamProvider data, final String oldVersion, final CommitMetaData commitMetaData) {
         final Optional<StoreInfo> keyHolder = internalReadKey(key);
         if (storageIsForbidden(keyHolder)) {
             throw new WrappingAPIException(new UnsupportedOperationException("modifyKey " + key));
@@ -332,7 +332,7 @@ class LockServiceImpl implements LockService {
         return storeInfo == null || !storeInfo.isPresent() || storeInfo.get().getMetaData().isProtected();
     }
 
-    private String internalModifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion, final CommitMetaData commitMetaData) {
+    private String internalUpdateMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion, final CommitMetaData commitMetaData) {
         checkIfPlainKeyExist(key);
         final Optional<StoreInfo> storeInfo = internalReadKey(key);
         if (storageIsForbidden(storeInfo)) {

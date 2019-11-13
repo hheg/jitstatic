@@ -56,12 +56,10 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     final Source source;
     private final HashService hashService;
     final LockService lock;
-    public final RefLockService refLockService;
 
     public RefHolder(final String ref, final Source source, final HashService hashService, final RefLockService refLockService,
             final ExecutorService workStealingExecutor) {
         this.ref = Objects.requireNonNull(ref);
-        this.refLockService = refLockService;
         this.source = Objects.requireNonNull(source);
         this.hashService = Objects.requireNonNull(hashService);
         this.lock = refLockService.getLockService(ref, workStealingExecutor, source, hashService);
@@ -78,7 +76,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         return lock.fireEvent(key, ActionData.addKey(key, data, metaData, commitMetaData));
     }
 
-    public CompletableFuture<Either<String, FailedToLock>> modifyKey(final String key, final ObjectStreamProvider data, final String oldVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateKey(final String key, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
         return lock.fireEvent(key, ActionData.updateKey(key, data, oldVersion, commitMetaData));
     }
@@ -87,7 +85,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         return lock.fireEvent(key, ActionData.deleteKey(key, commitMetaData));
     }
 
-    public CompletableFuture<Either<String, FailedToLock>> modifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         return lock.fireEvent(key, ActionData.updateMetakey(Objects.requireNonNull(key), Objects.requireNonNull(metaData), Objects
                 .requireNonNull(oldMetaDataVersion), Objects.requireNonNull(commitMetaData)));
@@ -106,7 +104,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         return JitStaticConstants.USERS + Objects.requireNonNull(userKeyPath);
     }
 
-    public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         final String key = createFullUserKeyPath(userKeyPath);
         final UserData generatedUser = generateUser(Objects.requireNonNull(data), getUser(userKeyPath).join(), version);
@@ -142,7 +140,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
 
     @Override
     public void close() {
-        // TODO Fix this
+        lock.close();
     }
 
     @Override

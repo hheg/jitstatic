@@ -216,7 +216,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
         Objects.requireNonNull(oldVersion, "oldVersion cannot be null");
         final RefHolder refHolder = getRefHolder(checkRef(ref));
-        return refHolder.modifyKey(key, data, oldVersion, commitMetaData);
+        return refHolder.updateKey(key, data, oldVersion, commitMetaData);
     }
 
     @Override
@@ -251,7 +251,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
             throw new WrappingAPIException(new UnsupportedOperationException(key));
         }
         final RefHolder refHolder = getRefHolder(checkRef(ref));
-        return refHolder.modifyMetadata(key, metaData, oldMetaDataVersion, commitMetaData);
+        return refHolder.updateMetadata(key, metaData, oldMetaDataVersion, commitMetaData);
     }
 
     @Override
@@ -400,7 +400,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         if (refHolder == null) {
             throw new UnsupportedOperationException(key);
         }
-        return refHolder.modifyUser(realm + "/" + key, creatorUserName, data, version);
+        return refHolder.updateUser(realm + "/" + key, creatorUserName, data, version);
     }
 
     @Override

@@ -65,19 +65,19 @@ public class ReadOnlyRefHolder extends RefHolder {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> modifyKey(final String key, final ObjectStreamProvider data, final String oldVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateKey(final String key, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) {
         throw new WrappingAPIException(new UnsupportedOperationException("modify key " + TAGS_CANNOT_BE_MODIFIED));
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> modifyMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateMetadata(final String key, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) {
         throw new WrappingAPIException(new UnsupportedOperationException("modify metadata " + TAGS_CANNOT_BE_MODIFIED));
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> modifyUser(final String userKeyPath, final String username, final UserData data,
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(final String userKeyPath, final String username, final UserData data,
             final String version) {
         throw new WrappingAPIException(new UnsupportedOperationException("update user " + TAGS_CANNOT_BE_MODIFIED));
     }

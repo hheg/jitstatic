@@ -128,7 +128,7 @@ public class RefHolderTest extends BaseTest {
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             lock.putKeyFull("key", Either.left(Optional.of(storeInfo)));
-            ref.modifyKey("key", toProvider(data), "1", cmd).orTimeout(5, TimeUnit.SECONDS).join();
+            ref.updateKey("key", toProvider(data), "1", cmd).orTimeout(5, TimeUnit.SECONDS).join();
             assertEquals("2", ref.readKey("key").get().getVersion());
         }
     }
@@ -146,7 +146,7 @@ public class RefHolderTest extends BaseTest {
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             lock.putKeyFull("key", Either.left(Optional.of(storeInfo)));
-            CompletableFuture<Either<String, FailedToLock>> modifyMetadata = ref.modifyMetadata("key", storageData, "1", commitMetaData);
+            CompletableFuture<Either<String, FailedToLock>> modifyMetadata = ref.updateMetadata("key", storageData, "1", commitMetaData);
             assertEquals("2", modifyMetadata.orTimeout(5, TimeUnit.SECONDS).join().getLeft());
             Optional<StoreInfo> key = ref.readKey("key");
             assertEquals("2", key.get().getMetaDataVersion());
@@ -232,7 +232,7 @@ public class RefHolderTest extends BaseTest {
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             assertEquals(VersionIsNotSame.class, assertThrows(WrappingAPIException.class, () -> ref
-                    .modifyUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
+                    .updateUser("user", "user", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS)
                     .join()).getCause().getClass());
         }
     }
@@ -246,7 +246,7 @@ public class RefHolderTest extends BaseTest {
             assertEquals("1", ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash")).orTimeout(5, TimeUnit.SECONDS)
                     .join()
                     .getLeft());
-            ref.modifyUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS).join();
+            ref.updateUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1").orTimeout(5, TimeUnit.SECONDS).join();
             verify(source).updateUser(eq(".users/user"), eq(REF), eq("modifyinguser"), eq(new UserData(Set.of(new Role("role")), null, "salt", "hash")));
         }
     }
@@ -260,7 +260,7 @@ public class RefHolderTest extends BaseTest {
             assertEquals("1", ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"))
                     .orTimeout(5, TimeUnit.SECONDS).join().getLeft());
             Throwable cause = assertThrows(CompletionException.class, () -> ref
-                    .modifyUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1")
+                    .updateUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1")
                     .orTimeout(5, TimeUnit.SECONDS).join()).getCause();
             assertEquals(UncheckedIOException.class, cause.getClass());
             assertEquals(IOException.class, cause.getCause().getClass());
@@ -276,7 +276,7 @@ public class RefHolderTest extends BaseTest {
             assertEquals("1", ref.addUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"))
                     .orTimeout(5, TimeUnit.SECONDS).join().getLeft());
             Throwable cause = assertThrows(CompletionException.class, () -> ref
-                    .modifyUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1")
+                    .updateUser("user", "modifyinguser", new UserData(Set.of(new Role("role")), null, "salt", "hash"), "1")
                     .orTimeout(5, TimeUnit.SECONDS).join()).getCause();
             assertEquals(WrappingAPIException.class, cause.getClass());
             assertEquals(RefNotFoundException.class, cause.getCause().getClass());
