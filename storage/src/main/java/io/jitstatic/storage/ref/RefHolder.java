@@ -32,7 +32,6 @@ import javax.annotation.Nullable;
 
 import com.spencerwi.either.Either;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
@@ -48,7 +47,6 @@ import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 
-@SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 public class RefHolder implements RefLockHolder, AutoCloseable {
     static final int MAX_ENTRIES = 2000;
     static final int THRESHOLD = 1_000_000;

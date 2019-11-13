@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import com.spencerwi.either.Either;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
@@ -67,6 +68,7 @@ import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 
+@SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 class LockServiceImpl implements LockService {
 
     private final Map<String, ActionData> keyMap;
