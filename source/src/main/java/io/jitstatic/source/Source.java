@@ -44,11 +44,11 @@ public interface Source extends AutoCloseable, CheckHealth {
 
     public SourceInfo getSourceInfo(String key, String ref) throws RefNotFoundException;
 
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(String key, String ref, ObjectStreamProvider data, CommitMetaData commitMetaData);
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> updateKey(String key, String ref, ObjectStreamProvider data, CommitMetaData commitMetaData);
 
     public Pair<Pair<ThrowingSupplier<ObjectLoader, IOException>, String>, String> addKey(String key, String ref, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
 
-    public String modifyMetadata(MetaData metaData, String metaDataVersion, String key, String ref, CommitMetaData commitMetaData);
+    public String updateMetaData(MetaData metaData, String metaDataVersion, String key, String ref, CommitMetaData commitMetaData);
 
     public void deleteKey(String key, String ref, CommitMetaData commitMetaData);
 

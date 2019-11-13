@@ -108,7 +108,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user,
+    public void getKeyAdminUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user,
             @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         APIHelper.checkRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
@@ -122,12 +122,12 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void put(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
+    public void updateKeyAdminUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
             final @Validated @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers, final @Context Request request,
             @Context SecurityContext context, @Context ExecutorService executor) {
         APIHelper.checkValidRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
-        modifyUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, context, executor);
+        updateUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, context, executor);
     }
 
     @POST
@@ -137,7 +137,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void post(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
+    public void addKeyAdminUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
             final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data, final @Auth User user, @Context SecurityContext context,
             @Context ExecutorService executor) {
         APIHelper.checkRef(ref);
@@ -152,7 +152,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void delete(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
+    public void deleteKeyAdminUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
             final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor) {
         APIHelper.checkRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
@@ -166,7 +166,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void getUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void getKeyUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
@@ -181,13 +181,13 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void putUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void updateKeyUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Validated @Valid @NotNull UserData data, final @Auth User user,
             final @Context HttpHeaders headers, final @Context Request request, @Context SecurityContext context, @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
-        modifyUser(key, ref, data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse, context, executor);
+        updateUser(key, ref, data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse, context, executor);
     }
 
     @POST
@@ -197,7 +197,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void postUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void addKeyUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
             final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
@@ -213,7 +213,7 @@ public class UsersResource {
     @Path(JITSTATIC_KEYUSER_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void deleteUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void deleteKeyUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
@@ -241,11 +241,11 @@ public class UsersResource {
     @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void putGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
+    public void updateGitUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Validated({ GitRolesGroup.class, Default.class }) @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers,
             final @Context Request request, @Context SecurityContext context, @Context ExecutorService executor) {
         authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
-        modifyUser(key, REFS_HEADS_SECRETS, data, request, user, JITSTATIC_GIT_REALM, asyncResponse, context, executor);
+        updateUser(key, REFS_HEADS_SECRETS, data, request, user, JITSTATIC_GIT_REALM, asyncResponse, context, executor);
     }
 
     @POST
@@ -255,7 +255,7 @@ public class UsersResource {
     @Path(JITSTATIC_GIT_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void postGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
+    public void addGitUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key,
             final @Valid @NotNull @Validated({ GitRolesGroup.class, Adding.class, Default.class }) UserData data,
             final @Auth User user, @Context SecurityContext context, @Context ExecutorService executor) {
         authorize(Set.of(createUserRole(key, JITSTATIC_GIT_REALM), GIT_CREATE, GIT_PUSH, GIT_FORCEPUSH), context);
@@ -275,7 +275,7 @@ public class UsersResource {
         deleteUser(key, REFS_HEADS_SECRETS, user, JITSTATIC_GIT_REALM, asyncResponse, executor);
     }
 
-    private void modifyUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm,
+    private void updateUser(final String key, final String ref, final UserData data, final Request request, final User user, final String realm,
             final AsyncResponse asyncResponse, SecurityContext context, ExecutorService executor) {
         try {
             storage.getUserData(key, ref, realm)
@@ -314,7 +314,7 @@ public class UsersResource {
 
     }
 
-    io.jitstatic.auth.UserData getRoles(final UserData data, SecurityContext context, Pair<String, io.jitstatic.auth.UserData> userData) {
+    io.jitstatic.auth.UserData getRoles(final UserData data, final SecurityContext context, final Pair<String, io.jitstatic.auth.UserData> userData) {
         if (context.isUserInRole(JitStaticConstants.ROLERROLES)) {
             return new io.jitstatic.auth.UserData(data.getRoles(), data.getBasicPassword(), null, null);
         } else {

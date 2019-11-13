@@ -211,7 +211,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         Mockito.when(storage.getMetaKey("dog", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "2")));
-        Mockito.when(storage.putMetaData(eq("dog"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
+        Mockito.when(storage.updateMetaData(eq("dog"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
                 .thenReturn(CompletableFuture.completedFuture(Either.left("3")));
         Response put = RESOURCES.target("/metakey/dog")
                 .request()
@@ -264,7 +264,7 @@ public class MetaKeyResourceTest {
         mukd.setUserMail("usermail");
         mukd.setMetaData(storageData);
         Mockito.when(storage.getMetaKey("dog/", REFS_HEADS_MASTER)).thenReturn(CompletableFuture.completedFuture(Pair.of(storageData, "2")));
-        Mockito.when(storage.putMetaData(eq("dog/"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
+        Mockito.when(storage.updateMetaData(eq("dog/"), eq(REFS_HEADS_MASTER), Mockito.isA(MetaData.class), eq("2"), any()))
                 .thenReturn(CompletableFuture.completedFuture(Either.left("3")));
         Response put = RESOURCES.target("/metakey/dog/")
                 .request()

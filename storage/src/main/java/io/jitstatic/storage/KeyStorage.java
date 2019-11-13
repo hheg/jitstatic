@@ -210,7 +210,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> putKey(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateKey(final String key, String ref, final ObjectStreamProvider data, final String oldVersion,
             final CommitMetaData commitMetaData) throws RefNotFoundException {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(data, DATA_CANNOT_BE_NULL);
@@ -241,7 +241,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) throws RefNotFoundException {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -255,7 +255,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> delete(final String key, final String ref, final CommitMetaData commitMetaData)
+    public CompletableFuture<Either<String, FailedToLock>> deleteKey(final String key, final String ref, final CommitMetaData commitMetaData)
             throws RefNotFoundException {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);

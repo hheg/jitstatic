@@ -313,7 +313,7 @@ class LockServiceImpl implements LockService {
         }
 
         Pair<StoreInfo, Pair<String, ThrowingSupplier<ObjectLoader, IOException>>> dataPair = Pair
-                .of(storeInfo, source.modifyKey(key, ref, data, commitMetaData));
+                .of(storeInfo, source.updateKey(key, ref, data, commitMetaData));
         final StoreInfo newStoreInfo = dataPair.getLeft();
         final Pair<String, ThrowingSupplier<ObjectLoader, IOException>> newVersion = dataPair.getRight();
         putKeyFull(key, Either
@@ -342,7 +342,7 @@ class LockServiceImpl implements LockService {
             throw new WrappingAPIException(new VersionIsNotSame(oldMetaDataVersion, storeInfo.get().getMetaDataVersion()));
         }
 
-        final String newMetaDataVersion = source.modifyMetadata(metaData, oldMetaDataVersion, key, ref, commitMetaData);
+        final String newMetaDataVersion = source.updateMetaData(metaData, oldMetaDataVersion, key, ref, commitMetaData);
         final StoreInfo si = storeInfo.get();
         if (si.isMasterMetaData()) {
             refCache.get().clear(); // Reminder

@@ -39,7 +39,7 @@ public class ReadOnlyRefHolder extends RefHolder {
     private static final String TAGS_CANNOT_BE_MODIFIED = "Tags cannot be modified";
 
     public ReadOnlyRefHolder(final String ref, final Source source, final HashService hashService, final RefLockService clusterService,
-            ExecutorService workStealer) {
+            final ExecutorService workStealer) {
         super(ref, source, hashService, clusterService, workStealer);
     }
 

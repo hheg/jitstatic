@@ -42,15 +42,15 @@ public interface Storage extends AutoCloseable, CheckHealth {
 
     public void close();
 
-    public CompletableFuture<Either<String, FailedToLock>> putKey(String key, String ref, ObjectStreamProvider data, String version,
+    public CompletableFuture<Either<String, FailedToLock>> updateKey(String key, String ref, ObjectStreamProvider data, String version,
             CommitMetaData commitMetaData) throws RefNotFoundException;
 
     public CompletableFuture<String> addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<Either<String, FailedToLock>> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateMetaData(String key, String ref, MetaData metaData, String metaDataVersion,
             CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<Either<String, FailedToLock>> delete(String key, String ref, CommitMetaData commitMetaData) throws RefNotFoundException;
+    public CompletableFuture<Either<String, FailedToLock>> deleteKey(String key, String ref, CommitMetaData commitMetaData) throws RefNotFoundException;
 
     public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref) throws RefNotFoundException;
 

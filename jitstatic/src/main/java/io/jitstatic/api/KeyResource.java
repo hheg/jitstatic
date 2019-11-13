@@ -121,7 +121,7 @@ public class KeyResource {
     @Metered(name = "get_storage_counter")
     @ExceptionMetered(name = "get_storage_exception")
     @Path("{key : .+}")
-    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void getKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpHeaders headers, final @Context HttpServletResponse response, @Context SecurityContext context,
             final @Context ExecutorService executor, final @Context Request request) {
         APIHelper.checkRef(askedRef);
@@ -198,7 +198,7 @@ public class KeyResource {
     @ExceptionMetered(name = "put_storage_exception")
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void modifyKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void updateKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context Request request,
             final @Validated @Valid @NotNull ModifyKeyData data, final @Context HttpHeaders headers, @Context SecurityContext context,
             @Context ExecutorService executor) {
@@ -219,7 +219,7 @@ public class KeyResource {
                         }
                         return currentVersion;
                     }, executor)
-                    .thenApplyAsync(currentVersion -> putKey(key, httpRequest, data, user, ref, currentVersion), executor)
+                    .thenApplyAsync(currentVersion -> updateKey(key, httpRequest, data, user, ref, currentVersion), executor)
                     .thenComposeAsync(Function.identity())
                     .thenApplyAsync(result -> {
                         if (result == null) {
@@ -241,11 +241,11 @@ public class KeyResource {
         }
     }
 
-    private CompletableFuture<Either<String, FailedToLock>> putKey(final String key, final HttpServletRequest httpRequest, final ModifyKeyData data,
+    private CompletableFuture<Either<String, FailedToLock>> updateKey(final String key, final HttpServletRequest httpRequest, final ModifyKeyData data,
             final User user, final String ref, String currentVersion) {
         try {
             return storage
-                    .putKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
+                    .updateKey(key, ref, data.getData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                             .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
@@ -299,7 +299,7 @@ public class KeyResource {
     @Timed(name = "delete_storage_time")
     @Metered(name = "delete_storage_counter")
     @ExceptionMetered(name = "delete_storage_exception")
-    public void delete(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void deleteKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, @Context SecurityContext context,
             @Context ExecutorService executor) {
         APIHelper.checkValidRef(askedRef);
@@ -312,7 +312,7 @@ public class KeyResource {
                         final String userMail = notEmpty(headers, X_JITSTATIC_MAIL);
 
                         helper.checkWritePermission(key, user, context, ref, storeInfo.getMetaData());
-                        return delete(key, httpRequest, user, ref, userHeader, message, userMail);
+                        return deleteKey(key, httpRequest, user, ref, userHeader, message, userMail);
                     }, executor)
                     .thenCompose(c -> c)
                     .thenApplyAsync(ignore -> {
@@ -324,10 +324,10 @@ public class KeyResource {
         }
     }
 
-    private CompletableFuture<Either<String, FailedToLock>> delete(final String key, final HttpServletRequest httpRequest, final User user, final String ref,
+    private CompletableFuture<Either<String, FailedToLock>> deleteKey(final String key, final HttpServletRequest httpRequest, final User user, final String ref,
             final String userHeader, final String message, final String userMail) {
         try {
-            return storage.delete(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), APIHelper
+            return storage.deleteKey(key, ref, new CommitMetaData(userHeader, userMail, message, user.getName(), APIHelper
                     .compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
             return CompletableFuture.failedFuture(new WrappingAPIException(e));

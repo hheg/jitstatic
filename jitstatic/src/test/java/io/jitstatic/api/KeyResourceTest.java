@@ -329,7 +329,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -351,7 +351,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -371,7 +371,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(eq("dog"), eq(null))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(null), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(null), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -437,7 +437,7 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), any())).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), any(), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), any(), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(null));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -456,7 +456,7 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenThrow(new WrappingAPIException(new RefNotFoundException("Test ref not found")));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -475,7 +475,7 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenThrow(new WrappingAPIException(new UnsupportedOperationException("Test operation")));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -494,7 +494,7 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenThrow((new WrappingAPIException(new VersionIsNotSame("", ""))));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -514,7 +514,7 @@ public class KeyResourceTest {
         WebTarget target = RESOURCES.target("/storage/dog");
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenThrow(new WrappingAPIException(new Exception("Test exception")));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -575,7 +575,7 @@ public class KeyResourceTest {
     public void testModifyApplicatiOnoctetStream() throws RefNotFoundException {
         Optional<StoreInfo> expected = DATA.get("book");
         when(storage.getKey(eq("book"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(expected));
-        when(storage.putKey(eq("book"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
+        when(storage.updateKey(eq("book"), eq(REFS_HEADS_MASTER), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(Either.left("2")));
         Response response = RESOURCES.target("/storage/book")
                 .request()
@@ -719,7 +719,7 @@ public class KeyResourceTest {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         Either<String, FailedToLock> expected = Either.left("2");
         when(storage.getKey(eq("dog"), Mockito.isNull())).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.putKey(eq("dog"), Mockito.isNull(), any(), eq("1"), any()))
+        when(storage.updateKey(eq("dog"), Mockito.isNull(), any(), eq("1"), any()))
                 .thenReturn(CompletableFuture.completedFuture(expected));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
@@ -761,7 +761,7 @@ public class KeyResourceTest {
     public void testDeleteKey() throws RefNotFoundException {
         Optional<StoreInfo> storeInfo = DATA.get("dog");
         when(storage.getKey(eq("dog"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(storeInfo));
-        when(storage.delete(eq("dog"), eq(REFS_HEADS_MASTER), any())).thenReturn(CompletableFuture.completedFuture(Either.left("1")));
+        when(storage.deleteKey(eq("dog"), eq(REFS_HEADS_MASTER), any())).thenReturn(CompletableFuture.completedFuture(Either.left("1")));
         Response delete = RESOURCES.target("/storage/dog")
                 .request()
                 .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)

@@ -124,7 +124,7 @@ public class RefHolderTest extends BaseTest {
         when(storeInfo.getMetaDataVersion()).thenReturn("1");
 
         byte[] data = getData().getBytes(UTF_8);
-        when(source.modifyKey(eq("key"), eq(REF), any(), eq(cmd))).thenReturn(Pair.of("2", ts));
+        when(source.updateKey(eq("key"), eq(REF), any(), eq(cmd))).thenReturn(Pair.of("2", ts));
         try (RefHolder ref = new RefHolder(REF, source, hashService, clusterService, workStealer);) {
             ref.start();
             lock.putKeyFull("key", Either.left(Optional.of(storeInfo)));
@@ -139,7 +139,7 @@ public class RefHolderTest extends BaseTest {
         MetaData storageData = mock(MetaData.class);
         CommitMetaData commitMetaData = mock(CommitMetaData.class);
 
-        when(source.modifyMetadata(any(), anyString(), any(), any(), any())).thenReturn("2");
+        when(source.updateMetaData(any(), anyString(), any(), any(), any())).thenReturn("2");
         when(storeInfo.getMetaData()).thenReturn(storageData);
         when(storeInfo.getVersion()).thenReturn("1");
         when(storeInfo.getMetaDataVersion()).thenReturn("1");

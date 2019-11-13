@@ -85,7 +85,7 @@ public class MetaKeyResource {
     @ExceptionMetered(name = "get_metakey_exception")
     @Path("/{key : .+}")
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void get(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void getMetaKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context Request request, final @Context HttpHeaders headers, @Context SecurityContext context,
             @Context ExecutorService executor) {
         APIHelper.checkRef(askedRef);
@@ -120,7 +120,7 @@ public class MetaKeyResource {
     @Path("/{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    public void modifyMetaKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void updateMetaKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Validated @Valid @NotNull ModifyMetaKeyData data, final @Context Request request,
             final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, final @Context SecurityContext context,
             @Context ExecutorService executor) {
@@ -143,7 +143,7 @@ public class MetaKeyResource {
                             throw new WebApplicationException(noChangeBuilder.header(HttpHeaders.CONTENT_ENCODING, UTF_8).tag(tag).build());
                         }
 
-                        return putMetaData(key, data, httpRequest, user, ref, currentVersion);
+                        return updateMetaData(key, data, httpRequest, user, ref, currentVersion);
                     }, executor)
                     .thenComposeAsync(c -> c, executor)
                     .thenApplyAsync(result -> {
@@ -162,10 +162,10 @@ public class MetaKeyResource {
         }
     }
 
-    private CompletableFuture<Either<String, FailedToLock>> putMetaData(final String key, final ModifyMetaKeyData data, final HttpServletRequest httpRequest,
+    private CompletableFuture<Either<String, FailedToLock>> updateMetaData(final String key, final ModifyMetaKeyData data, final HttpServletRequest httpRequest,
             final User user, final String ref, final String currentVersion) {
         try {
-            return storage.putMetaData(key, ref, data.getMetaData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
+            return storage.updateMetaData(key, ref, data.getMetaData(), currentVersion, new CommitMetaData(data.getUserInfo(), data.getUserMail(), data
                     .getMessage(), user.getName(), APIHelper.compileUserOrigin(user, httpRequest)));
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);

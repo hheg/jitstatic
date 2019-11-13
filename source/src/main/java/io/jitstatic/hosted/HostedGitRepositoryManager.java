@@ -277,7 +277,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, String ref, final ObjectStreamProvider data,
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> updateKey(final String key, String ref, final ObjectStreamProvider data,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(data);
         Objects.requireNonNull(key);
@@ -312,7 +312,7 @@ public class HostedGitRepositoryManager implements Source {
     }
 
     @Override
-    public String modifyMetadata(final MetaData metaData, final String metaDataVersion, final String key, final String ref,
+    public String updateMetaData(final MetaData metaData, final String metaDataVersion, final String key, final String ref,
             final CommitMetaData commitMetaData) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(commitMetaData);
