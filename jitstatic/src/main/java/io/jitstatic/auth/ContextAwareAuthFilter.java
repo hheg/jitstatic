@@ -93,7 +93,18 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
                 setPrincipal(requestContext, scheme, root, role -> true);
                 return realm.accept;
             }
-            return setupInRealm(requestContext, scheme, ref, realm, userName, credentials);
+            final Verdict verdict = setupInRealm(requestContext, scheme, ref, realm, userName, credentials);
+            if (!verdict.isAllowed && request.getMethod().equals("GET")) {
+                /*
+                 * Since we are allowing anonymous access on GETing keys and we don't know the
+                 * RBACs at this stage we need to test this for each resource. This means that
+                 * wrong credentials on a protected resources renders in a 403 instead of a 401,
+                 * but also the wrong credentials will still render in a 200 to a public key (a
+                 * key with empty read roles).
+                 */
+                return testForAnonymousAccess(requestContext, scheme, realm);
+            }
+            return verdict;
         } catch (RefNotFoundException e) {
             throw new WebApplicationException(e.getMessage(), Status.BAD_REQUEST);
         }
@@ -109,7 +120,7 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
         CompletableFuture.allOf(realm.getDomains().stream()
                 .map(d -> invokeInDomain(d, ref, realm, userName, credentials, resultReceiver))
                 .toArray(CompletableFuture[]::new))
-        .thenAccept(ignore -> resultEmitter.complete(realm.denied));
+                .thenAccept(ignore -> resultEmitter.complete(realm.denied));
         try {
             return resultEmitter.join();
         } catch (CompletionException e) {

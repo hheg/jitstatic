@@ -277,7 +277,7 @@ public class UserManagementTest extends BaseTest {
             Entity<JsonNode> entity = updater.getKey("file2", parse(JsonNode.class), version);
             assertEquals(version, entity.getTag());
         }
-        assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
+        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient updater = buildClient(DW.getLocalPort()).setPassword("2222").setUser(KEYUSER).build()) {
                 updater.getKey("file2", parse(JsonNode.class));
             }
@@ -874,7 +874,7 @@ public class UserManagementTest extends BaseTest {
             client.deleteUser(KEYUSER, null);
         }
         try (JitStaticClient newClient = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSER).build()) {
-            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> newClient.getKey("file", parse(io.jitstatic.api.UserData.class)))
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getKey("file", parse(io.jitstatic.api.UserData.class)))
                     .getStatusCode());
         }
     }
@@ -903,7 +903,7 @@ public class UserManagementTest extends BaseTest {
             assertEquals(currentRoles, updatedRoles);
             assertNotNull(keyUserClient.getKey("file2", parse(JsonNode.class)));
             version = client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(currentRoles, "1234"), user.getTag());
-            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class)))
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class)))
                     .getStatusCode());
         }
     }

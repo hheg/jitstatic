@@ -291,7 +291,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
             assertNotNull(key);
             key = client.getKey(ACCEPT_STORAGE, parse(JsonNode.class));
             assertNotNull(key);
-            assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> thirdUpdater.getKey(ACCEPT_STORAGE, parse(JsonNode.class))).getStatusCode());
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> thirdUpdater.getKey(ACCEPT_STORAGE, parse(JsonNode.class))).getStatusCode());
             Entity<io.jitstatic.MetaData> metaKey = client.getMetaKey(ACCEPT_STORAGE, null, parse(io.jitstatic.MetaData.class));
             String oldVersion = metaKey.getTag();
             io.jitstatic.MetaData md = metaKey.getData();
