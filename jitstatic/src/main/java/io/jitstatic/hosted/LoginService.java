@@ -72,7 +72,7 @@ public class LoginService extends AbstractLoginService {
             if (userData == null) {
                 return null;
             }
-            return new RoleBearingUserPrincipal(username, new HashingCredential(hashService, userData), userData.getRoles());
+            return new RoleBearingUserPrincipal(username, new HashingCredential(hashService, userData, username), userData.getRoles());
         } catch (final Exception e) {
             return null;
         }
@@ -102,10 +102,11 @@ public class LoginService extends AbstractLoginService {
         private static final long serialVersionUID = 1L;
         private final HashService service;
         private final UserData data;
-
-        public HashingCredential(final HashService service, final UserData data) {
+        private final String userName;
+        public HashingCredential(final HashService service, final UserData data, String userName) {
             this.service = service;
             this.data = data;
+            this.userName = userName;
         }
 
         @Override
@@ -114,7 +115,7 @@ public class LoginService extends AbstractLoginService {
                 credentials = new String((char[]) credentials);
             }
             if (credentials instanceof Password || credentials instanceof String) {
-                return service.hasSamePassword(data, credentials.toString());
+                return service.validatePassword(userName, data, credentials.toString());
             } else if (credentials instanceof HashingCredential) {
                 return data.equals(((HashingCredential) credentials).data);
             }

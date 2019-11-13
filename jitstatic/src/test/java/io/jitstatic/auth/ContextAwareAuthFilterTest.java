@@ -91,7 +91,7 @@ class ContextAwareAuthFilterTest {
         } else {
             when(storage.getUser(eq(user), eq(branch), eq(in.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
         }
-        when(hashService.hasSamePassword(data, pass)).thenReturn(true);
+        when(hashService.validatePassword(user, data, pass)).thenReturn(true);
 
         ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         Verdict authenticate = caaf.authenticate(crc, creds, "scheme");
@@ -245,7 +245,7 @@ class ContextAwareAuthFilterTest {
         when(storage.getUser(Mockito.anyString(), Mockito.any(), Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
         when(storage.getUser(eq(user), eq("refs/notref/other"), eq(Domain.KEYADMIN.getDomainName())))
                 .thenReturn(CompletableFuture.failedFuture(new WrappingAPIException(new RefNotFoundException("refs/notref/other"))));
-        when(hashService.hasSamePassword(data, pass)).thenReturn(true);
+        when(hashService.validatePassword(user, data, pass)).thenReturn(true);
 
         ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         assertEquals(Status.BAD_REQUEST.getStatusCode(), assertThrows(WebApplicationException.class, () -> caaf.authenticate(crc, new Object(), "scheme"))
@@ -274,7 +274,7 @@ class ContextAwareAuthFilterTest {
         URI uri = new URI("http://localhost:8080/application/storage/key?ref=refs%2Fheads%2Fother&?ref=refs%2Fheads%2Fmaster&?ref=refs%2Ftags%2Fblah");
         when(info.getRequestUri()).thenReturn(uri);
         when(storage.getUser(eq(user), eq("refs/heads/other"), eq(Domain.KEYADMIN.getDomainName()))).thenReturn(CompletableFuture.completedFuture(data));
-        when(hashService.hasSamePassword(data, pass)).thenReturn(true);
+        when(hashService.validatePassword(user, data, pass)).thenReturn(true);
 
         ContextAwareAuthFilter<Object> caaf = getUnit(storage, hashService, user, pass);
         Verdict authenticate = caaf.authenticate(crc, new Object(), "scheme");
@@ -296,7 +296,7 @@ class ContextAwareAuthFilterTest {
             }
 
             protected boolean validate(UserData userData, Object credentials) {
-                return userData != null && hashService.hasSamePassword(userData, pass);
+                return userData != null && hashService.validatePassword(user, userData, pass);
             };
 
             protected boolean isRoot(Object credentials) {

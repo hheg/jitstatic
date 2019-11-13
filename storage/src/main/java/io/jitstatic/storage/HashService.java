@@ -28,11 +28,15 @@ import org.apache.shiro.crypto.hash.DefaultHashService;
 import org.apache.shiro.crypto.hash.Hash;
 import org.apache.shiro.crypto.hash.HashRequest;
 import org.apache.shiro.util.ByteSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
 
 public class HashService implements Serializable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(HashService.class);
 
     private final String privateSalt;
     private final int iterations;
@@ -48,7 +52,15 @@ public class HashService implements Serializable {
 
     private static final long serialVersionUID = 7794693770611224576L;
 
-    public boolean hasSamePassword(final UserData data, final String password) {
+    public boolean validatePassword(String user, final UserData data, final String password) {
+        boolean isValid = checkPassword(data, password);
+        if (!isValid) {
+            LOG.info("User {} has incorrect password", user);
+        }
+        return isValid;
+    }
+
+    private boolean checkPassword(final UserData data, final String password) {
         if (data.getBasicPassword() == null || (data.getHash() != null && data.getSalt() != null)) {
             final DefaultHashService hasher = new DefaultHashService();
             if (privateSalt != null) {

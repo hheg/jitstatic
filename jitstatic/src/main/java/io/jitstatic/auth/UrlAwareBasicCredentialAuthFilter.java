@@ -51,7 +51,7 @@ public class UrlAwareBasicCredentialAuthFilter extends ContextAwareAuthFilter<Ba
     }
 
     @Override
-    public void filter(ContainerRequestContext requestContext) throws IOException {
+    public void filter(final ContainerRequestContext requestContext) throws IOException {
         final BasicCredentials credentials = getCredentials(requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
         final Verdict verdict = authenticate(requestContext, credentials, SecurityContext.BASIC_AUTH);
         if (!verdict.isAllowed) {
@@ -60,22 +60,22 @@ public class UrlAwareBasicCredentialAuthFilter extends ContextAwareAuthFilter<Ba
     }
 
     @Override
-    protected String getUserName(BasicCredentials credentials) {
+    protected String getUserName(final BasicCredentials credentials) {
         return credentials.getUsername();
     }
 
     @Override
-    protected boolean validate(UserData userData, BasicCredentials credentials) {
-        return userData != null && hashService.hasSamePassword(userData, credentials.getPassword());
+    protected boolean validate(final UserData userData, final BasicCredentials credentials) {
+        return userData != null && hashService.validatePassword(credentials.getUsername(), userData, credentials.getPassword());
     }
 
     @Override
-    protected boolean isRoot(BasicCredentials credentials) {
+    protected boolean isRoot(final BasicCredentials credentials) {
         return rootAuthenticator.test(credentials.getUsername(), credentials.getPassword());
     }
 
     @Nullable
-    private BasicCredentials getCredentials(String header) {
+    private BasicCredentials getCredentials(final String header) {
         if (header == null) {
             return null;
         }

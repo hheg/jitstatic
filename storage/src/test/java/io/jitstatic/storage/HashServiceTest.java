@@ -34,7 +34,7 @@ class HashServiceTest {
     void testHashPassword() {
         HashService hash = new HashService();
         UserData userData = hash.constructUserData(Set.of(), "password");
-        assertTrue(hash.hasSamePassword(userData, "password"));
+        assertTrue(hash.validatePassword("user", userData, "password"));
         assertNotNull(userData.getHash());
         assertNotNull(userData.getSalt());
         assertEquals(userData.getHash().length(), userData.getSalt().length());
@@ -44,7 +44,7 @@ class HashServiceTest {
     public void testLegacyPasswordCheck() {
         HashService hash = new HashService();
         UserData data = new UserData(Set.of(), "password", null, null);
-        assertTrue(hash.hasSamePassword(data, "password"));
+        assertTrue(hash.validatePassword("user", data, "password"));
     }
 
 }
