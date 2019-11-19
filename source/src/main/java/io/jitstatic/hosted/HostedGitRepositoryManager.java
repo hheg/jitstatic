@@ -42,6 +42,9 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.api.Git;
@@ -56,6 +59,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
+import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,14 +76,21 @@ import io.jitstatic.check.FileObjectIdStore;
 import io.jitstatic.check.SourceChecker;
 import io.jitstatic.check.SourceExtractor;
 import io.jitstatic.hosted.events.AddRefEvent;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.executors.RepoWriter;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
+import io.jitstatic.utils.ErrorReporter;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
+import zone.dragon.dropwizard.health.InjectableHealthCheck;
 
-public class HostedGitRepositoryManager implements Source {
+@Singleton
+@Service
+@Named("sourcechecker")
+public class HostedGitRepositoryManager extends InjectableHealthCheck implements Source {
 
     private static final Logger LOG = LoggerFactory.getLogger(HostedGitRepositoryManager.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -97,7 +108,14 @@ public class HostedGitRepositoryManager implements Source {
     private final ExecutorService uploadPackExecutor;
     private final RepoInserter repoInserter;
 
-    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, ExecutorService repoWriter, final ErrorReporter errorReporter)
+    @Inject
+    public HostedGitRepositoryManager(final JitstaticConfiguration config, final @RepoWriter ExecutorService repoWriter)
+            throws CorruptedSourceException, IOException {
+        this(config.getHostedFactory().getBasePath(), config.getHostedFactory().getHostedEndpoint(), config.getHostedFactory().getBranch(), repoWriter);
+    }
+
+    HostedGitRepositoryManager(final Path workingDirectory, final String endPointName, final String defaultRef, ExecutorService repoWriter,
+            final ErrorReporter errorReporter)
             throws CorruptedSourceException, IOException {
         if (!Files.isDirectory(Objects.requireNonNull(workingDirectory))) {
             if (Files.isRegularFile(workingDirectory)) {
@@ -225,9 +243,7 @@ public class HostedGitRepositoryManager implements Source {
         };
     }
 
-    public ReceivePackFactory<HttpServletRequest> getReceivePackFactory() {
-        return receivePackFactory;
-    }
+    public ReceivePackFactory<HttpServletRequest> getReceivePackFactory() { return receivePackFactory; }
 
     @Override
     public <T extends RepositoryListener> void addListener(final T listener, Class<T> type) {
@@ -339,9 +355,7 @@ public class HostedGitRepositoryManager implements Source {
         }
     }
 
-    public UploadPackFactory<HttpServletRequest> getUploadPackFactory() {
-        return uploadPackFactory;
-    }
+    public UploadPackFactory<HttpServletRequest> getUploadPackFactory() { return uploadPackFactory; }
 
     @Override
     public void deleteKey(final String key, final String ref, final CommitMetaData commitMetaData) {
@@ -354,7 +368,7 @@ public class HostedGitRepositoryManager implements Source {
             if (sourceInfo == null) {
                 return;
             }
-            updater.deleteKey(key, commitMetaData, sourceInfo.hasKeyMetaData(),ref);
+            updater.deleteKey(key, commitMetaData, sourceInfo.hasKeyMetaData(), ref);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         } catch (final RefNotFoundException e) {
@@ -399,17 +413,17 @@ public class HostedGitRepositoryManager implements Source {
 
     @Override
     public String updateUser(final String key, String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.updateUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "update user " + key, username, JITSTATIC_NOWHERE),ref);
+        return userUpdater.updateUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "update user " + key, username, JITSTATIC_NOWHERE), ref);
     }
 
     @Override
     public String addUser(final String key, String ref, final String username, final UserData data) throws IOException {
-        return userUpdater.addUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "add user " + key, username, JITSTATIC_NOWHERE),ref);
+        return userUpdater.addUser(key, data, new CommitMetaData(username, JITSTATIC_NOWHERE, "add user " + key, username, JITSTATIC_NOWHERE), ref);
     }
 
     @Override
     public void deleteUser(final String key, String ref, final String username) throws IOException {
-        userUpdater.deleteUser(key, new CommitMetaData(username, JITSTATIC_NOWHERE, "delete user " + key, username, JITSTATIC_NOWHERE),ref);
+        userUpdater.deleteUser(key, new CommitMetaData(username, JITSTATIC_NOWHERE, "delete user " + key, username, JITSTATIC_NOWHERE), ref);
     }
 
     @Override
@@ -425,12 +439,27 @@ public class HostedGitRepositoryManager implements Source {
 //        repoInserter.parse(new ByteArrayInputStream(data.getData()));
         repoInserter.moveRef(ObjectId.fromString(data.getOld()), ObjectId.fromString(data.getTip()), ref);
     }
-    
+
     private static class HealthCheckException extends RuntimeException {
         public HealthCheckException(Throwable fault) {
             super(fault);
         }
 
         private static final long serialVersionUID = 1L;
+    }
+
+    @Override
+    public void stop() throws Exception {
+        close();
+    }
+
+    @Override
+    protected Result check() throws Exception {
+        try {
+            checkHealth();
+            return Result.healthy();
+        } catch (final Throwable e) {
+            return Result.unhealthy(e);
+        }
     }
 }

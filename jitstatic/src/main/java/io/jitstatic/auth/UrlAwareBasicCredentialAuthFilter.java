@@ -26,6 +26,7 @@ import java.util.Base64;
 import java.util.function.BiPredicate;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.dropwizard.auth.basic.BasicCredentials;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 
@@ -43,6 +45,11 @@ public class UrlAwareBasicCredentialAuthFilter extends ContextAwareAuthFilter<Ba
     private static final Logger LOG = LoggerFactory.getLogger(UrlAwareBasicCredentialAuthFilter.class);
     private final HashService hashService;
     private final BiPredicate<String, String> rootAuthenticator;
+
+    @Inject
+    public UrlAwareBasicCredentialAuthFilter(final Storage storage, final HashService hashService, final JitstaticConfiguration config) {
+        this(storage, hashService, config.getRootAuthenticator());
+    }
 
     public UrlAwareBasicCredentialAuthFilter(final Storage storage, final HashService hashService, final BiPredicate<String, String> rootAuthenticator) {
         super(storage, "Basic");

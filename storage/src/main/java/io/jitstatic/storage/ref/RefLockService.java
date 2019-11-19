@@ -22,12 +22,14 @@ package io.jitstatic.storage.ref;
 
 import java.util.concurrent.ExecutorService;
 
-import io.jitstatic.source.Source;
-import io.jitstatic.storage.HashService;
+import org.jvnet.hk2.annotations.Contract;
 
+import io.jitstatic.source.Source;
+
+@Contract
 public interface RefLockService extends AutoCloseable {
 
-    public LockService getLockService(String ref, ExecutorService workstealingExecutor, Source source, HashService hashService);
+    public LockService getLockService(String ref, ExecutorService workstealingExecutor, Source source);
 
     public void returnLock(LockService keys);
 }

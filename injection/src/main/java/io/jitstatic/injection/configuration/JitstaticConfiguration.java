@@ -1,4 +1,4 @@
-package io.jitstatic;
+package io.jitstatic.injection.configuration;
 
 /*-
  * #%L
@@ -20,9 +20,6 @@ package io.jitstatic;
  * #L%
  */
 
-import java.io.IOException;
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
 import java.util.function.BiPredicate;
 
 import javax.validation.Valid;
@@ -31,16 +28,10 @@ import javax.validation.constraints.NotNull;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.Configuration;
-import io.dropwizard.setup.Environment;
-import io.jitstatic.check.CorruptedSourceException;
-import io.jitstatic.hosted.HostedFactory;
-import io.jitstatic.reporting.ReportingFactory;
-import io.jitstatic.source.Source;
-import io.jitstatic.storage.StorageFactory;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.reporting.ReportingFactory;
 
 public class JitstaticConfiguration extends Configuration {
-
-    private StorageFactory storage = new StorageFactory();
 
     @Valid
     @NotNull
@@ -55,20 +46,9 @@ public class JitstaticConfiguration extends Configuration {
 
     public void setReportingFactory(final ReportingFactory reporting) { this.reporting = reporting; }
 
-    public StorageFactory getStorageFactory() { return storage; }
-
-    public void setStorageFactory(final StorageFactory storage) { this.storage = storage; }
-
     public HostedFactory getHostedFactory() { return hosted; }
 
     public void setHostedFactory(final HostedFactory hosted) { this.hosted = hosted; }
-
-    public Source build(final Environment env, final String gitRealm, ExecutorService repoWriter) throws CorruptedSourceException, IOException {
-        Objects.requireNonNull(repoWriter);
-        final HostedFactory hostedFactory = getHostedFactory();
-        getReportingFactory().build(Objects.requireNonNull(env));
-        return hostedFactory.build(env, Objects.requireNonNull(gitRealm), repoWriter);
-    }
 
     public BiPredicate<String, String> getRootAuthenticator() {
         final HostedFactory hf = getHostedFactory();

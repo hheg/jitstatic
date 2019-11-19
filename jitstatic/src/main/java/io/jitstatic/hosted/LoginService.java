@@ -41,13 +41,12 @@ public class LoginService extends AbstractLoginService {
     private final UserPrincipal root;
     private final String defaultRef;
     private Storage storage;
-    private final HashService hashService;
+    private HashService hashService;
 
-    public LoginService(final String userName, final String secret, final String realm, final String defaultRef, HashService hashService) {
+    public LoginService(final String userName, final String secret, final String realm, final String defaultRef) {
         this._name = Objects.requireNonNull(realm);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.root = new UserPrincipal(Objects.requireNonNull(userName), new Password(Objects.requireNonNull(secret)));
-        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @Override
@@ -78,9 +77,8 @@ public class LoginService extends AbstractLoginService {
         }
     }
 
-    public void setUserStorage(final Storage storage) {
-        this.storage = storage;
-    }
+    public void setUserStorage(final Storage storage) { this.storage = storage; }
+    public void setHashService(final HashService hashService) { this.hashService = hashService; }
 
     private static class RoleBearingUserPrincipal extends UserPrincipal {
 
@@ -92,9 +90,7 @@ public class LoginService extends AbstractLoginService {
             this.roles = roles.stream().map(Role::getRole).toArray(String[]::new);
         }
 
-        public String[] getRoles() {
-            return Arrays.copyOf(roles, roles.length);
-        }
+        public String[] getRoles() { return Arrays.copyOf(roles, roles.length); }
     }
 
     private static class HashingCredential extends Credential {
@@ -103,6 +99,7 @@ public class LoginService extends AbstractLoginService {
         private final HashService service;
         private final UserData data;
         private final String userName;
+
         public HashingCredential(final HashService service, final UserData data, String userName) {
             this.service = service;
             this.data = data;

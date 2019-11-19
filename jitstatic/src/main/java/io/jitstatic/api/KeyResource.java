@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
@@ -89,6 +90,7 @@ import io.jitstatic.Role;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
@@ -108,6 +110,11 @@ public class KeyResource {
     private final Storage storage;
     private final APIHelper helper;
     private final boolean cors;
+    
+    @Inject
+    public KeyResource(final Storage storage, final JitstaticConfiguration config) {
+        this(storage, config.getHostedFactory().getCors() != null, config.getHostedFactory().getBranch());
+    }
 
     public KeyResource(final Storage storage, final boolean cors, final String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);

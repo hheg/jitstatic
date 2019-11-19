@@ -60,7 +60,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
         this.ref = Objects.requireNonNull(ref);
         this.source = Objects.requireNonNull(source);
         this.hashService = Objects.requireNonNull(hashService);
-        this.lock = refLockService.getLockService(ref, workStealingExecutor, source, hashService);
+        this.lock = refLockService.getLockService(ref, workStealingExecutor, source);
     }
 
     public void start() {

@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.utils;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,27 +20,22 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.Objects;
-import com.codahale.metrics.health.HealthCheck;
+import static org.junit.jupiter.api.Assertions.*;
 
-import io.jitstatic.utils.CheckHealth;
+import org.junit.jupiter.api.Test;
 
-public class HealthChecker extends HealthCheck {
+class NamingThreadFactoryTest {
 
-    private final CheckHealth source;
-
-    public HealthChecker(final CheckHealth source) {
-        this.source = Objects.requireNonNull(source);
-    }
-
-    @Override
-    protected Result check() throws Exception {
-        try {
-            source.checkHealth();
-            return Result.healthy();
-        } catch (final Throwable e) {
-            return Result.unhealthy(e);
-        }
+    @Test
+    void testThrowException() throws InterruptedException {
+        var rt = new RuntimeException("Test exception");
+        NamingThreadFactory ntf = new NamingThreadFactory("name");
+        Thread t = ntf.newThread(() -> {
+            throw rt;
+        });
+        t.start();
+        t.join();
+        assertSame(rt, ErrorReporter.INSTANCE.getFault());
     }
 
 }

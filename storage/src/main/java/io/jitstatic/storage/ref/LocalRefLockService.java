@@ -26,17 +26,24 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import org.jvnet.hk2.annotations.Service;
+
 import com.codahale.metrics.InstrumentedExecutorService;
 import com.codahale.metrics.MetricRegistry;
 
 import io.jitstatic.source.Source;
-import io.jitstatic.storage.HashService;
-import io.jitstatic.storage.NamingThreadFactory;
+import io.jitstatic.utils.NamingThreadFactory;
+import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-public class LocalRefLockService implements RefLockService {
+@Singleton
+@Service
+public class LocalRefLockService implements RefLockService, InjectableManaged {
     private final Map<String, LockService> refLockMap = new HashMap<>();
     private final ExecutorService repoWriter;
-
+    @Inject
     public LocalRefLockService(final MetricRegistry metrics) {
         this.repoWriter = new InstrumentedExecutorService(Executors.newSingleThreadExecutor(new NamingThreadFactory("RepoWriter")), metrics);
     }
@@ -49,8 +56,7 @@ public class LocalRefLockService implements RefLockService {
     }
 
     @Override
-    public synchronized LockService getLockService(final String ref, final ExecutorService workstealingExecutor, final Source source,
-            final HashService hashService) {
+    public synchronized LockService getLockService(final String ref, final ExecutorService workstealingExecutor, final Source source) {
         final LockService map = refLockMap.get(ref);
         return map == null ? new LockServiceImpl(this, ref, workstealingExecutor, source, repoWriter) : map;
     }
@@ -58,5 +64,15 @@ public class LocalRefLockService implements RefLockService {
     @Override
     public synchronized void returnLock(final LockService lock) {
         refLockMap.put(lock.getRef(), lock);
+    }
+
+    @Override
+    public void start() throws Exception {
+        // NOOP
+    }
+
+    @Override
+    public void stop() throws Exception {
+        close();
     }
 }

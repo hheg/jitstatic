@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -54,6 +55,7 @@ import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
 import io.jitstatic.auth.User;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
@@ -63,6 +65,11 @@ public class BulkResource {
     private final String defaultRef;
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
+    
+    @Inject
+    public BulkResource(final Storage storage, final JitstaticConfiguration config) {
+        this(storage, config.getHostedFactory().getBranch());
+    }
 
     public BulkResource(final Storage storage, String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);

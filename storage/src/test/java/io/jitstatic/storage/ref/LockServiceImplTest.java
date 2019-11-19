@@ -47,17 +47,15 @@ import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
-import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.KeyAlreadyExist;
-import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.test.BaseTest;
+import io.jitstatic.utils.NamingThreadFactory;
 import io.jitstatic.utils.WrappingAPIException;
 
 class LockServiceImplTest extends BaseTest {
 
     private static final String REF = "refs/heads/master";
     private Source source;
-    private HashService hashService = new HashService();
     private LocalRefLockService clusterService;
     private ExecutorService workStealer;
     private LockService lock;
@@ -71,7 +69,7 @@ class LockServiceImplTest extends BaseTest {
         repoWriter = Executors.newSingleThreadExecutor(new NamingThreadFactory("test-repowriter"));
         clusterService = mock(LocalRefLockService.class);
         lock = mock(LockService.class);
-        when(clusterService.getLockService(REF, workStealer, source, hashService)).thenReturn(lock);
+        when(clusterService.getLockService(REF, workStealer, source)).thenReturn(lock);
     }
 
     @AfterEach

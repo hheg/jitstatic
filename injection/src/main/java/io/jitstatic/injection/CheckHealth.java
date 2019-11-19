@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.injection;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2018 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,23 +19,8 @@ package io.jitstatic;
  * limitations under the License.
  * #L%
  */
+public interface CheckHealth {
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
-import org.junit.jupiter.api.Test;
-
-import io.jitstatic.AutoCloseableLifeCycleManager;
-
-public class AutoCloseableLifeCycleManagerTest {
-
-	AutoCloseable ac = mock(AutoCloseable.class);
-
-	@Test
-	public void testAutoCloseableLifeCycleManager() throws Exception {
-		AutoCloseableLifeCycleManager<AutoCloseable> unit = new AutoCloseableLifeCycleManager<AutoCloseable>(ac);
-		unit.stop();
-		verify(ac).close();
-	}
+	void checkHealth() throws Throwable;
 
 }

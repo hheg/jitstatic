@@ -1,4 +1,4 @@
-package io.jitstatic.reporting;
+package io.jitstatic.injection.configuration.reporting;
 
 import java.util.Locale;
 
@@ -27,13 +27,8 @@ import java.util.function.Function;
 
 import javax.validation.constraints.Pattern;
 
-import org.slf4j.LoggerFactory;
-
-import com.codahale.metrics.Slf4jReporter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
 
 public class ConsoleReporting {
@@ -47,23 +42,6 @@ public class ConsoleReporting {
 
 	@JsonProperty
 	private Duration reportPeriods = Duration.minutes(1);
-
-	public void build(final Environment env) {
-		final Slf4jReporter reporter = Slf4jReporter.forRegistry(env.metrics())
-				.outputTo(LoggerFactory.getLogger(ConsoleReporting.class)).convertRatesTo(convertRate.apply(getRates()))
-				.convertDurationsTo(getDurations().getUnit()).build();
-		env.lifecycle().manage(new Managed() {
-			@Override
-			public void start() throws Exception {
-				reporter.start(getReportPeriods().getQuantity(), getReportPeriods().getUnit());
-			}
-
-			@Override
-			public void stop() throws Exception {
-				reporter.stop();
-			}
-		});
-	}
 
 	public Duration getDurations() {
 		return durations;
@@ -89,7 +67,7 @@ public class ConsoleReporting {
 		this.reportPeriods = reportPeriods;
 	}
 
-	private Function<String, TimeUnit> convertRate = s -> {
+    public static final Function<String, TimeUnit> convertRate = s -> {
 		switch (s.toLowerCase(Locale.ROOT)) {
 		case "s":
 			return TimeUnit.SECONDS;

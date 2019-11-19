@@ -46,7 +46,7 @@ class ReadOnlyRefHolderTest {
         MetaData metaData = mock(MetaData.class);
         UserData userData = mock(UserData.class);
         LocalRefLockService lrls = mock(LocalRefLockService.class);
-        Mockito.when(lrls.getLockService(any(), any(), any(), any())).thenReturn(mock(LockService.class));
+        Mockito.when(lrls.getLockService(any(), any(), any())).thenReturn(mock(LockService.class));
         try (ReadOnlyRefHolder ref = new ReadOnlyRefHolder("ref", mock(Source.class), mock(HashService.class), lrls, workStealer);) {
             assertThrows(WrappingAPIException.class, () -> ref.addKey("key", osp, metaData, cmd));
             assertThrows(WrappingAPIException.class, () -> ref.addUser("user", "user", userData));

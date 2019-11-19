@@ -20,6 +20,11 @@
             <version>0.35.1-SNAPSHOT</version>
         </dependency>
         <dependency>
+            <groupId>io.jitstatic</groupId>
+            <artifactId>injection</artifactId>
+            <version>0.35.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>org.hibernate</groupId>
             <artifactId>hibernate-validator</artifactId>
         </dependency>

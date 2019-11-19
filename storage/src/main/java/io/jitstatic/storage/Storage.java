@@ -24,7 +24,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import javax.inject.Named;
+
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.jvnet.hk2.annotations.Contract;
 
 import com.spencerwi.either.Either;
 
@@ -33,11 +36,14 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.injection.CheckHealth;
 import io.jitstatic.source.ObjectStreamProvider;
-import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
+import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-public interface Storage extends AutoCloseable, CheckHealth {
+@Named("storagechecker")
+@Contract
+public interface Storage extends AutoCloseable, CheckHealth, InjectableManaged {
     public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref) throws RefNotFoundException;
 
     public void close();

@@ -55,6 +55,5 @@ public interface JitStaticConstants {
     public static boolean isRef(final String ref) {
         return ref != null && (ref.startsWith(Constants.R_HEADS) ^ ref.startsWith(Constants.R_TAGS));
     }
-    public String ROLERROLES = "roles";
-
+    public static final String ROLERROLES = "roles";
 }

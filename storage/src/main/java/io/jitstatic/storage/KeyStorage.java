@@ -33,11 +33,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
 import org.cache2k.integration.CacheLoader;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
+import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,18 +60,30 @@ import io.jitstatic.hosted.LoadException;
 import io.jitstatic.hosted.RefLockHolder;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.hosted.events.AddRef;
+import io.jitstatic.hosted.events.AddRefEventListener;
 import io.jitstatic.hosted.events.DeleteRef;
+import io.jitstatic.hosted.events.DeleteRefEventListener;
 import io.jitstatic.hosted.events.ReloadRef;
+import io.jitstatic.hosted.events.ReloadRefEventListener;
+import io.jitstatic.hosted.events.StorageAddRefEventListener;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.executors.DefaultExecutor;
+import io.jitstatic.injection.executors.WorkStealer;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.ref.ReadOnlyRefHolder;
 import io.jitstatic.storage.ref.RefHolder;
 import io.jitstatic.storage.ref.RefLockService;
+import io.jitstatic.utils.NamingThreadFactory;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.ShouldNeverHappenException;
 import io.jitstatic.utils.WrappingAPIException;
+import zone.dragon.dropwizard.health.InjectableHealthCheck;
 
-public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
+@Service
+@Singleton
+@Named("storagechecker")
+public class KeyStorage extends InjectableHealthCheck implements Storage, ReloadRef, DeleteRef, AddRef {
 
     private static final String DATA_CANNOT_BE_NULL = "data cannot be null";
     private static final String KEY_CANNOT_BE_NULL = "key cannot be null";
@@ -78,6 +96,13 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     private final ExecutorService refCleaner;
     private final ExecutorService executor;
 
+    @Inject
+    public KeyStorage(final Source source, final HashService hashService, final RefLockService clusterService, final JitstaticConfiguration config,
+            final @DefaultExecutor ExecutorService executor, @WorkStealer ExecutorService workStealer, final MetricRegistry metrics) {
+        this(source, config.getHostedFactory().getBranch(), hashService, clusterService, config.getHostedFactory()
+                .getUserName(), executor, workStealer, metrics);
+    }
+
     public KeyStorage(final Source source, final String defaultRef, final HashService hashService, final RefLockService clusterService, final String rootUser,
             final ExecutorService executor, final ExecutorService workStealingExecutor, final MetricRegistry metrics) {
         this.source = Objects.requireNonNull(source, "Source cannot be null");
@@ -88,6 +113,15 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
         this.refCleaner = new InstrumentedExecutorService(Executors.newSingleThreadExecutor(new NamingThreadFactory("RefCleaner")), Objects
                 .requireNonNull(metrics));
         addRef(this.defaultRef);
+    }
+
+    @PostConstruct
+    public void postConstruct() {
+        // TODO Change this to HK2 event system
+        source.addListener(new ReloadRefEventListener(this), ReloadRefEventListener.class);
+        source.addListener(new DeleteRefEventListener(this), DeleteRefEventListener.class);
+        source.addListener(new StorageAddRefEventListener(this), AddRefEventListener.class);
+        source.addRefHolderFactory(this::getRefHolderLock);
     }
 
     public RefLockHolder getRefHolderLock(final String ref) {
@@ -241,7 +275,8 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
     }
 
     @Override
-    public CompletableFuture<Either<String, FailedToLock>> updateMetaData(final String key, String ref, final MetaData metaData, final String oldMetaDataVersion,
+    public CompletableFuture<Either<String, FailedToLock>> updateMetaData(final String key, String ref, final MetaData metaData,
+            final String oldMetaDataVersion,
             final CommitMetaData commitMetaData) throws RefNotFoundException {
         Objects.requireNonNull(key, KEY_CANNOT_BE_NULL);
         Objects.requireNonNull(metaData, "metaData cannot be null");
@@ -463,6 +498,7 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
                 .loader(new CacheLoader<String, RefHolder>() {
                     @Override
                     public RefHolder load(final String ref) throws Exception {
+                        LOG.info("Adding ref {}", ref);
                         if (ref.startsWith("refs/tags/")) {
                             return new ReadOnlyRefHolder(ref, source, hashService, refLockService, executor);
                         }
@@ -476,10 +512,26 @@ public class KeyStorage implements Storage, ReloadRef, DeleteRef, AddRef {
 
     @Override
     public void addRef(final String ref) {
-        RefHolder refHolder = cache.peek(ref);
-        if (refHolder == null) {
-            LOG.info("Adding ref {}", ref);
-            cache.get(ref);
+        cache.get(ref);
+    }
+
+    @Override
+    public void start() throws Exception {
+        // NOOP
+    }
+
+    @Override
+    public void stop() throws Exception {
+        close();
+    }
+
+    @Override
+    protected Result check() throws Exception {
+        try {
+            checkHealth();
+            return Result.healthy();
+        } catch (final Throwable e) {
+            return Result.unhealthy(e);
         }
     }
 }

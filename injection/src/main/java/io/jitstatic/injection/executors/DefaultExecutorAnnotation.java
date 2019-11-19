@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.injection.executors;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,25 +20,12 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import org.glassfish.hk2.api.AnnotationLiteral;
 
-import org.junit.jupiter.api.Test;
-
-import io.jitstatic.ManagedObject;
-import io.jitstatic.source.Source;
-
-public class ManagedObjectTest {
-
-	Source m = mock(Source.class);
-
-	@Test
-	public void testManagedObject() throws Exception {
-		ManagedObject<Source> mo = new ManagedObject<>(m);
-		mo.start();
-		verify(m).start();
-		mo.stop();
-		verify(m).close();
-	}
-
+public final class DefaultExecutorAnnotation extends AnnotationLiteral<DefaultExecutor> implements DefaultExecutor {
+    private static final long serialVersionUID = 1L;
+    public static final DefaultExecutor INSTANCE = new DefaultExecutorAnnotation();
+    
+    private DefaultExecutorAnnotation() {
+    }
 }

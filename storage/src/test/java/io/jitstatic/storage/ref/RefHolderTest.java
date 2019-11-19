@@ -68,10 +68,10 @@ import io.jitstatic.source.Source;
 import io.jitstatic.source.SourceInfo;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.KeyAlreadyExist;
-import io.jitstatic.storage.NamingThreadFactory;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
+import io.jitstatic.utils.NamingThreadFactory;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
@@ -93,7 +93,7 @@ public class RefHolderTest extends BaseTest {
         repoWriter = Executors.newSingleThreadExecutor(new NamingThreadFactory("test-repowriter"));
         clusterService = mock(LocalRefLockService.class);
         lock = new LockServiceImpl(clusterService, REF, workStealer, source, repoWriter);
-        when(clusterService.getLockService(REF, workStealer, source, hashService)).thenReturn(lock);
+        when(clusterService.getLockService(REF, workStealer, source)).thenReturn(lock);
     }
 
     @AfterEach

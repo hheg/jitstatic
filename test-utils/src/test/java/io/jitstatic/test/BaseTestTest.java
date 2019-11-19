@@ -66,7 +66,6 @@ class BaseTestTest extends BaseTest {
                     assertEquals(Set.of(new Role("role")), apply.getData().getRoles());
                 }
             }
-            // TODO Need to reset to HEAD because bug in JGIT
             git.reset().setMode(ResetType.HARD).call();
             assertTrue(Files.exists(base.toPath().resolve("file")));
         }

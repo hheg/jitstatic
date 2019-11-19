@@ -21,23 +21,34 @@ package io.jitstatic.source;
  */
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.function.Function;
+
+import javax.inject.Named;
+import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.events.RepositoryListener;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.UploadPackFactory;
+import org.jvnet.hk2.annotations.Contract;
 
 import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.DistributedData;
 import io.jitstatic.hosted.RefLockHolder;
-import io.jitstatic.utils.CheckHealth;
+import io.jitstatic.injection.CheckHealth;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
+import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-public interface Source extends AutoCloseable, CheckHealth {
+@Named("sourcechecker")
+@Contract
+public interface Source extends AutoCloseable, CheckHealth, InjectableManaged {
     public void close();
 
     public void start();
@@ -73,5 +84,13 @@ public interface Source extends AutoCloseable, CheckHealth {
     public void readAllRefs() throws IOException;
 
     public void write(DistributedData data, String ref) throws IOException;
+
+    public RepositoryResolver<HttpServletRequest> getRepositoryResolver();
+
+    public ReceivePackFactory<HttpServletRequest> getReceivePackFactory();
+
+    public UploadPackFactory<HttpServletRequest> getUploadPackFactory();
+
+    public URI repositoryURI();
 
 }

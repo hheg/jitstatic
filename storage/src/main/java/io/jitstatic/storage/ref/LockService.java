@@ -27,6 +27,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.jvnet.hk2.annotations.Contract;
+
 import com.spencerwi.either.Either;
 
 import io.jitstatic.auth.UserData;
@@ -35,6 +37,7 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.utils.Pair;
 
+@Contract
 public interface LockService extends AutoCloseable {
 
     void close();

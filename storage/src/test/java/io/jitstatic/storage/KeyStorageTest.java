@@ -85,6 +85,7 @@ import io.jitstatic.storage.ref.RefLockService;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.utils.Functions;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
+import io.jitstatic.utils.NamingThreadFactory;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 

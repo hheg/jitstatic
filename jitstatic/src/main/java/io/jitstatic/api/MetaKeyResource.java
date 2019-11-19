@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -62,6 +63,7 @@ import io.jitstatic.CommitMetaData;
 import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.Storage;
 
 @Path("metakey")
@@ -72,6 +74,11 @@ public class MetaKeyResource {
     private static final Logger LOG = LoggerFactory.getLogger(MetaKeyResource.class);
     private final Storage storage;
     private final APIHelper helper;
+    
+    @Inject
+    public MetaKeyResource(final Storage storage, final JitstaticConfiguration config) {
+        this(storage,config.getHostedFactory().getBranch());
+    }
 
     public MetaKeyResource(final Storage storage, final String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);

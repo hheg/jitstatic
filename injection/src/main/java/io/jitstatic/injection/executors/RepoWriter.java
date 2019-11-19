@@ -1,10 +1,10 @@
-package io.jitstatic.reporting;
+package io.jitstatic.injection.executors;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,29 +20,19 @@ package io.jitstatic.reporting;
  * #L%
  */
 
-import javax.validation.Valid;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import io.dropwizard.setup.Environment;
+import javax.inject.Qualifier;
 
-public class ReportingFactory {
-	
-	@JsonProperty
-	@Valid
-	private ConsoleReporting console;
-	
-	public void build(final Environment env) {
-		if(getConsole() != null) {
-			getConsole().build(env);
-		}
-	}
-
-	public ConsoleReporting getConsole() {
-		return console;
-	}
-
-	public void setConsole(ConsoleReporting console) {
-		this.console = console;
-	}
+@Qualifier
+@Documented
+@Retention(RUNTIME)
+@Target({PARAMETER, METHOD})
+public @interface RepoWriter {
 }

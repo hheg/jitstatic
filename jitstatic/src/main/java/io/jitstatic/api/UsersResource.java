@@ -37,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.groups.Default;
@@ -79,6 +80,7 @@ import io.jitstatic.api.constraints.Adding;
 import io.jitstatic.api.constraints.GitRolesGroup;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.FailedToLock;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
@@ -94,6 +96,11 @@ public class UsersResource {
     private final APIHelper helper;
     private final HashService hashService;
 
+    @Inject
+    public UsersResource(final Storage storage, final JitstaticConfiguration config, final HashService hashService) {
+        this(storage, config.getHostedFactory().getBranch(), hashService);
+    }
+
     public UsersResource(final Storage storage, final String defaultBranch, final HashService hashService) {
         this.storage = Objects.requireNonNull(storage);
         this.helper = new APIHelper(LOG);
@@ -108,7 +115,8 @@ public class UsersResource {
     @Path(JITSTATIC_KEYADMIN_REALM + "/{key : .+}")
     @Consumes({ APPLICATION_JSON, APPLICATION_XML })
     @Produces({ APPLICATION_JSON, APPLICATION_XML })
-    public void getKeyAdminUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref, final @Auth User user,
+    public void getKeyAdminUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String ref,
+            final @Auth User user,
             @Context SecurityContext context, @Context ExecutorService executor, @Context Request request) {
         APIHelper.checkRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);

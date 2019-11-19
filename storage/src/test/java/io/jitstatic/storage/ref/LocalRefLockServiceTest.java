@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import com.codahale.metrics.MetricRegistry;
 
 import io.jitstatic.source.Source;
-import io.jitstatic.storage.HashService;
 
 class LocalRefLockServiceTest {
 
@@ -38,12 +37,11 @@ class LocalRefLockServiceTest {
     void testReturnLockService() throws Exception {
         MetricRegistry registry = new MetricRegistry();
         Source source = mock(Source.class);
-        HashService hashService = mock(HashService.class);
         ExecutorService workstealingExecutor = ForkJoinPool.commonPool();
         try (LocalRefLockService service = new LocalRefLockService(registry);) {
-            LockService lockService = service.getLockService("refs/heads/master", workstealingExecutor, source, hashService);
+            LockService lockService = service.getLockService("refs/heads/master", workstealingExecutor, source);
             service.returnLock(lockService);
-            LockService lockService2 = service.getLockService("refs/heads/master", workstealingExecutor, source, hashService);
+            LockService lockService2 = service.getLockService("refs/heads/master", workstealingExecutor, source);
             assertSame(lockService, lockService2);
         }
     }

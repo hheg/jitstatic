@@ -104,6 +104,7 @@ import io.jitstatic.check.SourceChecker;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.utils.ErrorReporter;
 
 @ExtendWith(TemporaryFolderExtension.class)
 public class JitStaticReceivePackTest extends BaseTest {

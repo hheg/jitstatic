@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.utils;
 
 /*-
  * #%L
@@ -25,8 +25,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.jitstatic.hosted.ErrorReporter;
 
 public class NamingThreadFactory implements ThreadFactory {
 

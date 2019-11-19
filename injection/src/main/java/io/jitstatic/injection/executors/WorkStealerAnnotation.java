@@ -1,4 +1,4 @@
-package io.jitstatic.storage;
+package io.jitstatic.injection.executors;
 
 /*-
  * #%L
@@ -20,24 +20,12 @@ package io.jitstatic.storage;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.glassfish.hk2.api.AnnotationLiteral;
 
-import org.junit.jupiter.api.Test;
+public class WorkStealerAnnotation extends AnnotationLiteral<WorkStealer> implements WorkStealer {
+    private static final long serialVersionUID = 1L;
+    public static final WorkStealerAnnotation INSTANCE = new WorkStealerAnnotation();
 
-import io.jitstatic.hosted.ErrorReporter;
-
-class NamingThreadFactoryTest {
-
-    @Test
-    void testThrowException() throws InterruptedException {
-        var rt = new RuntimeException("Test exception");
-        NamingThreadFactory ntf = new NamingThreadFactory("name");
-        Thread t = ntf.newThread(() -> {
-            throw rt;
-        });
-        t.start();
-        t.join();
-        assertSame(rt, ErrorReporter.INSTANCE.getFault());
+    private WorkStealerAnnotation() {
     }
-
 }

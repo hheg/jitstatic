@@ -77,7 +77,7 @@ class LockServiceImpl implements LockService {
     private static final String KEYPREFIX = "key-";
     private static final String GLOBAL = "globallock";
     private final AtomicReference<Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>>> refCache;
-    private final Logger LOG;
+    private final Logger log;
     private final ExecutorService workStealingExecutor;
     private final Source source;
     private final ExecutorService repoWriter;
@@ -88,7 +88,7 @@ class LockServiceImpl implements LockService {
         this.refLockService = Objects.requireNonNull(refLockService);
         this.ref = Objects.requireNonNull(ref);
         this.refCache = new AtomicReference<>(getStorage(1000));
-        this.LOG = LoggerFactory.getLogger(ref);
+        this.log = LoggerFactory.getLogger(ref);
         this.workStealingExecutor = Objects.requireNonNull(workStealingExecutor);
         this.source = Objects.requireNonNull(source);
         this.repoWriter = Objects.requireNonNull(repoWriter);
@@ -477,7 +477,7 @@ class LockServiceImpl implements LockService {
     @Override
     public void reload() {
         CompletableFuture.runAsync(((Supplier<Runnable>) () -> {
-            LOG.info("Reloading {}", ref);
+            log.info("Reloading {}", ref);
             final Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>> oldRefCache = refCache
                     .compareAndExchange(refCache.get(), getStorage(RefHolder.MAX_ENTRIES));
             return () -> {
@@ -486,7 +486,7 @@ class LockServiceImpl implements LockService {
                     return (value.isLeft() && value.getLeft().isPresent());
                 }).map(CacheEntry::getKey).forEach(key -> refCache.get().get(key));
                 oldRefCache.close();
-                LOG.info("Reloaded {}", ref);
+                log.info("Reloaded {}", ref);
             };
         }).get(), workStealingExecutor);
 

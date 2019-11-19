@@ -1,10 +1,10 @@
-package io.jitstatic;
+package io.jitstatic.injection.executors;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 H.Hegardt
+ * Copyright (C) 2017 - 2019 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,26 +20,19 @@ package io.jitstatic;
  * #L%
  */
 
-import java.util.Objects;
-import io.dropwizard.lifecycle.Managed;
-import io.jitstatic.source.Source;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-public class ManagedObject<T extends AutoCloseable & Source>  implements Managed {
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-	private final T object;
-	
-	public ManagedObject(final T object) {
-		this.object = Objects.requireNonNull(object);
-	}
-		
-	@Override
-	public void start() throws Exception {
-		this.object.start();
-	}
+import javax.inject.Qualifier;
 
-	@Override
-	public void stop() throws Exception {
-		this.object.close();
-	}
-
+@Qualifier
+@Documented
+@Retention(RUNTIME)
+@Target({PARAMETER, METHOD})
+public @interface DefaultExecutor {
 }

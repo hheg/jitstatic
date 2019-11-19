@@ -61,6 +61,7 @@ import io.jitstatic.check.SourceChecker;
 import io.jitstatic.hosted.events.AddRefEvent;
 import io.jitstatic.hosted.events.DeleteRefEvent;
 import io.jitstatic.hosted.events.ReloadRefEvent;
+import io.jitstatic.utils.ErrorReporter;
 import io.jitstatic.utils.Pair;
 
 public class JitStaticReceivePack extends ReceivePack {

@@ -37,6 +37,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.SourceChecker;
+import io.jitstatic.utils.ErrorReporter;
 
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 

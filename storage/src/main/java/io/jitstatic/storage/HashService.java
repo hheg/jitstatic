@@ -23,17 +23,24 @@ package io.jitstatic.storage;
 import java.io.Serializable;
 import java.util.Set;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 import org.apache.shiro.codec.Hex;
 import org.apache.shiro.crypto.hash.DefaultHashService;
 import org.apache.shiro.crypto.hash.Hash;
 import org.apache.shiro.crypto.hash.HashRequest;
 import org.apache.shiro.util.ByteSource;
+import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.jitstatic.Role;
 import io.jitstatic.auth.UserData;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 
+@Singleton
+@Service
 public class HashService implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HashService.class);
@@ -43,6 +50,10 @@ public class HashService implements Serializable {
 
     public HashService() {
         this(null, 5);
+    }
+    @Inject
+    public HashService(final JitstaticConfiguration config) {
+        this(config.getHostedFactory().getPrivateSalt(), config.getHostedFactory().getIterations());
     }
 
     public HashService(final String privateSalt, final int iterations) {

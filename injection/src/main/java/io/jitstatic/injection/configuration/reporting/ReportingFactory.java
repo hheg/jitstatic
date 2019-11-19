@@ -1,10 +1,10 @@
-package io.jitstatic.utils;
+package io.jitstatic.injection.configuration.reporting;
 
 /*-
  * #%L
  * jitstatic
  * %%
- * Copyright (C) 2017 - 2018 H.Hegardt
+ * Copyright (C) 2017 H.Hegardt
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,21 @@ package io.jitstatic.utils;
  * #L%
  */
 
-public interface CheckHealth {
+import javax.validation.Valid;
 
-	void checkHealth() throws Throwable;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
+public class ReportingFactory {
+	
+	@JsonProperty
+	@Valid
+	private ConsoleReporting console;
+
+	public ConsoleReporting getConsole() {
+		return console;
+	}
+
+	public void setConsole(ConsoleReporting console) {
+		this.console = console;
+	}
 }

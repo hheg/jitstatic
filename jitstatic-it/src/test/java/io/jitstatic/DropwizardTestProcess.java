@@ -24,7 +24,8 @@ import java.io.File;
 import java.io.IOException;
 
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
-import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.tools.ContainerUtils;
 
