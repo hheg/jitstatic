@@ -118,16 +118,22 @@ public class LoadTesterRunner {
     private Counters putCounters;
     private Counters gitCounters;
     private final List<DropwizardProcess> processes;
+    private final int duration;
 
     public LoadTesterRunner(DropwizardProcess process) {
         this(List.of(process));
     }
 
     public LoadTesterRunner(List<DropwizardProcess> processes) {
+        this(processes, 10_000);
+    }
+
+    public LoadTesterRunner(List<DropwizardProcess> processes, int duration) {
         if (processes.isEmpty()) {
             throw new IllegalArgumentException("The number of processes need to be more than one");
         }
         this.processes = processes;
+        this.duration = duration;
     }
 
     public void after() throws IOException {
@@ -253,8 +259,8 @@ public class LoadTesterRunner {
                 clients.add(new JitStaticUpdater(buildKeyClient(data.cache, processes.get(rand.nextInt(processes.size())))));
             }
             for (int i = 0; i < data.updaters; i++) {
-                GitClientUpdater gitClientUpdater = new GitClientUpdater(processes.get(rand.nextInt(processes.size())).getGitAddress(), user2, password2,
-                        processes.get(0).getFolderFile());
+                GitClientUpdater gitClientUpdater = new GitClientUpdater(processes.get(rand.nextInt(processes.size()))
+                        .getGitAddress(), user2, password2, processes.get(0).getFolderFile());
                 gitClientUpdater.initRepo();
                 updaters.add(gitClientUpdater);
             }
@@ -272,9 +278,8 @@ public class LoadTesterRunner {
                     fail(e1);
                 }
             });
-            CompletableFuture.allOf(
-                    CompletableFuture.runAsync(shutdownAndAwait(updaterPool)),
-                    CompletableFuture.runAsync(shutdownAndAwait(clientPool))).get(15, TimeUnit.SECONDS);
+            CompletableFuture.allOf(CompletableFuture.runAsync(shutdownAndAwait(updaterPool)), CompletableFuture.runAsync(shutdownAndAwait(clientPool)))
+                    .get(15, TimeUnit.SECONDS);
         }
     }
 
@@ -301,15 +306,14 @@ public class LoadTesterRunner {
                 execUpdatersJobs(updaterPool, updaterJobs, updaters, data);
                 execClientJobs(clientPool, clientJobs, clients, data);
             }
-        } while (System.currentTimeMillis() - start < 10_000);
+        } while (System.currentTimeMillis() - start < duration);
         LOG.info("doWork is done!");
     }
 
     private void waitForJobstoFinish(CompletableFuture<?>[] clientJobs, CompletableFuture<?>[] updaterJobs)
             throws InterruptedException, ExecutionException, TimeoutException {
-        CompletableFuture.allOf(
-                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(clientJobs), "direct clients")),
-                CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(updaterJobs), "git clients"))).get(160, TimeUnit.SECONDS);
+        CompletableFuture.allOf(CompletableFuture.runAsync(() -> waitForJobs(CompletableFuture.allOf(clientJobs), "direct clients")), CompletableFuture
+                .runAsync(() -> waitForJobs(CompletableFuture.allOf(updaterJobs), "git clients"))).get(duration * 16, TimeUnit.MILLISECONDS);
     }
 
     private void waitForJobs(CompletableFuture<Void> jobs, String type) {
@@ -396,8 +400,8 @@ public class LoadTesterRunner {
         Path path = Paths.get(workingFolder.toURI());
         Path user = path.resolve(USERS).resolve(JITSTATIC_KEYADMIN_REALM).resolve(USER);
         assertTrue(user.getParent().toFile().mkdirs());
-        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}").getBytes(UTF_8),
-                CREATE_NEW, TRUNCATE_EXISTING);
+        Files.write(user, ("{\"roles\":[{\"role\":\"write\"},{\"role\":\"read\"}],\"basicPassword\":\"" + PASSWORD + "\"}")
+                .getBytes(UTF_8), CREATE_NEW, TRUNCATE_EXISTING);
 
         for (String name : testData.names) {
             Files.write(path.resolve(name), data, CREATE_NEW, TRUNCATE_EXISTING);
@@ -645,13 +649,9 @@ public class LoadTesterRunner {
             this.value = value2;
         }
 
-        public JsonNode getValue() {
-            return value;
-        }
+        public JsonNode getValue() { return value; }
 
-        public String getTag() {
-            return tag;
-        }
+        public String getTag() { return tag; }
 
     }
 

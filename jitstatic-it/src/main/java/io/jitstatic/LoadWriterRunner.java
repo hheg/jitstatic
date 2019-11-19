@@ -98,16 +98,22 @@ public class LoadWriterRunner {
     private Optional<ResultData> result = Optional.empty();
 
     private final List<DropwizardProcess> processess;
+    private final int duration;
 
     public LoadWriterRunner(DropwizardProcess process) {
         this(List.of(process));
     }
 
     public LoadWriterRunner(List<DropwizardProcess> processess) {
+        this(processess, 20_000);
+    }
+
+    public LoadWriterRunner(List<DropwizardProcess> processess, int duration) {
         if (processess.isEmpty()) {
             throw new IllegalArgumentException("The number of processes need to be more than one");
         }
         this.processess = processess;
+        this.duration = duration;
     }
 
     public void testWrite(WriteData data) throws GitAPIException, InterruptedException, ExecutionException, TimeoutException, IOException {
@@ -134,7 +140,7 @@ public class LoadWriterRunner {
                     j++;
                 }
             }
-            CompletableFuture.allOf(jobs).get(200, TimeUnit.SECONDS);
+            CompletableFuture.allOf(jobs).get(duration * 20, TimeUnit.MILLISECONDS);
             result = Stream.of(jobs).map(CompletableFuture::join).reduce(ResultData::sum);
         } finally {
             service.shutdown();
@@ -162,7 +168,7 @@ public class LoadWriterRunner {
         int i = 1;
         long start = System.currentTimeMillis();
         try {
-            while ((stop = System.currentTimeMillis()) - start < 20_000) {
+            while ((stop = System.currentTimeMillis()) - start < duration) {
                 byte[] data2 = testData.getData(i);
                 bytes += data2.length;
                 tag = buildKeyClient.modifyKey(data2, new CommitData(key, branch, "k:" + key + ":" + i, "userinfo", "mail"), tag);
