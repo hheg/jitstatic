@@ -117,7 +117,7 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
             realm.invokeInRealm(requestContext, scheme, result.userData, userName, result.domain);
             return result.verdict;
         });
-        CompletableFuture.allOf(realm.getDomains().stream()
+        CompletableFuture.allOf(realm.getDomains().parallelStream()
                 .map(d -> invokeInDomain(d, ref, realm, userName, credentials, resultReceiver))
                 .toArray(CompletableFuture[]::new))
                 .thenAccept(ignore -> resultEmitter.complete(realm.denied));
