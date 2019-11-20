@@ -171,7 +171,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match"), headers.get("Access-Control-Allow-Headers"));
+        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match,if-none-match"), headers.get("Access-Control-Allow-Headers"));
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
 
@@ -306,7 +306,7 @@ public class CorsIT extends BaseTest {
                 .asString();
         Headers result = response.getHeaders();
         printHeaders(result);
-        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match"), result.get("Access-Control-Allow-Headers"));
+        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match,if-none-match"), result.get("Access-Control-Allow-Headers"));
         assertEquals(List.of("1800"), result.get("Access-Control-Max-Age"));
     }
 
@@ -411,7 +411,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match","if-none-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toList())), Set
                         .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
                                 .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
@@ -434,7 +434,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match","if-none-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toList())), Set
                         .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
                                 .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));

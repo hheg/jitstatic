@@ -149,7 +149,7 @@ public class HostedFactory {
 
         @JsonProperty
         @NotEmpty
-        private String allowedHeaders = "X-Requested-With,Content-Type,Accept,Origin,if-match";
+        private String allowedHeaders = "X-Requested-With,Content-Type,Accept,Origin,if-match,if-none-match";
 
         @JsonProperty
         @NotEmpty
