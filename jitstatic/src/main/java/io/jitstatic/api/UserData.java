@@ -29,6 +29,7 @@ import javax.validation.constraints.Size;
 import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.jitstatic.Role;
@@ -46,18 +47,25 @@ public class UserData {
     @GitRoles(groups = GitRolesGroup.class)
     private final Set<Role> roles;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final String ref;
+
     @JsonCreator
-    public UserData(@JsonProperty("roles") Set<Role> roles, @JsonProperty("basicPassword") String password) {
+    public UserData(@JsonProperty("roles") Set<Role> roles, @JsonProperty("basicPassword") String password,
+            @JsonProperty(value = "ref", required = false) String ref) {
         this.basicPassword = password;
         this.roles = roles;
+        this.ref = ref;
     }
 
     public UserData(io.jitstatic.auth.UserData userData) {
-        this(userData.getRoles(), userData.getHash() != null ? null : userData.getBasicPassword());
+        this(userData.getRoles(), userData.getHash() != null ? null : userData.getBasicPassword(), null);
     }
 
     public Set<Role> getRoles() { return roles; }
 
     public String getBasicPassword() { return basicPassword; }
+
+    public String getRef() { return ref; }
 
 }

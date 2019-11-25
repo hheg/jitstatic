@@ -174,7 +174,7 @@ public class UsersResourceTest {
     @Test
     public void testPutUserWithNoUser() {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, data.getStatus());
         data.close();
     }
@@ -189,7 +189,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, createCreds(user, pass))
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, data.getStatus());
         data.close();
     }
@@ -200,7 +200,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
     }
@@ -213,7 +213,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
     }
@@ -228,7 +228,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
         verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -244,7 +244,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
         verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -261,7 +261,7 @@ public class UsersResourceTest {
             Response data = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                     .header(AUTHORIZATION, BASIC_AUTH_CRED)
                     .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                    .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                    .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
             assertEquals("2", data.getEntityTag().getValue());
             data.close();
             verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYADMIN_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -274,7 +274,7 @@ public class UsersResourceTest {
     @Test
     public void testPostUserWithNoUser() {
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, response.getStatus());
         response.close();
     }
@@ -286,7 +286,7 @@ public class UsersResourceTest {
         when(storage.getUser(user, null, "keyadmin")).thenReturn(CompletableFuture.completedFuture(new UserData(Set.of(new Role("some")), pass, null, null)));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, createCreds(user, pass))
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, response.getStatus());
         response.close();
     }
@@ -297,7 +297,7 @@ public class UsersResourceTest {
                 .thenReturn(CompletableFuture.completedFuture(Pair.of("1", new UserData(Set.of(new Role("role")), "22", null, null))));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(CONFLICT_409, response.getStatus());
         response.close();
     }
@@ -309,7 +309,7 @@ public class UsersResourceTest {
                 .thenReturn(CompletableFuture.completedFuture("22"));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYADMIN_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());
         assertEquals("22", response.getEntityTag().getValue());
         response.close();
@@ -421,7 +421,7 @@ public class UsersResourceTest {
     @Test
     public void testPutKeyUserWithNoUser() {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, data.getStatus());
         data.close();
     }
@@ -435,7 +435,7 @@ public class UsersResourceTest {
                 .request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, data.getStatus());
         data.close();
     }
@@ -447,7 +447,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
     }
@@ -459,7 +459,7 @@ public class UsersResourceTest {
 
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 2 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "20"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "20", null), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
     }
@@ -474,7 +474,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(PRECONDITION_FAILED_412, data.getStatus());
         data.close();
         verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -490,7 +490,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(NOT_FOUND_404, data.getStatus());
         data.close();
         verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -506,7 +506,7 @@ public class UsersResourceTest {
         Response data = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
                 .header(HttpHeaders.IF_MATCH, "\"" + 1 + "\"")
-                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .put(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals("2", data.getEntityTag().getValue());
         data.close();
         verify(storage, times(1)).updateUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), eq(userData), eq("1"));
@@ -516,7 +516,7 @@ public class UsersResourceTest {
     public void testPostKeyUserWithNoUser() {
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin")
                 .request()
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(UNAUTHORIZED_401, response.getStatus());
         response.close();
     }
@@ -529,7 +529,7 @@ public class UsersResourceTest {
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin")
                 .request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(FORBIDDEN_403, response.getStatus());
         response.close();
     }
@@ -541,7 +541,7 @@ public class UsersResourceTest {
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin")
                 .request()
                 .header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(CONFLICT_409, response.getStatus());
         response.close();
     }
@@ -552,7 +552,7 @@ public class UsersResourceTest {
         when(storage.addUser(eq("keyadmin"), eq(REFS_HEADS_MASTER), eq(JITSTATIC_KEYUSER_REALM), eq(PUSER), any()))
                 .thenReturn(CompletableFuture.completedFuture("22"));
         Response response = RESOURCES.target("users/" + JITSTATIC_KEYUSER_REALM + "/keyadmin").request().header(AUTHORIZATION, BASIC_AUTH_CRED)
-                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22"), APPLICATION_JSON));
+                .post(Entity.entity(new io.jitstatic.api.UserData(Set.of(new Role("role")), "22", null), APPLICATION_JSON));
         assertEquals(OK_200, response.getStatus());
         assertEquals("22", response.getEntityTag().getValue());
         response.close();

@@ -276,13 +276,13 @@ You can't use the modify API on a tag since tags are immutable. You can still ch
 
 ### API for creating keys
 
-You can create a key by just POSTing the content to the server. Since there are no information about who can do what on the server, the user to do this is the same one for the git access point, ie the master password.
+You can create a key by just POSTing the content to the server. Since there are no information about who can do what on the server, the user to do this is the same one for the git access point, ie the master password. It's possible to add the ref in the body, or as a query parameter and if it's omitted it will default to what ref the server have defaulted to.
 
 ```
 curl -i -H 'Content-Type: application/json' \
 --user huser:hseCr3t -X POST \
--d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"read":[],"write":[],"contentType":"application/json"},"userInfo":"user"}' \
-http://localhost:8085/app/storage/test?ref=refs%2Fheads%2Fmaster
+-d '{"data":"eyJvbmUiOiJ0d28ifQ==","message":"testmessage","userMail":"test@test.com","metaData":{"read":[],"write":[],"contentType":"application/json"},"userInfo":"user","ref":"refs/heads/master"}' \
+http://localhost:8085/app/storage/test
 
 HTTP/1.1 200 OK
 Date: Sun, 04 Mar 2018 00:10:37 GMT

@@ -213,7 +213,7 @@ public class KeyResource {
             @Context ExecutorService executor) {
         // All resources without a user cannot be modified with this method. It has to
         // be done through directly changing the file in the Git repository.
-        APIHelper.checkValidRef(askedRef);
+        APIHelper.checkMutableRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         APIHelper.checkHeaders(headers);
         try {
@@ -268,10 +268,11 @@ public class KeyResource {
     @Path("{key : .+}")
     @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN })
-    public void addKey(@Suspended AsyncResponse asyncResponse, @NotNull final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
+    public void addKey(@Suspended AsyncResponse asyncResponse, @NotNull final @PathParam("key") String key, @QueryParam("ref") String askedRef,
             final @Validated @Valid @NotNull AddKeyData data, final @Context HttpServletRequest httpRequest, final @Auth User user,
             @Context SecurityContext context, @Context ExecutorService executor) throws JsonParseException, JsonMappingException, IOException {
-        APIHelper.checkValidRef(askedRef);
+        askedRef = data.getRef() != null ? data.getRef() : askedRef;
+        APIHelper.checkMutableRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
             storage.getKey(key, ref)
@@ -311,7 +312,7 @@ public class KeyResource {
     public void deleteKey(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, final @QueryParam("ref") String askedRef,
             final @Auth User user, final @Context HttpServletRequest httpRequest, final @Context HttpHeaders headers, @Context SecurityContext context,
             @Context ExecutorService executor) {
-        APIHelper.checkValidRef(askedRef);
+        APIHelper.checkMutableRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {
             helper.checkIfKeyExist(key, ref, storage)

@@ -99,7 +99,7 @@ class APIHelper {
         }
     }
 
-    static void checkValidRef(final String ref) {
+    static void checkMutableRef(final String ref) {
         if (ref != null) {
             checkRef(ref);
             if (ref.startsWith(Constants.R_TAGS)) {

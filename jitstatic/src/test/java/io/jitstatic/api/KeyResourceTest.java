@@ -606,7 +606,7 @@ public class KeyResourceTest {
         when(storage.getKey(eq("test"), eq(REFS_HEADS_MASTER))).thenReturn(CompletableFuture.completedFuture(Optional.empty()));
         when(storage.addKey(eq("test"), any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture("1"));
         AddKeyData addKeyData = new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                .of(new Role("write"))), "testmessage", "user", "test@test.com");
+                .of(new Role("write"))), "testmessage", "user", "test@test.com", null);
         Response response = RESOURCES.target("/storage/test")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
@@ -621,7 +621,7 @@ public class KeyResourceTest {
     public void testAddRootKey() throws RefNotFoundException {
         when(storage.getKey(anyString(), anyString())).thenThrow(new WrappingAPIException(new UnsupportedOperationException("test/")));
         AddKeyData addKeyData = new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                .of(new Role("write"))), "testmessage", "user", "test@test.com");
+                .of(new Role("write"))), "testmessage", "user", "test@test.com", null);
         Response response = RESOURCES.target("/storage/test/")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
@@ -634,7 +634,7 @@ public class KeyResourceTest {
     public void testAddKeyNoUser() {
         Response response = RESOURCES.target("/storage/test").request()
                 .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "testmessage", "user", "test@test.com")));
+                        .of(new Role("write"))), "testmessage", "user", "test@test.com", null)));
         assertEquals(Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
         assertEquals("Basic realm=\"" + JitStaticConstants.JITSTATIC_KEYUSER_REALM + "|" + JITSTATIC_KEYADMIN_REALM + "|"
                 + JitStaticConstants.JITSTATIC_GIT_REALM
@@ -650,7 +650,7 @@ public class KeyResourceTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "test", "user", "test@test.com")));
+                        .of(new Role("write"))), "test", "user", "test@test.com", null)));
         assertEquals(403, response.getStatus());
         response.close();
     }
@@ -665,7 +665,7 @@ public class KeyResourceTest {
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData(toProvider(data), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "test", "user", "test@test.com")));
+                        .of(new Role("write"))), "test", "user", "test@test.com", null)));
         assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
         response.close();
     }
@@ -680,7 +680,7 @@ public class KeyResourceTest {
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData(toProvider(data), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "test", "user", "test@test.com")));
+                        .of(new Role("write"))), "test", "user", "test@test.com", null)));
         assertEquals(HttpStatus.BAD_REQUEST_400, response.getStatus());
         response.close();
     }
@@ -695,7 +695,7 @@ public class KeyResourceTest {
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .post(Entity.json(new AddKeyData(toProvider(data), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "test", "user", "test@test.com")));
+                        .of(new Role("write"))), "test", "user", "test@test.com", null)));
         assertEquals(422, response.getStatus());
         response.close();
     }
@@ -710,7 +710,7 @@ public class KeyResourceTest {
                 .header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED_POST)
                 .accept(MediaType.APPLICATION_JSON)
                 .post(Entity.json(new AddKeyData(toProvider(new byte[] {}), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
-                        .of(new Role("write"))), "test", "user", "test@test.com")));
+                        .of(new Role("write"))), "test", "user", "test@test.com", null)));
         assertEquals(200, response.getStatus());
     }
 
