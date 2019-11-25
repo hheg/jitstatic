@@ -41,6 +41,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
@@ -95,6 +96,7 @@ import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
+@Singleton
 @Path("storage")
 @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class KeyResource {

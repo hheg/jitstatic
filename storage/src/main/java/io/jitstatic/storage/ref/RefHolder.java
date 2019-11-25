@@ -64,7 +64,7 @@ public class RefHolder implements RefLockHolder, AutoCloseable {
     }
 
     public void start() {
-
+        // NOOP
     }
 
     public boolean isEmpty() { return lock.isEmpty(); }

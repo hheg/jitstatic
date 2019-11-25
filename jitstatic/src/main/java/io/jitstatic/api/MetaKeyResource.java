@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -66,6 +67,7 @@ import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.Storage;
 
+@Singleton
 @Path("metakey")
 public class MetaKeyResource {
 

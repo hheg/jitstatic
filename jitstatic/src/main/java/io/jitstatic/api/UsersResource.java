@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import javax.validation.groups.Default;
@@ -86,6 +87,7 @@ import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 import io.jitstatic.utils.WrappingAPIException;
 
+@Singleton
 @Path("users")
 public class UsersResource {
 

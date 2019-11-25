@@ -36,6 +36,7 @@ import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
 import javax.annotation.Nullable;
+import javax.inject.Singleton;
 
 import org.cache2k.Cache;
 import org.cache2k.Cache2kBuilder;
@@ -45,6 +46,7 @@ import org.cache2k.integration.CacheLoaderException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +70,8 @@ import io.jitstatic.utils.VersionIsNotSame;
 import io.jitstatic.utils.WrappingAPIException;
 import io.jitstatic.utils.Functions.ThrowingSupplier;
 
+@Singleton
+@Service
 @SuppressFBWarnings(value = "NP_OPTIONAL_RETURN_NULL", justification = "Map's returns null and there's a difference from a previous cached 'not found' value and a new 'not found'")
 class LockServiceImpl implements LockService {
 
