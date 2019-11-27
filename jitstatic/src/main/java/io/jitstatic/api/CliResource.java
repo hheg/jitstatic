@@ -46,7 +46,10 @@ import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.hash.Hashing;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 @Path("cli")
+@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class CliResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(CliResource.class);
