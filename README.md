@@ -581,6 +581,17 @@ and to make the access logs in JSON you'd use
 	-Ddw.server.requestLog.appenders[0].layout.type=access-json
 ```
 
+## CLI (Alpha)
+
+There's a CLI for creating and managing users. To get the scripts you can retrieve them at the endpoint, `<appliction base>/cli/`, as such:
+```
+curl http://localhost:8085/application/cli/createuser.sh
+curl http://localhost:8085/application/cli/updateuser.sh
+curl http://localhost:8085/application/cli/deleteuser.sh
+curl http://localhost:8085/application/cli/fetch.sh
+```
+Note that this is alpha code and may change in future releases. 
+
 ## Java client
 You can find a Java client for JitStatic in Maven Central with coordinates 
 

@@ -17,6 +17,12 @@
         <dependency>
             <groupId>zone.dragon.dropwizard</groupId>
             <artifactId>dropwizard-hk2</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.xml.bind</groupId>
+                    <artifactId>jaxb-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.glassfish.hk2</groupId>

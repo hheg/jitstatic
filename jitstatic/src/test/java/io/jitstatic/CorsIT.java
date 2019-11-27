@@ -44,8 +44,6 @@ import java.util.stream.Collectors;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.glassfish.jersey.internal.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
@@ -455,11 +453,6 @@ public class CorsIT extends BaseTest {
 
     private static String getMetaData(MetaData metaData) throws JsonProcessingException {
         return MAPPER.writeValueAsString(metaData);
-    }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String string) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(string).setCreateBranch(true).call();
-        commitAndPush(git, provider);
     }
 
     @Override

@@ -58,7 +58,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
@@ -1181,11 +1180,6 @@ public class UserManagementTest extends BaseTest {
     }
 
     protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(ref).setCreateBranch(true).call();
-        commitAndPush(git, provider);
-    }
 
     private static io.jitstatic.client.UserData from(Set<Role> roles, String pass) {
         Set<io.jitstatic.client.MetaData.Role> clientRoles = roles.stream().map(r -> r.getRole()).map(io.jitstatic.client.MetaData.Role::new)
