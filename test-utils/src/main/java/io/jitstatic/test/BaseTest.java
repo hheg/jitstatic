@@ -234,6 +234,11 @@ public abstract class BaseTest {
         return Base64.getEncoder().encodeToString((user + ":" + password).getBytes(UTF_8));
     }
 
+    protected void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
+        git.checkout().setName(ref).setCreateBranch(true).call();
+        commitAndPush(git, provider);
+    }
+
     public static Exception shutdownExecutor(final ExecutorService service) {
         try {
             service.shutdown();

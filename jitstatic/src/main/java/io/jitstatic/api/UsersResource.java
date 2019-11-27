@@ -347,7 +347,7 @@ public class UsersResource {
                         if (newVersion == null) {
                             throw new WebApplicationException(Status.NOT_FOUND);
                         }
-                        LOG.info("{} logged in and added key {}/{} in {}", user, realm, key, ref);
+                        LOG.info("{} logged in and added user {}/{} in {}", user, realm, key, ref);
                         return Response.ok().tag(new EntityTag(newVersion)).header(HttpHeaders.CONTENT_ENCODING, UTF_8).build();
                     }, executor).exceptionally(helper::exceptionHandlerPOSTAPI).thenAcceptAsync(asyncResponse::resume, executor);
         } catch (RefNotFoundException e) {
@@ -371,7 +371,7 @@ public class UsersResource {
                         if (userData != null && userData.isPresent()) {
                             try {
                                 storage.deleteUser(key, ref, realm, user.getName());
-                                LOG.info("{} logged in and deleted key {}/{} in {}", user, realm, key, ref);
+                                LOG.info("{} logged in and deleted user {}/{} in {}", user, realm, key, ref);
                             } catch (RefNotFoundException e) {
                                 return new WebApplicationException(String.format("Ref %s not found", ref), Status.BAD_REQUEST);
                             }
