@@ -76,9 +76,9 @@ while test $# -gt 0; do
 done
 
 if [[ ! -z "$ERR" ]]; then
-	echo "Unknown arguments '$ERR'"
-	usage
-	exit 1
+   echo "Unknown arguments '$ERR'"
+   usage
+   exit 1
 fi
 
 if [[ -z "${USER}" ]]; then

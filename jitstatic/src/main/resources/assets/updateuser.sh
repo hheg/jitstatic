@@ -30,13 +30,13 @@ function usage () {
 }
 
 function urlencode() {
-	local LANG=C i c e=''
-	for ((i=0;i<${#1};i++)); do
-                c=${1:$i:1}
-		[[ "$c" =~ [a-zA-Z0-9\.\~\_\-] ]] || printf -v c '%%%02X' "'$c"
-                e+="$c"
-	done
-        echo "$e"
+   local LANG=C i c e=''
+   for ((i=0;i<${#1};i++)); do
+      c=${1:$i:1}
+      [[ "$c" =~ [a-zA-Z0-9\.\~\_\-] ]] || printf -v c '%%%02X' "'$c"
+      e+="$c"
+   done
+   echo "$e"
 }
 
 function json_roles(){
@@ -107,9 +107,9 @@ while test $# -gt 0; do
 done
 
 if [[ ! -z "$ERR" ]]; then
-	echo "Unknown arguments '$ERR'"
-	usage
-	exit 1
+   echo "Unknown arguments '$ERR'"
+   usage
+   exit 1
 fi
 
 if [[ -z "${USER}" ]]; then

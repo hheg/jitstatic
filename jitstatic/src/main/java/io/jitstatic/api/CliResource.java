@@ -26,9 +26,11 @@ import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
@@ -47,7 +49,9 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.hash.Hashing;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.dropwizard.jersey.caching.CacheControl;
 
+@Singleton
 @Path("cli")
 @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE", justification = "This is a false positive in Java 11, should be removed")
 public class CliResource {
@@ -70,6 +74,8 @@ public class CliResource {
     @Metered(name = "get_script_counter")
     @ExceptionMetered(name = "get_script_exception")
     @Path("{script : .+}")
+    @CacheControl
+    @Produces(MediaType.TEXT_PLAIN)
     public void getScript(final @Suspended AsyncResponse asyncResponse, final @PathParam("script") String script, final @Context ExecutorService executor) {
         CompletableFuture.supplyAsync(() -> {
             switch (script) {
@@ -85,7 +91,7 @@ public class CliResource {
                 throw new WebApplicationException(Status.NOT_FOUND);
             }
         }, executor)
-        .thenApplyAsync(c -> Response.ok(c.data).encoding("utf-8").type(MediaType.TEXT_PLAIN).tag(c.eTag).build(), executor)
+        .thenApplyAsync(c -> Response.ok(c.data).encoding("utf-8").tag(c.eTag).build(), executor)
         .exceptionally(t -> {
             if (t instanceof WebApplicationException) {
                 return ((WebApplicationException) t).getResponse();
