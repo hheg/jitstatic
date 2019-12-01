@@ -22,6 +22,7 @@ package io.jitstatic.injection.executors;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.ExecutorService;
@@ -42,5 +43,10 @@ public class DefaultExecutorFactoryTest {
         def.dispose(executorService);
         assertTrue(executorService.isShutdown());
         assertTrue(executorService.isTerminated());
+    }
+
+    @Test
+    public void testAnnotation() {
+        assertSame(DefaultExecutorAnnotation.INSTANCE, DefaultExecutorAnnotation.INSTANCE);
     }
 }

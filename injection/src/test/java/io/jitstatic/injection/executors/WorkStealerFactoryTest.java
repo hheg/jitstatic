@@ -43,4 +43,9 @@ class WorkStealerFactoryTest {
         assertTrue(executorService.isTerminated());
     }
 
+    @Test
+    public void testAnnotation() {
+        assertSame(WorkStealerAnnotation.INSTANCE, WorkStealerAnnotation.INSTANCE);
+    }
+
 }

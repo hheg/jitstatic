@@ -43,4 +43,9 @@ class RepoWriterFactoryTest {
         assertTrue(executorService.isTerminated());
     }
 
+    @Test
+    public void testAnnotation() {
+        assertSame(RepoWriterAnnotation.INSTANCE, RepoWriterAnnotation.INSTANCE);
+    }
+
 }
