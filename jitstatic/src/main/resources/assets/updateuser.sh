@@ -30,6 +30,7 @@ function usage () {
 }
 
 function urlencode() {
+# Following code is MIT-Licensed brian@aljex.com
    local LANG=C i c e=''
    for ((i=0;i<${#1};i++)); do
       c=${1:$i:1}
@@ -37,6 +38,7 @@ function urlencode() {
       e+="$c"
    done
    echo "$e"
+# end MIT-licensed code
 }
 
 function json_roles(){
