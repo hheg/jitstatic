@@ -78,13 +78,12 @@ class LockServiceImpl implements LockService {
     private final Map<String, ActionData> keyMap;
     private final String ref;
     private final LocalRefLockService refLockService;
-    private static final String KEYPREFIX = "key-";
-    private static final String GLOBAL = "globallock";
     private final AtomicReference<Cache<String, Either<Optional<StoreInfo>, Pair<String, UserData>>>> refCache;
     private final Logger log;
     private final ExecutorService workStealingExecutor;
     private final Source source;
     private final ExecutorService repoWriter;
+    private boolean branchPush = false;
 
     public LockServiceImpl(final LocalRefLockService refLockService, final String ref, ExecutorService workStealingExecutor, final Source source,
             final ExecutorService repoWriter) {
@@ -171,10 +170,6 @@ class LockServiceImpl implements LockService {
         }
     }
 
-    private String getRequestedKey(final String key) {
-        return key == null ? GLOBAL : KEYPREFIX + key;
-    }
-
     @Override
     public void close() {
         refLockService.returnLock(this);
@@ -183,13 +178,12 @@ class LockServiceImpl implements LockService {
     @Override
     public CompletableFuture<Either<String, FailedToLock>> fireEvent(final String key, final ActionData data) {
         return CompletableFuture.supplyAsync(() -> {
-            final String requestedKey = getRequestedKey(key);
-            if (keyMap.putIfAbsent(requestedKey, data) == null) {
+            if (!branchPush && keyMap.putIfAbsent(key, data) == null) {
                 return CompletableFuture.supplyAsync(() -> {
                     try {
                         return Either.<String, FailedToLock>left(invoke(data));
                     } finally {
-                        keyMap.remove(requestedKey);
+                        keyMap.remove(key);
                     }
                 }, repoWriter);
             } else {
@@ -202,8 +196,8 @@ class LockServiceImpl implements LockService {
     public CompletableFuture<Either<String, FailedToLock>> fireEvent(String ref, Supplier<Exception> preRequisite, Supplier<DistributedData> action,
             Consumer<Exception> postAction) {
         return CompletableFuture.supplyAsync(() -> {
-            final String requestedKey = getRequestedKey(null);
-            if (keyMap.putIfAbsent(requestedKey, ActionData.PLACEHOLDER) == null) {
+            if (!branchPush) {
+                branchPush = true;
                 return CompletableFuture.supplyAsync(() -> {
                     try {
                         Exception exception = preRequisite.get();
@@ -219,7 +213,7 @@ class LockServiceImpl implements LockService {
                         failedToLock.addSuppressed(exception);
                         return Either.<String, FailedToLock>right(failedToLock);
                     } finally {
-                        keyMap.remove(requestedKey);
+                        branchPush = false;
                     }
                 }, repoWriter);
             } else {
