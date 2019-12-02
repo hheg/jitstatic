@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.35.0</version>
+        <version>0.40.0</version>
     </parent>
     <artifactId>jitstatic</artifactId>
 
@@ -49,6 +49,11 @@
         <dependency>
             <groupId>io.dropwizard</groupId>
             <artifactId>dropwizard-json-logging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jitstatic</groupId>
+            <artifactId>injection</artifactId>
+            <version>0.40.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -99,26 +104,26 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>source</artifactId>
-            <version>0.35.0</version>
+            <version>0.40.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>storage</artifactId>
-            <version>0.35.0</version>
+            <version>0.40.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>version</artifactId>
-            <version>0.35.0</version>
+            <version>0.40.0</version>
         </dependency>
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.35.0</version>
+            <version>0.40.0</version>
         </dependency>
         <dependency>
             <groupId>javax.activation</groupId>
-            <artifactId>activation</artifactId>
+            <artifactId>javax.activation-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.spencerwi</groupId>
@@ -131,7 +136,7 @@
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
-            <version>2.3.0</version>
+            <version>2.3.1</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
@@ -262,7 +267,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>test-utils</artifactId>
-            <version>0.35.0</version>
+            <version>0.40.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -309,12 +314,21 @@
             <version>2.1</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.12.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <resources>
             <resource>
                 <directory>src/main/resources-filtered</directory>
                 <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
             </resource>
         </resources>
         <plugins>

@@ -24,16 +24,16 @@ import java.io.Serializable;
 
 import java.util.Objects;
 
-import javax.validation.constraints.NotNull;
+import org.hibernate.validator.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Role implements  Serializable {
-
+    
     private static final long serialVersionUID = 762144945862593404L;
 
-    @NotNull
+    @NotBlank
     private final String role;
 
     @JsonCreator
@@ -47,7 +47,7 @@ public class Role implements  Serializable {
 
     @Override
     public int hashCode() {
-        return role.hashCode();
+        return Objects.hashCode(role);
     }
 
     @Override
@@ -62,8 +62,13 @@ public class Role implements  Serializable {
         if (role == null) {
             if (other.role != null)
                 return false;
-        } else if (!role.equals(other.role))
+        } else if (!role.equalsIgnoreCase(other.role))
             return false;
         return true;
+    }
+    
+    @Override
+    public String toString() {
+        return "Role [role=" + role + "]";
     }
 }

@@ -43,16 +43,17 @@ import com.codahale.metrics.health.HealthCheck.Result;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class JitstaticInfoTest extends BaseTest {
 
     private final DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class,
-            AUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
+            ContainerUtils.getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private TemporaryFolder tmpFolder;
     private String adress;
 

@@ -24,7 +24,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import javax.inject.Named;
+
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.jvnet.hk2.annotations.Contract;
 
 import com.spencerwi.either.Either;
 
@@ -33,38 +36,41 @@ import io.jitstatic.MetaData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.StoreInfo;
+import io.jitstatic.injection.CheckHealth;
 import io.jitstatic.source.ObjectStreamProvider;
-import io.jitstatic.utils.CheckHealth;
 import io.jitstatic.utils.Pair;
+import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-public interface Storage extends AutoCloseable, CheckHealth {
-    public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref);
+@Named("storagechecker")
+@Contract
+public interface Storage extends AutoCloseable, CheckHealth, InjectableManaged {
+    public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref) throws RefNotFoundException;
 
     public void close();
 
-    public CompletableFuture<Either<String, FailedToLock>> putKey(String key, String ref, ObjectStreamProvider data, String version,
-            CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> updateKey(String key, String ref, ObjectStreamProvider data, String version,
+            CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<String> addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData);
+    public CompletableFuture<String> addKey(String key, String branch, ObjectStreamProvider data, MetaData metaData, CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<Either<String, FailedToLock>> putMetaData(String key, String ref, MetaData metaData, String metaDataVersion,
-            CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> updateMetaData(String key, String ref, MetaData metaData, String metaDataVersion,
+            CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<Either<String, FailedToLock>> delete(String key, String ref, CommitMetaData commitMetaData);
+    public CompletableFuture<Either<String, FailedToLock>> deleteKey(String key, String ref, CommitMetaData commitMetaData) throws RefNotFoundException;
 
-    public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref);
+    public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(List<Pair<String, Boolean>> keyPairs, String ref) throws RefNotFoundException;
 
     public CompletableFuture<List<Pair<List<Pair<String, StoreInfo>>, String>>> getList(List<Pair<List<Pair<String, Boolean>>, String>> input);
 
-    public UserData getUser(String username, String defaultRef, String realm) throws RefNotFoundException;
+    public CompletableFuture<UserData> getUser(String username, String ref, String realm) throws RefNotFoundException;
 
-    public Pair<String, UserData> getUserData(String username, String defaultRef, String realm) throws RefNotFoundException;
+    public CompletableFuture<Pair<String, UserData>> getUserData(String username, String ref, String realm) throws RefNotFoundException;
 
-    public CompletableFuture<Pair<MetaData, String>> getMetaKey(String key, String ref);
+    public CompletableFuture<Pair<MetaData, String>> getMetaKey(String key, String ref) throws RefNotFoundException;
 
-    public CompletableFuture<Either<String, FailedToLock>> updateUser(String key, String ref, String path, String username, UserData data, String version);
+    public CompletableFuture<Either<String, FailedToLock>> updateUser(String key, String ref, String path, String username, UserData data, String version) throws RefNotFoundException;
 
-    public CompletableFuture<String> addUser(String key, String ref, String path, String name, UserData data);
+    public CompletableFuture<String> addUser(String key, String ref, String path, String name, UserData data) throws RefNotFoundException;
 
-    public void deleteUser(String key, String ref, String jitstaticKeyadminRealm, String name);
+    public void deleteUser(String key, String ref, String jitstaticKeyadminRealm, String name) throws RefNotFoundException;
 }

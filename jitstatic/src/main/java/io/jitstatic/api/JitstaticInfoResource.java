@@ -1,5 +1,7 @@
 package io.jitstatic.api;
 
+import javax.inject.Singleton;
+
 /*-
  * #%L
  * jitstatic
@@ -31,6 +33,7 @@ import com.codahale.metrics.annotation.Timed;
 
 import io.jitstatic.version.ProjectVersion;
 
+@Singleton
 @Path("info")
 @Produces({ MediaType.TEXT_PLAIN })
 public class JitstaticInfoResource {

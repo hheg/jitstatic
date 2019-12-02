@@ -37,15 +37,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.auth.User;
 import io.jitstatic.constraints.IfNotEmpty;
-import io.jitstatic.constraints.Warning;
 
 @SuppressFBWarnings(justification = "Equals used here is not dodgy code", value = { "EQ_UNUSUAL" })
 public class MetaData {
 
     @Valid
     @Deprecated
-    @NotNull
-    @IfNotEmpty(payload = Warning.class, groups = { Warning.class })
+    @IfNotEmpty
     private final Set<User> users;
     @NotNull
     @NotEmpty
@@ -55,10 +53,10 @@ public class MetaData {
     @Valid
     private final List<HeaderPair> headers;
     @Valid
-    @NotNull(payload = Warning.class, groups = { Warning.class })
+    @NotNull
     private final Set<Role> read;
     @Valid
-    @NotNull(payload = Warning.class, groups = { Warning.class })
+    @NotNull
     private final Set<Role> write;
 
     @JsonCreator
@@ -75,17 +73,13 @@ public class MetaData {
         this.write = write;
     }
 
-    public MetaData(final String contentType, final boolean isProtected, final boolean hidden,
-            final List<HeaderPair> headers, final Set<Role> read, Set<Role> write) {
-        this(Set.of(), contentType, isProtected, hidden, headers, read, write);
+    public MetaData(final String contentType, final boolean isProtected, final boolean hidden, final List<HeaderPair> headers, final Set<Role> read,
+            Set<Role> write) {
+        this(Set.of(), contentType, isProtected, hidden, headers, Objects.requireNonNull(read), Objects.requireNonNull(write));
     }
 
     public MetaData(final Set<Role> read, final Set<Role> write) {
-        this(Set.of(), null, false, false, List.of(), read, write);
-    }
-
-    public MetaData(final Set<User> users) {
-        this(users, null, false, false, List.of(), null, null);
+        this(null, false, false, List.of(), read, write);
     }
 
     @Override
@@ -102,7 +96,7 @@ public class MetaData {
                 .filter(that -> Objects.equals(this.getContentType(), that.getContentType()))
                 .isPresent();
     }
-
+    
     @Deprecated
     public Set<User> getUsers() { return users; }
 

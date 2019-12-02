@@ -20,16 +20,15 @@ package io.jitstatic;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.CREATE;
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.GIT_CREATE;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
-import static org.eclipse.jetty.http.HttpStatus.BAD_REQUEST_400;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 import static org.eclipse.jetty.http.HttpStatus.UNAUTHORIZED_401;
@@ -59,7 +58,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
@@ -74,7 +72,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
 
 import io.dropwizard.testing.ConfigOverride;
@@ -92,16 +89,16 @@ import io.jitstatic.client.JitStaticClient;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.client.ModifyUserKeyData;
 import io.jitstatic.client.SearchPath;
-import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class UserManagementTest extends BaseTest {
 
-    private static final String ALLFILESPATTERN = ".";
     private static final String REFS_REMOTES_ORIGIN = "refs/remotes/origin/";
     private static final String KEYUSERNOROLE = "keyusernorole";
     private static final String KEYUSERNOROLEPASS = "1456";
@@ -109,24 +106,26 @@ public class UserManagementTest extends BaseTest {
     private static final String KEYADMINUSER = "keyadminuser";
     private static final String KEYADMINUSERPASS = "3456";
 
-    private static final String GITUSER = "gituser";
-    private static final String GITUSERPASS = "3234";
+    private static final String GITUSERPULL = "gituser";
+    private static final String GITUSERPULLPASS = "3234";
+
+    private static final String GITUSERPULLEXTRA = "gituserpull";
+    private static final String GITUSERPULLPASSEXTRA = "33445";
 
     private static final String KEYUSER = "keyuser";
     private static final String KEYUSERPASS = "2456";
 
     private static final String GITUSERFULL = "gituserfull";
     private static final String GITUSERFULLPASS = "1234";
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String GITUSERPUSH = "gituserpush";
     private static final String GITUSERPUSHPASS = "3333";
-    private static final Set<Role> ALL_ROLES = Set.of(new Role(PULL), new Role(PUSH), new Role(FORCEPUSH), new Role(SECRETS), new Role(CREATE));
+    private static final Set<Role> ALL_ROLES = Set
+            .of(new Role(GIT_PULL), new Role(GIT_PUSH), new Role(GIT_FORCEPUSH), new Role(GIT_SECRETS), new Role(GIT_CREATE));
     private TemporaryFolder tmpFolder;
     private String rootUser;
     private String rootPassword;
 
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ContainerUtils
             .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private String adress;
     private String gitAdress;
@@ -156,27 +155,30 @@ public class UserManagementTest extends BaseTest {
             Path keyuser = keyUserRealm.resolve(KEYUSER);
             Path keyusernorole = keyUserRealm.resolve(KEYUSERNOROLE);
             keyAdminUserData = new UserData(Set.of(new Role("read"), new Role("write")), KEYADMINUSERPASS, null, null);
-            keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS);
+            keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS, null);
             UserData keyUserUserDataNoRole = new UserData(Set.of(), KEYUSERNOROLEPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(keyAdminUserData), keyAdminUser.toFile());
-            Files.write(MAPPER.writeValueAsBytes(keyUserUserData), keyuser.toFile());
+            Files.write(MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("role")), KEYUSERPASS, null,null)), keyuser.toFile());
             Files.write(MAPPER.writeValueAsBytes(keyUserUserDataNoRole), keyusernorole.toFile());
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            Files.write(getMetaData(new io.jitstatic.MetaData(Set.of(), JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set
+            Files.write(getMetaData(new io.jitstatic.MetaData(JitStaticConstants.APPLICATION_JSON, false, false, List.of(), Set
                     .of(new Role("role")), Set.of(new Role("role")))).getBytes(UTF_8), workingFolder.resolve("file.metadata").toFile());
-            commit(git, provider);
-            Path gitRealm = users.resolve(GIT_REALM);
+            commitAndPush(git, provider);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
             Path gitUserPush = gitRealm.resolve(GITUSERPUSH);
-            Path gitUserNoPush = gitRealm.resolve(GITUSER);
+            Path gitUserPull = gitRealm.resolve(GITUSERPULL);
+            Path gitUserPullExtra = gitRealm.resolve(GITUSERPULLEXTRA);
             UserData gitUserData = new UserData(ALL_ROLES, GITUSERFULLPASS, null, null);
-            UserData gitUserDataNoPush = new UserData(Set.of(new Role(PULL)), GITUSERPASS, null, null);
-            UserData gitUserDataPush = new UserData(Set.of(new Role(PULL), new Role(PUSH)), GITUSERPUSHPASS, null, null);
+            UserData gitUserDataPull = new UserData(Set.of(new Role(GIT_PULL)), GITUSERPULLPASS, null, null);
+            UserData gitUserDataPush = new UserData(Set.of(new Role(GIT_PULL), new Role(GIT_PUSH)), GITUSERPUSHPASS, null, null);
+            UserData gitUserDataPullExtra = new UserData(Set.of(new Role(GIT_PULL)), GITUSERPULLPASSEXTRA, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserData), gitUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(gitUserDataPush), gitUserPush.toFile());
-            Files.write(MAPPER.writeValueAsBytes(gitUserDataNoPush), gitUserNoPush.toFile());
-            commit(git, provider, SECRETS);
+            Files.write(MAPPER.writeValueAsBytes(gitUserDataPull), gitUserPull.toFile());
+            Files.write(MAPPER.writeValueAsBytes(gitUserDataPullExtra), gitUserPullExtra.toFile());
+            commit(git, provider, GIT_SECRETS);
         }
     }
 
@@ -194,17 +196,17 @@ public class UserManagementTest extends BaseTest {
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             Files.write(getData(1).getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            commit(git, provider);
+            commitAndPush(git, provider);
         }
     }
 
     @Test
     public void testGitRealmUserPullNoPush() throws IOException, InvalidRemoteException, TransportException, GitAPIException {
         Path workingFolder = getFolderFile().toPath();
-        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPULL, GITUSERPULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             Files.write(getData(1).getBytes(UTF_8), workingFolder.resolve("file").toFile());
-            assertTrue(assertThrows(TransportException.class, () -> commit(git, provider)).getMessage().contains("authentication not supported"));
+            assertTrue(assertThrows(TransportException.class, () -> commitAndPush(git, provider)).getMessage().contains("authentication not supported"));
         }
     }
 
@@ -212,28 +214,32 @@ public class UserManagementTest extends BaseTest {
     public void testKeyAdminAddKey() throws URISyntaxException, ClientProtocolException, APIException, IOException {
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
             creator.createKey(getData(2)
-                    .getBytes(UTF_8), new CommitData("file2", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set.of(), "application/json", List.of()));
+                    .getBytes(UTF_8), new CommitData("file2", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set.of(), Set.of()));
         }
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
-            creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file4", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                    .of(), "application/json", List.of()));
+            creator.createKey(getData(2)
+                    .getBytes(UTF_8), new CommitData("file4", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set.of(), Set
+                            .of()));
         }
-        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser("otheruser").build()) {
-                creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file3", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", List.of()));
+                creator.createKey(getData(2)
+                        .getBytes(UTF_8), new CommitData("file3", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set
+                                .of(), Set.of()));
             }
         }).getStatusCode());
         assertEquals(HttpStatus.CONFLICT_409, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
-                creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", List.of()));
+                creator.createKey(getData(2)
+                        .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set
+                                .of(), Set.of()));
             }
         }).getStatusCode());
-        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser("otheruser").build()) {
-                creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", List.of()));
+                creator.createKey(getData(2)
+                        .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set
+                                .of(), Set.of()));
             }
         }).getStatusCode());
     }
@@ -242,8 +248,9 @@ public class UserManagementTest extends BaseTest {
     public void testKeyAdminModifyAnyKey() throws Exception {
         String version;
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
-            version = creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                    .of(), "application/json", List.of()));
+            version = creator.createKey(getData(2)
+                    .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set.of(), Set
+                            .of()));
         }
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
             String modifiedVersion = creator.modifyKey(getData(3).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), version);
@@ -254,16 +261,17 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testKeyUserCreateKey() throws Exception {
         String version;
-        assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword("wrong").setUser(KEYUSER).build()) {
-                creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", List.of()));
+                creator.createKey(getData(2)
+                        .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set
+                                .of(), Set.of()));
             }
         }).getStatusCode());
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
             Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"));
-            version = creator.createKey(getData(3).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                    .of(), "application/json", roles, roles));
+            version = creator.createKey(getData(3)
+                    .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
         }
         try (JitStaticClient updater = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
             Entity<JsonNode> entity = updater.getKey("file2", parse(JsonNode.class), version);
@@ -292,17 +300,17 @@ public class UserManagementTest extends BaseTest {
         String version;
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
             Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"));
-            creator.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                    .of(), "application/json", roles, roles));
+            creator.createKey(getData(2)
+                    .getBytes(UTF_8), new CommitData("file2", "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
         }
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
             Entity<JsonNode> metaKey = creator.getMetaKey("file2", "master", parse(JsonNode.class));
             version = metaKey.getTag();
         }
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"), new io.jitstatic.client.MetaData.Role("new"));
-            version = creator.modifyMetaKey("file2", "master", version, new ModifyUserKeyData(new io.jitstatic.client.MetaData(Set
-                    .of(), "application/json", roles, roles), "msg", "mail", "ui"));
+            Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("new"));
+            version = creator
+                    .modifyMetaKey("file2", "master", version, new ModifyUserKeyData(new io.jitstatic.client.MetaData("application/json", roles, roles), "msg", "mail", "ui"));
         }
 
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYADMINUSERPASS).setUser(KEYADMINUSER).build()) {
@@ -323,8 +331,8 @@ public class UserManagementTest extends BaseTest {
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
             for (String file : List.of("path/file", "path/path/file", "file3")) {
                 Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"));
-                creator.createKey(getData(i).getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", roles, roles));
+                creator.createKey(getData(i)
+                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
                 i++;
             }
         }
@@ -332,8 +340,8 @@ public class UserManagementTest extends BaseTest {
             i = 0;
             for (String file : List.of("path/file2", "path/path/file2", "file2")) {
                 Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("other"));
-                creator.createKey(getData(i).getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", roles, roles));
+                creator.createKey(getData(i)
+                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
                 i++;
             }
         }
@@ -360,8 +368,8 @@ public class UserManagementTest extends BaseTest {
         try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
             for (String file : List.of("path/file", "path/path/file", "file3")) {
                 Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"));
-                creator.createKey(getData(i).getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", roles, roles));
+                creator.createKey(getData(i)
+                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
                 i++;
             }
         }
@@ -369,8 +377,8 @@ public class UserManagementTest extends BaseTest {
             i = 0;
             for (String file : List.of("path/file2", "path/path/file2", "file2")) {
                 Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("other"));
-                creator.createKey(getData(i).getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData(Set
-                        .of(), "application/json", roles, roles));
+                creator.createKey(getData(i)
+                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
                 i++;
             }
         }
@@ -394,20 +402,20 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testGitUserCantPullSecretsBranch() throws Exception {
         Path workingFolder = getFolderFile().toPath();
-        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPULL, GITUSERPULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             List<Ref> call = git.branchList().setListMode(ListMode.REMOTE).call();
-            assertTrue(call.stream().noneMatch(r -> r.getName().equals(REFS_REMOTES_ORIGIN + SECRETS)));
-            assertThrows(RefNotAdvertisedException.class, () -> git.pull().setRemoteBranchName(SECRETS).setCredentialsProvider(provider).call());
+            assertTrue(call.stream().noneMatch(r -> r.getName().equals(REFS_REMOTES_ORIGIN + GIT_SECRETS)));
+            assertThrows(RefNotAdvertisedException.class, () -> git.pull().setRemoteBranchName(GIT_SECRETS).setCredentialsProvider(provider).call());
 
-            git.checkout().setCreateBranch(true).setName(SECRETS).call();
+            git.checkout().setCreateBranch(true).setName(GIT_SECRETS).call();
 
             Path users = workingFolder.resolve(USERS);
-            Path gitRealm = users.resolve(GIT_REALM);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
-            Path gitUserNoPush = gitRealm.resolve(GITUSER);
+            Path gitUserNoPush = gitRealm.resolve(GITUSERPULL);
 
-            UserData gitUserDataNoPush = new UserData(Set.of(new Role(PULL), new Role(SECRETS)), GITUSERPASS, null, null);
+            UserData gitUserDataNoPush = new UserData(Set.of(new Role(GIT_PULL), new Role(GIT_SECRETS)), GITUSERPULLPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserDataNoPush), gitUserNoPush.toFile());
             git.add().addFilepattern(ALLFILESPATTERN).call();
             git.commit().setMessage("New git user roles").call();
@@ -418,7 +426,7 @@ public class UserManagementTest extends BaseTest {
                 Collection<Ref> advertisedRefs = pr.getAdvertisedRefs();
                 advertisedRefs.forEach(System.out::println);
                 for (RemoteRefUpdate remoteRefUpdate : pr.getRemoteUpdates()) {
-                    assertEquals("refs/heads/" + SECRETS, remoteRefUpdate.getRemoteName());
+                    assertEquals("refs/heads/" + GIT_SECRETS, remoteRefUpdate.getRemoteName());
                     assertEquals(Status.REJECTED_OTHER_REASON, remoteRefUpdate.getStatus());
                 }
             }
@@ -431,16 +439,17 @@ public class UserManagementTest extends BaseTest {
         UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             List<Ref> call = git.branchList().setListMode(ListMode.REMOTE).call();
-            assertTrue(call.stream().anyMatch(r -> r.getName().equals(REFS_REMOTES_ORIGIN + SECRETS)));
+            assertTrue(call.stream().anyMatch(r -> r.getName().equals(REFS_REMOTES_ORIGIN + GIT_SECRETS)));
 
-            assertNotNull(git.checkout().setStartPoint("origin/" + SECRETS).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK).setName(SECRETS)
+            assertNotNull(git.checkout().setStartPoint("origin/" + GIT_SECRETS).setCreateBranch(true).setUpstreamMode(SetupUpstreamMode.TRACK)
+                    .setName(GIT_SECRETS)
                     .call());
 
             Path users = workingFolder.resolve(USERS);
-            Path gitRealm = users.resolve(GIT_REALM);
-            Path gitUserNoPush = gitRealm.resolve(GITUSER);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
+            Path gitUserNoPush = gitRealm.resolve(GITUSERPULL);
 
-            UserData gitUserDataNoPush = new UserData(Set.of(new Role("pull"), new Role(PUSH)), GITUSERPASS, null, null);
+            UserData gitUserDataNoPush = new UserData(Set.of(new Role("pull"), new Role(GIT_PUSH)), GITUSERPULLPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserDataNoPush), gitUserNoPush.toFile());
             git.add().addFilepattern(ALLFILESPATTERN).call();
             git.commit().setMessage("New git user roles").call();
@@ -450,7 +459,7 @@ public class UserManagementTest extends BaseTest {
                 Collection<Ref> advertisedRefs = pr.getAdvertisedRefs();
                 advertisedRefs.forEach(System.out::println);
                 for (RemoteRefUpdate remoteRefUpdate : pr.getRemoteUpdates()) {
-                    assertEquals("refs/heads/" + SECRETS, remoteRefUpdate.getRemoteName());
+                    assertEquals("refs/heads/" + GIT_SECRETS, remoteRefUpdate.getRemoteName());
                     assertEquals(Status.OK, remoteRefUpdate.getStatus());
                 }
             }
@@ -459,7 +468,8 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testReadAndWriteEndpoint() throws Exception {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build(); JitStaticClient noUser = buildClient(DW.getLocalPort()).build();) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build();
+                JitStaticClient noUser = buildClient(DW.getLocalPort()).build();) {
             String key = "key";
             String createKey = client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), new MetaData("application/json", Set
                     .of(), Set.of(new MetaData.Role("role"))));
@@ -475,18 +485,18 @@ public class UserManagementTest extends BaseTest {
             Entity<JsonNode> metaKey = client.getMetaKey(key, "master", parse(JsonNode.class));
             MetaData newMetaData = new MetaData("application/json", Set.of(new MetaData.Role("role")), Set.of(new MetaData.Role("role")));
             client.modifyMetaKey(key, "master", metaKey.getTag(), new ModifyUserKeyData(newMetaData, "msg", "mail", "info"));
-            assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, parse(JsonNode.class))).getStatusCode());
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> noUser.getKey(key, parse(JsonNode.class))).getStatusCode());
             assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.delete(new CommitData(key, "msg", "userinfo", "mail")))
                     .getStatusCode());
             client.delete(new CommitData(key, "msg", "userinfo", "mail"));
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class))).getStatusCode());
             createKey = client.createKey(getData().getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), new MetaData("application/json", Set
                     .of(new MetaData.Role("role")), Set.of()));
-            assertEquals(UNAUTHORIZED_401, assertThrows(APIException.class, () -> noUser.getKey(key, parse(JsonNode.class))).getStatusCode());
-            assertEquals(BAD_REQUEST_400, assertThrows(APIException.class, () -> client.delete(new CommitData(key, "msg", "userinfo", "mail")))
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> noUser.getKey(key, parse(JsonNode.class))).getStatusCode());
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> client.delete(new CommitData(key, "msg", "userinfo", "mail")))
                     .getStatusCode());
             String tag2 = key2.getTag();
-            assertEquals(BAD_REQUEST_400, assertThrows(APIException.class, () -> client
+            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> client
                     .modifyKey(getData(5).getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), tag2))
                             .getStatusCode());
         }
@@ -494,7 +504,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testGetKeyAdminUser() throws URISyntaxException, IOException {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
             Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, parse(JsonNode.class));
             assertNotNull(adminUser.getData());
             io.jitstatic.api.UserData value = MAPPER.treeToValue(adminUser.getData(), io.jitstatic.api.UserData.class);
@@ -515,7 +525,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testGetUserWithWrongUser() throws RefNotFoundException {
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
                 client.getAdminUser(KEYADMINUSER, null, null, parse(JsonNode.class));
             }
@@ -524,7 +534,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testGetUserNotChanged() throws RefNotFoundException, URISyntaxException, IOException {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
             Entity<JsonNode> adminUser = client.getAdminUser(KEYADMINUSER, null, null, parse(JsonNode.class));
             assertNotNull(adminUser.getData());
             assertNotNull(adminUser.getTag());
@@ -546,7 +556,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testPutUserWithUserButNotValid() {
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
                 client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set
                         .of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
@@ -557,7 +567,7 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testPutUserWithUserButNotFound() {
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
                 client.modifyAdminUser("noparse(JsonNode.class)ound", null, new io.jitstatic.client.UserData(Set
                         .of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
             }
@@ -567,7 +577,7 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testPutUserWithUserButFoundWrongEtag() throws RefNotFoundException {
         assertEquals(HttpStatus.PRECONDITION_FAILED_412, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
                 client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set
                         .of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
             }
@@ -577,7 +587,7 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testPutUserWithUserButRemoved() throws RefNotFoundException {
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
                 client.deleteAdminUser(KEYADMINUSER, null);
                 client.modifyAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set
                         .of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
@@ -587,7 +597,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testPutUserWithUser() throws URISyntaxException, IOException {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
             Entity<io.jitstatic.api.UserData> entity = client.getAdminUser(KEYADMINUSER, null, null, parse(io.jitstatic.api.UserData.class));
             String version = client.modifyAdminUser(KEYADMINUSER, null, from(entity.getData().getRoles(), "22"), entity.getTag());
             entity = client.getAdminUser(KEYADMINUSER, null, null, parse(io.jitstatic.api.UserData.class));
@@ -609,7 +619,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testPostUserWithWrongUser() {
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
                 client.addAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
             }
@@ -619,7 +629,7 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testPostUserWithUserButExist() {
         assertEquals(HttpStatus.CONFLICT_409, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
                 client.addAdminUser(KEYADMINUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
             }
         }).getStatusCode());
@@ -627,7 +637,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testPostUserWithUser() throws URISyntaxException, IOException {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
             String version = client
                     .addAdminUser("newuser", null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"));
             try (JitStaticClient newClient = buildClient(DW.getLocalPort()).setUser("newuser").setPassword("22").build()) {
@@ -650,7 +660,7 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testDeleteUserWithWrongUser() {
-        assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
+        assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
                 client.deleteAdminUser(KEYADMINUSER, null);
             }
@@ -660,7 +670,7 @@ public class UserManagementTest extends BaseTest {
     @Test
     public void testDeleteUserNotFound() {
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
-            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+            try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
                 client.deleteAdminUser("nothing", null);
             }
         }).getStatusCode());
@@ -668,11 +678,12 @@ public class UserManagementTest extends BaseTest {
 
     @Test
     public void testDeleteUser() throws URISyntaxException, IOException {
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSER).setPassword(GITUSERPASS).build()) {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build()) {
             client.deleteAdminUser(KEYADMINUSER, null);
         }
         try (JitStaticClient newClient = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getUser(KEYUSER, null, null, parse(io.jitstatic.api.UserData.class))).getStatusCode());
+            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> newClient
+                    .getUser(KEYUSER, null, null, parse(io.jitstatic.api.UserData.class))).getStatusCode());
         }
     }
 
@@ -701,7 +712,7 @@ public class UserManagementTest extends BaseTest {
     public void testGetKeyUserWithWrongUser() {
         assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
-                client.getUser(KEYUSER, null, null, parse(JsonNode.class));
+                client.getUser(KEYUSERNOROLE, null, null, parse(JsonNode.class));
             }
         }).getStatusCode());
     }
@@ -731,16 +742,29 @@ public class UserManagementTest extends BaseTest {
     public void testPutKeyUserWithUserButNotValid() {
         assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
-                client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
+                client.modifyUser("someuser", null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
             }
         }).getStatusCode());
+    }
+
+    @Test
+    public void testPutKeyUserWithUserChangePassword() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
+            Entity<io.jitstatic.api.UserData> key = client.getUser(KEYUSER, null, null, parse(io.jitstatic.api.UserData.class));
+            assertNotNull(client
+                    .modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"), key.getTag()));
+        }
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword("22").build()) {
+            client.getUser(KEYUSER, null, null, parse(io.jitstatic.api.UserData.class));
+        }
     }
 
     @Test
     public void testPutKeyUserWithUserButNotFound() {
         assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> {
             try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build()) {
-                client.modifyUser("noparse(JsonNode.class)ound", null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
+                client.modifyUser("noparse(JsonNode.class)ound", null, new io.jitstatic.client.UserData(Set
+                        .of(new io.jitstatic.client.MetaData.Role("role")), "22"), "12345");
             }
         }).getStatusCode());
     }
@@ -850,7 +874,8 @@ public class UserManagementTest extends BaseTest {
             client.deleteUser(KEYUSER, null);
         }
         try (JitStaticClient newClient = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSER).build()) {
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getKey("file", parse(io.jitstatic.api.UserData.class))).getStatusCode());
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> newClient.getKey("file", parse(io.jitstatic.api.UserData.class)))
+                    .getStatusCode());
         }
     }
 
@@ -860,7 +885,8 @@ public class UserManagementTest extends BaseTest {
                 JitStaticClient keyUserClient = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build()) {
             client.createKey(getData(2).getBytes(UTF_8), new CommitData("file2", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", Set
                     .of(new MetaData.Role("added")), Set.of()));
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class))).getStatusCode());
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class)))
+                    .getStatusCode());
 
             Entity<io.jitstatic.api.UserData> user = client.getUser(KEYUSER, null, null, parse(io.jitstatic.api.UserData.class));
             assertTrue(user.getData().getBasicPassword().equals(KEYUSERPASS));
@@ -877,7 +903,8 @@ public class UserManagementTest extends BaseTest {
             assertEquals(currentRoles, updatedRoles);
             assertNotNull(keyUserClient.getKey("file2", parse(JsonNode.class)));
             version = client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(currentRoles, "1234"), user.getTag());
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class))).getStatusCode());
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> keyUserClient.getKey("file2", parse(JsonNode.class)))
+                    .getStatusCode());
         }
     }
 
@@ -891,7 +918,7 @@ public class UserManagementTest extends BaseTest {
             client.addUser("someuser", null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role")), "pass"));
         }
         Path workingFolder = getFolderFile().toPath();
-        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPULL, GITUSERPULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(KEYUSER).toFile(), UserData.class);
             assertNull(value.getHash());
@@ -911,7 +938,7 @@ public class UserManagementTest extends BaseTest {
             client.modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new MetaData.Role("role")), "newpass"), user.getTag());
         }
         Path workingFolder = getFolderFile().toPath();
-        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSER, GITUSERPASS);
+        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERPULL, GITUSERPULLPASS);
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(KEYUSER).toFile(), UserData.class);
             assertNotNull(value.getHash());
@@ -936,7 +963,7 @@ public class UserManagementTest extends BaseTest {
         String addeduserpass = "1111";
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
             String version = client.addGitUser(addedgituser, new io.jitstatic.client.UserData(Set
-                    .of(new MetaData.Role(PULL), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE), new MetaData.Role(SECRETS)), addeduserpass));
+                    .of(new MetaData.Role(GIT_PULL), new MetaData.Role(GIT_PUSH), new MetaData.Role(GIT_FORCEPUSH), new MetaData.Role(GIT_CREATE), new MetaData.Role(GIT_SECRETS)), addeduserpass));
             assertNotNull(version);
         }
         Path workingFolder = getFolderFile().toPath();
@@ -944,7 +971,7 @@ public class UserManagementTest extends BaseTest {
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             assertNotNull(git.checkout().setCreateBranch(true).setName("secrets").setUpstreamMode(SetupUpstreamMode.TRACK).setStartPoint("origin/" + "secrets")
                     .call());
-            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
             assertNotNull(value.getHash());
             assertNotNull(value.getSalt());
             assertNull(value.getBasicPassword());
@@ -957,7 +984,7 @@ public class UserManagementTest extends BaseTest {
         String addeduserpass = "1111";
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
             APIException apiException = assertThrows(APIException.class, () -> client.addGitUser(addedgituser, new io.jitstatic.client.UserData(Set
-                    .of(new MetaData.Role("PALL"), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE), new MetaData.Role(SECRETS)), addeduserpass)));
+                    .of(new MetaData.Role("PALL"), new MetaData.Role(GIT_PUSH), new MetaData.Role(GIT_FORCEPUSH), new MetaData.Role(GIT_CREATE), new MetaData.Role(GIT_SECRETS)), addeduserpass)));
             assertEquals("POST http://localhost:" + DW.getLocalPort()
                     + "/application/storage/ failed with: 422  {\"errors\":[\"roles Contains not valid git roles\"]}", apiException.getMessage());
             assertEquals(HttpStatus.UNPROCESSABLE_ENTITY_422, apiException.getStatusCode());
@@ -971,7 +998,7 @@ public class UserManagementTest extends BaseTest {
         String addeduserpass = "1111";
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
             String version = client.addGitUser(addedgituser, new io.jitstatic.client.UserData(Set
-                    .of(new MetaData.Role(PULL), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE), new MetaData.Role(SECRETS)), addeduserpass));
+                    .of(new MetaData.Role(GIT_PULL), new MetaData.Role(GIT_PUSH), new MetaData.Role(GIT_FORCEPUSH), new MetaData.Role(GIT_CREATE), new MetaData.Role(GIT_SECRETS)), addeduserpass));
             assertNotNull(version);
         }
         Path workingFolder = getFolderFile().toPath();
@@ -979,43 +1006,26 @@ public class UserManagementTest extends BaseTest {
         try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
             assertNotNull(git.checkout().setCreateBranch(true).setName("secrets").setUpstreamMode(SetupUpstreamMode.TRACK).setStartPoint("origin/" + "secrets")
                     .call());
-            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
+            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_GIT_REALM).resolve(addedgituser).toFile(), UserData.class);
             assertNotNull(value.getHash());
             assertNotNull(value.getSalt());
             assertNull(value.getBasicPassword());
         }
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
             client.deleteGitUser(addedgituser);
-            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client.getGitUser(addedgituser, parse(io.jitstatic.api.UserData.class))).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND_404, assertThrows(APIException.class, () -> client
+                    .getGitUser(addedgituser, parse(io.jitstatic.api.UserData.class))).getStatusCode());
         }
     }
 
     @Test
     public void testSameUserAsRoot() throws Exception {
-        String addeduser = KEYADMINUSER;
+        String addeduser = "huser";
         String addeduserpass = "1111";
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
-            String version = client.addUser(addeduser, null, new io.jitstatic.client.UserData(Set
-                    .of(new MetaData.Role(PULL), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE), new MetaData.Role(SECRETS)), addeduserpass));
-            assertNotNull(version);
-        }
-        Path workingFolder = getFolderFile().toPath();
-        UsernamePasswordCredentialsProvider provider = new UsernamePasswordCredentialsProvider(GITUSERFULL, GITUSERFULLPASS);
-        try (Git git = Git.cloneRepository().setDirectory(workingFolder.toFile()).setURI(gitAdress).setCredentialsProvider(provider).call()) {
-            UserData value = MAPPER.readValue(workingFolder.resolve(USERS).resolve(JITSTATIC_KEYUSER_REALM).resolve(addeduser).toFile(), UserData.class);
-            assertNotNull(value.getHash());
-            assertNotNull(value.getSalt());
-            assertNull(value.getBasicPassword());
-        }
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
-            Entity<io.jitstatic.api.UserData> gu = client.getUser(addeduser, null, null, parse(io.jitstatic.api.UserData.class));
-            assertNotNull(gu.getData().getRoles());
-            assertNotNull(gu);
-            assertNull(gu.getData().getBasicPassword());
-        }
-
-        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(addeduser).setPassword("1111").build();) {
-            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> client.getUser(addeduser, null, null, parse(io.jitstatic.api.UserData.class))).getStatusCode());
+            assertEquals(HttpStatus.CONFLICT_409, assertThrows(APIException.class, () -> client.addUser(addeduser, null, new io.jitstatic.client.UserData(Set
+                    .of(new MetaData.Role(GIT_PULL), new MetaData.Role(GIT_PUSH), new MetaData.Role(GIT_FORCEPUSH), new MetaData.Role(GIT_CREATE), new MetaData.Role(GIT_SECRETS)), addeduserpass)))
+                            .getStatusCode());
         }
     }
 
@@ -1025,7 +1035,7 @@ public class UserManagementTest extends BaseTest {
         String userEmailPass = "1111";
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
             String version = client.addUser(userEmail, null, new io.jitstatic.client.UserData(Set
-                    .of(new MetaData.Role("role"), new MetaData.Role(PULL), new MetaData.Role(PUSH), new MetaData.Role(FORCEPUSH), new MetaData.Role(CREATE), new MetaData.Role(SECRETS)), userEmailPass));
+                    .of(new MetaData.Role("role"), new MetaData.Role(GIT_PULL), new MetaData.Role(GIT_PUSH), new MetaData.Role(GIT_FORCEPUSH), new MetaData.Role(GIT_CREATE), new MetaData.Role(GIT_SECRETS)), userEmailPass));
             assertNotNull(version);
         }
         Path workingFolder = getFolderFile().toPath();
@@ -1068,7 +1078,7 @@ public class UserManagementTest extends BaseTest {
             UserData userData = MAPPER.readValue(keyUserNoPush.toFile(), UserData.class);
             UserData modified = new UserData(userData.getRoles(), "222", userData.getSalt(), userData.getHash());
             Files.write(MAPPER.writeValueAsBytes(modified), keyUserNoPush.toFile());
-            commit(git, provider);
+            commitAndPush(git, provider);
         }
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword("111").build();) {
             Entity<JsonNode> user = client.getKey("file", "refs/heads/master", null, parse(JsonNode.class));
@@ -1079,28 +1089,97 @@ public class UserManagementTest extends BaseTest {
         }
     }
 
+    @Test
+    public void testKeyUserCannotAccessOtherKeyUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSERNOROLE).setPassword(KEYUSERNOROLEPASS).build();) {
+            assertNotNull(client.getUser(KEYUSERNOROLE, null, null, parse(UserData.class)).getData());
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> client.getUser(KEYUSER, null, null, parse(UserData.class)))
+                    .getStatusCode());
+        }
+    }
+
+    @Test
+    public void testGitUserWithoutCreateRoleCannotModifyOtherGitUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build();) {
+            Entity<UserData> extra = client.getGitUser(GITUSERPULLEXTRA, null, parse(UserData.class));
+            assertEquals(HttpStatus.FORBIDDEN_403, assertThrows(APIException.class, () -> client
+                    .modifyGitUser(GITUSERPULLEXTRA, from(extra.getData().getRoles(), "pass"), extra.getTag())).getStatusCode());
+        }
+    }
+
+    @Test
+    public void testKeyUserCanChangePasswordButNotItsOwnRoles() throws URISyntaxException, IOException {
+        String version;
+        Set<io.jitstatic.Role> oldRoles;
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword(KEYUSERPASS).build();) {
+            Entity<UserData> user = client.getUser(KEYUSER, null, null, parse(UserData.class));
+            oldRoles = user.getData().getRoles();
+            version = client
+                    .modifyUser(KEYUSER, null, new io.jitstatic.client.UserData(Set.of(new io.jitstatic.client.MetaData.Role("no")), "newpass"), user.getTag());
+            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> client.getUser(KEYUSER, null, null, parse(UserData.class)))
+                    .getStatusCode());
+        }
+
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYUSER).setPassword("newpass").build();) {
+            Entity<UserData> userWithNewPassword = client.getUser(KEYUSER, null, null, parse(UserData.class));
+            assertEquals(version, userWithNewPassword.getTag());
+            assertEquals(oldRoles, userWithNewPassword.getData().getRoles());
+        }
+    }
+
+    @Test
+    public void testGitUserCanChangePasswordButNotItsOwnRoles() throws URISyntaxException, IOException {
+        String version;
+        Set<io.jitstatic.Role> oldRoles;
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword(GITUSERPULLPASS).build();) {
+            Entity<UserData> user = client.getGitUser(GITUSERPULL, null, parse(UserData.class));
+            oldRoles = user.getData().getRoles();
+            version = client
+                    .modifyGitUser(GITUSERPULL, new io.jitstatic.client.UserData(Set
+                            .of(new io.jitstatic.client.MetaData.Role(JitStaticConstants.GIT_SECRETS)), "newpass"), user.getTag());
+            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> client.getGitUser(GITUSERPULL, null, parse(UserData.class)))
+                    .getStatusCode());
+        }
+
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPULL).setPassword("newpass").build();) {
+            Entity<UserData> userWithNewPassword = client.getGitUser(GITUSERPULL, null, parse(UserData.class));
+            assertEquals(version, userWithNewPassword.getTag());
+            assertEquals(oldRoles, userWithNewPassword.getData().getRoles());
+        }
+    }
+
+    @Test
+    public void testGitUserCanChangePasswordAndOthersRoles() throws URISyntaxException, IOException {
+        String version;
+        Set<io.jitstatic.Role> oldRoles;
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERFULL).setPassword(GITUSERFULLPASS).build();) {
+            Entity<UserData> user = client.getGitUser(GITUSERPUSH, null, parse(UserData.class));
+            user.getData().getRoles().add(new Role(JitStaticConstants.GIT_FORCEPUSH));
+            oldRoles = user.getData().getRoles();
+            version = client
+                    .modifyGitUser(GITUSERPUSH, from(oldRoles, "newpass"), user.getTag());
+        }
+
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(GITUSERPUSH).setPassword("newpass").build();) {
+            Entity<UserData> userWithNewPassword = client.getGitUser(GITUSERPUSH, null, parse(UserData.class));
+            assertEquals(version, userWithNewPassword.getTag());
+            assertEquals(oldRoles, userWithNewPassword.getData().getRoles());
+        }
+    }
+
+    @Test
+    public void testKeyAdminChangePasswordAndOtherRolesOnGitUser() throws URISyntaxException, IOException {
+        try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(KEYADMINUSER).setPassword(KEYADMINUSERPASS).build();) {
+            assertEquals(HttpStatus.UNAUTHORIZED_401, assertThrows(APIException.class, () -> client.getGitUser(GITUSERPUSH, null, parse(UserData.class)))
+                    .getStatusCode());
+        }
+    }
+
     private static String getMetaData(io.jitstatic.MetaData metaData) throws JsonProcessingException {
         return MAPPER.writeValueAsString(metaData);
     }
 
     protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        verifyOkPush(git.push().setCredentialsProvider(provider).call());
-    }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(ref).setCreateBranch(true).call();
-        commit(git, provider);
-    }
-
-    private void mkdirs(Path... paths) {
-        for (Path p : paths) {
-            assertTrue(p.toFile().mkdirs());
-        }
-    }
 
     private static io.jitstatic.client.UserData from(Set<Role> roles, String pass) {
         Set<io.jitstatic.client.MetaData.Role> clientRoles = roles.stream().map(r -> r.getRole()).map(io.jitstatic.client.MetaData.Role::new)

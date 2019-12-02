@@ -1,10 +1,10 @@
 package io.jitstatic.hosted;
 
-import static io.jitstatic.JitStaticConstants.CREATE;
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_CREATE;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 
 /*-
  * #%L
@@ -51,7 +51,6 @@ import org.junit.jupiter.api.Test;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.jitstatic.hosted.LoginService;
-import io.jitstatic.storage.HashService;
 
 @SuppressFBWarnings(value = { "NP_NULL_PARAM_DEREF_NONVIRTUAL", "DM_STRING_CTOR" }, justification = "Testing explicitly for this")
 public class LoginServiceTest {
@@ -63,32 +62,31 @@ public class LoginServiceTest {
 
     private ServletRequest req = mock(ServletRequest.class);
     private UserIdentity uid = mock(UserIdentity.class);
-    private HashService hashService = new HashService();
 
     @Test
     public void testLoginServiceNullUserName() {
-        assertThrows(NullPointerException.class, () -> new LoginService(null, secret, realm, DEFAULT_MASTER_REF, hashService));
+        assertThrows(NullPointerException.class, () -> new LoginService(null, secret, realm, DEFAULT_MASTER_REF));
     }
 
     @Test
     public void testLoginServiceNullSecret() {
-        assertThrows(NullPointerException.class, () -> new LoginService(user, null, realm, DEFAULT_MASTER_REF, hashService));
+        assertThrows(NullPointerException.class, () -> new LoginService(user, null, realm, DEFAULT_MASTER_REF));
     }
 
     @Test
     public void testLoginServiceNullRealm() {
-        assertThrows(NullPointerException.class, () -> new LoginService(user, secret, null, DEFAULT_MASTER_REF, hashService));
+        assertThrows(NullPointerException.class, () -> new LoginService(user, secret, null, DEFAULT_MASTER_REF));
     }
 
     @Test
     public void testGetName() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         assertEquals(sls.getName(), new String(realm));
     }
 
     @Test
     public void testLogin() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         UserIdentity login = sls.login(user, secret, req);
         assertNotNull(login);
         Principal userPrincipal = login.getUserPrincipal();
@@ -99,36 +97,36 @@ public class LoginServiceTest {
 
     @Test
     public void testNotLogin() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         UserIdentity login = sls.login(user, "", req);
         assertNull(login);
     }
 
     @Test
     public void testValidate() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         when(uid.getUserPrincipal()).thenReturn(new AbstractLoginService.UserPrincipal(user, new Password(secret)));
         assertTrue(sls.validate(uid));
     }
 
     @Test
     public void testLoadRoleInfo() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         String[] loadRoleInfo = sls.loadRoleInfo(new AbstractLoginService.UserPrincipal(new String(user), new Password(new String(secret))));
         assertTrue(loadRoleInfo.length == 5);
-        Arrays.asList(loadRoleInfo).containsAll(List.of(PUSH, PULL, FORCEPUSH, CREATE,SECRETS));
+        Arrays.asList(loadRoleInfo).containsAll(List.of(GIT_PUSH, GIT_PULL, GIT_FORCEPUSH, GIT_CREATE,GIT_SECRETS));
     }
 
     @Test
     public void testNotRoleInfoForUser() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         String[] loadRoleInfo = sls.loadRoleInfo(new AbstractLoginService.UserPrincipal(new String("someoneelse"), new Password(new String(secret))));
         assertArrayEquals(new String[] {}, loadRoleInfo);
     }
 
     @Test
     public void testLoadUserInfo() {
-        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF, hashService);
+        LoginService sls = new LoginService(user, secret, realm, DEFAULT_MASTER_REF);
         UserPrincipal loadUserInfo = sls.loadUserInfo(user);
         assertTrue(loadUserInfo.authenticate(new Password(new String(secret))));
         assertEquals(user, loadUserInfo.getName());

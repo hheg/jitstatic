@@ -40,7 +40,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.glassfish.jersey.test.grizzly.GrizzlyWebTestContainerFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,13 +47,10 @@ import org.mockito.Mockito;
 
 import io.dropwizard.auth.AuthDynamicFeature;
 import io.dropwizard.auth.AuthValueFactoryProvider;
-import io.dropwizard.auth.basic.BasicCredentialAuthFilter;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
-import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
-import io.jitstatic.auth.ConfiguratedAuthenticator;
-import io.jitstatic.auth.KeyAdminAuthenticatorImpl;
+import io.jitstatic.auth.UrlAwareBasicCredentialAuthFilter;
 import io.jitstatic.auth.User;
 import io.jitstatic.hosted.StoreInfo;
 import io.jitstatic.storage.HashService;
@@ -74,14 +70,9 @@ public class BulkResourceTest {
     private HashService hashService = new HashService();
 
     public ResourceExtension RESOURCES = ResourceExtension.builder().setTestContainerFactory(new GrizzlyWebTestContainerFactory())
-            .addProvider(
-                    new AuthDynamicFeature(new BasicCredentialAuthFilter.Builder<User>().setAuthenticator(new ConfiguratedAuthenticator())
-                            .setRealm(JitStaticConstants.GIT_REALM).setAuthorizer((User u, String r) -> true).buildAuthFilter()))
-            .addProvider(RolesAllowedDynamicFeature.class).addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
-            .addResource(
-                    new BulkResource(storage,
-                            new KeyAdminAuthenticatorImpl(storage, (user, ref) -> new User(USER, SECRET).equals(user), REF_HEADS_MASTER, hashService),
-                            REF_HEADS_MASTER, hashService))
+            .addProvider(new AuthDynamicFeature(new UrlAwareBasicCredentialAuthFilter(storage, hashService, (u, p) -> u.equals(USER) && p.equals(SECRET))))
+            .addProvider(new AuthValueFactoryProvider.Binder<>(User.class))
+            .addResource(new BulkResource(storage, REF_HEADS_MASTER))
             .build();
 
     @Test
@@ -95,11 +86,8 @@ public class BulkResourceTest {
         when(storage.getList(Mockito.any()))
                 .thenReturn(CompletableFuture.completedFuture(List.of(Pair.of(List.of(Pair.of("key1", storeInfoMock)), REF_HEADS_MASTER))));
         Response response = RESOURCES.target("/bulk/fetch").request().header(HttpHeaders.AUTHORIZATION, BASIC_AUTH_CRED)
-                .buildPost(Entity.entity(
-                        List.of(new BulkSearch(REF_HEADS_MASTER,
-                                List.of(new SearchPath("key1", false), new SearchPath("decoy/key1", false),
-                                        new SearchPath("data/data/key1", false), new SearchPath("dir/dir/key1", false)))),
-                        MediaType.APPLICATION_JSON))
+                .buildPost(Entity.entity(List.of(new BulkSearch(REF_HEADS_MASTER, List
+                        .of(new SearchPath("key1", false), new SearchPath("decoy/key1", false), new SearchPath("data/data/key1", false), new SearchPath("dir/dir/key1", false)))), MediaType.APPLICATION_JSON))
                 .invoke();
         SearchResultWrapper entity = response.readEntity(SearchResultWrapper.class);
         assertNotNull(entity);

@@ -35,7 +35,7 @@ import javax.validation.Payload;
 @Retention(RUNTIME)
 @Target(FIELD)
 public @interface IfNotEmpty {
-    String message() default "Using Users in metadata file is deprecated";
+    String message() default "Users in metadata will be ignored";
 
     Class<?>[] groups() default {};
 

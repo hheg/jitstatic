@@ -59,7 +59,7 @@ public class SourceUpdater {
         return updateMetaDataEntry.getRight().name();
     }
 
-    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> modifyKey(final String key, final ObjectStreamProvider data,
+    public Pair<String, ThrowingSupplier<ObjectLoader, IOException>> updateKey(final String key, final ObjectStreamProvider data,
             final CommitMetaData commitMetaData, final String ref) throws IOException {
         final Pair<String, ObjectId> updatedKeyEntry = addEntry(Pair.of(Pair.of(key, data), Pair.ofNothing()), commitMetaData, ref).get(0);
         return Pair.of(updatedKeyEntry.getRight().name(), getObjectLoaderFactory(updatedKeyEntry));

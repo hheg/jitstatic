@@ -36,6 +36,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.eclipse.jetty.http.HttpStatus;
@@ -58,17 +59,18 @@ import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.client.BulkSearch;
 import io.jitstatic.client.JitStaticClient;
 import io.jitstatic.client.SearchPath;
-import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ DropwizardExtensionsSupport.class, TemporaryFolderExtension.class })
 public class BulkSearchTest extends BaseTest {
     private static final String USER = "user1";
     private static final String SECRET = "0234";
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ContainerUtils
             .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
 
     private static final String METADATA = ".metadata";
@@ -86,6 +88,7 @@ public class BulkSearchTest extends BaseTest {
 
         try (Git local = Git.cloneRepository().setURI(adress + "/" + servletName + "/" + endpoint).setDirectory(temporaryGitFolder)
                 .setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, pass)).call()) {
+            setupUser(local, "keyuser", USER, SECRET, Set.of("read", "write"));
             for (String k : List
                     .of("key1", "key2", "key3", "data/key1", "data/key2", "data/key3", "data/data/key1", "data/data/key2", "data/data/key3", "decoy/key1", "decoy/decoy/key1")) {
                 addFilesAndPush(k, temporaryGitFolder, local, user, pass);
@@ -152,8 +155,6 @@ public class BulkSearchTest extends BaseTest {
     }
 
     @Override
-    protected File getFolderFile() throws IOException { 
-        return tmpFolder.createTemporaryDirectory();
-    }
+    protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
 
 }

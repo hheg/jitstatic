@@ -54,6 +54,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
+import io.jitstatic.utils.ErrorReporter;
 
 @ExtendWith(TemporaryFolderExtension.class)
 public class JitStaticReceivePackFactoryTest {

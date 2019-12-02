@@ -20,7 +20,7 @@ package io.jitstatic.hosted;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
@@ -98,7 +98,7 @@ public class UserExtractorTest extends BaseTest {
 
     @Test
     public void testFetchUserKey() throws JsonProcessingException, IOException, NoFilepatternException, GitAPIException {
-        Path gitRealm = users.resolve(GIT_REALM);
+        Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
         Path creatorRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
         Path updaterRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
         mkdirs(gitRealm, creatorRealm, updaterRealm);
@@ -133,7 +133,7 @@ public class UserExtractorTest extends BaseTest {
 
         commit();
         UserExtractor ue = new UserExtractor(bareGit.getRepository());
-        Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(USERS + GIT_REALM + "/" + gitUserKey, REF_HEAD_MASTER);
+        Pair<String, UserData> extractUserFromRef = ue.extractUserFromRef(USERS + JITSTATIC_GIT_REALM + "/" + gitUserKey, REF_HEAD_MASTER);
         assertEquals(gitUserData, extractUserFromRef.getRight());
         assertNotNull(extractUserFromRef.getLeft());
         extractUserFromRef = ue.extractUserFromRef(USERS + JITSTATIC_KEYADMIN_REALM + "/" + creatorUserKey, REF_HEAD_MASTER);
@@ -147,7 +147,7 @@ public class UserExtractorTest extends BaseTest {
 
     @Test
     public void testValidateAll() throws Exception {
-        Path gitRealm = users.resolve(GIT_REALM);
+        Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
 
         Path creatorRealm = users.resolve(JITSTATIC_KEYUSER_REALM);
         Path updaterRealm = users.resolve(JITSTATIC_KEYADMIN_REALM);
@@ -194,15 +194,15 @@ public class UserExtractorTest extends BaseTest {
         assertEquals(REF_HEAD_MASTER, ref.getName());
         assertEquals(bareGit.getRepository().getRefDatabase().exactRef(REF_HEAD_MASTER).getObjectId(), ref.getObjectId());
         Pair<String, List<Pair<FileObjectIdStore, Exception>>> realmErrors = masterBranch.getRight().get(0);
-        assertEquals(GIT_REALM, realmErrors.getLeft());
+        assertEquals(JITSTATIC_GIT_REALM, realmErrors.getLeft());
         List<Pair<FileObjectIdStore, Exception>> fileErrors = realmErrors.getRight();
-        assertEquals(USERS + GIT_REALM + "/sgituser", fileErrors.get(0).getLeft().getFileName());
+        assertEquals(USERS + JITSTATIC_GIT_REALM + "/sgituser", fileErrors.get(0).getLeft().getFileName());
         assertNotNull(fileErrors.get(0).getRight());
     }
 
     @Test
     public void testGitRealmUserDoesntHaveCorrectRoles() throws Exception {
-        Path gitRealm = users.resolve(GIT_REALM);
+        Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
 
         mkdirs(gitRealm);
 
@@ -228,21 +228,15 @@ public class UserExtractorTest extends BaseTest {
         assertEquals(REF_HEAD_MASTER, ref.getName());
         assertEquals(bareGit.getRepository().getRefDatabase().exactRef(REF_HEAD_MASTER).getObjectId(), ref.getObjectId());
         Pair<String, List<Pair<FileObjectIdStore, Exception>>> realmErrors = masterBranch.getRight().get(0);
-        assertEquals(GIT_REALM, realmErrors.getLeft());
+        assertEquals(JITSTATIC_GIT_REALM, realmErrors.getLeft());
         List<Pair<FileObjectIdStore, Exception>> fileErrors = realmErrors.getRight();
-        assertEquals(USERS + GIT_REALM + "/tgituser", fileErrors.get(0).getLeft().getFileName());
+        assertEquals(USERS + JITSTATIC_GIT_REALM + "/tgituser", fileErrors.get(0).getLeft().getFileName());
         assertNotNull(fileErrors.get(0).getRight());
 
     }
 
     public void write(Path userPath, UserData userData) throws IOException, JsonProcessingException {
         Files.write(userPath, MAPPER.writeValueAsBytes(userData), StandardOpenOption.CREATE);
-    }
-
-    private void mkdirs(Path... realms) {
-        for (Path realm : realms) {
-            assertTrue(realm.toFile().mkdirs());
-        }
     }
 
     @Override

@@ -60,7 +60,7 @@ public class SourceJSONParserTest {
     @Test
     public void testReadObjectWithUserWithNoUser() throws UnsupportedEncodingException, IOException {
         assertThat(assertThrows(StorageParseException.class, () -> {
-            try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}]}".getBytes(StandardCharsets.UTF_8.name()))) {
+            try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}".getBytes(StandardCharsets.UTF_8.name()))) {
                 p.parseMetaData(bc);
             }
         }).getLocalizedMessage(), CoreMatchers.containsString("Error: property=users[].user, message=may not be empty, invalidValue=null"));

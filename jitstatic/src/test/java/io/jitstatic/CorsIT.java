@@ -20,17 +20,16 @@ package io.jitstatic;
  * #L%
  */
 
-import static io.jitstatic.JitStaticConstants.FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.GIT_REALM;
+import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
 import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
-import static io.jitstatic.JitStaticConstants.PULL;
-import static io.jitstatic.JitStaticConstants.PUSH;
-import static io.jitstatic.JitStaticConstants.SECRETS;
+import static io.jitstatic.JitStaticConstants.GIT_PULL;
+import static io.jitstatic.JitStaticConstants.GIT_PUSH;
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,8 +44,6 @@ import java.util.stream.Collectors;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.glassfish.jersey.internal.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,19 +65,19 @@ import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.AddKeyData;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.client.MetaData;
-import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.test.BaseTest;
 import io.jitstatic.test.TemporaryFolder;
 import io.jitstatic.test.TemporaryFolderExtension;
-import io.jitstatic.tools.AUtils;
+import io.jitstatic.tools.ContainerUtils;
 
 @ExtendWith({ TemporaryFolderExtension.class, DropwizardExtensionsSupport.class })
 public class CorsIT extends BaseTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsIT.class);
 
-    private static final String ALLFILESPATTERN = ".";
     private static final String KEYUSERNOROLE = "keyusernorole";
     private static final String KEYUSERNOROLEPASS = "1456";
 
@@ -101,7 +98,7 @@ public class CorsIT extends BaseTest {
     private String rootUser;
     private String rootPassword;
 
-    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, AUtils
+    private DropwizardAppExtension<JitstaticConfiguration> DW = new DropwizardAppExtension<>(JitstaticApplication.class, ContainerUtils
             .getDropwizardConfigurationResource(), ConfigOverride.config("hosted.basePath", getFolder()));
     private String adress;
     private String gitAdress;
@@ -144,19 +141,20 @@ public class CorsIT extends BaseTest {
                     .of(new io.jitstatic.client.HeaderPair("X-Test", "testvalue")), Set.of(new MetaData.Role("role")), Set.of(new MetaData.Role("role"))))
                             .getBytes(UTF_8), workingFolder.resolve("file2.metadata").toFile());
 
-            commit(git, provider);
-            Path gitRealm = users.resolve(GIT_REALM);
+            commitAndPush(git, provider);
+            Path gitRealm = users.resolve(JITSTATIC_GIT_REALM);
             mkdirs(gitRealm);
             Path gitUser = gitRealm.resolve(GITUSERFULL);
             Path gitUserPush = gitRealm.resolve(GITUSERPUSH);
             Path gitUserNoPush = gitRealm.resolve(GITUSER);
-            UserData gitUserData = new UserData(Set.of(new Role(PULL), new Role(PUSH), new Role(FORCEPUSH), new Role(SECRETS)), GITUSERFULLPASS, null, null);
-            UserData gitUserDataNoPush = new UserData(Set.of(new Role(PULL)), GITUSERPASS, null, null);
-            UserData gitUserDataPush = new UserData(Set.of(new Role(PULL), new Role(PUSH)), GITUSERPUSHPASS, null, null);
+            UserData gitUserData = new UserData(Set
+                    .of(new Role(GIT_PULL), new Role(GIT_PUSH), new Role(GIT_FORCEPUSH), new Role(GIT_SECRETS)), GITUSERFULLPASS, null, null);
+            UserData gitUserDataNoPush = new UserData(Set.of(new Role(GIT_PULL)), GITUSERPASS, null, null);
+            UserData gitUserDataPush = new UserData(Set.of(new Role(GIT_PULL), new Role(GIT_PUSH)), GITUSERPUSHPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(gitUserData), gitUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(gitUserDataPush), gitUserPush.toFile());
             Files.write(MAPPER.writeValueAsBytes(gitUserDataNoPush), gitUserNoPush.toFile());
-            commit(git, provider, SECRETS);
+            commit(git, provider, GIT_SECRETS);
         }
     }
 
@@ -171,7 +169,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match"), headers.get("Access-Control-Allow-Headers"));
+        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match,if-none-match"), headers.get("Access-Control-Allow-Headers"));
         assertEquals(List.of("true"), headers.get("Access-Control-Allow-Credentials"));
     }
 
@@ -207,7 +205,7 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequestGet() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS));
         HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers result = response.getHeaders();
@@ -245,7 +243,7 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testSimpleRequest() throws UnirestException {
-        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Origin", "http://localhost", "Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS));
         HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers responseHeaders = response.getHeaders();
@@ -262,10 +260,10 @@ public class CorsIT extends BaseTest {
     @Test
     public void testSimpleRequestPost() throws UnirestException, JsonProcessingException {
         Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
-                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+                + Base64.encodeAsString(KEYADMINUSER + ":" + KEYADMINUSERPASS));
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/application/storage/file3", DW.getLocalPort())).headers(headers)
                 .body(MAPPER.writeValueAsBytes(new AddKeyData(ObjectStreamProvider
-                        .toProvider(new byte[] { 0 }), new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))
+                        .toProvider(new byte[] { 0 }), new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um", null)))
                 .asString();
         Headers responseHeaders = response.getHeaders();
         printHeaders(responseHeaders);
@@ -279,7 +277,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testSimpleRequestHead() throws UnirestException {
         Map<String, String> headers = Map.of("Origin", "http://localhost", "Access-Control-Request-Headers", "Content-Type,Accept", "Authorization", "Basic "
-                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+                + baseEncode(KEYUSER, KEYUSERPASS));
         HttpResponse<String> response = Unirest.head(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         printHeaders(response.getHeaders());
@@ -306,7 +304,7 @@ public class CorsIT extends BaseTest {
                 .asString();
         Headers result = response.getHeaders();
         printHeaders(result);
-        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match"), result.get("Access-Control-Allow-Headers"));
+        assertEquals(List.of("X-Requested-With,Content-Type,Accept,Origin,if-match,if-none-match"), result.get("Access-Control-Allow-Headers"));
         assertEquals(List.of("1800"), result.get("Access-Control-Max-Age"));
     }
 
@@ -352,7 +350,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testNonSimpleRequestDelete() throws UnirestException, JsonProcessingException {
         Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
-                + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+                + baseEncode(KEYUSER, KEYUSERPASS));
         HttpResponse<String> response = Unirest.delete(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers responseHeaders = response.getHeaders();
@@ -365,7 +363,7 @@ public class CorsIT extends BaseTest {
 
     @Test
     public void testGetShouldntHaveCORSHeaders() throws UnirestException {
-        Map<String, String> headers = Map.of("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS));
+        Map<String, String> headers = Map.of("Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS));
         HttpResponse<String> response = Unirest.get(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort())).headers(headers)
                 .asString();
         Headers responseHeaders = response.getHeaders();
@@ -375,7 +373,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testMultipleDeclaredAccessHeaders() throws UnirestException {
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/storage/file2", DW.getLocalPort()))
-                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS))
                 .header("Access-Control-Request-Method", "DELETE")
                 .header("Access-Control-Request-Headers", "content-type,if-match")
                 .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
@@ -398,7 +396,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testMetaDataResource() throws UnirestException {
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/metakey/file2", DW.getLocalPort()))
-                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS))
                 .header("Access-Control-Request-Method", "PUT")
                 .header("Access-Control-Request-Headers", "content-type,if-match")
                 .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
@@ -411,7 +409,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match","if-none-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toList())), Set
                         .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
                                 .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
@@ -421,7 +419,7 @@ public class CorsIT extends BaseTest {
     @Test
     public void testUserDataResource() throws UnirestException {
         HttpResponse<String> response = Unirest.options(String.format("http://localhost:%s/application/users/keyuser/keyuser", DW.getLocalPort()))
-                .header("Authorization", "Basic " + Base64.encodeAsString(KEYUSER + ":" + KEYUSERPASS))
+                .header("Authorization", "Basic " + baseEncode(KEYUSER, KEYUSERPASS))
                 .header("Access-Control-Request-Method", "PUT")
                 .header("Access-Control-Request-Headers", "content-type,if-match")
                 .header("Access-Control-Request-Headers", JitStaticConstants.X_JITSTATIC_MAIL)
@@ -434,7 +432,7 @@ public class CorsIT extends BaseTest {
         assertEquals(List.of("http://localhost"), headers.get("Access-Control-Allow-Origin"));
         assertEquals(List.of("1800"), headers.get("Access-Control-Max-Age"));
         assertEquals(List.of("OPTIONS,GET,PUT,POST,DELETE,HEAD"), headers.get("Access-Control-Allow-Methods"));
-        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
+        assertEquals(Set.of(Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin", "if-match","if-none-match").stream().map(h -> h.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toList())), Set
                         .of(headers.get("Access-Control-Allow-Headers").stream().map(s -> Arrays.stream(s.split(","))).flatMap(s -> s)
                                 .map(m -> m.toLowerCase(Locale.ROOT)).collect(Collectors.toList())));
@@ -455,26 +453,6 @@ public class CorsIT extends BaseTest {
 
     private static String getMetaData(MetaData metaData) throws JsonProcessingException {
         return MAPPER.writeValueAsString(metaData);
-    }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        git.push().setCredentialsProvider(provider).call();
-    }
-
-    private void commit(Git git, UsernamePasswordCredentialsProvider provider, String string) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(string).setCreateBranch(true).call();
-        git.add().addFilepattern(ALLFILESPATTERN).call();
-        git.commit().setMessage("Test commit").call();
-        verifyOkPush(git.push().setCredentialsProvider(provider).call());
-
-    }
-
-    private void mkdirs(Path... paths) {
-        for (Path p : paths) {
-            assertTrue(p.toFile().mkdirs());
-        }
     }
 
     @Override

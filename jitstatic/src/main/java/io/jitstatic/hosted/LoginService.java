@@ -37,17 +37,16 @@ import io.jitstatic.storage.Storage;
 public class LoginService extends AbstractLoginService {
 
     private static final String[] EMPTY_ROLES = new String[0];
-    private static final String[] ROLES = JitStaticConstants.ROLES.toArray(new String[JitStaticConstants.ROLES.size()]);
+    private static final String[] ROLES = JitStaticConstants.GIT_ROLES.toArray(new String[JitStaticConstants.GIT_ROLES.size()]);
     private final UserPrincipal root;
     private final String defaultRef;
     private Storage storage;
-    private final HashService hashService;
+    private HashService hashService;
 
-    public LoginService(final String userName, final String secret, final String realm, final String defaultRef, HashService hashService) {
+    public LoginService(final String userName, final String secret, final String realm, final String defaultRef) {
         this._name = Objects.requireNonNull(realm);
         this.defaultRef = Objects.requireNonNull(defaultRef);
         this.root = new UserPrincipal(Objects.requireNonNull(userName), new Password(Objects.requireNonNull(secret)));
-        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @Override
@@ -68,19 +67,18 @@ public class LoginService extends AbstractLoginService {
             return root;
         }
         try {
-            final UserData userData = storage.getUser(username, defaultRef, _name);
+            final UserData userData = storage.getUser(username, defaultRef, _name).join();
             if (userData == null) {
                 return null;
             }
-            return new RoleBearingUserPrincipal(username, new HashingCredential(hashService, userData), userData.getRoles());
+            return new RoleBearingUserPrincipal(username, new HashingCredential(hashService, userData, username), userData.getRoles());
         } catch (final Exception e) {
             return null;
         }
     }
 
-    public void setUserStorage(final Storage storage) {
-        this.storage = storage;
-    }
+    public void setUserStorage(final Storage storage) { this.storage = storage; }
+    public void setHashService(final HashService hashService) { this.hashService = hashService; }
 
     private static class RoleBearingUserPrincipal extends UserPrincipal {
 
@@ -92,9 +90,7 @@ public class LoginService extends AbstractLoginService {
             this.roles = roles.stream().map(Role::getRole).toArray(String[]::new);
         }
 
-        public String[] getRoles() {
-            return Arrays.copyOf(roles, roles.length);
-        }
+        public String[] getRoles() { return Arrays.copyOf(roles, roles.length); }
     }
 
     private static class HashingCredential extends Credential {
@@ -102,10 +98,12 @@ public class LoginService extends AbstractLoginService {
         private static final long serialVersionUID = 1L;
         private final HashService service;
         private final UserData data;
+        private final String userName;
 
-        public HashingCredential(final HashService service, final UserData data) {
+        public HashingCredential(final HashService service, final UserData data, String userName) {
             this.service = service;
             this.data = data;
+            this.userName = userName;
         }
 
         @Override
@@ -114,7 +112,7 @@ public class LoginService extends AbstractLoginService {
                 credentials = new String((char[]) credentials);
             }
             if (credentials instanceof Password || credentials instanceof String) {
-                return service.hasSamePassword(data, credentials.toString());
+                return service.validatePassword(userName, data, credentials.toString());
             } else if (credentials instanceof HashingCredential) {
                 return data.equals(((HashingCredential) credentials).data);
             }

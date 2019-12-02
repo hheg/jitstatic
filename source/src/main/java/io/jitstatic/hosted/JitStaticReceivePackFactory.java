@@ -37,6 +37,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 import io.jitstatic.JitStaticConstants;
 import io.jitstatic.check.SourceChecker;
+import io.jitstatic.utils.ErrorReporter;
 
 public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServletRequest> {
 
@@ -92,7 +93,7 @@ public class JitStaticReceivePackFactory implements ReceivePackFactory<HttpServl
             final Repository db,
             final String user) {
         final ReceivePack rp = new JitStaticReceivePack(db, defaultRef, errorReporter, bus, new SourceChecker(db), userExtractor, req
-                .isUserInRole(JitStaticConstants.FORCEPUSH), inserter, repoWriter);
+                .isUserInRole(JitStaticConstants.GIT_FORCEPUSH), inserter, repoWriter);
         rp.setRefLogIdent(toPersonIdent(req, user));
         rp.setAtomic(true);
         rp.setPreReceiveHook(PreReceiveHookChain.newChain(List.of(new LogoPoster())));

@@ -20,48 +20,63 @@ package io.jitstatic;
  * #L%
  */
 
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
 import javax.servlet.FilterRegistration.Dynamic;
+import javax.servlet.Servlet;
 import javax.validation.Validator;
 
-import org.eclipse.jetty.servlets.CrossOriginFilter;
+import org.eclipse.jetty.security.SecurityHandler;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.util.component.LifeCycle.Listener;
+import org.eclipse.jgit.http.server.GitServlet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.health.HealthCheck;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.jetty.setup.ServletEnvironment;
+import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
+import io.dropwizard.setup.AdminEnvironment;
 import io.dropwizard.setup.Environment;
+import io.dropwizard.util.Duration;
 import io.jitstatic.api.KeyResource;
-import io.jitstatic.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.hosted.HostedFactory;
+import io.jitstatic.injection.configuration.hosted.HostedFactory.Cors;
+import io.jitstatic.injection.configuration.reporting.ConsoleReporting;
+import io.jitstatic.injection.configuration.reporting.ReportingFactory;
+import io.jitstatic.hosted.InterceptingCrossOriginFilter;
 import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
 import io.jitstatic.storage.Storage;
-import io.jitstatic.storage.StorageFactory;
+import io.jitstatic.test.BaseTest;
+import io.jitstatic.test.TemporaryFolder;
+import io.jitstatic.test.TemporaryFolderExtension;
 
-public class JitstaticApplicationTest {
+@ExtendWith({ TemporaryFolderExtension.class })
+public class JitstaticApplicationTest extends BaseTest {
     @Mock
     private Environment environment;
     @Mock
@@ -70,8 +85,6 @@ public class JitstaticApplicationTest {
     private HealthCheckRegistry hcr;
     @Mock
     private LifecycleEnvironment lifecycle;
-    @Mock
-    private StorageFactory storageFactory;
     @Mock
     private HostedFactory hostedFactory;
     @Mock
@@ -94,22 +107,31 @@ public class JitstaticApplicationTest {
     private ExecutorService executor;
     @Mock
     private MetricRegistry registry;
+    @Mock
+    private AdminEnvironment adminEnv;
 
-    private HashService hashService = new HashService(); 
+    private HashService hashService = new HashService();
     private JitstaticConfiguration config;
 
+    private TemporaryFolder tmpFolder;
+
     @BeforeEach
-    public void setup() {
+    public void setup() throws IOException {
         MockitoAnnotations.initMocks(this);
         config = new JitstaticConfiguration();
-        config.setStorageFactory(storageFactory);
         when(hostedFactory.getBranch()).thenReturn("refs/heads/master");
+        when(hostedFactory.getBasePath()).thenReturn(tmpFolder.createTemporaryDirectory().toPath());
+        when(hostedFactory.getServletName()).thenReturn("name");
+        when(hostedFactory.getUserName()).thenReturn("user");
+        when(hostedFactory.getSecret()).thenReturn("secret");
         when(environment.servlets()).thenReturn(servlets);
-        when(servlets.addFilter(Mockito.eq("CORS"), Mockito.eq(CrossOriginFilter.class))).thenReturn(filter);
+        when(environment.getApplicationContext()).thenReturn(handler);
+        when(environment.admin()).thenReturn(adminEnv);
+        when(servlets.addServlet(eq("name"), Mockito.<GitServlet>any())).thenReturn(mock(javax.servlet.ServletRegistration.Dynamic.class));
+        when(servlets.addFilter(Mockito.eq("CORS"), Mockito.eq(InterceptingCrossOriginFilter.class))).thenReturn(filter);
         when(environment.lifecycle()).thenReturn(lifecycle);
         when(environment.jersey()).thenReturn(jersey);
         when(environment.healthChecks()).thenReturn(hcr);
-        when(storageFactory.build(any(), isA(Environment.class), any(), any(), any(), any(), any(), any())).thenReturn(storage);
         when(environment.getApplicationContext()).thenReturn(handler);
         when(handler.getBean(Mockito.eq(LoginService.class))).thenReturn(service);
         when(handler.getBean(Mockito.eq(HashService.class))).thenReturn(hashService);
@@ -122,101 +144,91 @@ public class JitstaticApplicationTest {
     public void buildsAMapResource() throws Exception {
         JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
-        verify(jersey).register(isA(KeyResource.class));
+        verify(jersey).register(eq(KeyResource.class));
     }
 
     @Test
-    public void buildsAstorageHealthCheck() throws Exception {
+    public void testGitServletIsRegistered() throws Exception {
         JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any(), any())).thenReturn(source);
         app.run(config, environment);
-        verify(hcr).register(eq("storagechecker"), isA(HealthCheck.class));
+        verify(handler).addBean(isA(GitServlet.class));
     }
 
     @Test
-    public void testRemoteManagerLifeCycleManagerIsRegistered() throws Exception {
+    public void testConsoleReporting() throws Exception {
+        ReportingFactory reportingFactory = mock(ReportingFactory.class);
+        ConsoleReporting consoleReporting = mock(ConsoleReporting.class);
+        when(reportingFactory.getConsole()).thenReturn(consoleReporting);
+        when(consoleReporting.getRates()).thenReturn("s");
+        when(consoleReporting.getDurations()).thenReturn(Duration.seconds(5));
+        when(consoleReporting.getReportPeriods()).thenReturn(Duration.seconds(5));
+        ArgumentCaptor<Managed> arg = ArgumentCaptor.forClass(Managed.class);
         JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any(), any())).thenReturn(source);
+        config.setReportingFactory(reportingFactory);
         app.run(config, environment);
-        verify(lifecycle, times(1)).manage(isA(ManagedObject.class));
+        verify(lifecycle).manage(arg.capture());
+        Managed managed = arg.getValue();
+        managed.start();
+        managed.stop();
+        verify(consoleReporting, times(2)).getReportPeriods();
     }
 
     @Test
-    public void testStorageLifeCycleManagerIsRegisterd() throws Exception {
+    public void testSetupAdmin() throws Exception {
         JitstaticApplication app = new JitstaticApplication();
         config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(any(), any(), any())).thenReturn(source);
+        when(hostedFactory.isProtectHealthChecks()).thenReturn(true);
+        when(hostedFactory.isProtectMetrics()).thenReturn(true);
+        when(hostedFactory.isProtectTasks()).thenReturn(true);
+        when(hostedFactory.getAdminName()).thenReturn("name");
+        when(hostedFactory.getAdminPass()).thenReturn("pass");
         app.run(config, environment);
-        verify(lifecycle, times(2)).manage(isA(AutoCloseableLifeCycleManager.class));
+        verify(adminEnv).setSecurityHandler(any());
     }
 
     @Test
-    public void testResourcesAreGettingClosed() throws Exception {
+    public void testSetupCors() throws Exception {
         JitstaticApplication app = new JitstaticApplication();
-        assertThrows(RuntimeException.class, () -> {
-            config.setHostedFactory(hostedFactory);
-            when(hostedFactory.build(any(), any(), any())).thenReturn(source);
-            Mockito.doThrow(new RuntimeException()).when(jersey).register(any(KeyResource.class));
-            try {
-                app.run(config, environment);
-            } catch (Exception e) {
-                verify(source).close();
-                verify(storage).close();
-                throw e;
-            }
-        });
+        config.setHostedFactory(hostedFactory);
+        when(hostedFactory.getCors()).thenReturn(new Cors());
+        app.run(config, environment);
+        verify(filter, times(6)).setInitParameter(any(), any());
     }
 
     @Test
-    public void testDealingWhenFailed() throws Exception {
-        JitstaticApplication app = new JitstaticApplication();
-        TestException r = new TestException("Test Exception");
-        HostedFactory hf = mock(HostedFactory.class);
+    public void testHandlerManagement() throws Exception {
+        ArgumentCaptor<SecurityHandler> ac = ArgumentCaptor.forClass(SecurityHandler.class);
+        when(environment.servlets()).thenReturn(servlets);
+        when(servlets.addServlet(any(), Mockito.<Servlet>any())).thenReturn(mock(javax.servlet.ServletRegistration.Dynamic.class));
+        when(environment.getApplicationContext()).thenReturn(handler);
+        when(environment.getObjectMapper()).thenReturn(mapper);
+        HostedFactory hf = new HostedFactory();
         config.setHostedFactory(hf);
-        doThrow(r).when(hf).build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any());
-        assertSame(r, assertThrows(TestException.class, () -> {
-            app.run(config, environment);
-        }));
-    }
-
-    @Test
-    public void testBothHostedAndRemoteConfigurationIsSet() throws Exception {
+        hf.setBasePath(tmpFolder.createTemporaryDirectory().toPath());
+        hf.setTmpPath(tmpFolder.createTemporaryDirectory().toPath());
+        hf.setHostedEndpoint("endpoint");
+        hf.setUserName("user");
+        hf.setSecret("secret");
+        hf.setServletName("servletName");
+        hf.setBranch("refs/heads/master");
         JitstaticApplication app = new JitstaticApplication();
-        config.setStorageFactory(storageFactory);
-        config.setHostedFactory(hostedFactory);
-        when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
-        when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
-                .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
         app.run(config, environment);
-        
-    }
-
-    @Test
-    public void testClosingSourceAndThrow() throws Exception {
-        JitstaticApplication app = new JitstaticApplication();
-        assertThrows(TestException.class, () -> {
-            doThrow(new TestException("Test exception1")).when(source).close();
-            doThrow(new TestException("Test exception2")).when(storage).close();
-            config.setStorageFactory(storageFactory);
-            config.setHostedFactory(hostedFactory);
-            when(config.getKeyAdminAuthenticator(storage, hashService)).thenThrow(new TestException("Test exception3"));
-            when(hostedFactory.build(Mockito.eq(environment), Mockito.eq(JitStaticConstants.GIT_REALM), any())).thenReturn(source);
-            when(storageFactory.build(Mockito.eq(source), Mockito.eq(environment), Mockito.eq(JitStaticConstants.JITSTATIC_KEYADMIN_REALM), Mockito
-                    .eq(hashService), any(), any(), any(), any())).thenReturn(storage);
-            app.run(config, environment);
-        });
-    }
-
-    private static class TestException extends RuntimeException {
-
-        private static final long serialVersionUID = 1L;
-
-        public TestException(String msg) {
-            super(msg);
-        }
+        verify(servlets).setSecurityHandler(ac.capture());
+        SecurityHandler sh = ac.getValue();
+        Handler h = sh.getHandler();
+        h.addLifeCycleListener(mock(Listener.class));
+        h.destroy();
+        h.getServer();
+        h.isFailed();
+        h.isRunning();
+        h.isStarted();
+        h.isStarting();
+        h.isStopped();
+        h.isStopping();
+        h.removeLifeCycleListener(mock(Listener.class));
+        h.setServer(mock(Server.class));
     }
 }

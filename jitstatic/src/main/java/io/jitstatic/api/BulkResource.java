@@ -22,7 +22,6 @@ package io.jitstatic.api;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -37,8 +37,10 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
@@ -50,30 +52,30 @@ import com.codahale.metrics.annotation.Timed;
 
 import io.dropwizard.auth.Auth;
 import io.dropwizard.validation.Validated;
+import io.jitstatic.JitStaticConstants;
 import io.jitstatic.MetaData;
 import io.jitstatic.Role;
-import io.jitstatic.auth.KeyAdminAuthenticator;
 import io.jitstatic.auth.User;
-import io.jitstatic.storage.HashService;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.storage.Storage;
 import io.jitstatic.utils.Pair;
 
+@Singleton
 @Path("bulk")
 public class BulkResource {
 
     private final String defaultRef;
     private static final Logger LOG = LoggerFactory.getLogger(BulkResource.class);
     private final Storage storage;
-    private final KeyAdminAuthenticator addKeyAuthenticator;
-    private final HashService hashService;
+    
     @Inject
-    private ExecutorService executor;
+    public BulkResource(final Storage storage, final JitstaticConfiguration config) {
+        this(storage, config.getHostedFactory().getBranch());
+    }
 
-    public BulkResource(final Storage storage, KeyAdminAuthenticator adminKeyAuthenticator, String defaultBranch, HashService hashService) {
+    public BulkResource(final Storage storage, String defaultBranch) {
         this.storage = Objects.requireNonNull(storage);
-        this.addKeyAuthenticator = Objects.requireNonNull(adminKeyAuthenticator);
         this.defaultRef = Objects.requireNonNull(defaultBranch);
-        this.hashService = Objects.requireNonNull(hashService);
     }
 
     @POST
@@ -83,11 +85,10 @@ public class BulkResource {
     @ExceptionMetered(name = "fetch_storage_exception")
     @Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
-    public void fetch(@Suspended AsyncResponse asyncResponse,
-            final @Validated @NotEmpty @Valid List<BulkSearch> searches,
-            final @Auth Optional<User> userHolder) {
+    public void fetch(@Suspended AsyncResponse asyncResponse, final @Validated @NotEmpty @Valid List<BulkSearch> searches, final @Auth User user,
+            @Context SecurityContext context, @Context ExecutorService executor) {
         CompletableFuture.supplyAsync(() -> searches.stream()
-                .filter(bs -> APIHelper.isRef(bs.getRef()))
+                .filter(bs -> JitStaticConstants.isRef(bs.getRef()))
                 .map(bs -> Pair.of(bs.getPaths().stream()
                         .map(sp -> Pair.of(sp.getPath(), sp.isRecursively()))
                         .collect(Collectors.toList()), bs.getRef()))
@@ -98,21 +99,9 @@ public class BulkResource {
                                 .filter(data -> {
                                     final String ref = APIHelper.setToDefaultRefIfNull(p.getRight(), defaultRef);
                                     final MetaData storageData = data.getRight().getMetaData();
-                                    final Set<User> allowedUsers = storageData.getUsers();
                                     final Set<Role> readRoles = storageData.getRead();
-                                    if (allowedUsers.isEmpty() && (readRoles == null || readRoles.isEmpty())) {
-                                        LOG.info("{} logged in and accessed key {} in {}", userHolder.orElse(new User("anonymous", null)), data.getLeft(), ref);
-                                        return true;
-                                    }
-                                    if (!userHolder.isPresent()) {
-                                        return false;
-                                    }
-                                    final User user = userHolder.get();
-                                    if (allowedUsers.contains(user) || APIHelper.isKeyUserAllowed(storage, hashService, user, ref, readRoles)
-                                            || addKeyAuthenticator.authenticate(user, ref)) {
-                                        LOG.info("{} logged in and accessed key {} in {}", user, p.getLeft().stream()
-                                                .map(Pair::getLeft)
-                                                .collect(Collectors.toList()), ref);
+                                    if (readRoles.isEmpty() || APIHelper.isUserInRole(context, readRoles)) {
+                                        LOG.info("{} logged in and accessed key {} in {}", user, data.getLeft(), ref);
                                         return true;
                                     }
                                     return false;

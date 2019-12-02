@@ -39,7 +39,7 @@ class JitStaticRefFilterTest {
     @Test
     void testJitStaticRefFilter() {
         HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
-        Mockito.when(req.isUserInRole(Mockito.eq(JitStaticConstants.SECRETS))).thenReturn(false);
+        Mockito.when(req.isUserInRole(Mockito.eq(JitStaticConstants.GIT_SECRETS))).thenReturn(false);
         JitStaticRefFilter filter = new JitStaticRefFilter(req);
         final Map<String, Ref> refs = new HashMap<>();
         Ref HEAD = Mockito.mock(Ref.class);

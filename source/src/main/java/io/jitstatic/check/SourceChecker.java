@@ -1,7 +1,5 @@
 package io.jitstatic.check;
 
-import static io.jitstatic.JitStaticConstants.APPLICATION_JSON;
-
 /*-
  * #%L
  * jitstatic
@@ -124,35 +122,7 @@ public class SourceChecker {
         }
         final Pair<FileObjectIdStore, Either<String, Exception>> check = readAndCheckMetaFileData(metaFileData);
         final Either<String, Exception> fileMetaDataResult = check.getRight();
-        if (fileMetaDataResult.isLeft()) {
-            if (metaFileData.isMasterMetaData()) {
-                return Stream.of();
-            }
-            final String contentType = fileMetaDataResult.getLeft();
-            return Stream.of(Pair.ofNothing(), readAndCheckSourceFileData(sourceFileData, contentType));
-        }
-        return Stream.of(Pair.of(check.getLeft(), fileMetaDataResult.getRight()));
-    }
-    /** 
-     * This is deprecated since JitStatic isn't going to check files if they are valid according to declared type.
-     * This should be solely something the user should validate.
-     */
-    @Deprecated
-    private Pair<FileObjectIdStore, Exception> readAndCheckSourceFileData(final SourceFileData data, final String contentType) {
-        final InputStreamHolder inputStreamHolder = data.getInputStreamHolder();
-        if (inputStreamHolder.isPresent()) {
-            try (InputStream is = inputStreamHolder.inputStream()) {
-                if (APPLICATION_JSON.equalsIgnoreCase(contentType)) {
-                    PARSER.parseJson(is);
-                }
-            } catch (final IOException e) {
-                return Pair.of(data.getFileInfo(), e);
-            }
-            // File OK
-            return Pair.ofNothing();
-        }
-        // File had a repository exception
-        return Pair.of(data.getFileInfo(), inputStreamHolder.exception());
+        return fileMetaDataResult.isLeft() ? Stream.of() : Stream.of(Pair.of(check.getLeft(), fileMetaDataResult.getRight()));
     }
 
     private Pair<FileObjectIdStore, Either<String, Exception>> readAndCheckMetaFileData(final MetaFileData data) {

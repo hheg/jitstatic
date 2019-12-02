@@ -35,7 +35,7 @@ import com.codahale.metrics.health.HealthCheck.Result;
 
 import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
-import io.jitstatic.JitstaticConfiguration;
+import io.jitstatic.injection.configuration.JitstaticConfiguration;
 
 public class ContainerUtils {
 

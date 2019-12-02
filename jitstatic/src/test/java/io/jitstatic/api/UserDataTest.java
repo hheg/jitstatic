@@ -39,14 +39,14 @@ class UserDataTest {
 
     @Test
     void testUserData() {
-        UserData data = new UserData(Set.of(new Role("role")), "pass");
+        UserData data = new UserData(Set.of(new Role("role")), "pass", null);
         Set<ConstraintViolation<UserData>> validate = validator.validate(data);
         assertTrue(validate.isEmpty());
     }
 
     @Test
     public void testUserDataWithNoPassword() {
-        UserData data = new UserData(Set.of(new Role("role")), null);
+        UserData data = new UserData(Set.of(new Role("role")), null, null);
         Set<ConstraintViolation<UserData>> validate = validator.validate(data);
         assertTrue(validate.isEmpty());
         validate = validator.validate(data, Adding.class, Default.class);
@@ -55,7 +55,7 @@ class UserDataTest {
 
     @Test
     public void testUserDataWithNoRole() {
-        UserData data = new UserData(null, "pass");
+        UserData data = new UserData(null, "pass", null);
         Set<ConstraintViolation<UserData>> validate = validator.validate(data);
         assertTrue(validate.size() == 1);
         validate = validator.validate(data, Adding.class, Default.class);
