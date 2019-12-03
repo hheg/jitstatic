@@ -257,13 +257,48 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
     }
 
     protected enum Realm {
-        USERS_USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)),
-        USERS_ADMIN_GIT(List.of(Domain.KEYADMIN, Domain.GIT)),
-        USERS_GIT(List.of(Domain.GIT)),
-        NONE_USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)),
-        USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)),
-        ADMIN_GIT(List.of(Domain.KEYADMIN, Domain.GIT)),
-        GIT(List.of(Domain.GIT)),
+        USERS_USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setUsersPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        USERS_ADMIN_GIT(List.of(Domain.KEYADMIN, Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setUsersPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        USERS_GIT(List.of(Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setUsersPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        NONE_USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setKeysPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        USER_ADMIN_GIT(List.of(Domain.KEYUSER, Domain.KEYADMIN, Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setKeysPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        ADMIN_GIT(List.of(Domain.KEYADMIN, Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setKeysPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
+        GIT(List.of(Domain.GIT)) {
+            @Override
+            void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
+                domain.setKeysPrincipal(requestContext, scheme, userData, userName);
+            }
+        },
         NONE(List.of(Domain.NONE)) {
             @Override
             void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
@@ -289,9 +324,8 @@ public abstract class ContextAwareAuthFilter<C> implements ContainerRequestFilte
             this.accept = new Verdict(true, this);
         }
 
-        void invokeInRealm(ContainerRequestContext requestContext, String scheme, UserData userData, String userName, Domain domain) {
-            domain.setUsersPrincipal(requestContext, scheme, userData, userName);
-        }
+        abstract void invokeInRealm(final ContainerRequestContext requestContext, final String scheme, final UserData userData, final String userName,
+                Domain domain);
 
         public String getRealmName() { return realmName; }
 
