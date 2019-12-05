@@ -155,7 +155,7 @@ public class UserManagementTest extends BaseTest {
             Path keyuser = keyUserRealm.resolve(KEYUSER);
             Path keyusernorole = keyUserRealm.resolve(KEYUSERNOROLE);
             keyAdminUserData = new UserData(Set.of(new Role("read"), new Role("write")), KEYADMINUSERPASS, null, null);
-            keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS, null);
+            keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS);
             UserData keyUserUserDataNoRole = new UserData(Set.of(), KEYUSERNOROLEPASS, null, null);
             Files.write(MAPPER.writeValueAsBytes(keyAdminUserData), keyAdminUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(new UserData(Set.of(new Role("role")), KEYUSERPASS, null,null)), keyuser.toFile());

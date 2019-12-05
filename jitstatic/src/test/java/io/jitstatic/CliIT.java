@@ -152,7 +152,7 @@ public class CliIT extends BaseTest {
             Path keyAdminUser = keyAdminRealm.resolve(KEYADMINUSER);
             Path keyuser = keyUserRealm.resolve(KEYUSER);
             UserData keyAdminUserData = new UserData(Set.of(new Role("read"), new Role("write")), KEYADMINUSERPASS, null, null);
-            io.jitstatic.api.UserData keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS, null);
+            io.jitstatic.api.UserData keyUserUserData = new io.jitstatic.api.UserData(Set.of(new Role("role")), KEYUSERPASS);
             Files.write(MAPPER.writeValueAsBytes(keyAdminUserData), keyAdminUser.toFile());
             Files.write(MAPPER.writeValueAsBytes(keyUserUserData), keyuser.toFile());
             Files.write(getData().getBytes(UTF_8), workingFolder.resolve("file").toFile());

@@ -51,19 +51,16 @@ public class AddKeyData {
     @NotBlank
     private final String userInfo;
 
-    private final String ref;
-
     @JsonCreator
     public AddKeyData(
             @JsonSerialize(using = StreamingSerializer.class) @JsonDeserialize(using = StreamingDeserializer.class) @JsonProperty("data") final ObjectStreamProvider data,
             @JsonProperty("metaData") final MetaData metaData, @JsonProperty("message") final String message, @JsonProperty("userInfo") final String userInfo,
-            @JsonProperty("userMail") final String userMail, final @JsonProperty(value = "ref", required = false) String ref) {
+            @JsonProperty("userMail") final String userMail) {
         this.data = data;
         this.metaData = metaData;
         this.message = message;
         this.userMail = userMail;
         this.userInfo = userInfo;
-        this.ref = ref;
     }
 
     public ObjectStreamProvider getData() { return data; }
@@ -75,6 +72,4 @@ public class AddKeyData {
     public String getUserMail() { return userMail; }
 
     public String getUserInfo() { return userInfo; }
-
-    public String getRef() { return ref; }
 }
