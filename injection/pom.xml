@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.jitstatic</groupId>
         <artifactId>jitstatic-parent</artifactId>
-        <version>0.40.1-SNAPSHOT</version>
+        <version>0.40.1</version>
     </parent>
     <artifactId>injection</artifactId>
 
@@ -12,7 +12,7 @@
         <dependency>
             <groupId>io.jitstatic</groupId>
             <artifactId>utils</artifactId>
-            <version>0.40.1-SNAPSHOT</version>
+            <version>0.40.1</version>
         </dependency>
         <dependency>
             <groupId>zone.dragon.dropwizard</groupId>
