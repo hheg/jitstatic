@@ -271,7 +271,6 @@ public class KeyResource {
     public void addKey(@Suspended AsyncResponse asyncResponse, @NotNull final @PathParam("key") String key, @QueryParam("ref") String askedRef,
             final @Validated @Valid @NotNull AddKeyData data, final @Context HttpServletRequest httpRequest, final @Auth User user,
             @Context SecurityContext context, @Context ExecutorService executor) throws JsonParseException, JsonMappingException, IOException {
-        askedRef = data.getRef() != null ? data.getRef() : askedRef;
         APIHelper.checkMutableRef(askedRef);
         final String ref = APIHelper.setToDefaultRefIfNull(askedRef, defaultRef);
         try {

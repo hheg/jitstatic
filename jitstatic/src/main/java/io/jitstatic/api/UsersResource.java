@@ -135,7 +135,6 @@ public class UsersResource {
     public void updateKeyAdminUser(@Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, @QueryParam("ref") String ref,
             final @Validated @Valid @NotNull UserData data, final @Auth User user, final @Context HttpHeaders headers, final @Context Request request,
             @Context SecurityContext context, @Context ExecutorService executor) {
-        ref = data.getRef() != null ? data.getRef() : ref;
         APIHelper.checkMutableRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
         updateUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, context, executor);
@@ -151,7 +150,6 @@ public class UsersResource {
     public void addKeyAdminUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, @QueryParam("ref") String ref,
             final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data, final @Auth User user, @Context SecurityContext context,
             @Context ExecutorService executor) {
-        ref = data.getRef() != null ? data.getRef() : ref;
         APIHelper.checkMutableRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYADMIN_REALM), JITSTATIC_KEYADMIN_REALM), context);
         addUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, user, JITSTATIC_KEYADMIN_REALM, asyncResponse, executor);
@@ -195,7 +193,6 @@ public class UsersResource {
     public void updateKeyUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, @QueryParam("ref") String ref,
             final @Validated @Valid @NotNull UserData data, final @Auth User user,
             final @Context HttpHeaders headers, final @Context Request request, final @Context SecurityContext context, final @Context ExecutorService executor) {
-        ref = data.getRef() != null ? data.getRef() : ref;
         APIHelper.checkMutableRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         updateUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, request, user, JITSTATIC_KEYUSER_REALM, asyncResponse, context, executor);
@@ -211,7 +208,6 @@ public class UsersResource {
     public void addKeyUser(final @Suspended AsyncResponse asyncResponse, final @PathParam("key") String key, @QueryParam("ref") String ref,
             final @Valid @NotNull @Validated({ Adding.class, Default.class }) UserData data,
             final @Auth User user, final @Context SecurityContext context, final @Context ExecutorService executor) {
-        ref = data.getRef() != null ? data.getRef() : ref;
         APIHelper.checkMutableRef(ref);
         authorize(Set.of(createUserRole(key, JITSTATIC_KEYUSER_REALM), JITSTATIC_KEYUSER_REALM, JITSTATIC_GIT_REALM), context);
         addUser(key, APIHelper.setToDefaultRefIfNull(ref, defaultRef), data, user, JITSTATIC_KEYUSER_REALM, asyncResponse, executor);
