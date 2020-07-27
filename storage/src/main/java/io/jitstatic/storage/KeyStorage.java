@@ -9,9 +9,9 @@ package io.jitstatic.storage;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -317,8 +317,7 @@ public class KeyStorage extends InjectableHealthCheck implements Storage, Reload
 
     @Override
     public CompletableFuture<List<Pair<String, StoreInfo>>> getListForRef(final List<Pair<String, Boolean>> keyPairs,
-            final String ref) throws RefNotFoundException {
-        final String finalRef = checkRef(ref);
+            final String finalRef) throws RefNotFoundException {
         final List<CompletableFuture<List<Pair<String, StoreInfo>>>> collected = Tree.of(Objects.requireNonNull(keyPairs)).accept(Tree.EXTRACTOR).stream()
                 .map(pair -> {
                     final String key = pair.getLeft();
@@ -341,7 +340,19 @@ public class KeyStorage extends InjectableHealthCheck implements Storage, Reload
 
     private CompletableFuture<Optional<StoreInfo>> getKeyMuted(final String key, final String ref) {
         try {
-            return getKey(key, ref);
+            return getKey(key, ref).handle((o, t) -> {
+                if (t != null) {
+                    try {
+                        unwrap(o, t, ref);
+                    } catch (WrappingAPIException e) {
+                        Throwable cause = e.getCause();
+                        if (cause instanceof RefNotFoundException) {
+                            return Optional.<StoreInfo>empty();
+                        } else throw e;
+                    }
+                }
+                return o;
+            });
         } catch (RefNotFoundException e) {
             throw new WrappingAPIException(e);
         }
@@ -494,20 +505,20 @@ public class KeyStorage extends InjectableHealthCheck implements Storage, Reload
             ExecutorService executor) {
         return new Cache2kBuilder<String, RefHolder>() {
         }
-                .name(KeyStorage.class)
-                .loader(new CacheLoader<String, RefHolder>() {
-                    @Override
-                    public RefHolder load(final String ref) throws Exception {
-                        LOG.info("Adding ref {}", ref);
-                        if (ref.startsWith("refs/tags/")) {
-                            return new ReadOnlyRefHolder(ref, source, hashService, refLockService, executor);
-                        }
-                        final RefHolder refHolder = new RefHolder(ref, source, hashService, refLockService, executor);
-                        refHolder.start();
-                        return refHolder;
-                    }
-                })
-                .build();
+        .name(KeyStorage.class)
+        .loader(new CacheLoader<String, RefHolder>() {
+            @Override
+            public RefHolder load(final String ref) throws Exception {
+                LOG.info("Adding ref {}", ref);
+                if (ref.startsWith("refs/tags/")) {
+                    return new ReadOnlyRefHolder(ref, source, hashService, refLockService, executor);
+                }
+                final RefHolder refHolder = new RefHolder(ref, source, hashService, refLockService, executor);
+                refHolder.start();
+                return refHolder;
+            }
+        })
+        .build();
     }
 
     @Override

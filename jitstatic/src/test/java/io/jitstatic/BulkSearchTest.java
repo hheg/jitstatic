@@ -9,9 +9,9 @@ package io.jitstatic;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,7 +42,10 @@ import java.util.function.Function;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,7 @@ import com.mashape.unirest.http.exceptions.UnirestException;
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import io.jitstatic.api.SearchResult;
 import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.client.BulkSearch;
 import io.jitstatic.client.JitStaticClient;
@@ -124,6 +128,67 @@ public class BulkSearchTest extends BaseTest {
                 .body("[]")
                 .asString();
         assertEquals(HttpStatus.UNPROCESSABLE_ENTITY_422, response.getStatus(), response.getBody());
+    }
+
+    @Test
+    public void testSearchInDifferentBranches() throws InvalidRemoteException, TransportException, GitAPIException, IOException, URISyntaxException {
+        File temporaryGitFolder = tmpFolder.createTemporaryDirectory();
+        String adress = String.format("http://localhost:%d/application", DW.getLocalPort());
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String servletName = hostedFactory.getServletName();
+        String endpoint = hostedFactory.getHostedEndpoint();
+        UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(user, pass);
+        try (Git local = Git.cloneRepository().setURI(adress + "/" + servletName + "/" + endpoint).setDirectory(temporaryGitFolder)
+                .setCredentialsProvider(credentials).call()) {
+            commit(local, credentials, "other");
+            Ref master = local.checkout().setName("master").call();
+            assertTrue("refs/heads/master".equals(master.getName()));
+            setupUser(local, "keyuser", USER, "other", Set.of("someother", "write"));
+            commit(local, credentials, "master", false);
+        }
+        try (JitStaticClient updaterClient = buildClient(DW.getLocalPort()).setUser(USER).setPassword(SECRET).build();) {
+            SearchResultWrapper search = updaterClient
+                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("data/key3", false))),
+                            new BulkSearch("refs/heads/other", List.of(new SearchPath("data/data/key1", false)))), parse());
+            assertNotNull(search);
+            assertTrue(search.getResult().size() == 1, "Was " + search.getResult().size() + " should be one");
+            SearchResult searchResult = search.getResult().get(0);
+            assertEquals("data/data/key1", searchResult.getKey());
+            assertEquals("refs/heads/other", searchResult.getRef());
+        }
+    }
+
+    @Test
+    public void testGetPublicKeyAnonymously() throws IOException, InvalidRemoteException, TransportException, GitAPIException, URISyntaxException {
+        File temporaryGitFolder = tmpFolder.createTemporaryDirectory();
+        String adress = String.format("http://localhost:%d/application", DW.getLocalPort());
+        HostedFactory hostedFactory = DW.getConfiguration().getHostedFactory();
+        String user = hostedFactory.getUserName();
+        String pass = hostedFactory.getSecret();
+        String servletName = hostedFactory.getServletName();
+        String endpoint = hostedFactory.getHostedEndpoint();
+        UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(user, pass);
+        try (Git local = Git.cloneRepository().setURI(adress + "/" + servletName + "/" + endpoint).setDirectory(temporaryGitFolder)
+                .setCredentialsProvider(credentials).call()) {
+            Files.write(temporaryGitFolder.toPath().resolve("anonymouskey"), new byte[] { 1 }, StandardOpenOption.CREATE_NEW);
+            Files.write(temporaryGitFolder.toPath().resolve("anonymouskey.metadata"), "{\"read\":[],\"write\":[{\"role\":\"write\"}]}"
+                    .getBytes(UTF_8), StandardOpenOption.CREATE_NEW);
+            commit(local, credentials, "master", false);
+        }
+        try (JitStaticClient updaterClient = buildClient(DW.getLocalPort()).build();) {
+            SearchResultWrapper search = updaterClient
+                    .search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("anonymouskey", false))),
+                            new BulkSearch("refs/heads/other", List.of(new SearchPath("data/data/key1", false)))),
+                            parse());
+            assertNotNull(search);
+            assertTrue(search.getResult().size() == 1, "Was " + search.getResult().size() + " should be one");
+            SearchResult searchResult = search.getResult().get(0);
+            assertEquals("anonymouskey", searchResult.getKey());
+            assertEquals("refs/heads/master", searchResult.getRef());
+        }
+
     }
 
     private Function<InputStream, SearchResultWrapper> parse() {
