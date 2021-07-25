@@ -66,7 +66,6 @@ INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabl
 INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /storage/*
 INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /metakey/*
 INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /users/*
-INFO  [2018-11-23 20:26:37,476] io.jitstatic.hosted.HostedFactory: CORS is enabled for /bulk/*
 INFO  [2018-11-23 20:26:37,477] io.jitstatic.hosted.HostedFactory: CORS is enabled for /info/*
 INFO  [2018-11-23 20:26:37,503] io.dropwizard.server.SimpleServerFactory: Registering jersey handler with root path prefix: /app
 INFO  [2018-11-23 20:26:37,503] io.dropwizard.server.SimpleServerFactory: Registering admin handler with root path prefix: /admin
@@ -75,7 +74,6 @@ INFO  [2018-11-23 20:26:37,642] org.eclipse.jetty.setuid.SetUIDListener: Opened 
 INFO  [2018-11-23 20:26:37,645] org.eclipse.jetty.server.Server: jetty-9.4.z-SNAPSHOT; built: 2018-06-05T18:24:03.829Z; git: d5fc0523cfa96bfebfbda19606cad384d772f04c; jvm 10.0.2+13
 INFO  [2018-11-23 20:26:38,471] io.dropwizard.jersey.DropwizardResourceConfig: The following paths were found for the configured resources:
 
-    POST    /bulk/fetch (io.jitstatic.api.BulkResource)
     GET     /info/commitid (io.jitstatic.api.JitstaticInfoResource)
     GET     /info/version (io.jitstatic.api.JitstaticInfoResource)
     GET     /metakey/{key : .+} (io.jitstatic.api.MetaKeyResource)
@@ -413,34 +411,6 @@ Content-Length: 320
 
 {"result":[{"key":"root/dir1/dir2/file4","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file1","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"},{"key":"root/dir1/file2","type":"application/json","tag":"264f8aec58118e2682091653017213ace0c04922"}]}
 ```
-### API for Fetching multiple keys
-
-It's possible to fetch multiple keys from a repo like this:
-
-```
-[master]
-root/dir1/file1
-root/dir1/file2
-root/dir3/file3
-root/dir1/dir2/file4
-file5
-```
-
-```
-curl --user user1:1234 -i http://localhost:8085/app/bulk/fetch \
--H 'Content-Type: application/json' \
--X POST \
--d '[{"ref":"refs/heads/master","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":true}]},{"ref":"refs/heads/develop","paths":[{"path":"root/dir1/","recursively":false},{"path":"root/dir3/file3","recursively":false}]}]'
-HTTP/1.1 200 OK
-Date: Fri, 23 Nov 2018 20:38:21 GMT
-Content-Type: application/json
-Content-Length: 537
-
-{"result":[{"key":"root/dir1/file1","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir1/file2","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"},{"key":"root/dir3/file3","tag":"264f8aec58118e2682091653017213ace0c04922","contentType":"application/json","content":"eyJoZWxsbyIgOiAid29ybGQifQo=","ref":"refs/heads/master"}]}
-```
-
-All keys are still protected by authorization. The keys are still protected by the corresponding access rules. 
-
 
 ### MetaKeys
 
