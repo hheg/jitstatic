@@ -9,9 +9,9 @@ package io.jitstatic;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,12 +22,12 @@ package io.jitstatic;
 
 import static io.jitstatic.JitStaticConstants.GIT_CREATE;
 import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.GIT_PULL;
 import static io.jitstatic.JitStaticConstants.GIT_PUSH;
 import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
@@ -79,16 +79,13 @@ import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.jitstatic.api.KeyData;
 import io.jitstatic.api.KeyDataWrapper;
-import io.jitstatic.api.SearchResult;
 import io.jitstatic.api.SearchResultWrapper;
 import io.jitstatic.auth.UserData;
 import io.jitstatic.client.APIException;
-import io.jitstatic.client.BulkSearch;
 import io.jitstatic.client.CommitData;
 import io.jitstatic.client.JitStaticClient;
 import io.jitstatic.client.MetaData;
 import io.jitstatic.client.ModifyUserKeyData;
-import io.jitstatic.client.SearchPath;
 import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.test.BaseTest;
@@ -360,33 +357,6 @@ public class UserManagementTest extends BaseTest {
                 throw new UncheckedIOException(e);
             }
         };
-    }
-
-    @Test
-    public void testBulkSearch() throws Exception {
-        int i = 0;
-        try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            for (String file : List.of("path/file", "path/path/file", "file3")) {
-                Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("role"));
-                creator.createKey(getData(i)
-                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
-                i++;
-            }
-        }
-        try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            i = 0;
-            for (String file : List.of("path/file2", "path/path/file2", "file2")) {
-                Set<io.jitstatic.client.MetaData.Role> roles = Set.of(new io.jitstatic.client.MetaData.Role("other"));
-                creator.createKey(getData(i)
-                        .getBytes(UTF_8), new CommitData(file, "master", "msg", "ui", "mail"), new io.jitstatic.client.MetaData("application/json", roles, roles));
-                i++;
-            }
-        }
-        try (JitStaticClient creator = buildClient(DW.getLocalPort()).setPassword(KEYUSERPASS).setUser(KEYUSER).build()) {
-            SearchResultWrapper search = creator.search(List.of(new BulkSearch("refs/heads/master", List.of(new SearchPath("path/", true)))), readData());
-            Set<String> keys = search.getResult().stream().map(SearchResult::getKey).collect(Collectors.toSet());
-            assertEquals(Set.of("path/file", "path/path/file"), keys);
-        }
     }
 
     private Function<InputStream, SearchResultWrapper> readData() {
@@ -1179,6 +1149,7 @@ public class UserManagementTest extends BaseTest {
         return MAPPER.writeValueAsString(metaData);
     }
 
+    @Override
     protected File getFolderFile() throws IOException { return tmpFolder.createTemporaryDirectory(); }
 
     private static io.jitstatic.client.UserData from(Set<Role> roles, String pass) {

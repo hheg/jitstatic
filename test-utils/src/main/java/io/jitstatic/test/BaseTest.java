@@ -9,9 +9,9 @@ package io.jitstatic.test;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -132,8 +132,7 @@ public abstract class BaseTest {
         };
     }
 
-    protected void setupUser(Git repo, String realm, String userName, String password, Set<String> roles)
-            throws JsonProcessingException, IOException, NoFilepatternException, GitAPIException {
+    protected void setupUser(Git repo, String realm, String userName, String password, Set<String> roles) throws JsonProcessingException, IOException, NoFilepatternException, GitAPIException {
         File gitBase = repo.getRepository().getDirectory().getParentFile();
         Path user = gitBase.toPath().resolve(".users/" + realm + "/" + userName);
         mkdirs(user.getParent());
@@ -179,7 +178,7 @@ public abstract class BaseTest {
         public String getRole() { return role; }
 
         public void setRole(String role) { this.role = role; }
-        
+
         @Override
         public boolean equals(Object obj) {
             if (this == obj)
@@ -204,16 +203,26 @@ public abstract class BaseTest {
         assertTrue(StreamSupport.stream(call.spliterator(), false)
                 .allMatch(p -> p.getRemoteUpdates().stream()
                         .allMatch(u -> u.getStatus() == Status.OK)), () -> StreamSupport.stream(call.spliterator(), false)
-                                .map(pr -> pr.getRemoteUpdates().stream()
-                                        .map(ru -> String.format("%s %s %s", ru.getStatus(), ru.getRemoteName(), ru.getMessage()))
-                                        .collect(Collectors.joining(",")))
-                                .collect(Collectors.joining(",")));
+                .map(pr -> pr.getRemoteUpdates().stream()
+                        .map(ru -> String.format("%s %s %s", ru.getStatus(), ru.getRemoteName(), ru.getMessage()))
+                        .collect(Collectors.joining(",")))
+                .collect(Collectors.joining(",")));
     }
-    
+
     protected void commit(Git git) throws NoHeadException, NoMessageException, UnmergedPathsException, ConcurrentRefUpdateException, WrongRepositoryStateException, AbortedByHookException, GitAPIException {
         git.add().addFilepattern(ALLFILESPATTERN).call();
         git.commit().setMessage("Test commit").call();
     }
+
+    protected void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
+        commit(git, provider, ref, true);
+    }
+
+    protected void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref, boolean createBranch) throws NoFilepatternException, GitAPIException {
+        git.checkout().setName(ref).setCreateBranch(createBranch).call();
+        commitAndPush(git, provider);
+    }
+
 
     protected void commitAndPush(Git git, UsernamePasswordCredentialsProvider provider) throws NoFilepatternException, GitAPIException {
         commit(git);
@@ -222,7 +231,9 @@ public abstract class BaseTest {
 
     protected void mkdirs(Path... paths) {
         for (Path p : paths) {
-            assertTrue(p.toFile().mkdirs());
+            if (!p.toFile().exists()) {
+                assertTrue(p.toFile().mkdirs());
+            }
         }
     }
 
@@ -232,11 +243,6 @@ public abstract class BaseTest {
 
     protected String baseEncode(String user, String password) {
         return Base64.getEncoder().encodeToString((user + ":" + password).getBytes(UTF_8));
-    }
-
-    protected void commit(Git git, UsernamePasswordCredentialsProvider provider, String ref) throws NoFilepatternException, GitAPIException {
-        git.checkout().setName(ref).setCreateBranch(true).call();
-        commitAndPush(git, provider);
     }
 
     public static Exception shutdownExecutor(final ExecutorService service) {

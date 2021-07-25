@@ -9,9 +9,9 @@ package io.jitstatic;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -65,7 +65,6 @@ import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import io.jitstatic.api.BulkResource;
 import io.jitstatic.api.CliResource;
 import io.jitstatic.api.JitstaticInfoResource;
 import io.jitstatic.api.KeyResource;
@@ -76,6 +75,9 @@ import io.jitstatic.auth.AdminConstraintSecurityHandler;
 import io.jitstatic.auth.UrlAwareBasicCredentialAuthFilter;
 import io.jitstatic.auth.User;
 import io.jitstatic.git.OverridingSystemReader;
+import io.jitstatic.hosted.HostedGitRepositoryManager;
+import io.jitstatic.hosted.InterceptingCrossOriginFilter;
+import io.jitstatic.hosted.LoginService;
 import io.jitstatic.injection.configuration.JitstaticConfiguration;
 import io.jitstatic.injection.configuration.hosted.HostedFactory;
 import io.jitstatic.injection.configuration.hosted.HostedFactory.Cors;
@@ -86,9 +88,6 @@ import io.jitstatic.injection.executors.RepoWriterAnnotation;
 import io.jitstatic.injection.executors.RepoWriterFactory;
 import io.jitstatic.injection.executors.WorkStealerAnnotation;
 import io.jitstatic.injection.executors.WorkStealerFactory;
-import io.jitstatic.hosted.HostedGitRepositoryManager;
-import io.jitstatic.hosted.InterceptingCrossOriginFilter;
-import io.jitstatic.hosted.LoginService;
 import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.source.Source;
 import io.jitstatic.storage.HashService;
@@ -147,7 +146,6 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         env.jersey().register(KeyResource.class);
         env.jersey().register(JitstaticInfoResource.class);
         env.jersey().register(MetaKeyResource.class);
-        env.jersey().register(BulkResource.class);
         env.jersey().register(UsersResource.class);
         env.jersey().register(CliResource.class);
 
