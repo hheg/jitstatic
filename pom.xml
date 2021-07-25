@@ -30,7 +30,7 @@
         <junit.vintage.version>5.5.2</junit.vintage.version>
         <junit.platform.version>1.5.2</junit.platform.version>
         <dockerfile-maven-version>1.4.10</dockerfile-maven-version>
-        <http.client.version>4.5.10</http.client.version>
+        <http.client.version>4.5.13</http.client.version>
         <awaitility.version>4.0.1</awaitility.version>
     </properties>
     <licenses>
