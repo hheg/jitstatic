@@ -9,9 +9,9 @@ package io.jitstatic.storage;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -152,7 +153,9 @@ public class KeyStorageTest extends BaseTest {
     @Test
     public void testGetARootKey() throws Throwable {
         try (KeyStorage ks = new KeyStorage(source, null, hashService, clusterService, "root", defaultExecutor, workStealer, registry)) {
-            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.getKey("root/", null)).getCause().getClass());
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> {
+                throw assertThrows(ExecutionException.class, () -> ks.getKey("root/", null).get()).getCause();
+            }).getCause().getClass());
             ks.checkHealth();
         }
     }
@@ -169,7 +172,10 @@ public class KeyStorageTest extends BaseTest {
             when(si.getMetadataInputStream()).thenReturn(mtest1).thenReturn(mtest2);
             when(source.getSourceInfo(eq("root/"), anyString())).thenReturn(si);
             when(source.getSourceInfo(eq("root"), anyString())).thenReturn(null);
-            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> ks.getKey("root/", null)).getCause().getClass());
+            assertEquals(UnsupportedOperationException.class, assertThrows(WrappingAPIException.class, () -> {
+                throw assertThrows(ExecutionException.class, () -> ks
+                        .getKey("root/", null).get()).getCause();
+            }).getCause().getClass());
             assertTrue(ks.getMetaKey("root/", null).get().isPresent());
 
             MetaData sd = new MetaData("text/plain", false, false, List.of(), Set.of(), Set.of());

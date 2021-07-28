@@ -9,9 +9,9 @@ package io.jitstatic;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,20 +21,22 @@ package io.jitstatic;
  */
 
 import static io.jitstatic.JitStaticConstants.GIT_FORCEPUSH;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
-import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.GIT_PULL;
 import static io.jitstatic.JitStaticConstants.GIT_PUSH;
 import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYADMIN_REALM;
+import static io.jitstatic.JitStaticConstants.JITSTATIC_KEYUSER_REALM;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -45,7 +47,6 @@ import java.util.stream.Collectors;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.glassfish.jersey.internal.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -258,9 +259,9 @@ public class CorsIT extends BaseTest {
     }
 
     @Test
-    public void testSimpleRequestPost() throws UnirestException, JsonProcessingException {
+    public void testSimpleRequestPost() throws UnirestException, JsonProcessingException, UnsupportedEncodingException {
         Map<String, String> headers = Map.of("Origin", "http://localhost", "Content-Type", "application/json", "Authorization", "Basic "
-                + Base64.encodeAsString(KEYADMINUSER + ":" + KEYADMINUSERPASS));
+                + Base64.getEncoder().encodeToString((KEYADMINUSER + ":" + KEYADMINUSERPASS).getBytes("UTF-8")));
         HttpResponse<String> response = Unirest.post(String.format("http://localhost:%s/application/storage/file3", DW.getLocalPort())).headers(headers)
                 .body(MAPPER.writeValueAsBytes(new AddKeyData(ObjectStreamProvider
                         .toProvider(new byte[] { 0 }), new io.jitstatic.MetaData(Set.of(new Role("read")), Set.of(new Role("read"))), "msg", "ui", "um")))

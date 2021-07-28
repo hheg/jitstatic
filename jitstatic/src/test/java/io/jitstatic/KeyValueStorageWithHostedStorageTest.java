@@ -1,5 +1,7 @@
 package io.jitstatic;
 
+import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
+
 /*-
  * #%L
  * jitstatic
@@ -9,9 +11,9 @@ package io.jitstatic;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,11 +23,11 @@ package io.jitstatic;
  */
 
 import static io.jitstatic.JitStaticConstants.JITSTATIC_GIT_REALM;
-import static io.jitstatic.JitStaticConstants.GIT_SECRETS;
 import static io.jitstatic.JitStaticConstants.USERS;
 import static io.jitstatic.source.ObjectStreamProvider.toByte;
 import static org.eclipse.jetty.http.HttpStatus.BAD_REQUEST_400;
 import static org.eclipse.jetty.http.HttpStatus.FORBIDDEN_403;
+import static org.eclipse.jetty.http.HttpStatus.METHOD_NOT_ALLOWED_405;
 import static org.eclipse.jetty.http.HttpStatus.NOT_FOUND_404;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -569,13 +571,13 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
         try (JitStaticClient client = buildClient(DW.getLocalPort()).setUser(user).setPassword(pass).build()) {
             final String key = USERS + "/" + JITSTATIC_GIT_REALM + "/user";
             assertEquals(NOT_FOUND_404, assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class))).getStatusCode());
-            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> client
+            assertEquals(METHOD_NOT_ALLOWED_405, assertThrows(APIException.class, () -> client
                     .createKey(getData()
                             .getBytes(UTF_8), new CommitData(key, "msg", "info", "mail"), new MetaData(APPLICATION_JSON, false, false, roleOf("read"), roleOf("write"))))
                                     .getStatusCode());
             assertThrows(APIException.class, () -> client.getKey(key, parse(JsonNode.class)));
             assertThrows(APIException.class, () -> client.getKey(key, GIT_SECRETS, parse(JsonNode.class)));
-            assertEquals(FORBIDDEN_403, assertThrows(APIException.class, () -> {
+            assertEquals(METHOD_NOT_ALLOWED_405, assertThrows(APIException.class, () -> {
                 client.createKey(getData()
                         .getBytes(UTF_8), new CommitData(key, GIT_SECRETS, "msg", "info", "mail"), new MetaData(APPLICATION_JSON, false, false, roleOf("read"), roleOf("write")));
             }).getStatusCode());
@@ -598,6 +600,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
         assertEquals(HttpStatus.FORBIDDEN_403, blocked.getStatus());
     }
 
+    @Override
     protected File getFolderFile() throws IOException { return tmpfolder.createTemporaryDirectory(); }
 
     private void writeFile(Path workBase, String file) throws IOException {

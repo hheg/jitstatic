@@ -125,21 +125,31 @@ public class JitstaticApplication extends Application<JitstaticConfiguration> {
         registerCustomDeserializer(env, hostedFactory);
 
         env.jersey().register(new AbstractBinder() {
+
+            boolean loaded = false;
+
             @Override
             protected void configure() {
-                bindFactory(DefaultExecutorFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class)
-                        .qualifiedBy(DefaultExecutorAnnotation.INSTANCE);
-                bindFactory(RepoWriterFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class).qualifiedBy(RepoWriterAnnotation.INSTANCE);
-                bindFactory(WorkStealerFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class).qualifiedBy(WorkStealerAnnotation.INSTANCE);
+                // This binder is called twice...
+                if (!loaded) {
+                    bindFactory(DefaultExecutorFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class)
+                            .qualifiedBy(DefaultExecutorAnnotation.INSTANCE);
+                    bindFactory(RepoWriterFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class)
+                            .qualifiedBy(RepoWriterAnnotation.INSTANCE);
+                    bindFactory(WorkStealerFactory.class, Singleton.class).to(Factory.class).to(ExecutorService.class)
+                            .qualifiedBy(WorkStealerAnnotation.INSTANCE);
 
-                bind(HashService.class).to(HashService.class).in(Singleton.class);
-                bind(LocalRefLockService.class).to(RefLockService.class).in(Singleton.class);
-                bind(HostedGitRepositoryManager.class).to(Source.class).to(InjectableManaged.class).to(InjectableHealthCheck.class).in(Singleton.class);
-                bind(KeyStorage.class).to(Storage.class).to(InjectableManaged.class).to(InjectableHealthCheck.class).in(Singleton.class);
-                bind(GitServletHook.class).to(GitServletHook.class).to(InjectableManaged.class).in(Singleton.class);
-                bind(LoginServiceHook.class).to(LoginServiceHook.class).to(InjectableManaged.class).in(Singleton.class);
+                    bind(HashService.class).to(HashService.class).in(Singleton.class);
+                    bind(LocalRefLockService.class).to(RefLockService.class).in(Singleton.class);
+                    bind(HostedGitRepositoryManager.class).to(Source.class).to(InjectableManaged.class).to(InjectableHealthCheck.class).in(Singleton.class);
+                    bind(KeyStorage.class).to(Storage.class).to(InjectableManaged.class).to(InjectableHealthCheck.class).in(Singleton.class);
+                    bind(GitServletHook.class).to(GitServletHook.class).to(InjectableManaged.class).in(Singleton.class);
+                    bind(LoginServiceHook.class).to(LoginServiceHook.class).to(InjectableManaged.class).in(Singleton.class);
+                    loaded = true;
+                }
             }
         });
+
         env.jersey().register(new AuthDynamicFeature(UrlAwareBasicCredentialAuthFilter.class));
         env.jersey().register(new AuthValueFactoryProvider.Binder<>(User.class));
 
