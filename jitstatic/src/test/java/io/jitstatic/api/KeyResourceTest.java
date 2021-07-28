@@ -9,9 +9,9 @@ package io.jitstatic.api;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -619,7 +619,7 @@ public class KeyResourceTest {
 
     @Test
     public void testAddRootKey() throws RefNotFoundException {
-        when(storage.getKey(anyString(), anyString())).thenThrow(new WrappingAPIException(new UnsupportedOperationException("test/")));
+        when(storage.getKey(anyString(), anyString())).thenReturn(CompletableFuture.failedFuture(new WrappingAPIException(new UnsupportedOperationException("test/"))));
         AddKeyData addKeyData = new AddKeyData(toProvider(new byte[] { 1 }), new MetaData(null, false, false, List.of(), Set.of(new Role("read")), Set
                 .of(new Role("write"))), "testmessage", "user", "test@test.com");
         Response response = RESOURCES.target("/storage/test/")
@@ -745,7 +745,8 @@ public class KeyResourceTest {
     }
 
     @Test
-    public void testPutOnMasterMetaKeyShouldFail() {
+    public void testPutOnMasterMetaKeyShouldFail() throws RefNotFoundException {
+        when(storage.getKey(anyString(), anyString())).thenReturn(CompletableFuture.failedFuture(new WrappingAPIException(new UnsupportedOperationException("dog/"))));
         byte[] readTree = "{\"food\" : [\"treats\",\"steak\"]}".getBytes(UTF_8);
         ModifyKeyData data = new ModifyKeyData(toProvider(readTree), "message", "user", "mail");
         Response response = RESOURCES.target("/storage/dog/").request()

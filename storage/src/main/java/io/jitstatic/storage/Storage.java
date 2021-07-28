@@ -9,9 +9,9 @@ package io.jitstatic.storage;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,8 +23,6 @@ package io.jitstatic.storage;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-
-import javax.inject.Named;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.jvnet.hk2.annotations.Contract;
@@ -41,11 +39,11 @@ import io.jitstatic.source.ObjectStreamProvider;
 import io.jitstatic.utils.Pair;
 import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-@Named("storagechecker")
 @Contract
 public interface Storage extends AutoCloseable, CheckHealth, InjectableManaged {
     public CompletableFuture<Optional<StoreInfo>> getKey(String key, String ref) throws RefNotFoundException;
 
+    @Override
     public void close();
 
     public CompletableFuture<Either<String, FailedToLock>> updateKey(String key, String ref, ObjectStreamProvider data, String version,

@@ -46,7 +46,6 @@ import io.jitstatic.utils.Functions.ThrowingSupplier;
 import io.jitstatic.utils.Pair;
 import zone.dragon.dropwizard.lifecycle.InjectableManaged;
 
-@Named("sourcechecker")
 @Contract
 public interface Source extends AutoCloseable, CheckHealth, InjectableManaged {
     public void close();

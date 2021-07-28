@@ -150,7 +150,7 @@ public class KeyStorage extends InjectableHealthCheck implements Storage, Reload
     @Override
     public CompletableFuture<Optional<StoreInfo>> getKey(final String key, final String ref) throws RefNotFoundException {
         if (key.endsWith("/")) {
-            throw new WrappingAPIException(new UnsupportedOperationException(key));
+            return CompletableFuture.failedFuture(new WrappingAPIException(new UnsupportedOperationException(key)));
         }
         return getKeyDirect(key, ref);
     }
