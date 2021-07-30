@@ -61,6 +61,6 @@ public class SourceJSONParserTest {
             try (InputStream bc = new ByteArrayInputStream("{\"users\":[{\"password\":\"1234\"}],\"read\":[{\"role\":\"read\"}],\"write\":[{\"role\":\"write\"}]}}".getBytes(StandardCharsets.UTF_8.name()))) {
                 p.parseMetaData(bc);
             }
-        }).getLocalizedMessage(), CoreMatchers.containsString("Error: property=users[].user, message=may not be empty, invalidValue=null"));
+        }).getLocalizedMessage(), CoreMatchers.containsString("Error: property=users[].user, message=must not be blank, invalidValue=null"));
     }
 }

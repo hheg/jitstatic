@@ -259,7 +259,7 @@ public class KeyValueStorageWithHostedStorageTest extends BaseTest {
                             .of(new User("", "1234")), APPLICATION_JSON)));
             assertEquals(HttpStatus.UNPROCESSABLE_ENTITY_422, apiException.getStatusCode());
             assertThat(apiException.getMessage(), CoreMatchers.containsString("metaData.users Users in metadata will be ignored"));
-            assertThat(apiException.getMessage(), CoreMatchers.containsString("metaData.users[].user may not be empty"));
+            assertThat(apiException.getMessage(), CoreMatchers.containsString("metaData.users[].user must not be blank"));
         }
     }
 
