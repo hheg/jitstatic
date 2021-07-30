@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.utils.VersionIsNotSame;
-import io.jitstatic.utils.WrappingAPIException;
 
 public class WrappingAPIExceptionTest {
 

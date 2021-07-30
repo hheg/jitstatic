@@ -27,8 +27,6 @@ import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.utils.LinkedException;
-
 public class LinkedExceptionTest {
 
     @Test

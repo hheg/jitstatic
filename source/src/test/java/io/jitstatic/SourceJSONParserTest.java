@@ -35,8 +35,6 @@ import java.nio.charset.StandardCharsets;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.SourceJSONParser;
-
 public class SourceJSONParserTest {
 
     private final SourceJSONParser p = new SourceJSONParser();

@@ -28,7 +28,6 @@ import java.util.Set;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.UpdateFailedException;
 import io.jitstatic.check.MetaDataFileIsMissingSourceFile;
 import io.jitstatic.hosted.FailedToLock;
 import io.jitstatic.hosted.LoadException;

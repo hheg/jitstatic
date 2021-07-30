@@ -50,7 +50,6 @@ import org.eclipse.jetty.util.security.Password;
 import org.junit.jupiter.api.Test;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jitstatic.hosted.LoginService;
 
 @SuppressFBWarnings(value = { "NP_NULL_PARAM_DEREF_NONVIRTUAL", "DM_STRING_CTOR" }, justification = "Testing explicitly for this")
 public class LoginServiceTest {

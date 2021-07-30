@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 
-import io.jitstatic.version.ProjectVersion;
 import org.junit.jupiter.api.Test;
 
 public class ProjectVersionTest {

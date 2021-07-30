@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.jitstatic.auth.User;
 
 @SuppressFBWarnings(value = { "DM_STRING_CTOR" }, justification = "Not testing for reference equality")
 public class UserTest {

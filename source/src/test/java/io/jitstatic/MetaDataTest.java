@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.jitstatic.MetaData;
 import io.jitstatic.auth.User;
 
 public class MetaDataTest {

@@ -24,7 +24,7 @@ import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.hibernate.validator.constraints.NotBlank;
+import javax.validation.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
