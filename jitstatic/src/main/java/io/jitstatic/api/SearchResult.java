@@ -1,7 +1,5 @@
 package io.jitstatic.api;
 
-import org.hibernate.validator.constraints.NotBlank;
-
 /*-
  * #%L
  * jitstatic
@@ -21,6 +19,8 @@ import org.hibernate.validator.constraints.NotBlank;
  * limitations under the License.
  * #L%
  */
+
+import javax.validation.constraints.NotBlank;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -28,8 +28,6 @@ import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
-import io.jitstatic.utils.ErrorConsumingThreadFactory;
-
 public class ErrorConssumingThreadFactoryTest {
 
 	@Test

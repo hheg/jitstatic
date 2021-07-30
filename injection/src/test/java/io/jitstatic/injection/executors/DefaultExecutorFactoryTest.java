@@ -31,8 +31,6 @@ import org.junit.jupiter.api.Test;
 
 import com.codahale.metrics.MetricRegistry;
 
-import io.jitstatic.injection.executors.DefaultExecutorFactory;
-
 public class DefaultExecutorFactoryTest {
     @Test
     public void testRegistration() {

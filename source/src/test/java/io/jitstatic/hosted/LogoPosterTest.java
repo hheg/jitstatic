@@ -33,8 +33,6 @@ import org.eclipse.jgit.transport.UploadPack;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import io.jitstatic.hosted.LogoPoster;
-
 public class LogoPosterTest {
 
     private final ReceivePack rp = mock(ReceivePack.class);

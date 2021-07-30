@@ -27,7 +27,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
-import io.jitstatic.api.JitstaticInfoResource;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class JitstaticInfoResourceTest {

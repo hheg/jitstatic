@@ -25,7 +25,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.function.Function;
 
-import javax.inject.Named;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.api.errors.RefNotFoundException;

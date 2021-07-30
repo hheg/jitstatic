@@ -28,8 +28,6 @@ import org.junit.jupiter.api.Test;
 
 import com.codahale.metrics.MetricRegistry;
 
-import io.jitstatic.injection.executors.WorkStealerFactory;
-
 class WorkStealerFactoryTest {
 
     @Test
