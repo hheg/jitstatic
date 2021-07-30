@@ -75,7 +75,7 @@ class APIHelper {
             } else if (apiException instanceof RefNotFoundException) {
                 return new WebApplicationException(apiException.getMessage(), Status.BAD_REQUEST).getResponse();
             } else if (apiException instanceof UnsupportedOperationException) {
-                return new WebApplicationException(Status.METHOD_NOT_ALLOWED).getResponse();
+                return new WebApplicationException(apiException.getMessage(), Status.METHOD_NOT_ALLOWED).getResponse();
             } else if (apiException instanceof IOException) {
                 log.error("IO Error while executing command", e);
                 return new WebApplicationException("Data is malformed", 422).getResponse();
