@@ -19,7 +19,7 @@
         <dropwizard.version>2.0.23</dropwizard.version>
         <dropwizard.hk2.version>2.1.1</dropwizard.hk2.version>
         <hk2.version>2.6.1</hk2.version>
-        <jgit.version>5.5.1.201910021850-r</jgit.version>
+        <jgit.version>6.6.1.202309021850-r</jgit.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.fileEncoding>UTF-8</project.build.fileEncoding>
         <maven.compiler.release>11</maven.compiler.release>
